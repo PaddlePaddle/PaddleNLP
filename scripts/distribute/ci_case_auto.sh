@@ -542,17 +542,9 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
             ips=-1
             mem=-1
             echo "use_fused_rms_norm=$use_fused_rms_norm  use_fast_layer_norm=$use_fast_layer_norm  result: loss=$loss ips=$ips mem=$mem"
-            if [ "$use_fast_layer_norm" -eq 1 ]; then
-                loss_base=9.0000000
-            else
-                loss_base=9.3513937
-            fi
+            loss_base=9.3513937
             if [ $IS_A100 -ne 0 ];then
-                if [ "$use_fast_layer_norm" -eq 1 ]; then
-                    loss_base=9.11111111
-                else
-                    loss_base=9.39356422
-                fi
+                loss_base=9.39356422
             fi
             ips_base=-1
             mem_base=-1
