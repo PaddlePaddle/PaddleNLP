@@ -51,7 +51,7 @@ jobs:
           git fetch origin pull/${PR_ID}/head:test && git checkout test
           git remote add upstream https://github.com/PaddlePaddle/PaddleNLP.git
           git fetch upstream ${BRANCH}
-          git merge upstream/${BRANCH}
+          git merge ${BRANCH}
           git diff --numstat upstream/${BRANCH} |awk '{print $NF}'
           git log --pretty=oneline -10
       
