@@ -24,6 +24,13 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 
 import numpy as np
+from paddle.distributed.fleet import fleet
+from paddle.distributed.fleet.utils.hybrid_parallel_util import (
+    fused_allreduce_gradients_with_group,
+)
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+    is_sequence_parallel_parameter,
+)
 from tqdm.auto import tqdm
 
 from paddlenlp.utils.log import logger
@@ -609,3 +616,29 @@ class EarlyStoppingCallback(TrainerCallback):
         self.check_metric_value(args, state, control, metric_value)
         if self.early_stopping_patience_counter >= self.early_stopping_patience:
             control.should_training_stop = True
+
+
+class SPGradSyncCallback(TrainerCallback):
+    """
+    SPGradSyncCallback
+    只能在非 sharding stage2 的情况下使用。
+    开启sharding stage2 时，在 `on_optimizer_begin` 的时候 grad 已经被清空了
+    """
+
+    def __init__(self, model):
+        assert hasattr(fleet, "_hcg"), "must use MP when calling this Callback"
+        logger.info("using sp callback")
+        params = []
+        self.model = model
+        for n, p in model.named_parameters():
+            if is_sequence_parallel_parameter(p):
+                logger.info(f"register bw hook for:{n}")
+                params.append(p)
+        logger.info(f"#-sp-sync param:{len(params)}")
+        self._sp_params = params
+
+    def on_optimizer_begin(self, args, state, control, **kwargs):
+        """on_optimizer_begin"""
+        if self._sp_params:
+            mp_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
+            fused_allreduce_gradients_with_group(self._sp_params, group=mp_group, scale=1.0)  # sum not mean

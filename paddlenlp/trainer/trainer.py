@@ -138,6 +138,7 @@ from .trainer_callback import (
     DefaultFlowCallback,
     PrinterCallback,
     ProgressCallback,
+    SPGradSyncCallback,
     TrainerCallback,
     TrainerControl,
     TrainerState,
@@ -2182,11 +2183,6 @@ class Trainer:
             else:
                 model, self.optimizer = decorated
 
-        if self.args.tensor_parallel_degree > 1 and self.args.sequence_parallel:
-            register_sequence_parallel_allreduce_hooks(
-                model, self.args.gradient_accumulation_steps, self.args.fuse_sequence_parallel_allreduce
-            )
-
         if self.args.world_size == 1:
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
@@ -2374,6 +2370,17 @@ class Trainer:
                     and "enable_stage1_broadcast_overlap" in self.args.sharding_parallel_config
                 ):
                     self.optimizer._set_broadcast_overlap(True, model)
+
+        # use callback for sp grad sync in case of unexpected behaviour (except sharding stage 2&3)
+        if self.args.tensor_parallel_degree > 1 and self.args.sequence_parallel:
+            if ShardingOption.SHARD_GRAD_OP in self.args.sharding or ShardingOption.FULL_SHARD in self.args.sharding:
+                register_sequence_parallel_allreduce_hooks(
+                    unwrap_model(model),
+                    self.args.gradient_accumulation_steps,
+                    self.args.fuse_sequence_parallel_allreduce,
+                )
+            else:
+                self.add_callback(SPGradSyncCallback(model._layers))
 
         return model
 
