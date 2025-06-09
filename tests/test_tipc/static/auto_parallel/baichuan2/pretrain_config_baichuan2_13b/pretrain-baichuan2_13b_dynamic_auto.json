@@ -46,7 +46,7 @@
     "use_fused_rope": true,
     "use_fused_rms_norm": true,
     "max_seq_length": 4096,
-    "sequence_parallel": true,
+    "sequence_parallel": 0,
     "sharding": "stage1",
     "sharding_parallel_degree": 8,
     "sharding_parallel_config": "enable_tensor_fusion enable_overlap",
