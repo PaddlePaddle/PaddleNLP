@@ -15,7 +15,7 @@ import json
 import math
 import os
 import shutil
-from multiprocessing import Process
+from multiprocessing import Process, Queue
 
 import numpy as np
 import paddle
@@ -54,6 +54,11 @@ SPARSIFY_MERGE_MAPPING = {
 }
 
 
+def run_merge_in_process(merger_obj, base_index, shard_file, lora_config, file_type_list, key_list, q):
+    remove_nbytes = merger_obj.shard_lora_merge(base_index, shard_file, lora_config, file_type_list, key_list)
+    q.put(remove_nbytes)
+
+
 class MergeModel:
     def __init__(self, merge_config):
         self.reset_merge_model(merge_config=merge_config)
@@ -82,6 +87,7 @@ class MergeModel:
         # init merge method
         sparsify_method = SparsifyMethod(self.merge_config)
         self.merge_method = MergeMethod(merge_config, sparsify_method)
+        self.remove_keys = getattr(merge_config, "remove_keys", [])
 
     def merge_model(self):
         if self.merge_config.lora_model_path is not None:
@@ -103,7 +109,10 @@ class MergeModel:
             else:
                 src_path = self.merge_config.model_path_list[0]
             for file in self.merge_config.copy_file_list:
-                src_file = os.path.join(src_path, file)
+                if file == "config.json":
+                    src_file = os.path.join(self.merge_config.lora_model_path, file)
+                else:
+                    src_file = os.path.join(src_path, file)
                 dst_file = os.path.join(self.merge_config.output_path, file)
                 if os.path.isfile(src_file):
                     shutil.copy2(src_file, dst_file)
@@ -235,7 +244,7 @@ class MergeModel:
             logger.info(f"Model index file saved in {save_index_file}.")
             self.merge_config.save_pretrained(self.merge_config.output_path)
 
-    def get_model_state_dict(self, model_path, file_type, key_list=None, file=None):
+    def get_model_state_dict(self, model_path, file_type, key_list=None, file=None, need_remove=False):
         if file_type == "safetensors":
             state_dict = {}
             with open(os.path.join(model_path, self.safe_index_name()), "r", encoding="utf-8") as f:
@@ -284,6 +293,14 @@ class MergeModel:
                         state_dict[k] = f.get_tensor(k)
         else:
             raise ValueError(f"Unsupported file_type: {file_type}")
+
+        if need_remove:
+            remove_nbytes = 0
+            for k in list(state_dict.keys()):
+                if k in self.remove_keys:
+                    tensor = state_dict.pop(k)
+                    remove_nbytes += int(np.prod(tensor.shape) * self.numpy_dtype_map[str(tensor.dtype)])
+            return state_dict, remove_nbytes
         return state_dict
 
     def get_safetensor_index(self, model_path, file_type):
@@ -557,8 +574,12 @@ class MergeModel:
         merge_state_dict = {}
         lora_state_dict = self.get_model_state_dict(self.merge_config.lora_model_path, file_type_list[0])
         logger.info("Load LoRA weight successfully.")
-        base_state_dict = self.get_model_state_dict(
-            self.merge_config.base_model_path, file_type_list[1], key_list=key_list, file=file
+        base_state_dict, remove_nbytes = self.get_model_state_dict(
+            self.merge_config.base_model_path,
+            file_type_list[1],
+            key_list=key_list,
+            file=file,
+            need_remove=True,
         )
         logger.info("Load model weight successfully.")
         if not lora_config.rslora:
@@ -600,6 +621,7 @@ class MergeModel:
             metadata={"format": "np"},
         )
         logger.info(f"Model weights saved in {save_file_name}.")
+        return remove_nbytes
 
     def merge_safetensor_lora_model(self, file_type_list):
         # Load index
@@ -613,45 +635,66 @@ class MergeModel:
         index["weight_map"] = {}
 
         # LoRA Merge
-        key_list = list(base_index["weight_map"].keys())
+        old_key_list = list(base_index["weight_map"].keys())
+        key_list = [k for k in old_key_list if k not in self.remove_keys]
+        total_remove_nbytes = 0
         if not self.is_cpu:
             rank = dist.get_rank()
             file_list = sorted(list(set(base_index["weight_map"].values())))
+
             if file_type_list[-1] == "safetensors" and len(file_list) >= dist.get_world_size():
                 positions = divide_positions(len(file_list), dist.get_world_size())
                 logger.info(f"Merging file list: {file_list[positions[rank] : positions[rank + 1]]}")
                 for shard_file in file_list[positions[rank] : positions[rank + 1]]:
                     logger.info(f"Start merging tensor in {shard_file}")
-                    self.shard_lora_merge(base_index, shard_file, lora_config, file_type_list, file=shard_file)
+                    remove_nbytes = self.shard_lora_merge(
+                        base_index, shard_file, lora_config, file_type_list, file=shard_file
+                    )
+                    total_remove_nbytes += remove_nbytes
                 index["weight_map"] = base_index["weight_map"]
+                for k in list(index["weight_map"].keys()):
+                    if k in self.remove_keys:
+                        del index["weight_map"][k]
             else:
                 divided_key_list = divide_lora_key_list(key_list, dist.get_world_size(), lora_config)
                 local_keys = divided_key_list[rank]
                 shard_file = (
                     f"{self.merge_config.merge_prefix}-{rank+1:05d}-of-{dist.get_world_size():05d}.safetensors"
                 )
-                self.shard_lora_merge(base_index, shard_file, lora_config, file_type_list, key_list=local_keys)
+                remove_nbytes = self.shard_lora_merge(
+                    base_index, shard_file, lora_config, file_type_list, key_list=local_keys
+                )
+                total_remove_nbytes += remove_nbytes
                 for i in range(len(divided_key_list)):
                     shard_file = (
                         f"{self.merge_config.merge_prefix}-{i+1:05d}-of-{dist.get_world_size():05d}.safetensors"
                     )
                     for k in divided_key_list[i]:
                         index["weight_map"][k] = shard_file
+
+            # update total_remove_nbytes in main process
+            total_remove_nbytes_tensor = paddle.to_tensor(total_remove_nbytes)
+            if dist.get_world_size() > 1:
+                dist.reduce(total_remove_nbytes_tensor, dst=0)  # op=ReduceOp.SUM
+            total_remove_nbytes = total_remove_nbytes_tensor.item()
         else:
             divided_key_list = divide_lora_key_list(key_list, self.merge_config.n_process, lora_config)
             threads = []
+            queue = Queue()
             for i in range(len(divided_key_list)):
                 shard_file = (
                     f"{self.merge_config.merge_prefix}-{i+1:05d}-of-{self.merge_config.n_process:05d}.safetensors"
                 )
                 t = Process(
-                    target=self.shard_lora_merge,
+                    target=run_merge_in_process,
                     args=(
+                        self,
                         base_index,  # base index
                         shard_file,  # shard_file name
                         lora_config,
                         file_type_list,
                         divided_key_list[i],  # key_list
+                        queue,
                     ),
                 )
                 threads.append(t)
@@ -663,8 +706,12 @@ class MergeModel:
             for t in threads:
                 t.join()
 
+            while not queue.empty():
+                total_remove_nbytes += queue.get()
+
         # Save safe index file
         if paddle.distributed.get_rank() == 0:
+            index["metadata"]["total_size"] -= total_remove_nbytes
             save_index_file = os.path.join(self.merge_config.output_path, self.safe_index_name())
             with open(save_index_file, "w", encoding="utf-8") as f:
                 f.write(json.dumps(index, indent=2) + "\n")
@@ -675,7 +722,11 @@ class MergeModel:
         # Load & check state dict
         lora_state_dict = self.get_model_state_dict(self.merge_config.lora_model_path, file_type_list[0])
         logger.info("Load LoRA weight successfully.")
-        base_state_dict = self.get_model_state_dict(self.merge_config.base_model_path, file_type_list[1])
+        base_state_dict, remove_nbytes = self.get_model_state_dict(
+            self.merge_config.base_model_path,
+            file_type_list[1],
+            need_remove=True,
+        )
         logger.info("Load model weight successfully.")
         for key in lora_state_dict.keys():
             if "lora_A" in key:

@@ -140,12 +140,14 @@ std::vector<paddle::Tensor> preprocess_for_moe_kernel(const paddle::Tensor& topk
     
     if (num_experts == 8) {
       run_align_kernel(8);
+    } else if (num_experts == 64) {
+      run_align_kernel(64);
     } else if (num_experts == 256) {
       run_align_kernel(256);
     } else if (num_experts == 2) {
       run_align_kernel(2);
     } else {
-      printf("errors");
+      printf("【ERROR】, please add the current number of experts in the case");
     }
 
     const int block_threads = 256;
