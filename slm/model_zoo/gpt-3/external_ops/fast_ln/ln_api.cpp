@@ -253,12 +253,10 @@ std::vector<paddle::Tensor> RMSLnFwd(const paddle::Tensor &x,
   auto sizes = x.shape();
   PD_CHECK(sizes.size() >= 2);
 
-  int rows = 1;
-  for (size_t i = 0; i + 1 < sizes.size(); ++i) {
-    rows *= sizes[i];
-  }
+  std::vector<int> row_sizes(sizes.begin(), sizes.begin() + sizes.size() - 1);
 
   const int cols = sizes[sizes.size() - 1];
+  const int rows = x.numel() / cols;
   auto hidden_size = scale.numel();
 
   PD_CHECK(hidden_size == cols);
@@ -267,7 +265,7 @@ std::vector<paddle::Tensor> RMSLnFwd(const paddle::Tensor &x,
   auto place = x.place();
 
   auto y = paddle::empty(sizes, output_type, place);
-  auto invvar = paddle::empty({rows}, compute_type, place);
+  auto invvar = paddle::empty({row_sizes}, compute_type, place);
 
   LaunchNormFwd(x.stream(),
                 place,
@@ -491,11 +489,8 @@ std::vector<std::vector<int64_t>> RMSLnFwdInferShape(
     std::vector<int64_t> x_shape,
     std::vector<int64_t> scale_shape,
     float epsilon) {
-  int64_t rows = 1;
-  for (size_t i = 0; i + 1 < x_shape.size(); ++i) {
-    rows *= x_shape[i];
-  }
-  return {x_shape, {rows}};
+  std::vector<int64_t> row_shape(x_shape.begin(), x_shape.begin() + x_shape.size() - 1);
+  return {x_shape, row_shape};
 }
 
 std::vector<paddle::DataType> LnFwdInferDtype(paddle::DataType x_dtype,
@@ -566,11 +561,19 @@ PD_BUILD_OP(fast_rms_norm)
     .Attrs({"epsilon: float"})
     .SetKernelFn(PD_KERNEL(RMSLnFwd))
     .SetInferShapeFn(PD_INFER_SHAPE(RMSLnFwdInferShape))
-    .SetInferDtypeFn(PD_INFER_DTYPE(RMSLnFwdInferDtype));
+    .SetInferDtypeFn(PD_INFER_DTYPE(RMSLnFwdInferDtype))
+#ifdef CUSTOM_OP_WITH_SPMD
+    .SetInferSpmdFn(PD_INFER_SPMD_RULE(phi::distributed::RmsNormInferSpmd))
+#endif
+;
 
 PD_BUILD_GRAD_OP(fast_rms_norm)
     .Inputs({"x", "scale", "invvar", paddle::Grad("y")})
     .Outputs({paddle::Grad("x"), paddle::Grad("scale")})
     .Attrs({"epsilon: float"})
     .SetKernelFn(PD_KERNEL(RMSLnBwd))
-    .SetInferShapeFn(PD_INFER_SHAPE(RMSLnBwdInferShape));
+    .SetInferShapeFn(PD_INFER_SHAPE(RMSLnBwdInferShape))
+#ifdef CUSTOM_OP_WITH_SPMD
+    .SetInferSpmdFn(PD_INFER_SPMD_RULE(phi::distributed::RmsNormGradInferSpmd))
+#endif
+;
