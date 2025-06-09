@@ -14,6 +14,7 @@
 # import inspect
 import json
 import logging
+import math
 import os
 import sys
 from functools import partial
@@ -76,6 +77,7 @@ from paddlenlp.trl.llm_utils import (
     init_chat_template,
 )
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.optimizer import AdamWLoRAPro
 from paddlenlp.utils.tools import get_env_device
 
 # Fine-tune Environment Variables to support sharding stage1 overlap optimization.
@@ -164,6 +166,13 @@ def main():
         qlora_weight_blocksize=model_args.qlora_weight_blocksize,
         qlora_weight_double_quant=model_args.qlora_weight_double_quant,
         qlora_weight_double_quant_block_size=model_args.qlora_weight_double_quant_block_size,
+        apply_hadamard=model_args.apply_hadamard,
+        hadamard_block_size=model_args.hadamard_block_size,
+        quant_input_grad=model_args.quant_input_grad,
+        quant_weight_grad=model_args.quant_weight_grad,
+        apply_online_actscale_step=model_args.apply_online_actscale_step,
+        actscale_moving_rate=model_args.actscale_moving_rate,
+        fp8_format_type=model_args.fp8_format_type,
     )
 
     model_config = AutoConfig.from_pretrained(
@@ -445,8 +454,19 @@ def main():
         gen_args=gen_args,
         data_args=data_args,
     )
-    trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
+    trainable_parameters = [
+        p for p in model.parameters() if not p.stop_gradient or ("quantization_linear" in p.name and "w_1" in p.name)
+    ]
     trainer.set_optimizer_grouped_parameters(trainable_parameters)
+    if model_args.lorapro:
+        optimizer = AdamWLoRAPro(
+            learning_rate=training_args.learning_rate,
+            parameters=trainable_parameters,
+            weight_decay=training_args.weight_decay,
+            scaling_factor=model_args.lorapro_scaling_factor,
+            x_mode=model_args.lorapro_x_mode,
+        )
+        trainer.optimizer = optimizer
 
     # Train
     if training_args.do_train:
@@ -560,7 +580,13 @@ def create_peft_model(model_args, reft_args, training_args, dtype, model_config,
                 use_quick_lora=model_args.use_quick_lora,
                 lora_use_mixer=model_args.lora_use_mixer,
                 use_mora=model_args.use_mora,
+                lorapro=model_args.lorapro,
             )
+            if model_args.lorapro:
+                if model_args.rslora:
+                    model_args.lorapro_scaling_factor = lora_config.lora_alpha / math.sqrt(lora_config.r)
+                else:
+                    model_args.lorapro_scaling_factor = lora_config.lora_alpha / lora_config.r
             model = LoRAModel(model, lora_config)
         else:
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)

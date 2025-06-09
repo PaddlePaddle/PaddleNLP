@@ -94,7 +94,7 @@ def offline_ann(index_name, doc_dir):
             query_type="image",
             document_embedding_models={"text": args.document_embedding_model},
         )
-    # Writing docs may take a while. so waitting until writing docs to be completed.
+    # Writing docs may take a while. so waiting until writing docs to be completed.
     document_count = document_store.get_document_count()
     while document_count == 0:
         time.sleep(1)

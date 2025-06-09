@@ -112,7 +112,7 @@ if [[ ${FLAGS_enable_CI} == "true" ]] || [[ ${FLAGS_enable_CE} == "true" ]];then
     print_info $exit_code unittest
 
     cd ${nlp_dir}
-    echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
+    echo -e "\033[35m ---- Generate Allure Report  \033[0m"
     unset http_proxy && unset https_proxy
     cp scripts/regression/gen_allure_report.py ./
     python gen_allure_report.py > /dev/null

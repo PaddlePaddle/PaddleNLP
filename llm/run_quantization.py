@@ -104,12 +104,21 @@ def main():
             raise ValueError("Please specific dtype: --fp16 or --bf16")
     else:
         dtype = "float32"
-    quantization_config = dict(
-        weight_quantize_algo=model_args.weight_quantize_algo,
-        qlora_weight_blocksize=model_args.qlora_weight_blocksize,
-        qlora_weight_double_quant=model_args.qlora_weight_double_quant,
-        qlora_weight_double_quant_block_size=model_args.qlora_weight_double_quant_block_size,
-    )
+
+    if hasattr(model_args, "qlora_weight_blocksize"):
+        quantization_config = dict(
+            weight_quantize_algo=model_args.weight_quantize_algo,
+            qlora_weight_blocksize=model_args.qlora_weight_blocksize,
+            qlora_weight_double_quant=model_args.qlora_weight_double_quant,
+            qlora_weight_double_quant_block_size=model_args.qlora_weight_double_quant_block_size,
+        )
+    else:
+        quantization_config = dict(
+            weight_quantize_algo=model_args.weight_quantize_algo,
+            weight_blocksize=model_args.weight_blocksize,
+            weight_double_quant=model_args.weight_double_quant,
+            weight_double_quant_block_size=model_args.weight_double_quant_block_size,
+        )
 
     model_config = AutoConfig.from_pretrained(
         model_args.model_name_or_path,

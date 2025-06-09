@@ -359,7 +359,7 @@ class TransformerDecodeCell(nn.Layer):
                     `[batch_size, sequence_length, vocab_size]`.
                 - `new_states` (Tensor):
                     This output has the same structure and data type with `states`
-                    while the length is one larger since concatanating the
+                    while the length is one larger since concatenating the
                     intermediate results of current step.
 
         Example:
@@ -617,7 +617,7 @@ class TransformerModel(nn.Layer):
             The dropout probability used in MHA to drop some attention target.
             If None, use the value of dropout. Defaults to None.
         act_dropout (float):
-            The dropout probability used after FFN activition. If None, use
+            The dropout probability used after FFN activation. If None, use
             the value of dropout. Defaults to None.
         bos_id (int, optional):
             The start token id and also be used as padding id. Defaults to 0.

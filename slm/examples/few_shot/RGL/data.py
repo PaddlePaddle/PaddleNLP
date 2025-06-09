@@ -168,7 +168,7 @@ class DataProcessor(object):
     @property
     def labels(self):
         if not getattr(self, "_labels"):
-            raise ValueError("labels and label_mappings are not setted yet.")
+            raise ValueError("labels and label_mappings are not set yet.")
         return self._labels
 
     @labels.setter
@@ -179,7 +179,7 @@ class DataProcessor(object):
     @property
     def label_mapping(self):
         if not getattr(self, "_labels"):
-            raise ValueError("labels and label_mappings are not setted yet.")
+            raise ValueError("labels and label_mappings are not set yet.")
         if not getattr(self, "_label_mapping"):
             self._label_mapping = {k: i for i, k in enumerate(self._labels)}
         return self._label_mapping

@@ -50,7 +50,7 @@ def set_seed(seed=1000):
 
 def create_dataloader(dataset, trans_fn=None, mode="train", batch_size=1, batchify_fn=None):
     """
-    Creats dataloader.
+    Creates dataloader.
 
     Args:
         dataset(obj:`paddle.io.Dataset`): Dataset instance.
@@ -92,7 +92,7 @@ if __name__ == "__main__":
 
     tokenizer = CharTokenizer(vocab, args.language, "../../../punctuations")
 
-    # Constructs the newtork.
+    # Constructs the network.
     vocab_size = len(vocab)
     num_classes = len(train_ds.label_list)
     pad_token_id = 0

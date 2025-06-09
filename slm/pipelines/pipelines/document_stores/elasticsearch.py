@@ -101,8 +101,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         :param port: port(s) of elasticsearch nodes
         :param username: username (standard authentication via http_auth)
         :param password: password (standard authentication via http_auth)
-        :param api_key_id: ID of the API key (altenative authentication mode to the above http_auth)
-        :param api_key: Secret value of the API key (altenative authentication mode to the above http_auth)
+        :param api_key_id: ID of the API key (alternative authentication mode to the above http_auth)
+        :param api_key: Secret value of the API key (alternative authentication mode to the above http_auth)
         :param aws4auth: Authentication for usage with aws elasticsearch (can be generated with the requests-aws4auth package)
         :param index: Name of index in elasticsearch to use for storing the documents that we want to search. If not existing yet, we will create one.
         :param label_index: Name of index in elasticsearch to use for storing labels. If not existing yet, we will create one.
@@ -221,7 +221,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         if type(search_fields) == str:
             search_fields = [search_fields]
 
-        # TODO we should implement a more flexible interal mapping here that simplifies the usage of additional,
+        # TODO we should implement a more flexible internal mapping here that simplifies the usage of additional,
         # custom fields (e.g. meta data you want to return)
         self.search_fields = search_fields
         self.content_field = content_field
@@ -1756,8 +1756,8 @@ class OpenSearchDocumentStore(ElasticsearchDocumentStore):
         :param port: port(s) of elasticsearch nodes
         :param username: username (standard authentication via http_auth)
         :param password: password (standard authentication via http_auth)
-        :param api_key_id: ID of the API key (altenative authentication mode to the above http_auth)
-        :param api_key: Secret value of the API key (altenative authentication mode to the above http_auth)
+        :param api_key_id: ID of the API key (alternative authentication mode to the above http_auth)
+        :param api_key: Secret value of the API key (alternative authentication mode to the above http_auth)
         :param aws4auth: Authentication for usage with aws elasticsearch (can be generated with the requests-aws4auth package)
         :param index: Name of index in elasticsearch to use for storing the documents that we want to search. If not existing yet, we will create one.
         :param label_index: Name of index in elasticsearch to use for storing labels. If not existing yet, we will create one.
@@ -1818,7 +1818,7 @@ class OpenSearchDocumentStore(ElasticsearchDocumentStore):
         self.similarity_to_space_type = {"cosine": "cosinesimil", "dot_product": "innerproduct", "l2": "l2"}
         self.space_type_to_similarity = {v: k for k, v in self.similarity_to_space_type.items()}
         # Overwrite default kwarg values of parent class so that in default cases we can initialize
-        # an OpenSearchDocumentStore without provding any arguments
+        # an OpenSearchDocumentStore without providing any arguments
         super(OpenSearchDocumentStore, self).__init__(
             verify_certs=verify_certs, scheme=scheme, username=username, password=password, port=port, **kwargs
         )

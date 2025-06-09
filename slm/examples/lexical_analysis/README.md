@@ -108,6 +108,12 @@ python export_model.py --data_dir=./lexical_analysis_dataset_tiny --params_path=
 
 导出模型之后，可以用于部署，deploy/predict.py 文件提供了 python 部署预测示例。运行方式：
 
+开启 PIR（PaddlePaddle 3.0.0默认）：
+```shell
+python deploy/predict.py --model_file=infer_model/static_graph_params.json --params_file=infer_model/static_graph_params.pdiparams --data_dir lexical_analysis_dataset_tiny
+```
+
+未开启 PIR：
 ```shell
 python deploy/predict.py --model_file=infer_model/static_graph_params.pdmodel --params_file=infer_model/static_graph_params.pdiparams --data_dir lexical_analysis_dataset_tiny
 ```

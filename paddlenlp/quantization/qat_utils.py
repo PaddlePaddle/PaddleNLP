@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from copy import deepcopy
 
 import paddle
 from paddle.autograd import PyLayer
 
-from paddlenlp.utils import infohub
-
-from .hadamard_utils import random_hadamard_matrix
+from .hadamard_utils import apply_hadamard_matmul
 
 try:
     from transformer_engine import transformer_engine_paddle as tex
@@ -35,147 +32,150 @@ try:
 except ImportError:
     USE_FP8_GEMM = False
 
+QMIN_QMAX_MAPPING = {
+    "a8w8linear_activation": (-128, 127),
+    "a8w4linear_activation": (-128, 127),
+    "a8w8linear_weight": (-128, 127),
+    "a8w4linear_weight": (-8, 7),
+    "float8_e4m3fn": (-488, 488),
+    "float8_e5m2": (-57344, 57344),
+}
 
-def quantize_tensorwise(x, quantization_config=None, bit_length=8, state=0, training=False, act_scale=None):
-    qmax = (1 << (bit_length - 1)) - 1
-    qmin = -1 * qmax - 1
-    if quantization_config.apply_hadamard:
-        target_x = x @ infohub.hadamard[x.shape[-1]][0]
+
+def quantize(
+    x,
+    weight_quantize_algo,
+    tensor_type,
+    quantization_config,
+    side="right",
+    apply_hadamard=False,
+    act_scale=None,
+    state=0,
+    training=False,
+    group=None,
+):
+    if apply_hadamard:
+        target_x = apply_hadamard_matmul(x, side, quantization_config.hadamard_block_size)
+        hadamard_scale = quantization_config.hadamard_block_size
     else:
-        target_x = x
-
-    if act_scale is not None:
-        if training:
-            scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
-            if state < quantization_config.skip_first_act_scale_step:
-                act_scale.set_value((state * act_scale + scale) / (state + 1))
+        target_x, hadamard_scale = x, 1.0
+    if weight_quantize_algo in ["fp8linear"]:
+        qmin, qmax = QMIN_QMAX_MAPPING[quantization_config.fp8_format[tensor_type]]
+    else:
+        qmin, qmax = QMIN_QMAX_MAPPING[weight_quantize_algo + "_" + tensor_type]
+    if tensor_type == "activation":
+        if act_scale is not None:
+            if training:
+                scale = (paddle.max(paddle.abs(target_x)) / qmax + quantization_config.scale_epsilon).reshape([1])
+                if group is not None:
+                    paddle.distributed.all_reduce(scale, op=paddle.distributed.ReduceOp.MAX, group=group, sync_op=True)
+                if state < quantization_config.apply_online_actscale_step:
+                    act_scale[:] = (state * act_scale + scale) / (state + 1)
+                else:
+                    scale = (
+                        1 - quantization_config.actscale_moving_rate
+                    ) * act_scale + quantization_config.actscale_moving_rate * scale
+                    act_scale[:] = scale
             else:
-                act_scale.set_value(
-                    (1 - quantization_config.moving_rate) * act_scale + quantization_config.moving_rate * scale
-                )
                 scale = act_scale
         else:
-            scale = act_scale
-    else:
-        scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
-
-    x_int8 = paddle.clip((target_x / scale).round(), qmin, qmax).astype("int8")
-    return x_int8, scale
-
-
-def dequantize_tensorwise(x_int8, scale, apply_hadamard=False):
-    x = x_int8.astype(scale.dtype) * scale
-    if apply_hadamard:
-        x = x @ infohub.hadamard[x.shape[-1]][0].T
-    return x
-
-
-def fp8_quantize_tensorwise(x, tensor_type, quantization_config=None, state=0, training=False, act_scale=None):
-    assert tensor_type in ["weight", "activation", "grad_output"], "Only support weight, activation and grad_output"
-    fp8_format = quantization_config.fp8_format[tensor_type]
-    qmin, qmax = (-448, 448) if fp8_format == "float8_e4m3fn" else (-57344, 57344)
-    tensor_type_to_shape_index = {"weight": 0, "activation": -1, "grad_output": -2}
-
-    if quantization_config is not None and quantization_config.apply_hadamard:
-        if getattr(infohub, "hadamard") is None:
-            setattr(infohub, "hadamard", {})
-
-        hadamard_matrix_shape = x.shape[tensor_type_to_shape_index[tensor_type]]
-        if hadamard_matrix_shape in infohub.hadamard:
-            hadamard_matrix, block_size = infohub.hadamard[hadamard_matrix_shape]
+            scale = (paddle.max(paddle.abs(target_x)) / qmax + quantization_config.scale_epsilon).reshape([1])
+        if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+            quant_x = paddle.clip((target_x / scale).round(), qmin, qmax).astype("int8")
+        elif weight_quantize_algo in ["fp8linear"]:
+            quant_x = (target_x / scale).astype(quantization_config.fp8_format[tensor_type]).view("int8")
         else:
-            hadamard_matrix, block_size = random_hadamard_matrix(hadamard_matrix_shape, x.dtype, is_block=True)
-            infohub.hadamard[hadamard_matrix_shape] = (hadamard_matrix, block_size)
-        target_x = hadamard_matrix.T @ x if tensor_type in ["weight", "grad_output"] else x @ hadamard_matrix
-    else:
-        target_x = x
-        block_size = 1
-
-    if act_scale is not None:
-        if training:
-            scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
-            if state < quantization_config.skip_first_act_scale_step:
-                act_scale.set_value((state * act_scale + scale) / (state + 1))
-            else:
-                act_scale.set_value(
-                    (1 - quantization_config.moving_rate) * act_scale + quantization_config.moving_rate * scale
-                )
-                # scale = act_scale
+            raise NotImplementedError(f"Unknown {weight_quantize_algo}.")
+    elif tensor_type == "weight":
+        if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+            # channelwise
+            scale = paddle.max(paddle.abs(target_x), axis=0, keepdim=True) / qmax + quantization_config.scale_epsilon
+            if group is not None:
+                paddle.distributed.all_reduce(scale, op=paddle.distributed.ReduceOp.MAX, group=group, sync_op=True)
+            quant_x = paddle.clip((target_x / scale).round(), qmin, qmax).astype("int8").T
+            scale = scale.squeeze(0) / hadamard_scale
+        elif weight_quantize_algo in ["fp8linear"]:
+            scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.scale_epsilon
+            if group is not None:
+                paddle.distributed.all_reduce(scale, op=paddle.distributed.ReduceOp.MAX, group=group, sync_op=True)
+            quant_x = (target_x / scale).astype(quantization_config.fp8_format[tensor_type]).view("int8").T
+            scale = (scale / hadamard_scale).reshape([1])
         else:
-            scale = act_scale
+            raise NotImplementedError(f"Unknown {weight_quantize_algo}.")
+    elif tensor_type == "grad_output":
+        if weight_quantize_algo in ["fp8linear"]:
+            scale = (paddle.max(paddle.abs(target_x)) / qmax + quantization_config.scale_epsilon).reshape([1])
+            quant_x = (target_x / scale).astype(quantization_config.fp8_format[tensor_type])
+            scale = scale / hadamard_scale
+        else:
+            raise NotImplementedError(f"Unknown {weight_quantize_algo}.")
     else:
-        scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
-
-    x_fp8 = target_x / scale
-    x_fp8 = x_fp8.astype(fp8_format).view("int8")
-    x_fp8 = x_fp8.T if tensor_type == "weight" else x_fp8
+        raise NotImplementedError(f"Unknown {tensor_type}.")
     scale.stop_gradient = True
-    scale = scale / block_size if tensor_type in ["weight", "grad_output"] else scale
-    return x_fp8, scale
+    return quant_x, scale
 
 
-def fp8_dequantize_tensorwise(x_fp8, scale, tensor_type, quantization_config=None):
-    x_fp8 = x_fp8.view(quantization_config.fp8_format[tensor_type])
-    x_fp8 = x_fp8.T if tensor_type == "weight" else x_fp8
-    x = x_fp8.astype(scale.dtype) * scale
-    if quantization_config.apply_hadamard:
-        hadamard_matrix_shape = x.shape[0] if tensor_type == "weight" else x.shape[-1]
-        hadamard_matrix, _ = infohub.hadamard[hadamard_matrix_shape]
-        x = hadamard_matrix @ x if tensor_type == "weight" else x @ hadamard_matrix.T
-    return x
-
-
-def quantize_channelwise(w, apply_hadamard=False, bit_length=8):
-    qmax = (1 << (bit_length - 1)) - 1
-    qmin = -1 * qmax - 1
-    if apply_hadamard:
-        if getattr(infohub, "hadamard") is None:
-            setattr(infohub, "hadamard", {})
-        if w.shape[0] in infohub.hadamard:
-            hadamard_matrix, block_size = infohub.hadamard[w.shape[0]]
-        else:
-            hadamard_matrix, block_size = random_hadamard_matrix(w.shape[0], w.dtype, is_block=True)
-            infohub.hadamard[w.shape[0]] = (hadamard_matrix, block_size)
-        w = hadamard_matrix.T @ w
-    else:
-        block_size = 1
-    scale = paddle.max(paddle.abs(w), axis=0, keepdim=True) / qmax
-    w_int8 = paddle.clip((w / scale).round(), qmin, qmax).astype("int8")
-    scale.stop_gradient = True
-    return w_int8.T, scale.squeeze(0) / block_size
-
-
-def dequantize_channelwise(w_int8, scale, apply_hadamard=False):
-    w = w_int8.T.astype(scale.dtype) * scale
-    if apply_hadamard:
-        w = infohub.hadamard[w_int8.shape[1]][0] @ w
-    return w
-
-
-def a8w8_forward(
-    x, w_int8, w_scale=None, bias=None, dtype=None, quantization_config=None, state=0, training=False, act_scale=None
+def dequantize(
+    quant_x, scale, tensor_type, weight_quantize_algo, quantization_config, apply_hadamard=False, side="left"
 ):
-    x_int8, x_scale = quantize_tensorwise(
-        x, quantization_config, bit_length=8, state=state, training=training, act_scale=act_scale
+    if tensor_type == "weight":
+        if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+            x = quant_x.T.astype(scale.dtype)
+        elif weight_quantize_algo in ["fp8linear"]:
+            x = quant_x.view(quantization_config.fp8_format[tensor_type]).T.astype(scale.dtype)
+        else:
+            raise NotImplementedError(f"Unknown weight_quantize_algo: {weight_quantize_algo}")
+        if apply_hadamard:
+            x = apply_hadamard_matmul(x, side, quantization_config.hadamard_block_size)
+        x *= scale
+    else:
+        raise NotImplementedError(f"Unknown {tensor_type}.")
+    return x
+
+
+def int8_forward(
+    x,
+    quant_w,
+    scale_w,
+    weight_quantize_algo,
+    bias=None,
+    quantization_config=None,
+    state=0,
+    training=False,
+    act_scale=None,
+    group=None,
+):
+    quant_x, scale_x = quantize(
+        x=x,
+        weight_quantize_algo=weight_quantize_algo,
+        tensor_type="activation",
+        quantization_config=quantization_config,
+        side="right",
+        apply_hadamard=quantization_config.apply_hadamard,
+        act_scale=act_scale,
+        state=state,
+        training=training,
+        group=group,
     )
-    out = paddle.matmul(x_int8, w_int8.T).astype(dtype) * (x_scale * w_scale.unsqueeze(0))
+
+    out = paddle.matmul(quant_x, quant_w.T).astype(scale_w.dtype) * (scale_x * scale_w)
     if bias is not None:
         out += bias
-    return out, x_int8, x_scale
+    return out, quant_x, scale_x
 
 
-def a8w8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scale):
+def int8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scale):
     if not ctx.x_stop_gradient:
-        if ctx.quantization_config.quant_input_grad:
-            grad_output_int8, grad_output_scale = quantize_tensorwise(grad_output * quant_scale)
-            input_grad = paddle.matmul(grad_output_int8, quant_weight).astype(ctx.dtype) * grad_output_scale
-            if ctx.quantization_config.apply_hadamard:
-                input_grad = input_grad @ infohub.hadamard[quant_weight.shape[-1]][0].T
-        else:
-            qdq_weight = dequantize_channelwise(
-                quant_weight, quant_scale, apply_hadamard=ctx.quantization_config.apply_hadamard
-            )
-            input_grad = paddle.matmul(grad_output, qdq_weight.T)
+        qdq_weight = dequantize(
+            quant_weight,
+            quant_scale,
+            "weight",
+            ctx.weight_quantize_algo,
+            ctx.quantization_config,
+            ctx.quantization_config.apply_hadamard,
+            "left",
+        )
+        input_grad = paddle.matmul(grad_output, qdq_weight.T)
     else:
         input_grad = None
 
@@ -193,15 +193,29 @@ def a8w8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_sca
 
 
 def fp8_forward(
-    x, w_fp8, w_scale=None, bias=None, dtype=None, quantization_config=None, state=0, training=False, act_scale=None
+    x,
+    w_fp8,
+    w_scale,
+    weight_quantize_algo,
+    bias=None,
+    dtype=None,
+    quantization_config=None,
+    state=0,
+    training=False,
+    act_scale=None,
+    group=None,
 ):
-    x_fp8, x_scale = fp8_quantize_tensorwise(
+    x_fp8, x_scale = quantize(
         x,
-        tensor_type="activation",
-        quantization_config=quantization_config,
+        weight_quantize_algo,
+        "activation",
+        quantization_config,
+        side="right",
+        apply_hadamard=quantization_config.apply_hadamard,
+        act_scale=act_scale,
         state=state,
         training=training,
-        act_scale=act_scale,
+        group=group,
     )
     x_fp8 = x_fp8.view(quantization_config.fp8_format["activation"])
     w_fp8 = w_fp8.view(quantization_config.fp8_format["weight"])
@@ -209,7 +223,7 @@ def fp8_forward(
     if USE_FP8_GEMM:
         x_shape = x_fp8.shape
         x_fp8 = x_fp8.view((-1, x_fp8.shape[-1]))
-        fwd_scales = paddle.stack([x_scale.astype("float32"), w_scale.astype("float32")])
+        fwd_scales = paddle.concat([x_scale.astype("float32"), w_scale.astype("float32")])
         out, _ = fp8_gemm(
             A=w_fp8,
             A_scale_inv=fwd_scales,
@@ -240,10 +254,13 @@ def fp8_forward(
 def fp8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scale):
     if not ctx.x_stop_gradient:
         if ctx.quantization_config.quant_input_grad:
-            grad_output_fp8, grad_output_scale = fp8_quantize_tensorwise(
+            grad_output_fp8, grad_output_scale = quantize(
                 grad_output,
-                tensor_type="grad_output",
-                quantization_config=ctx.quantization_config,
+                ctx.weight_quantize_algo,
+                "grad_output",
+                ctx.quantization_config,
+                side="left",
+                apply_hadamard=False,
             )
             grad_output_fp8 = grad_output_fp8.view(ctx.quantization_config.fp8_format["grad_output"])
             quant_weight = quant_weight.view(ctx.quantization_config.fp8_format["weight"])
@@ -271,11 +288,16 @@ def fp8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scal
                 weight_ = quant_weight.astype(ctx.dtype) * quant_scale
                 input_grad = paddle.matmul(grad_output_, weight_).astype(ctx.dtype)
             if ctx.quantization_config.apply_hadamard:
-                input_grad = infohub.hadamard[grad_output.shape[-2]][0] @ input_grad
-                input_grad = input_grad @ infohub.hadamard[quant_weight.shape[-1]][0].T
+                input_grad = apply_hadamard_matmul(input_grad, "right", ctx.quantization_config.hadamard_block_size)
         else:
-            qdq_weight = fp8_dequantize_tensorwise(
-                quant_weight, quant_scale, tensor_type="weight", quantization_config=ctx.quantization_config
+            qdq_weight = dequantize(
+                quant_weight,
+                quant_scale,
+                "weight",
+                ctx.weight_quantize_algo,
+                ctx.quantization_config,
+                apply_hadamard=ctx.quantization_config.apply_hadamard,
+                side="left",
             )
             input_grad = paddle.matmul(grad_output, qdq_weight.T)
     else:
@@ -283,14 +305,13 @@ def fp8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scal
 
     if not ctx.w_stop_gradient:
         if ctx.quantization_config.quant_weight_grad:
-            quantization_config_ = deepcopy(ctx.quantization_config)
-            quantization_config_.apply_hadamard = False
-            grad_output_fp8, grad_output_scale = fp8_quantize_tensorwise(
-                grad_output,
+            grad_output_fp8, grad_output_scale = quantize(
+                x=grad_output,
+                weight_quantize_algo=ctx.weight_quantize_algo,
                 tensor_type="grad_output",
-                quantization_config=quantization_config_,
+                quantization_config=ctx.quantization_config,
+                apply_hadamard=False,
             )
-            grad_output_fp8 = grad_output_fp8.view(ctx.quantization_config.fp8_format["grad_output"])
             quant_x = quant_x.view(ctx.quantization_config.fp8_format["activation"])
             if USE_FP8_GEMM:
                 quant_x = quant_x.view((-1, quant_x.shape[-1]))
@@ -321,9 +342,8 @@ def fp8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scal
                         grad_output_.reshape([-1, grad_output_.shape[-1]]),
                     ).astype(ctx.dtype)
             if ctx.quantization_config.apply_hadamard:
-                hadamard_matrix, block_size = infohub.hadamard[quant_x.shape[-1]]
-                weight_grad = weight_grad / block_size
-                weight_grad = hadamard_matrix @ weight_grad
+                weight_grad = weight_grad / ctx.quantization_config.hadamard_block_size
+                weight_grad = apply_hadamard_matmul(weight_grad, "left", ctx.quantization_config.hadamard_block_size)
         else:
             if len(x.shape) == 2:
                 weight_grad = paddle.matmul(x.transpose([1, 0]), grad_output)
@@ -350,33 +370,39 @@ class QATFunc(PyLayer):
         state,
         training,
         act_scale,
+        weight_quantize_algo,
+        group,
     ):
         quant_x, x_scale = None, None
-        if quantization_config.weight_quantize_algo in ["fp8linear"]:
+        if weight_quantize_algo in ["fp8linear"]:
             output, quant_x, x_scale = fp8_forward(
                 x,
                 quant_weight,
                 w_scale=quant_scale,
+                weight_quantize_algo=weight_quantize_algo,
                 bias=bias,
                 dtype=dtype,
                 quantization_config=quantization_config,
                 state=state,
                 training=training,
                 act_scale=act_scale,
+                group=group,
             )
         else:
-            output, quant_x, x_scale = a8w8_forward(
+            output, quant_x, x_scale = int8_forward(
                 x,
-                quant_weight,
-                w_scale=quant_scale,
+                quant_w=quant_weight,
+                scale_w=quant_scale,
+                weight_quantize_algo=weight_quantize_algo,
                 bias=bias,
-                dtype=dtype,
                 quantization_config=quantization_config,
                 state=state,
                 training=training,
                 act_scale=act_scale,
+                group=group,
             )
         ctx.quantization_config = quantization_config
+        ctx.weight_quantize_algo = weight_quantize_algo
         ctx.dtype = dtype
         ctx.x_stop_gradient = x.stop_gradient
         ctx.w_stop_gradient = quant_weight.stop_gradient
@@ -399,7 +425,7 @@ class QATFunc(PyLayer):
         if ctx.quantization_config.weight_quantize_algo in ["fp8linear"]:
             input_grad, weight_grad = fp8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scale)
         else:
-            input_grad, weight_grad = a8w8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scale)
+            input_grad, weight_grad = int8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scale)
 
         if not ctx.b_stop_gradient:
             bias_grad = grad_output.sum(axis=[0, 1])

@@ -68,7 +68,7 @@ def load_vocab(dict_path):
 
 class LacTask(Task):
     """
-    Lexical analysis of Chinese task to segement the chinese sentence.
+    Lexical analysis of Chinese task to segment the chinese sentence.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.

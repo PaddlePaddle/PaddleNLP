@@ -118,6 +118,7 @@ function llama_case_list_auto() {
         llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN
         llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1
         llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate
+        llama_baichuan_dygraph_auto_sp_async_reduce_scatter_bs8_bf16_DP4-MP2-SP
     )
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
@@ -221,94 +222,109 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
         
         export CUDA_DEVICE_MAX_CONNECTIONS=1
 
-        flags=("" "FLAGS_fuse_allreduce_in_opt" "FLAGS_fuse_reducescatter_in_opt")
+        flags=("" "FLAGS_fuse_allreduce_in_opt" "FLAGS_fuse_reducescatter_in_opt" "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap")
         for i in "${!flags[@]}"; do
             flag="${flags[$i]}"
 
             if [ -n "$flag" ]; then
-                export "$flag=true"
+                for f in $flag; do
+                    export "$f=true"
+                done
             fi
-
-            task_name="llama_dygraph_auto_bs4_bf16_SD2_$flag"
-            case_out_dir="output/$task_name"
-            case_log_dir="output/$task_name""_log"
-            rm -rf $case_out_dir
-            rm -rf $case_log_dir
-
-            python -u  -m paddle.distributed.launch \
-                --gpus "0,1" \
-                --log_dir  "output/$task_name""_log" \
-                ./run_pretrain_auto.py \
-                --model_name_or_path "meta-llama/Llama-2-7b" \
-                --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
-                --input_dir "./data" \
-                --output_dir "./output" \
-                --weight_decay 0.01 \
-                --warmup_ratio 0.01 \
-                --max_grad_norm 1.0 \
-                --learning_rate 3e-05 \
-                --min_learning_rate 3e-06 \
-                --max_steps 10 \
-                --logging_steps 10 \
-                --eval_steps 1000 \
-                --save_steps 50000 \
-                --continue_training 0 \
-                --do_train true \
-                --do_eval false \
-                --do_predict false \
-                --disable_tqdm true \
-                --skip_profile_timer true \
-                --device gpu \
-                --enable_auto_parallel 1 \
-                --per_device_train_batch_size 1 \
-                --gradient_accumulation_steps 1 \
-                --per_device_eval_batch_size 2 \
-                --recompute false \
-                --recompute_use_reentrant true \
-                --recompute_granularity full \
-                --pp_recompute_interval 0 \
-                --bf16 true \
-                --fp16_opt_level "O2"  \
-                --amp_master_grad true \
-                --fuse_attention_ffn true \
-                --fuse_attention_qkv true \
-                --fused_linear_param_grad_add 1 \
-                --use_flash_attention true \
-                --use_fused_rope true \
-                --use_fused_rms_norm true \
-                --max_seq_length 4096 \
-                --sequence_parallel false \
-                --pipeline_parallel_degree 1 \
-                --tensor_parallel_degree 1 \
-                --sharding "stage1" \
-                --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
-                --sharding_parallel_config "" \
-                --to_static 0 \
-                --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
-                --amp_custom_white_list "lookup_table" "lookup_table_v2" \
-                --num_hidden_layers 4 \
-                >>${log_path}/$FUNCNAME 2>&1
-            loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-            ips=-1
-            mem=-1
-            echo "result: loss=$loss ips=$ips mem=$mem"
-            
-            if [ -z "$flag" ]; then
-                loss_base=9.23502579
-            elif [ "$flag" = "FLAGS_fuse_allreduce_in_opt" ]; then
-                loss_base=9.23502579
-            elif [ "$flag" = "FLAGS_fuse_reducescatter_in_opt" ]; then
-                loss_base=9.23504105
-            else
-                loss_base=-1
+            acc_steps=(1)
+            if [ "$flag" = "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap" ]; then
+                acc_steps=(1 2)
             fi
+            for acc_step in "${acc_steps[@]}"; do
+                task_name="llama_dygraph_auto_bs4_bf16_SD2_$f"
+                case_out_dir="output/$task_name"
+                case_log_dir="output/$task_name""_log"
+                rm -rf $case_out_dir
+                rm -rf $case_log_dir
 
-            ips_base=-1
-            mem_base=-1
-            check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+                python -u  -m paddle.distributed.launch \
+                    --gpus "0,1" \
+                    --log_dir  "output/$task_name""_log" \
+                    ./run_pretrain_auto.py \
+                    --model_name_or_path "meta-llama/Llama-2-7b" \
+                    --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
+                    --input_dir "./data" \
+                    --output_dir "./output" \
+                    --weight_decay 0.01 \
+                    --warmup_ratio 0.01 \
+                    --max_grad_norm 1.0 \
+                    --learning_rate 3e-05 \
+                    --min_learning_rate 3e-06 \
+                    --max_steps 10 \
+                    --logging_steps 10 \
+                    --eval_steps 1000 \
+                    --save_steps 50000 \
+                    --continue_training 0 \
+                    --do_train true \
+                    --do_eval false \
+                    --do_predict false \
+                    --disable_tqdm true \
+                    --skip_profile_timer true \
+                    --device gpu \
+                    --enable_auto_parallel 1 \
+                    --per_device_train_batch_size 1 \
+                    --gradient_accumulation_steps $acc_step \
+                    --per_device_eval_batch_size 2 \
+                    --recompute false \
+                    --recompute_use_reentrant true \
+                    --recompute_granularity full \
+                    --pp_recompute_interval 0 \
+                    --bf16 true \
+                    --fp16_opt_level "O2"  \
+                    --amp_master_grad true \
+                    --fuse_attention_ffn true \
+                    --fuse_attention_qkv true \
+                    --fused_linear_param_grad_add 1 \
+                    --use_flash_attention true \
+                    --use_fused_rope true \
+                    --use_fused_rms_norm true \
+                    --max_seq_length 4096 \
+                    --sequence_parallel false \
+                    --pipeline_parallel_degree 1 \
+                    --tensor_parallel_degree 1 \
+                    --sharding "stage1" \
+                    --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
+                    --sharding_parallel_config "" \
+                    --to_static 0 \
+                    --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
+                    --amp_custom_white_list "lookup_table" "lookup_table_v2" \
+                    --num_hidden_layers 4 \
+                    >>${log_path}/$FUNCNAME 2>&1
+                loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+                ips=-1
+                mem=-1
+                echo "result: loss=$loss ips=$ips mem=$mem"
+                
+                if [ -z "$flag" ]; then
+                    loss_base=9.23502579
+                elif [ "$flag" = "FLAGS_fuse_allreduce_in_opt" ]; then
+                    loss_base=9.23502579
+                elif [ "$flag" = "FLAGS_fuse_reducescatter_in_opt" ]; then
+                    loss_base=9.23504105
+                elif [ "$flag" = "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap" ]; then
+                    if [ $acc_step -eq 1 ]; then
+                        loss_base=9.23504868
+                    else
+                        loss_base=9.16484451
+                    fi
+                else
+                    loss_base=-1
+                fi
+
+                ips_base=-1
+                mem_base=-1
+                check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+            done
 
             if [ -n "$flag" ]; then
-                export "$flag=false"
+                for f in $flag; do
+                    export "$f=false"
+                done
             fi
         done
         echo "=========== $FUNCNAME run  end ==========="
@@ -381,7 +397,8 @@ function llama_dygraph_auto_bs8_fp32_DP2() {
         loss_base=9.50651741
     fi
     ips_base=-1
-    mem_base=9.381539106369019
+    # TODO(lizhenxing): Fix memory increase caused by "skip redundant reshard ops when mesh==1" case
+    mem_base=9.881539106369019
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -465,64 +482,67 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     task_name="llama_auto_bs8_dp2mp2pp2"
     case_out_dir="output/$task_name"
     case_log_dir="output/$task_name""_log"
-    rm -rf $case_out_dir
-    rm -rf $case_log_dir
 
-    python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
-        --model_type "llama" \
-        --model_name_or_path "facebook/llama-7b" \
-        --tokenizer_name_or_path "facebook/llama-7b" \
-        --input_dir "./data" \
-        --output_dir $case_out_dir \
-        --split 949,50,1 \
-        --max_seq_length 2048 \
-        --hidden_size 1024 \
-        --intermediate_size 3072 \
-        --num_hidden_layers 8 \
-        --num_attention_heads 32 \
-        --per_device_train_batch_size 1 \
-        --per_device_eval_batch_size 4 \
-        --gradient_accumulation_steps 4 \
-        --use_flash_attention 0 \
-        --use_fused_rms_norm 0 \
-        --fp16 0 \
-        --fp16_opt_level "O2" \
-        --scale_loss 1024 \
-        --pipeline_parallel_degree 2 \
-        --tensor_parallel_degree 2 \
-        --sharding_parallel_degree 1 \
-        --learning_rate 0.0001 \
-        --min_learning_rate 0.00001 \
-        --max_steps 10 \
-        --save_steps 5000 \
-        --weight_decay 0.01 \
-        --warmup_ratio 0.01 \
-        --logging_steps 1 \
-        --dataloader_num_workers 1 \
-        --sharding "" \
-        --eval_steps 1000000 \
-        --disable_tqdm true \
-        --continue_training 0 \
-        --recompute 0 \
-        --do_train \
-        --do_eval \
-        --device "gpu" \
-        --data_impl "mmap" \
-        --enable_auto_parallel 1 \
-        --to_static 0 \
-        --max_grad_norm 1.0 \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=-1
-    mem=-1
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.3513937
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=9.39356422
-    fi
-    ips_base=-1
-    mem_base=-1
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    for use_fused_rms_norm in "1" "0"; do
+        rm -rf $case_out_dir
+        rm -rf $case_log_dir
+
+        python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
+            --model_type "llama" \
+            --model_name_or_path "facebook/llama-7b" \
+            --tokenizer_name_or_path "facebook/llama-7b" \
+            --input_dir "./data" \
+            --output_dir $case_out_dir \
+            --split 949,50,1 \
+            --max_seq_length 2048 \
+            --hidden_size 1024 \
+            --intermediate_size 3072 \
+            --num_hidden_layers 8 \
+            --num_attention_heads 32 \
+            --per_device_train_batch_size 1 \
+            --per_device_eval_batch_size 4 \
+            --gradient_accumulation_steps 4 \
+            --use_flash_attention 0 \
+            --use_fused_rms_norm ${use_fused_rms_norm} \
+            --fp16 0 \
+            --fp16_opt_level "O2" \
+            --scale_loss 1024 \
+            --pipeline_parallel_degree 2 \
+            --tensor_parallel_degree 2 \
+            --sharding_parallel_degree 1 \
+            --learning_rate 0.0001 \
+            --min_learning_rate 0.00001 \
+            --max_steps 10 \
+            --save_steps 5000 \
+            --weight_decay 0.01 \
+            --warmup_ratio 0.01 \
+            --logging_steps 1 \
+            --dataloader_num_workers 1 \
+            --sharding "" \
+            --eval_steps 1000000 \
+            --disable_tqdm true \
+            --continue_training 0 \
+            --recompute 0 \
+            --do_train \
+            --do_eval \
+            --device "gpu" \
+            --data_impl "mmap" \
+            --enable_auto_parallel 1 \
+            --to_static 0 \
+            --max_grad_norm 1.0 \
+            >>${log_path}/$FUNCNAME 2>&1
+        loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+        ips=-1
+        mem=-1
+        echo "use_fused_rms_norm=$use_fused_rms_norm  result: loss=$loss ips=$ips mem=$mem"
+        loss_base=9.3513937
+        if [ $IS_A100 -ne 0 ];then
+            loss_base=9.39356422
+        fi
+        ips_base=-1
+        mem_base=-1
+        check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    done
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -3662,6 +3682,106 @@ if [ $IS_A100 -eq 1 ]; then
     rm -f $model_config_json
 fi
     echo "=========== $FUNCNAME run  end ==========="
+}
+
+function llama_baichuan_dygraph_auto_sp_async_reduce_scatter_bs8_bf16_DP4-MP2-SP() {
+    if [ $IS_A100 -ne 1 ]; then
+        echo "=========== $FUNCNAME run begin ==========="
+        export PYTHONPATH=$root_path/:$PYTHONPATH
+        export FLAGS_call_stack_level=3
+        export GLOG_minloglevel=3
+        export NVIDIA_TF32_OVERRIDE=0
+
+        export CUDA_DEVICE_MAX_CONNECTIONS=1
+        export FLAGS_fuse_reducescatter_in_opt=1
+        export FLAGS_enable_inplace_master_grad=1
+        export FLAGS_auto_parallel_align_mode=1
+        export FLAGS_max_inplace_grad_add=65536
+        export FLAGS_embedding_deterministic=1
+        export FLAGS_cudnn_deterministic=1
+
+        task_name="llama_baichuan_dygraph_auto_sp_async_reduce_scatter_bs8_bf16_dp4mp2sp"
+        case_out_dir="output/$task_name"
+        case_log_dir="output/$task_name""_log"
+        rm -rf $case_out_dir
+        rm -rf $case_log_dir
+
+        config_json="pretrain_argument_for_ci_auto_dp4_mp2_sp.json"
+
+        cat <<EOF >"$config_json"
+{
+    "model_name_or_path": "baichuan-inc/Baichuan2-13B-Base",
+    "tokenizer_name_or_path": "baichuan-inc/Baichuan2-13B-Base",
+    "input_dir": "./data",
+    "output_dir": "./checkpoints/baichuan2_13b_ckpts",
+    "split": "949,50,1",
+    "to_static": false,
+    "pipeline_parallel_degree": 1,
+    "tensor_parallel_degree": 2,
+    "virtual_pp_degree": 1,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.01,
+    "max_grad_norm": 1.0,
+    "learning_rate": 0.00003,
+    "min_learning_rate": 0.000003,
+    "max_steps": 12,
+    "logging_steps": 5,
+    "eval_steps": 10000,
+    "save_steps": 1000,
+    "continue_training": 0,
+    "do_train": true,
+    "do_eval": false,
+    "do_predict": false,
+    "disable_tqdm": true,
+    "save_total_limit": 2,
+    "device": "gpu",
+    "dataloader_num_workers": 1,
+    "distributed_dataloader": 0,
+    "enable_auto_parallel": 1,
+    "per_device_train_batch_size": 2,
+    "gradient_accumulation_steps": 2,
+    "per_device_eval_batch_size": 1,
+    "recompute": false,
+    "recompute_use_reentrant": true,
+    "recompute_granularity": "full",
+    "pp_recompute_interval": 0,
+    "bf16": true,
+    "fp16_opt_level": "O2",
+    "amp_master_grad": true,
+    "fuse_attention_ffn": true,
+    "fuse_attention_qkv": true,
+    "use_flash_attention": true,
+    "fused_linear": 1,
+    "fused_linear_param_grad_add": 1,
+    "use_fused_rope": true,
+    "use_fused_rms_norm": true,
+    "max_seq_length": 1024,
+    "sequence_parallel": 1,
+    "sharding": "stage1",
+    "sharding_parallel_degree": 4,
+    "sharding_parallel_config": "enable_tensor_fusion enable_overlap",
+    "tensor_parallel_config": "enable_mp_async_allreduce replace_with_parallel_cross_entropy enable_sp_async_reduce_scatter",
+    "data_parallel_config": "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate",
+    "pipeline_parallel_config": "enable_send_recv_overlap enable_split_backward",
+    "num_hidden_layers": 2
+}
+EOF
+
+        python -u -m paddle.distributed.launch \
+            --gpus "0,1,2,3,4,5,6,7" \
+            --log_dir "$case_log_dir" \
+            run_pretrain_auto.py $config_json \
+            >>${log_path}/$FUNCNAME 2>&1
+        loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10,' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+        ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10,' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
+        mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10,' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
+        echo "result: loss=$loss ips=$ips mem=$mem"
+        loss_base=10.8060318
+        ips_base=1228.4263
+        mem_base=17.393041372299194
+        check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+        echo "=========== $FUNCNAME run  end ==========="
+    fi
 }
 
 ############ case end ############

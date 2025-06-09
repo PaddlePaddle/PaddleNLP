@@ -93,7 +93,7 @@ def main():
         acc = metric.accumulate()
         return {"accuracy": acc}
 
-    # Deine the early-stopping callback.
+    # Define the early-stopping callback.
     callbacks = [EarlyStoppingCallback(early_stopping_patience=4, early_stopping_threshold=0.0)]
 
     # Initialize the trainer.

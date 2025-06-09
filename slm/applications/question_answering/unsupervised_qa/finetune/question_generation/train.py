@@ -206,7 +206,7 @@ def run(args):
                             model_eval = model._layers if isinstance(model, paddle.DataParallel) else model
                             bleu4 = evaluation(model_eval, dev_data_loader, args, tokenizer)
                             if bleu4 > best_bleu4:
-                                print("best BLEU-4 performence has been updated: %.5f  --> %.5f" % (best_bleu4, bleu4))
+                                print("best BLEU-4 performance has been updated: %.5f  --> %.5f" % (best_bleu4, bleu4))
                                 best_bleu4 = bleu4
                                 save_ckpt(model, tokenizer, args.save_dir, "best")
 

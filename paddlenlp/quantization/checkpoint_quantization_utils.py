@@ -63,7 +63,7 @@ def group_wise_quant_dequant(
         tp_degree (`int`):
             Tensor parallel world size.
         use_pd (`bool`):
-            Whether to use paddle caculation. If False will use numpy.
+            Whether to use paddle calculation. If False will use numpy.
         symmetry (`bool`):
             Whether to use symmetry quantization.
     """
@@ -201,7 +201,7 @@ def cal_abs_min_max_channel(inputs, quant_axis=1):
         inputs (`numpy.array`):
             input tensor for quantization.
         quant_axis (`int`):
-            dimension where calulating inputs' abs min and max scales on.
+            dimension where calculating inputs' abs min and max scales on.
     """
     eps = 1e-8
     reduce_axis = tuple([i for i in range(len(inputs.shape)) if i != quant_axis])
@@ -227,7 +227,7 @@ def asymmetry_qdq_weight(
         quant_bits (`int`):
             Quantization bits.
         quant_axis (`int`):
-            Scales caculation axis.
+            Scales calculation axis.
         mins (`paddle.Tensor`):
             Min scales tensor in asymmetry quantization.
         maxs (`paddle.Tensor`):
@@ -239,7 +239,7 @@ def asymmetry_qdq_weight(
         tp_degree (`int`):
             Model parallel world size.
         use_pd (`bool`):
-            Whether to use paddle caculation. If False will use numpy.
+            Whether to use paddle calculation. If False will use numpy.
     """
 
     if mins is None:
@@ -288,7 +288,7 @@ def cal_abs_max_channel(inputs, quant_axis=1):
         inputs (`numpy.array`):
             input tensor for quantization.
         quant_axis (`int`):
-            dimension where calulating inputs' abs max scales on.
+            dimension where calculating inputs' abs max scales on.
     """
     epsilon = 1e-8
     reduce_axis = tuple([i for i in range(len(inputs.shape)) if i != quant_axis])
@@ -311,7 +311,7 @@ def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, tp_ran
         quant_bits (`int`):
             Quantization bits.
         quant_axis (`int`):
-            Scales caculation axis.
+            Scales calculation axis.
         scales (`paddle.Tensor`):
             Abs max scales tensor in symmetry quantization.
         dequant (`bool`):
@@ -321,7 +321,7 @@ def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, tp_ran
         tp_degree (`int`):
             Model parallel world size.
         use_pd (`bool`):
-            Whether to use paddle caculation. If False will use numpy.
+            Whether to use paddle calculation. If False will use numpy.
     """
 
     if scales is None:

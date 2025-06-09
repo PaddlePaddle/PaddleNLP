@@ -33,7 +33,7 @@ class TestPromptNode(unittest.TestCase):
         assert len(node.get_prompt_template_names()) == total_count + 1
         assert "fake-template" in node.get_prompt_template_names()
 
-        # Verify that adding the same template throws an expection
+        # Verify that adding the same template throws an exception
         with pytest.raises(ValueError) as e:
             node.add_prompt_template(fake_template)
             assert e.match(
@@ -45,7 +45,7 @@ class TestPromptNode(unittest.TestCase):
         assert len(node.get_prompt_template_names()) == total_count
         assert "fake-template" not in node.get_prompt_template_names()
 
-        # Verify that removing the same template throws an expection
+        # Verify that removing the same template throws an exception
         with pytest.raises(ValueError) as e:
             node.remove_prompt_template("fake-template")
             assert e.match("Prompt template fake-template does not exist")
