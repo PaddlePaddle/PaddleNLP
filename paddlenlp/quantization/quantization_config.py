@@ -59,17 +59,33 @@ class QuantizationConfig:
         dtype=None,
         ignore_modules=None,
         group_size=-1,
+        apply_hadamard=False,
+        hadamard_is_block=True,
+        hadamard_block_size=-1,
+        quant_input_grad=False,
+        apply_online_actscale_step=200,
+        scale_epsilon=0,
+        moving_rate=0.01,
         **kwargs,
     ):
         if weight_quantize_algo is not None:
             if isinstance(weight_quantize_algo, dict):
                 if any(
                     algo
-                    not in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8", "nf4", "fp4", "int8_train"]
+                    not in [
+                        "weight_only_int8",
+                        "weight_only_int4",
+                        "llm.int8",
+                        "a8w8",
+                        "nf4",
+                        "fp4",
+                        "a8w8linear",
+                        "a8w4linear",
+                    ]
                     for algo in weight_quantize_algo
                 ):
                     raise ValueError(
-                        f"weight_quantize_algo:{weight_quantize_algo.keys()} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4', 'int8_train']"
+                        f"weight_quantize_algo:{weight_quantize_algo.keys()} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4']"
                     )
             elif weight_quantize_algo not in [
                 "weight_only_int8",
@@ -78,10 +94,11 @@ class QuantizationConfig:
                 "a8w8",
                 "nf4",
                 "fp4",
-                "int8_train",
+                "a8w8linear",
+                "a8w4linear",
             ]:
                 raise ValueError(
-                    f"weight_quantize_algo:{weight_quantize_algo} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4', 'int8_train']"
+                    f"weight_quantize_algo:{weight_quantize_algo} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4']"
                 )
         if quant_type is not None and quant_type not in [
             "weight_only_int8",
@@ -90,10 +107,9 @@ class QuantizationConfig:
             "a8w8c8",
             "a8w8_fp8",
             "a8w8c8_fp8",
-            "int8_train",
         ]:
             raise ValueError(
-                f"quant_type:{quant_type} not in supported list ['weight_only_int8', 'weight_only_int4', 'a8w8', 'a8w8c8', 'a8w8_fp8', 'a8w8c8_fp8', 'int8_train']"
+                f"quant_type:{quant_type} not in supported list ['weight_only_int8', 'weight_only_int4', 'a8w8', 'a8w8c8', 'a8w8_fp8', 'a8w8c8_fp8']"
             )
         self.weight_quantize_algo = weight_quantize_algo
         self.quant_type = quant_type
@@ -115,17 +131,33 @@ class QuantizationConfig:
         self.dtype = dtype
         self.ignore_modules = ignore_modules
         self.group_size = group_size
+        self.apply_hadamard = apply_hadamard
+        self.quant_input_grad = quant_input_grad
+        self.apply_online_actscale_step = apply_online_actscale_step
+        self.scale_epsilon = scale_epsilon
+        self.hadamard_is_block = hadamard_is_block
+        self.moving_rate = moving_rate
+        self.hadamard_block_size = hadamard_block_size
 
     def is_weight_quantize(self):
         if isinstance(self.weight_quantize_algo, dict):
             return True
-        elif self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "nf4", "fp4", "a8w8"]:
+        elif self.weight_quantize_algo in [
+            "weight_only_int8",
+            "weight_only_int4",
+            "llm.int8",
+            "nf4",
+            "fp4",
+            "a8w8",
+            "a8w8linear",
+            "a8w4linear",
+        ]:
             return True
         else:
             return False
 
     def is_support_merge_tensor_parallel(self):
-        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8", "int8_train"]:
+        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8"]:
             return False
         else:
             return True
