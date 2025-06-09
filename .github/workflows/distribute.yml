@@ -23,7 +23,7 @@ defaults:
 jobs:
   distribute-ci:
     name: distribute-test
-    runs-on: Auto-Parallel
+    runs-on: [self-hosted, Auto-Parallel]
     steps:
       - name: Download PaddleNLP
         env:
