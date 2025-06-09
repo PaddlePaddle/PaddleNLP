@@ -51,6 +51,7 @@ std::vector<paddle::Tensor> AppendAttention(
     const paddle::optional<paddle::Tensor>& cache_v_zp,
     const paddle::optional<paddle::Tensor>& out_linear_shifts,
     const paddle::optional<paddle::Tensor>& out_linear_smooths,
+    const paddle::optional<paddle::Tensor>& excess_blocks,
     const std::string& compute_dtype,
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
@@ -237,11 +238,9 @@ std::vector<paddle::Tensor> GetPaddingOffsetV2(const paddle::Tensor& input_ids,
 
 void SaveOutMmsg(const paddle::Tensor& x,
                  const paddle::Tensor& not_need_stop, // cpu
-                 const paddle::Tensor& queue_id,      // cpu
                  int64_t rank_id);
 
 void GetOutput(const paddle::Tensor& x,
-               const paddle::Tensor& queue_id, // cpu
                int64_t rank_id,
                bool wait_flag);
 

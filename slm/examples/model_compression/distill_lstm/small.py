@@ -43,7 +43,7 @@ class BiLSTM(nn.Layer):
     ):
         super(BiLSTM, self).__init__()
         if embedding_name is not None:
-            raise ValueError("TokenEmbedding is depercated in PaddleNLP since 3.0, please set embedding_name to None ")
+            raise ValueError("TokenEmbedding is deprecated in PaddleNLP since 3.0, please set embedding_name to None ")
         else:
             self.embedder = nn.Embedding(vocab_size, embed_dim, padding_idx)
 

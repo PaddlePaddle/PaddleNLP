@@ -45,7 +45,7 @@ class StuffDocuments(BaseCombineDocuments):
         First, merge multiple documents, and then generate a multi document summary .
         Ensuring that the number of tokens for all documents does not exceed the len_str.
 
-        :param document_prompt: the prompt for geting and merging multiple documents
+        :param document_prompt: the prompt for getting and merging multiple documents
         :param llm_prompt: the prompt for multiple document summaries
         :param len_str: maximum document length
         :param llm: the  Language Model

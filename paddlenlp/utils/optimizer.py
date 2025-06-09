@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
+
 import paddle
 from paddle import pir
 from paddle.base import core, framework
+from paddle.base.dygraph import base as imperative_base
 from paddle.base.framework import Variable, in_dynamic_or_pir_mode, in_pir_mode
 from paddle.base.libpaddle import DataType
 from paddle.distributed import fleet
@@ -22,7 +25,6 @@ from paddle.optimizer.adamw import AdamW
 from paddle.pir import Value
 
 try:
-    # from paddlenlp_kernel.triton.optimizer import adamw_triton
     from .adamw_triton import adamw_triton
 except:
     adamw_triton = None
@@ -148,7 +150,7 @@ class AdamWMini(AdamW):
         mom1 = beta1 * mom1 + (1.0 - beta1) * grad
         mom2 = beta2 * mom2 + (1.0 - beta2) * (grad * grad).mean()
         denom = mom2.sqrt() / (1.0 - beta2_pow).sqrt() + epsilon
-        p += (moment1 / denom) * (-(lr / (1.0 - beta1_pow)))
+        p += (mom1 / denom) * (-(lr / (1.0 - beta1_pow)))
         if master_weight is not None:
             master_weight[:] = p
             param[:] = p.astype(param.dtype)
@@ -161,16 +163,17 @@ class AdamWMini(AdamW):
 
 
 class AdamWCustom(AdamW):
-    def __init__(self, quantization_config, *args, **kwargs):
+
+    def __init__(self, quantization_config, tensorwise_offload_optimizer, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.quant_scale_mapping = {}
         for p in self._param_groups:
             if "quantization_linear" in p.name and "w_1" in p.name:
                 self.quant_scale_mapping[p.name.replace("w_1", "w_0")] = p
-        print("self.quant_scale_mapping", self.quant_scale_mapping)
         self.quantization_config = quantization_config
         self._hcg = fleet.get_hybrid_communicate_group()
         self.mp_group = self._hcg.get_model_parallel_group()
+        self.tensorwise_offload_optimizer = tensorwise_offload_optimizer
 
     def _add_moments_pows(self, p, moment_dtype=core.VarDesc.VarType.FP32):
         acc_dtype = p.dtype
@@ -226,10 +229,14 @@ class AdamWCustom(AdamW):
 
                 self._add_moments_pows(master_p, moment_dtype)
                 self._already_create_accumulator.add(p.name)
-                print(p.name, p.dtype, master_p.dtype, moment_dtype)
-                continue
-            else:
+
+            elif self._is_dtype_fp16_or_bf16(p.dtype) and not self._multi_precision:
                 raise NotImplementedError("AdamWCustom only support AMP training")
+            else:
+                self._add_moments_pows(p)
+                self._already_create_accumulator.add(p.name)
+            if self.tensorwise_offload_optimizer:
+                self.offload_optim(p)
 
     def _create_master_weight(self, param):
         if param.name in self._master_weights:
@@ -238,9 +245,20 @@ class AdamWCustom(AdamW):
             var_name = self._gen_master_weight_var_name(param)
             if param.name in self.quant_scale_mapping:
                 quant_scale = self.quant_scale_mapping[param.name]
-                var = dequantize(param, quant_scale, "weight", self.quantization_config.apply_hadamard, "left").astype(
-                    "float32"
-                )
+                if self.quantization_config.weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]:
+                    var = dequantize(
+                        param,
+                        quant_scale,
+                        "weight",
+                        self.quantization_config.weight_quantize_algo,
+                        self.quantization_config,
+                        apply_hadamard=self.quantization_config.apply_hadamard,
+                        side="left",
+                    ).astype("float32")
+                else:
+                    raise NotImplementedError(
+                        f"Unknown weight_quantize_algo {self.quantization_config.weight_quantize_algo}"
+                    )
             else:
                 var = paddle.cast(param, "float32")
             var.name = var_name
@@ -253,7 +271,7 @@ class AdamWCustom(AdamW):
         :param dtype: instance of core.VarDesc.VarType
         :return: True if dtype is one of fp16 or bf16, False otherwise
         """
-        if dtype == paddle.int8:
+        if dtype == paddle.int8 or dtype == paddle.float8_e4m3fn:
             return True
         assert isinstance(
             dtype, (core.VarDesc.VarType, core.DataType)
@@ -273,6 +291,9 @@ class AdamWCustom(AdamW):
         with_decay = True
         if self._apply_decay_param_fun is not None and not self._apply_decay_param_fun(param.name):
             with_decay = False
+
+        if self.tensorwise_offload_optimizer:
+            self.reload_optim(param)
 
         moment1 = self._get_accumulator_master(self._moment1_acc_str, param_and_grad[0])
         moment2 = self._get_accumulator_master(self._moment2_acc_str, param_and_grad[0])
@@ -315,24 +336,29 @@ class AdamWCustom(AdamW):
                 skip_update_param,
             )
             if skip_update_param:
-                print("check here")
-                if self.quantization_config.weight_quantize_algo in ["a8w8linear"]:
-                    # if "row_parallel_quantiztaion_linear" in param_and_grad[0].name:
-                    #     group = self.mp_group
-                    # else:
-                    #     group = None
+                if param.weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]:
+                    if "parallel_quantization_linear" not in param.name:
+                        group = None
+                    elif param.weight_quantize_algo in ["a8w8linear", "a8w4linear"] and "row" in param.name:
+                        group = None
+                    else:
+                        group = self.mp_group
                     param[:], quant_scale[:] = quantize(
-                        param_and_grad[0],
-                        self.quantization_config.weight_quantize_algo,
-                        "weight",
-                        self.quantization_config,
-                        self.quantization_config.apply_hadamard,
-                        "left",
+                        x=master_weight.astype(quant_scale.dtype),
+                        weight_quantize_algo=self.quantization_config.weight_quantize_algo,
+                        tensor_type="weight",
+                        quantization_config=self.quantization_config,
+                        side="left",
+                        apply_hadamard=self.quantization_config.apply_hadamard,
+                        group=group,
                     )
                 else:
                     raise NotImplementedError(
                         f"Please check your weight_quantize_algo {self.quantization_config.weight_quantize_algo}."
                     )
+            if self.tensorwise_offload_optimizer:
+                self.offload_optim(param)
+
             return None
         else:
             raise NotImplementedError("Not implemented yet.")
@@ -539,3 +565,194 @@ class AdamWInt8(AdamW):
         # update powers
         b1_pow[:] *= beta1
         b2_pow[:] *= beta2
+    def offload_optim(self, p):
+        find_master = self._multi_precision and self._is_dtype_fp16_or_bf16(p.dtype)
+        if find_master:
+            self._master_weights[p.name] = self._master_weights[p.name].pin_memory()
+            target_name = self._master_weights[p.name].name
+        else:
+            target_name = p.name
+        for name in [self._moment1_acc_str, self._moment2_acc_str]:
+            if self._name is not None:
+                name = self._name + "_" + name
+            self._accumulators[name][target_name] = self._accumulators[name][target_name].pin_memory()
+
+    def reload_optim(self, p):
+        find_master = self._multi_precision and self._is_dtype_fp16_or_bf16(p.dtype)
+        if find_master:
+            self._master_weights[p.name] = self._master_weights[p.name].cuda()
+            target_name = self._master_weights[p.name].name
+        else:
+            target_name = p.name
+        for name in [self._moment1_acc_str, self._moment2_acc_str]:
+            if self._name is not None:
+                name = self._name + "_" + name
+            self._accumulators[name][target_name] = self._accumulators[name][target_name].cuda()
+
+
+class AdamWLoRAPro(AdamW):
+    def __init__(self, scaling_factor=2.0, x_mode="zero", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        assert scaling_factor is not None
+        if x_mode not in ["zero", "sylvester", "symmetry"]:
+            raise ValueError(
+                f"Invalid x_mode value: {x_mode}, " f"mode should be in ['zero', 'sylvester', 'symmetry']"
+            )
+        self.scaling_factor = scaling_factor
+        self.x_mode = x_mode
+
+    def _solve_sylvester(self, A, B, C, X=None):
+        if A.dtype in [paddle.bfloat16, paddle.float16]:
+            A = A.to("float32")
+            B = B.to("float32")
+            C = C.to("float32")
+        B = -B
+        m = tuple(B.shape)[-1]
+        n = tuple(A.shape)[-1]
+        R, U = paddle.linalg.eig(x=A)
+        S, V = paddle.linalg.eig(x=B)
+
+        CV = C @ V
+
+        U_real, U_imag = paddle.real(U), paddle.imag(U)
+        CV_real, CV_imag = paddle.real(CV), paddle.imag(CV)
+
+        n_dim = U_real.shape[0]
+
+        block_top = paddle.concat([U_real, -U_imag], axis=1)  # (n, 2n)
+        block_bot = paddle.concat([U_imag, U_real], axis=1)  # (n, 2n)
+        A_block = paddle.concat([block_top, block_bot], axis=0)  # (2n, 2n)
+        B_block = paddle.concat([CV_real, CV_imag], axis=0)  # (2n, m)
+
+        F_block = paddle.linalg.solve(A_block, B_block)  # [F_real; F_imag]
+
+        F_real = F_block[:n_dim, :]
+        F_imag = F_block[n_dim:, :]
+        F = paddle.complex(F_real, F_imag)
+
+        W = R[..., :, None] - S[..., None, :]
+        Y = F / W
+        try:
+            V_inv = paddle.linalg.inv(V)
+        except RuntimeError:
+            # Add regularization to handle singular matrices
+            epsilon = 1e-6 * paddle.mean(paddle.abs(V))
+            V_reg = V + epsilon * paddle.eye(V.shape[-1])
+            V_inv = paddle.linalg.inv(V_reg)
+        X = U[..., :n, :n] @ Y[..., :n, :m] @ V_inv[..., :m, :m]
+
+        if all(paddle.isreal(x.flatten()[0]) for x in [A, B, C]):
+            return paddle.real(X)
+        else:
+            return X
+
+    @imperative_base.no_grad
+    @framework.non_static_only
+    def step(self) -> None:
+        """
+        Execute the optimizer and update parameters once.
+
+        Returns:
+            None
+
+        Examples:
+            .. code-block:: python
+
+                >>> import paddle
+
+                >>> a = paddle.rand([2,13], dtype="float32")
+                >>> linear = paddle.nn.Linear(13, 5)
+                >>> # This can be any optimizer supported by dygraph.
+                >>> opt = paddle.optimizer.AdamW(learning_rate = 0.01,
+                ...                             parameters = linear.parameters())
+                >>> out = linear(a)
+                >>> out.backward()
+                >>> opt.step()
+                >>> opt.clear_grad()
+        """
+        if paddle.base.dygraph.base.in_to_static_mode():
+            self._declarative_step()
+            return
+
+        if not isinstance(self._parameter_list[0], dict):
+            param_id_to_idx = {id(param): idx for idx, param in enumerate(self._parameter_list)}
+
+            lora_params = {}
+            for idx, param in enumerate(self._parameter_list):
+                name = getattr(param, "name", f"param_{idx}")
+                match = re.match(r"lo_ra_linear_(\d+)\.w_(\d+)", name)
+                if match:
+                    layer_num = int(match.group(1))
+                    weight_type = match.group(2)
+                    if layer_num not in lora_params:
+                        lora_params[layer_num] = {}
+                    lora_params[layer_num][weight_type] = param
+
+            for layer_num, weights in lora_params.items():
+                if "1" in weights and "2" in weights:
+                    param_B = weights["1"]
+                    param_A = weights["2"]
+
+                    idx_B = param_id_to_idx[id(param_B)]
+                    idx_A = param_id_to_idx[id(param_A)]
+
+                    if param_A._grad_ivar() is not None and param_B._grad_ivar() is not None:
+                        A = param_A.detach()
+                        B = param_B.detach()
+                        grad_A = param_A._grad_ivar()
+                        grad_B = param_B._grad_ivar()
+
+                        delta = 1e-08
+                        AA_T = A @ A.T
+                        B_TB = B.T @ B
+                        AA_T_inv = paddle.linalg.pinv(AA_T + delta * paddle.eye(num_rows=AA_T.shape[0]))
+                        B_TB_inv = paddle.linalg.pinv(B_TB + delta * paddle.eye(num_rows=B_TB.shape[0]))
+
+                        if self.x_mode == "sylvester":
+                            X = self._solve_sylvester(
+                                B_TB, AA_T, -(1 / self.scaling_factor**2) * B_TB_inv @ grad_A @ A.T
+                            )
+                        elif self.x_mode == "symmetry":
+                            X = -0.5 * (1 / self.scaling_factor**2) * B_TB_inv @ B.T @ grad_B @ AA_T
+                        else:  # zero mode
+                            X = paddle.zeros(shape=(B_TB_inv.shape[0], B_TB_inv.shape[0]))
+
+                        X = X.clone().detach().cast(A.dtype)
+
+                        new_grad_A = (1 / self.scaling_factor**2) * B_TB_inv @ grad_A + X @ A
+                        new_grad_B = (1 / self.scaling_factor**2) * (
+                            (paddle.eye(num_rows=B.shape[0]) - B @ B_TB_inv @ B.T) @ grad_B @ AA_T_inv
+                        ) - B @ X
+
+                        self._parameter_list[idx_A]._grad_ivar()[:] = new_grad_A
+                        self._parameter_list[idx_B]._grad_ivar()[:] = new_grad_B
+
+            params_grads = []
+            for param in self._parameter_list:
+                if param.stop_gradient:
+                    continue
+                if param._grad_ivar() is not None:
+                    grad_var = param._grad_ivar()
+                    if framework.in_dygraph_mode():
+                        if (
+                            hasattr(grad_var, "is_selected_rows")
+                            and grad_var.is_selected_rows()
+                            and self.regularization is not None
+                        ):
+                            raise RuntimeError(
+                                "AdamW don't support weight_decay with sparse parameters, please set it to None."
+                            )
+                    else:
+                        if (
+                            hasattr(grad_var, "_is_sparse")
+                            and grad_var._is_sparse()
+                            and self.regularization is not None
+                        ):
+                            raise RuntimeError(
+                                "AdamW don't support weight_decay with sparse parameters, please set it to None."
+                            )
+                    params_grads.append((param, grad_var))
+
+                    self._apply_optimize(loss=None, startup_program=None, params_grads=params_grads)
+        else:
+            raise NotImplementedError("AdamWLoRAPro does not support parameter groups")

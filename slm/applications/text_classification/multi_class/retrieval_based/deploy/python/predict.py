@@ -22,6 +22,10 @@ from scipy import spatial
 
 from paddlenlp.data import Pad, Tuple
 from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 
 sys.path.append(".")
 
@@ -114,8 +118,8 @@ class Predictor(object):
         self.max_seq_length = max_seq_length
         self.batch_size = batch_size
 
-        model_file = model_dir + "/inference.get_pooled_embedding.pdmodel"
-        params_file = model_dir + "/inference.get_pooled_embedding.pdiparams"
+        model_file = model_dir + f"/inference.get_pooled_embedding{PADDLE_INFERENCE_MODEL_SUFFIX}"
+        params_file = model_dir + f"/inference.get_pooled_embedding{PADDLE_INFERENCE_WEIGHTS_SUFFIX}"
         if not os.path.exists(model_file):
             raise ValueError("not find model file path {}".format(model_file))
         if not os.path.exists(params_file):

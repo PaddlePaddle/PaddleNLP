@@ -17,8 +17,10 @@ from __future__ import annotations
 import inspect
 import json
 import os
+import re
 from copy import deepcopy
 from dataclasses import dataclass
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -38,7 +40,7 @@ from paddle import Tensor
 from paddle.nn import Layer
 
 from paddlenlp.utils.distributed import distributed_allgather, distributed_gather
-from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHTS_NAME, PYTORCH_WEIGHTS_NAME
+from paddlenlp.utils.env import CONFIG_NAME, PYTORCH_WEIGHTS_NAME
 from paddlenlp.utils.import_utils import (
     is_package_available,
     is_torch_available,
@@ -56,6 +58,45 @@ from ..utils import device_guard
 # the type hinting for pytorch model & layer & tensor
 Module = TypeVar("Module")
 PytorchTensor = TypeVar("PytorchTensor")
+
+
+def add_quant_mapping(name_action_mappings, quantization_config, is_optim=False):
+    mapping_keys = list(name_action_mappings.keys())
+    pattern = r"^(?:.*\.)?layers(\.[a-zA-Z0-9_]+)*\.weight$"
+    for key in mapping_keys:
+        if re.match(pattern, key):
+            quant_key = key.replace("weight", "quant_weight")
+            quant_scale_key = key.replace("weight", "quant_scale")
+            fn = name_action_mappings.pop(key)
+            if is_optim:
+                name_action_mappings[quant_key] = fn
+            else:
+                if isinstance(fn, partial):
+                    if "is_column" in fn.keywords:
+                        old_value = fn.keywords["is_column"]
+                        new_value = not old_value
+                        name_action_mappings[quant_key] = partial(
+                            fn.func, *fn.args, **{**fn.keywords, "is_column": new_value}
+                        )
+                        if quantization_config.weight_quantize_algo not in ["fp8linear"] and old_value:
+                            name_action_mappings[quant_scale_key] = partial(
+                                fn.func, *fn.args, **{**fn.keywords, "is_column": new_value}
+                            )
+                    elif "is_quant" in fn.keywords:
+                        old_value = fn.keywords["is_quant"]
+                        new_value = not old_value
+                        name_action_mappings[quant_key] = partial(
+                            fn.func, *fn.args, **{**fn.keywords, "is_quant": new_value}
+                        )
+                        if quantization_config.weight_quantize_algo not in ["fp8linear"]:
+                            name_action_mappings[quant_scale_key] = split_or_merge_func(
+                                is_split=fn.keywords["tensor_parallel_degree"],
+                                tensor_parallel_degree=fn.keywords["tensor_parallel_degree"],
+                                tensor_parallel_rank=fn.keywords["tensor_parallel_rank"],
+                                num_attention_heads=fn.keywords["num_attention_head"],
+                            )
+
+    return name_action_mappings
 
 
 def tensor_summary(tensor: Union[str, Tensor, PytorchTensor, tuple, list, ndarray]):
@@ -439,7 +480,7 @@ def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=No
 
 
 """
-There're three types of MultiHeadAttention QKV Layout in Transfomers
+There're three types of MultiHeadAttention QKV Layout in Transformers
 
 tensor_parallel_qkv = [q1, k1, v1, q2, k2, v2]
 naive_merged_qkv    = [q1, q1, k1, k2, v1, v2]
@@ -572,14 +613,14 @@ def split_param_func():
             [gate_weight, up_weight] => [gate_weight], [up_weight]
 
         Args:
-            fused_param (_type_): len(fused_param)=1, only one weight to be splitted
+            fused_param (_type_): len(fused_param)=1, only one weight to be split
             split_nums (int, optional): split_nums. Defaults to 2.
             is_qkv (bool, optional): for attention qkv weights. Defaults to False.
             num_heads (_type_, optional): query heads. Defaults to None.
             num_key_value_heads (_type_, optional): key and value heads. Defaults to None.
 
         Returns:
-            _type_: splitted weights
+            _type_: split weights
         """
         concat_fn = np.concatenate
         split_fn = np.split
@@ -692,7 +733,7 @@ class StateDictNameMapping:
         return self.action == "transpose"
 
     def should_merge_last_two_dim(self) -> bool:
-        """check that wether merge last two dim"""
+        """check that whether merge last two dim"""
         return self.action == "merge_last_two_dim"
 
     def run(self, state_dict: dict[str, ndarray], name: str) -> ndarray:
@@ -764,7 +805,7 @@ class TensorInfoSaver:
         """output the summary info into different terminal
 
         Args:
-            output_path (Optional[str], optional): the dir/file of sumamry file. Defaults to None.
+            output_path (Optional[str], optional): the dir/file of summary file. Defaults to None.
         """
         if output_path and os.path.isdir(output_path):
             output_path = os.path.join(output_path, "tensor_summary.xlsx")
@@ -800,10 +841,10 @@ class TensorInfoSaver:
 
 
 class LogitHooker:
-    """hooks for pytorch model and paddle model, used to generate the logits of elment layers"""
+    """hooks for pytorch model and paddle model, used to generate the logits of element layers"""
 
     def __init__(self, mappings: List[StateDictNameMapping], tensor_info_saver: Optional[TensorInfoSaver] = None):
-        """registe the logit hooks to compare the inputs * outputs model
+        """register the logit hooks to compare the inputs * outputs model
 
         Args:
             mappings (List[StateDictNameMapping]): the mappings between paddle & pytorch model
@@ -850,7 +891,7 @@ class LogitHooker:
         self.tensor_info_saver.add(state_dict_name, "pytorch-outputs", outputs)
 
     def register_paddle_model_hooks(self, model: Layer):
-        """regist post forward hook to save the inputs & outputs of paddle model
+        """register post forward hook to save the inputs & outputs of paddle model
 
         Args:
             model (Layer): paddle model
@@ -885,7 +926,7 @@ class LogitHooker:
             register_hook_by_name(model, mapping, self._paddle_hooks)
 
     def register_pytorch_model_hooks(self, model: Module):
-        """regist hook for pytorch model to save the inputs & outputs of pytorch model
+        """register hook for pytorch model to save the inputs & outputs of pytorch model
 
         Args:
             model (_type_): pytorch model
@@ -1006,7 +1047,7 @@ class LogitComparer:
         pytorch_model: Union[Module, Dict[str, ndarray]],
         name_mappings: List[StateDictNameMapping],
     ):
-        """compare the pytorch and paddle mdoel state with name mappings
+        """compare the pytorch and paddle model state with name mappings
 
         Args:
             paddle_model (Union[Layer, Dict[str, ndarray]]): paddle model instance
@@ -1045,7 +1086,7 @@ class LogitComparer:
         """compare the logit of pytorch & paddle model
 
         Returns:
-            bool: if the logits is absolutly same
+            bool: if the logits is absolutely same
         """
         PaddleModel, PytorchModel = self.get_paddle_pytorch_model_classes()
         paddle_model = PaddleModel.from_pretrained(self.input_dir)
@@ -1120,7 +1161,7 @@ class LogitComparer:
         if is_torch_available() and is_transformers_available():
             result = self.compare_logits()
             if result is True:
-                logger.info("the logits between pytorch model and paddle model is absolutly same")
+                logger.info("the logits between pytorch model and paddle model is absolutely same")
             else:
                 logger.error(
                     "the logits between pytorch model and paddle model is not same, please check it out more carefully."
@@ -1134,7 +1175,7 @@ class LogitComparer:
 class ConversionMixin:
     @classmethod
     def support_conversion(cls, config: PretrainedConfig) -> bool:
-        """check wether the model support conversion"""
+        """check whether the model support conversion"""
         try:
             # try to get the name-mapping info
             _ = cls._get_name_mappings(config)
@@ -1161,7 +1202,7 @@ class ConversionMixin:
                     file for file in os.listdir(os.path.dirname(weight_file)) if file.startswith("pytorch_model-")
                 ]
             state_dict = {}
-            for file in files:
+            for file in sorted(files):
                 sub_state_dict = load_torch(os.path.join(os.path.dirname(weight_file), file))
                 state_dict.update(sub_state_dict)
         else:
@@ -1179,13 +1220,9 @@ class ConversionMixin:
                 all_layer_names.remove(name_mapping.source_name)
 
         if all_layer_names:
-            logger.warning(f"there are {len(all_layer_names)} tensors not initialized:")
-            for layer_name in all_layer_names:
-                logger.warning(f"--- {layer_name}")
+            logger.warning(f"There are {len(all_layer_names)} tensors not initialized:")
+            logger.warning(f"Keys: {all_layer_names}")
 
-        model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)
-        if not os.path.isfile(model_weight_file):
-            paddle.save(state_dict, model_weight_file)
         return state_dict
 
     @classmethod
@@ -1211,8 +1248,12 @@ class ConversionMixin:
         is_split=True,
         ignore_error=False,
         base_model_prefix=None,
+        post_quantize=False,
+        is_optim=False,
     ):
         name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=is_split)
+        if config.quantization_config.is_weight_quantize() and not post_quantize:
+            name_action_mappings = add_quant_mapping(name_action_mappings, config.quantization_config, is_optim)
         state_keys_map = cls._resolve_prefix_keys(
             name_action_mappings.keys(), loaded_state_dict_keys, ignore_error, base_model_prefix=base_model_prefix
         )
@@ -1234,10 +1275,12 @@ class ConversionMixin:
         """
 
         name_action_mappings = cls._get_tensor_parallel_mappings(config)
+        if config.quantization_config.is_weight_quantize():
+            name_action_mappings = add_quant_mapping(name_action_mappings, config.quantization_config)
         if state_dict is None:
             with device_guard("cpu"):
                 state_dict = paddle.load(weight_file, return_numpy=False)
-            logger.info("Starting to convert orignal state_dict to tensor parallel state_dict.")
+            logger.info("Starting to convert original state_dict to tensor parallel state_dict.")
 
         state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys(), ignore_error)
 
@@ -1265,6 +1308,8 @@ class ConversionMixin:
             config (PretrainedConfig): the PretrainedConfig instance of model
         """
         name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=False)
+        if config.quantization_config.is_weight_quantize():
+            name_action_mappings = add_quant_mapping(name_action_mappings, config.quantization_config)
         state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys())
 
         for k, v in state_keys_map.items():
@@ -1553,10 +1598,7 @@ class Converter(ConversionMixin, LogitComparer):
             all_layer_names.remove(name_mapping.source_name)
 
         if all_layer_names:
-            logger.warning(f"there are {len(all_layer_names)} tensors not initialized:")
-            for layer_name in all_layer_names:
-                logger.warning(f"--- {layer_name}")
+            logger.warning(f"There are {len(all_layer_names)} tensors not initialized:")
+            logger.warning(f"Keys: {all_layer_names}")
 
-        model_weight_file = os.path.join(input_dir, PADDLE_WEIGHTS_NAME)
-        paddle.save(state_dict, model_weight_file)
         return state_dict

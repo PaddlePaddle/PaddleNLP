@@ -69,7 +69,7 @@ def hadamard_matmul(input, side, hadamard_maxtrix, block_size):
         # H.T@input -> (input.T@H).T
         input = input.transpose([1, 0])
     block_num = input.shape[-1] // block_size
-    output = input.reshape([-1, block_num, block_size]) @ hadamard_maxtrix
+    output = input.reshape([-1, block_num, block_size]) @ hadamard_matrix
     output = output.reshape([-1, block_num * block_size])
     if side == "left":
         output = output.transpose([1, 0])
@@ -78,26 +78,14 @@ def hadamard_matmul(input, side, hadamard_maxtrix, block_size):
     return output
 
 
-def apply_hadamard_matmul(x, side, quantization_config=None, dequant=False):
+def apply_hadamard_matmul(x, side, block_size):
     if getattr(infohub, "hadamard") is None:
         setattr(infohub, "hadamard", {})
-    if side == "left":
-        x_shape = x.shape[0]
-    else:
-        x_shape = x.shape[-1]
-    if x_shape in infohub.hadamard:
-        hadamard_maxtrix, block_size = infohub.hadamard[x_shape]
-    else:
-        hadamard_matrix, block_size = random_hadamard_matrix(x_shape, x.dtype, quantization_config)
-        infohub.hadamard[x_shape] = (hadamard_matrix, block_size)
-    if block_size > 1:
-        target_x = hadamard_matmul(x, side, hadamard_maxtrix, block_size)
-    else:
-        if dequant:
-            hadamard_matrix = hadamard_matrix.T
-        if side == "right":
-            target_x = x @ hadamard_matrix
-        else:
-            target_x = hadamard_matrix.T @ x
 
-    return target_x, block_size
+    if block_size in infohub.hadamard:
+        hadamard_matrix = infohub.hadamard[block_size]
+    else:
+        hadamard_matrix = create_hadamard_matrix(block_size, x.dtype)
+        infohub.hadamard[block_size] = hadamard_matrix
+    target_x = hadamard_matmul(x, side, hadamard_matrix, block_size)
+    return target_x

@@ -200,7 +200,7 @@ def is_chinese_char(cp):
 
 
 def _is_nonnormalized_char(char):
-    """Check whther `chars` is a non-normalized character."""
+    """Check whether `chars` is a non-normalized character."""
     cp = ord(char)
     if (
         (0xFF00 <= cp <= 0xFFEF)
@@ -526,8 +526,24 @@ class ChatTemplate:
         def raise_exception(message):
             raise TemplateError(message)
 
+        def regex_findall(s, pattern, multiline=False, dotall=False):
+            flags = 0
+            if multiline:
+                flags |= re.MULTILINE
+            if dotall:
+                flags |= re.DOTALL
+            return re.findall(pattern, s, flags)
+
+        def tojson(x, ensure_ascii=False, indent=None, separators=None, sort_keys=False):
+            # We override the built-in tojson filter because Jinja's default filter escapes HTML characters
+            # We also expose some options like custom indents and separators
+            return json.dumps(x, ensure_ascii=ensure_ascii, indent=indent, separators=separators, sort_keys=sort_keys)
+
         jinja_env = ImmutableSandboxedEnvironment(trim_blocks=True, lstrip_blocks=True, keep_trailing_newline=True)
         jinja_env.globals["raise_exception"] = raise_exception
+        jinja_env.filters["regex_findall"] = regex_findall
+        jinja_env.filters["tojson"] = tojson
+        jinja_env.globals.update(regex_findall=regex_findall)
         return jinja_env.from_string(chat_template)
 
     def render_conversation(
@@ -669,7 +685,7 @@ class ChatTemplateMixin:
             conversation = [[conversation]]
         elif isinstance(conversation, list) and isinstance(conversation[0], str):
             raise ValueError(
-                "apply_chat_template do not support appling batch conversations, "
+                "apply_chat_template do not support applying batch conversations, "
                 "so you should apply the conversation one by one."
             )
 
@@ -691,15 +707,24 @@ class ChatTemplateMixin:
                 conversations = conversation
             else:
                 raise ValueError(
-                    "apply_chat_template do not support appling batch conversations, "
+                    "apply_chat_template do not support applying batch conversations, "
                     "so you should apply the conversation one by one."
                 )
+        elif isinstance(conversation, dict):
+            conversations = conversation
+            query = self.chat_template.render(
+                conversations, **self.special_tokens_map, add_generation_prompt=add_generation_prompt
+            )
+            return query
+
         query = self.chat_template.render(
             messages=conversations, **self.special_tokens_map, add_generation_prompt=add_generation_prompt
         )
         return query
 
-    def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}, **kwargs):
+    def encode_chat_inputs(
+        self, conversations: List[List[str, str]] | Dict[str, Any], context_data: Dict[str, Any] = {}, **kwargs
+    ):
         """Encodes conversation to pairs of token ids.
         Turn 0: bos + system + sep + user     bot + eos
         Turn t: sep + bot + query             bot + eos
@@ -715,7 +740,13 @@ class ChatTemplateMixin:
             raise ValueError("chat_template is not set, please set chat_template first.")
         elif isinstance(self.chat_template, Template):
             add_generation_prompt = kwargs.pop("add_generation_prompt", True)
-            query = self._encode_chat_inputs(conversations, context_data, add_generation_prompt=add_generation_prompt)
+            if not isinstance(conversations, dict):
+                query = self._encode_chat_inputs(
+                    conversations, context_data, add_generation_prompt=add_generation_prompt
+                )
+            else:
+                conversations.update(add_generation_prompt=add_generation_prompt)
+                query = self._encode_chat_inputs_openai_format(conversations)
         elif isinstance(self.chat_template, ChatTemplate):
             query = self._encode_chat_inputs_paddle(conversations, context_data)
         return query
@@ -744,6 +775,50 @@ class ChatTemplateMixin:
 
         result["conversations"] = conversation_ids
         return result
+
+    def _encode_chat_inputs_openai_format(
+        self,
+        conversations: Dict[str, Any],
+        add_generation_prompt=True,
+    ):
+        conversation_dict = {} if "tools" not in conversations else {"tools": conversations["tools"]}
+        conversation_dict["messages"] = (
+            [conversations["messages"][0]] if conversations["messages"][0]["role"] == "system" else []
+        )
+
+        if conversations["messages"][0]["role"] == "system":
+            conversations["messages"] = conversations["messages"][1:]
+
+        cur_str = ""
+        conversation_ids = []
+        for idx in range(0, len(conversations["messages"]), 2):
+            conversation_id = []
+            conversation_dict["messages"].append(conversations["messages"][idx])
+            round_str = self.chat_template.render(
+                conversation_dict, add_generation_prompt=False, **self.special_tokens_map
+            )
+            conversation_id.append(
+                self.encode(round_str[len(cur_str) :], split_special_tokens=False, add_special_tokens=False)[
+                    "input_ids"
+                ]
+            )
+            cur_str = round_str
+
+            if idx + 1 < len(conversations["messages"]):
+                conversation_dict["messages"].append(conversations["messages"][idx + 1])
+                round_str = self.chat_template.render(
+                    conversation_dict, add_generation_prompt=False, **self.special_tokens_map
+                )
+                conversation_id.append(
+                    self.encode(round_str[len(cur_str) :], split_special_tokens=False, add_special_tokens=False)[
+                        "input_ids"
+                    ]
+                )
+                cur_str = round_str
+
+            conversation_ids.append(conversation_id)
+
+        return conversation_ids
 
     def _encode_chat_inputs(
         self,
@@ -807,7 +882,7 @@ class ChatTemplateMixin:
 
     def _extract_non_learnable_parts(self, origin_msg: List[Dict[str, str]], split_s: List[str]):
         """Split the entire chat by specified words. Extract the non-learnable parts."""
-        # distingish and replace the special words in original string to an uncompiled form: Like | -> \|
+        # distinguish and replace the special words in original string to an uncompiled form: Like | -> \|
         regex_pattern = "|".join(map(re.escape, split_s))
         # splited by replaced specified words
         non_learnable_parts = re.split(
@@ -1585,7 +1660,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
                         sequence = ids + pair_ids if pair else ids
                         token_type_ids = [0] * len(ids) + ([0] * len(pair_ids) if pair else [])
                     encoded_inputs["offset_mapping"] = offset_mapping
-                    # Build output dictionnary
+                    # Build output dictionary
                     encoded_inputs["input_ids"] = sequence
                     if return_token_type_ids:
                         encoded_inputs["token_type_ids"] = token_type_ids
@@ -1936,7 +2011,7 @@ class BPETokenizer(PretrainedTokenizer):
             The reversible bpe codes work on unicode strings.
             This means you need a large # of unicode characters in your vocab if you want to avoid UNKs.
             When you're at something like a 10B token dataset you end up needing around 5K for decent coverage.
-            This is a signficant percentage of your normal, say, 32K bpe vocab.
+            This is a significant percentage of your normal, say, 32K bpe vocab.
             To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
             And avoids mapping to whitespace/control characters the bpe code barfs on.
             """

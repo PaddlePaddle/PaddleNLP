@@ -19,6 +19,11 @@ import numpy as np
 import paddle
 
 from paddlenlp.transformers import ChatGLMConfig, ChatGLMForCausalLM, ChatGLMModel
+
+# from paddlenlp.utils.env import (
+#     PADDLE_INFERENCE_MODEL_SUFFIX,
+#     PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+# )
 from tests.transformers.test_configuration_common import ConfigTester
 from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import (
@@ -380,8 +385,8 @@ class ChatGLMTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
 #                     ),
 #                 )
 
-#                 model_path = os.path.join(tempdir, "model.pdmodel")
-#                 params_path = os.path.join(tempdir, "model.pdiparams")
+#                 model_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")
+#                 params_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
 #                 config = paddle.inference.Config(model_path, params_path)
 
 #                 config.disable_gpu()
@@ -450,8 +455,8 @@ class ChatGLMTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
 #                     ),
 #                 )
 
-#                 model_path = os.path.join(tempdir, "model.pdmodel")
-#                 params_path = os.path.join(tempdir, "model.pdiparams")
+#                 model_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")
+#                 params_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
 #                 config = paddle.inference.Config(model_path, params_path)
 
 #                 config.disable_gpu()

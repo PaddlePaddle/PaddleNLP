@@ -184,7 +184,7 @@ class PDCTools:
             return PDCErrorCode.CommandTimeout
         result = result_queue.get()
         if isinstance(result, str):
-            logger.error(f"Unknown exception occured during download process, details: {result}")
+            logger.error(f"Unknown exception occurred during download process, details: {result}")
             return PDCErrorCode.UnknownError
         return result
 
@@ -234,7 +234,7 @@ class PDCTools:
             return PDCErrorCode.CommandTimeout
         result = result_queue.get()
         if isinstance(result, str):
-            logger.error(f"Unknown exception occured during download process, details: {result}")
+            logger.error(f"Unknown exception occurred during download process, details: {result}")
             return PDCErrorCode.UnknownError
         return result
 

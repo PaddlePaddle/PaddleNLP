@@ -39,6 +39,11 @@ from paddlenlp.transformers import (  # import gpt model
     PretrainedConfig,
     PretrainedTokenizer,
 )
+
+# from paddlenlp.utils.env import (
+#     PADDLE_INFERENCE_MODEL_SUFFIX,
+#     PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+# )
 from tests.testing_utils import slow
 
 
@@ -694,7 +699,7 @@ class UtilsFunctionsTest:
                     2.12662941,
                     -9.32562038,
                     2.35652522,
-                ],  # cummulative prob of 4 highest values <= 0.6
+                ],  # cumulative prob of 4 highest values <= 0.6
                 [
                     0.58425518,
                     4.53139238,
@@ -726,7 +731,7 @@ class UtilsFunctionsTest:
                     9.67702323,  # 1st highest value; idx. 27
                     -5.89478553,
                     1.85370467,
-                ],  # cummulative prob of 4 highest values <= 0.6
+                ],  # cumulative prob of 4 highest values <= 0.6
             ],
             dtype="float32",
         )
@@ -1199,8 +1204,8 @@ class TinyRandomGenerationTest(unittest.TestCase):
 #                 ),
 #             )
 
-#             model_path = os.path.join(tempdir, "model.pdmodel")
-#             params_path = os.path.join(tempdir, "model.pdiparams")
+#             model_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")
+#             params_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
 #             config = paddle.inference.Config(model_path, params_path)
 
 #             config.disable_gpu()
@@ -1265,8 +1270,8 @@ class TinyRandomGenerationTest(unittest.TestCase):
 #                 ),
 #             )
 
-#             model_path = os.path.join(tempdir, "model.pdmodel")
-#             params_path = os.path.join(tempdir, "model.pdiparams")
+#             model_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")
+#             params_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
 #             config = paddle.inference.Config(model_path, params_path)
 
 #             config.disable_gpu()

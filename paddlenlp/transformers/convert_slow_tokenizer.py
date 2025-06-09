@@ -274,7 +274,7 @@ def bytes_to_unicode():
     The reversible bpe codes work on unicode strings.
     This means you need a large # of unicode characters in your vocab if you want to avoid UNKs.
     When you're at something like a 10B token dataset you end up needing around 5K for decent coverage.
-    This is a signficant percentage of your normal, say, 32K bpe vocab.
+    This is a significant percentage of your normal, say, 32K bpe vocab.
     To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
     And avoids mapping to whitespace/control characters the bpe code barfs on.
     """
@@ -691,5 +691,5 @@ def convert_slow_tokenizer(transformer_tokenizer, from_tiktoken=False) -> Tokeni
             raise ValueError(
                 f"Converting from Tiktoken failed, if a converter for SentencePiece is available, provide a model path "
                 f"with a SentencePiece tokenizer.model file."
-                f"Currently available slow->fast convertors: {list(SLOW_TO_FAST_CONVERTERS.keys())}"
+                f"Currently available slow->fast converters: {list(SLOW_TO_FAST_CONVERTERS.keys())}"
             )

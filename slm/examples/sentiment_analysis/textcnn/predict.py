@@ -72,7 +72,7 @@ if __name__ == "__main__":
     vocab = Vocab.load_vocabulary(args.vocab_path, unk_token="[UNK]", pad_token="[PAD]")
     label_map = {0: "negative", 1: "neutral", 2: "positive"}
 
-    # Construct the newtork.
+    # Construct the network.
     vocab_size = len(vocab)
     num_classes = len(label_map)
     pad_token_id = vocab.to_indices("[PAD]")

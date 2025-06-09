@@ -23,6 +23,7 @@ import paddle
 from paddle.distributed import fleet
 
 from paddlenlp.datasets.rlhf_datasets import RLHFDataset, collate_fn
+from paddlenlp.generation import GenerationConfig
 from paddlenlp.rl.models.score_model import AutoModelForScore
 from paddlenlp.rl.trainer.ppo_trainer import PPOTrainer
 from paddlenlp.rl.utils.config_utils import (
@@ -31,7 +32,7 @@ from paddlenlp.rl.utils.config_utils import (
     TrainingArguments,
 )
 from paddlenlp.rl.utils.offload_utils import offload_tensor_to_cpu
-from paddlenlp.rl.utils.reshard_utils import init_rollout_env
+from paddlenlp.rl.utils.reshard_utils import ReshardController
 from paddlenlp.rl.utils.timer_utils import timers_scope_runtimer
 from paddlenlp.trainer import (
     EarlyStoppingCallback,
@@ -44,6 +45,7 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     PretrainedConfig,
 )
+from paddlenlp.transformers.configuration_utils import LlmMetaConfig
 from paddlenlp.trl import llm_utils
 from paddlenlp.utils.log import logger
 
@@ -79,6 +81,7 @@ def create_actor_models(
     data_args: DataArgument,
     training_args: TrainingArguments,
     common_config: Dict,
+    reshard_controller: ReshardController = None,
 ):
     with timers_scope_runtimer("Actor model loading time"):
         # actor model
@@ -87,22 +90,21 @@ def create_actor_models(
             tensor_parallel_output=training_args.tensor_parallel_output,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             tensor_parallel_rank=training_args.tensor_parallel_rank,
-            recompute_granularity=model_args.recompute_granularity,
+            recompute_granularity=training_args.recompute_granularity,
             dtype=training_args.model_dtype,
             recompute=training_args.recompute,
             recompute_use_reentrant=training_args.recompute_use_reentrant,
             **common_config,
         )
+        LlmMetaConfig.set_llm_config(actor_model_config, training_args)
 
         actor_model_config.use_fused_head_and_loss_fn = training_args.use_fused_head_and_loss_fn
         actor_model_config.set_attn_func = True
         actor_model_config.max_position_embeddings = data_args.max_length
         actor_model_config.use_sparse_head_and_loss_fn = False
-        actor_model_config.fused_linear = model_args.fused_linear
-        actor_model_config.use_fused_rms_norm = training_args.use_fused_rms_norm
         actor_model_config.seq_length = data_args.max_length
         actor_model_config.max_sequence_length = data_args.max_length
-        print(f"Loading Actor model with config:\n\t{actor_model_config}\n")
+        logger.info(f"Loading Actor model with config:\n\t{actor_model_config}\n")
 
         if not training_args.autotuner_benchmark:
             actor_model = AutoModelForCausalLM.from_pretrained(
@@ -112,18 +114,16 @@ def create_actor_models(
             actor_model = AutoModelForCausalLM.from_config(actor_model_config)
 
     with timers_scope_runtimer("Actor eval model loading time"):
-        if (
-            training_args.rollout_tensor_parallel_degree != training_args.tensor_parallel_degree
-            or training_args.pipeline_parallel_degree > 1
-        ):
+        if reshard_controller is not None:
+            reshard_controller.set_rollout_env("[create actor eval model]")
             actor_eval_model_config = copy.deepcopy(actor_model_config)
             actor_eval_model_config.use_fused_head_and_loss_fn = False
-            with init_rollout_env(training_args.rollout_tensor_parallel_degree):
-                hcg = fleet.get_hybrid_communicate_group()
-                actor_eval_model_config.tensor_parallel_degree = hcg.get_model_parallel_world_size()
-                actor_eval_model_config.tensor_parallel_rank = hcg.get_model_parallel_rank()
-                # TODO(gongenlei): lazy load lazy guard
-                actor_eval_model = AutoModelForCausalLM.from_config(actor_eval_model_config)
+            hcg = fleet.get_hybrid_communicate_group()
+            actor_eval_model_config.tensor_parallel_degree = hcg.get_model_parallel_world_size()
+            actor_eval_model_config.tensor_parallel_rank = hcg.get_model_parallel_rank()
+            # TODO(gongenlei): lazy load lazy guard
+            actor_eval_model = AutoModelForCausalLM.from_config(actor_eval_model_config)
+            reshard_controller.set_train_env("[after create actor eval model]")
         else:
             actor_eval_model = None
 
@@ -167,10 +167,10 @@ def create_reward_models(
             recompute_use_reentrant=training_args.recompute_use_reentrant,
             **common_config,
         )
+        LlmMetaConfig.set_llm_config(reward_model_config, training_args)
         reward_model_config.max_position_embeddings = data_args.max_length
         reward_model_config.use_sparse_head_and_loss_fn = False
-        reward_model_config.fused_linear = model_args.fused_linear
-        print(f"Loading Reward model with config:\n\t{reward_model_config}\n")
+        logger.info(f"Loading Reward model with config:\n\t{reward_model_config}\n")
 
         config = copy.deepcopy(reward_model_config)
         if training_args.eval_mode is not None:
@@ -276,7 +276,8 @@ def create_rl_dataset(data_args, training_args, tokenizer):
         tokenizer=tokenizer,
         max_prompt_len=data_args.max_prompt_len,
         requires_label=requires_label,
-        label_key=data_args.label_key,
+        prompt_key=data_args.prompt_key,
+        response_key=data_args.response_key,
         splits="train",
     )
     dev_ds = RLHFDataset(
@@ -284,7 +285,8 @@ def create_rl_dataset(data_args, training_args, tokenizer):
         tokenizer=tokenizer,
         max_prompt_len=data_args.max_prompt_len,
         requires_label=requires_label,
-        label_key=data_args.label_key,
+        prompt_key=data_args.prompt_key,
+        response_key=data_args.response_key,
         splits="dev",
     )
     return train_ds, dev_ds
@@ -295,6 +297,8 @@ def main():
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
+    elif len(sys.argv) >= 2 and sys.argv[1].endswith(".yaml"):
+        model_args, data_args, training_args = parser.parse_yaml_file_and_cmd_lines()
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
@@ -312,14 +316,22 @@ def main():
             )
 
     common_config = dict(
-        use_flash_attention=model_args.use_flash_attention,
+        use_flash_attention=training_args.use_flash_attention,
         sequence_parallel=training_args.sequence_parallel,
         fused_rotary=False,
         max_sequence_length=data_args.max_length,
     )
 
+    if (
+        training_args.rollout_tensor_parallel_degree != training_args.tensor_parallel_degree
+        or training_args.pipeline_parallel_degree > 1
+    ):
+        reshard_controller = ReshardController(tensor_parallel_degree=training_args.rollout_tensor_parallel_degree)
+    else:
+        reshard_controller = None
+
     actor_model, actor_eval_model, reference_model, actor_tokenizer = create_actor_models(
-        model_args, data_args, training_args, common_config
+        model_args, data_args, training_args, common_config, reshard_controller
     )
 
     if not training_args.use_rm_server and model_args.reward_model_name_or_path is not None:
@@ -354,6 +366,12 @@ def main():
         accuracy = (eval_preds.predictions == 3).astype("float32").mean().item()
         return {"accuracy": accuracy}
 
+    try:
+        generation_config = GenerationConfig.from_pretrained(model_args.actor_model_name_or_path)
+    except:
+        logger.warning("Can't find generation config, so it will not use generation_config field in the model config")
+        generation_config = None
+
     trainer = PPOTrainer(
         actor_model=actor_model,
         reference_model=reference_model,
@@ -372,8 +390,11 @@ def main():
             collate_fn,
             pad_token_id=actor_tokenizer.pad_token_id,
             requires_label=True if training_args.use_rm_server else False,
-        ),
+            max_prompt_len=data_args.max_prompt_len if training_args.balance_batch else None,
+        ),  # NOTE: enforce prompt padding to max_prompt_len when using balance_batch
         compute_metrics=compute_metrics,  # TODO: only used for grpo (kk datasets)
+        generation_config=generation_config,
+        reshard_controller=reshard_controller,
     )
 
     # TODO(gongenlei) resume_from_checkpoint is not ready

@@ -6,7 +6,7 @@
 
 **The AutoNLP APIs are subjective to significant changes until formal release**
 
-**AutoNLP** is an experimental project by PaddleNLP to democratize NLP for everyone. Delivering a successful NLP project is not easy, as it requires deep domain knowledge. Time after time, we have seen people struggle to make NLP work on their dataset, for their projects, which is why we are building **AutoNLP**. Compared with the traditional AutoML approach of massive paid compute for State-of-the-Art model performance, we have a different philosphy:
+**AutoNLP** is an experimental project by PaddleNLP to democratize NLP for everyone. Delivering a successful NLP project is not easy, as it requires deep domain knowledge. Time after time, we have seen people struggle to make NLP work on their dataset, for their projects, which is why we are building **AutoNLP**. Compared with the traditional AutoML approach of massive paid compute for State-of-the-Art model performance, we have a different philosophy:
 
 
 1. Instead of training State-of-the-Art models on huge datasets running on huge clusters, our goal is to deliver **decent models under limited compute**. We assume our users have a few GPUs at most and want to get decent models under 8 hours on their own in-house datasets. Note that you can get this level of compute for FREE on [Baidu AI Studio](https://aistudio.baidu.com/aistudio).
@@ -50,8 +50,8 @@ Args:
 - text_column (string, required): Name of the column that contains the input text.
 - label_column (string, required): Name of the column that contains the target variable to predict.
 - language (string, required): language of the text
-- metric_for_best_model (string, optional): the name of the metrc for selecting the best model.
-- greater_is_better (bool, optional): Whether better models should have a greater metric or not. Use in conjuction with `metric_for_best_model`.
+- metric_for_best_model (string, optional): the name of the metric for selecting the best model.
+- greater_is_better (bool, optional): Whether better models should have a greater metric or not. Use in conjunction with `metric_for_best_model`.
 - problem_type (str, optional): Select among ["multi_class", "multi_label"] based on the nature of your problem
 - output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results"
 - verbosity: (int, optional): controls the verbosity of the run. Defaults to 1, which let the workers log to the driver.To reduce the amount of logs, use verbosity > 0 to set stop the workers from logging to the driver.

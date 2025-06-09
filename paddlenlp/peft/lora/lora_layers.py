@@ -65,6 +65,9 @@ class LoRALinear(nn.Linear):
         pissa: bool = False,
         lora_use_mixer: bool = False,
         use_mora: bool = False,
+        lorapro: bool = False,
+        mp_moe: bool = False,
+        is_distributed: bool = False,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
@@ -82,6 +85,7 @@ class LoRALinear(nn.Linear):
         self.merged = False
         self.pissa = pissa
         self.lora_use_mixer = lora_use_mixer
+        self.lorapro = lorapro
 
         # Actual trainable parameters
         if use_mora:  # reset the rank and create high rank matrix
@@ -143,6 +147,10 @@ class LoRALinear(nn.Linear):
         self.weight.stop_gradient = True
         self._use_quick_lora = use_quick_lora and lora_dropout == 0.0
         self.disable_lora = False
+        if mp_moe or is_distributed:
+            for p in self.parameters():
+                p.is_distributed = is_distributed
+                p.mp_moe = mp_moe
 
     def pissa_init(self, rank):
         weight = self.weight

@@ -351,7 +351,7 @@ class VocabParallelEntropy(paddle.autograd.PyLayer):
 
 
 def entropy_from_logits(logits: paddle.Tensor, tensor_parallel_output=False):
-    return VocabParallelEntropy.apply(logits, tensor_parallel_output)
+    return VocabParallelEntropy.apply(logits.astype("float32"), tensor_parallel_output)
 
 
 @merge_fwd_labels
@@ -411,6 +411,12 @@ class RLHFPPOMixedLoss(nn.Layer):
         sequence_mask,
         ref_log_probs=None,
         response_start=0,
+        # for varlen flashmask
+        pad_size=0,
+        raw_input_ids=None,
+        indices=None,
+        raw_input_shape=None,
+        input_ids_rmpad_rolled=None,
     ):
         """
         计算损失函数，包含两部分：soft target loss和PPO loss。
@@ -428,14 +434,29 @@ class RLHFPPOMixedLoss(nn.Layer):
         Returns:
             paddle.Tensor: 返回损失函数，如果labels不为None，则为soft target loss；否则为PPO loss。
         """
-
+        use_remove_padding = indices is not None
         if not self.config.use_fused_head_and_loss_fn:
             logits = logits if isinstance(logits, paddle.Tensor) else logits[0]
             if self.use_fp32_compute and logits.dtype != paddle.float32:
                 logits = logits.cast(paddle.float32)
-            logits = logits / self.temperature if self.temperature > 0.0 else logits
+
+            if self.temperature > 0.0:
+                # use inplace method to save gpu memory
+                logits.scale_(1.0 / self.temperature)
+
         else:
             hidden_states, weight, bias, transpose_y = logits
+            if use_remove_padding:
+                input_ids = raw_input_ids
+                if pad_size > 0:
+                    hidden_states = hidden_states[:, :-pad_size]
+
+                from ..utils.bert_padding import pad_input
+
+                hidden_states = pad_input(
+                    hidden_states.squeeze(0), indices, batch=raw_input_shape[0], seqlen=raw_input_shape[1]
+                ).contiguous()
+
             if self.use_fp32_compute and hidden_states.dtype != paddle.float32:
                 hidden_states = hidden_states.cast(paddle.float32)
                 weight = weight.cast(paddle.float32)
@@ -455,25 +476,23 @@ class RLHFPPOMixedLoss(nn.Layer):
                 vocab_size=self.config.vocab_size,
                 tensor_parallel_degree=self.config.tensor_parallel_degree,
                 tensor_parallel_output=self.config.tensor_parallel_output,
-                pg_loss_coeff=self.pg_loss_coeff,  # donot use this
+                pg_loss_coeff=self.pg_loss_coeff,  # do not use this
                 clip_range_ratio=self.clip_range_ratio,
                 clip_range_ratio_low=self.clip_range_ratio_low,
                 clip_range_ratio_high=self.clip_range_ratio_high,
-                entropy_coeff=self.entropy_coeff,  # donot support this
+                entropy_coeff=self.entropy_coeff,  # do not support this
                 clip_range_score=self.clip_range_score,
                 kl_loss_coeff=self.kl_loss_coeff,
                 loop_chunk_size=1024,
                 response_start=response_start,
-                use_actor_fused_loss=True,  # TODO, currently only support kunbo's fused head loss
+                use_actor_fused_loss=True,  # currently only support kunbo's fused head loss
                 temperature=self.temperature,
             )
             with paddle.no_grad():
                 self.info_buffer["kl_loss"] = (
                     kl_loss.detach() / self.kl_loss_coeff if self.kl_loss_coeff > 0 else paddle.to_tensor([0.0])
                 )
-                self.info_buffer["entropy_loss"] = (
-                    entropy_loss.detach() / self.entropy_coeff if self.entropy_coeff > 0 else paddle.to_tensor([0.0])
-                )
+                self.info_buffer["entropy_loss"] = entropy_loss.detach()
                 self.info_buffer["pure_policy_loss"] = (
                     pg_loss.detach() / self.pg_loss_coeff if self.pg_loss_coeff > 0 else paddle.to_tensor([0.0])
                 )
@@ -484,16 +503,38 @@ class RLHFPPOMixedLoss(nn.Layer):
             loss = self.ptx_coeff * self.sft_criterion(logits, labels)
         # ppo loss
         if reward_advantages is not None:
-            if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
-                log_probs = (
-                    -ParallelCrossEntropy()(
-                        logits[:, response_start:-1].astype("float32"), input_ids[:, response_start + 1 :]
+            if use_remove_padding:
+                from ..utils.bert_padding import pad_input
+
+                if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
+                    log_probs = (
+                        -ParallelCrossEntropy()(logits.astype("float32"), input_ids_rmpad_rolled)
+                        .squeeze(axis=-1)
+                        .astype(logits.dtype)
                     )
-                    .squeeze(axis=-1)
-                    .astype(logits.dtype)
-                )
+                else:
+                    log_probs = gather_log_probabilities(logits, input_ids_rmpad_rolled)
+
+                if pad_size > 0:
+                    log_probs = log_probs[:, :-pad_size]
+                log_probs = pad_input(
+                    log_probs.squeeze(0).unsqueeze(-1), indices, batch=raw_input_shape[0], seqlen=raw_input_shape[1]
+                ).squeeze(-1)
+                log_probs = log_probs[:, response_start:-1].contiguous()
             else:
-                log_probs = gather_log_probabilities(logits[:, response_start:-1], input_ids[:, response_start + 1 :])
+                if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
+                    log_probs = (
+                        -ParallelCrossEntropy()(
+                            logits[:, response_start:-1].astype("float32"), input_ids[:, response_start + 1 :]
+                        )
+                        .squeeze(axis=-1)
+                        .astype(logits.dtype)
+                    )
+                else:
+                    log_probs = gather_log_probabilities(
+                        logits[:, response_start:-1], input_ids[:, response_start + 1 :]
+                    )
+
             if log_probs.shape[1] == old_log_probs.shape[1]:
                 # labels (old_log_probs, reward_advantages, sequence_mask) has
                 # src+tgt-1 length, valid length is determined by sequence_mask
@@ -530,7 +571,23 @@ class RLHFPPOMixedLoss(nn.Layer):
             loss += self.kl_loss_coeff * kl_loss
 
         if self.entropy_coeff > 0:
-            entropy_loss_raw = entropy_from_logits(logits[:, response_start:-1], self.config.tensor_parallel_output)
+            if use_remove_padding:
+                entropy_loss_rmpad = entropy_from_logits(
+                    logits.cast("float32"), self.config.tensor_parallel_output
+                ).cast(logits.dtype)
+                if pad_size > 0:
+                    entropy_loss_rmpad = entropy_loss_rmpad[:, :-pad_size]
+                entropy_loss = pad_input(
+                    entropy_loss_rmpad.squeeze(0).unsqueeze(-1),
+                    indices,
+                    batch=raw_input_shape[0],
+                    seqlen=raw_input_shape[1],
+                ).squeeze(-1)
+                entropy_loss_raw = entropy_loss[:, response_start:-1].contiguous()
+            else:
+                entropy_loss_raw = entropy_from_logits(
+                    logits[:, response_start:-1], self.config.tensor_parallel_output
+                )
             entropy_loss = paddle.sum(entropy_loss_raw * sequence_mask) / sequence_mask.sum()
             self.info_buffer["entropy_loss"] = entropy_loss.detach()
             loss -= self.entropy_coeff * entropy_loss
@@ -657,6 +714,7 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
         clip_range_score: float,
         kl_loss_coeff: float,  # KL loss coefficient
         temperature: float,
+        print_entropy_loss: bool = True,
     ):
         """
         forward function of ActorFusedLoss
@@ -754,11 +812,11 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             token_end_idx = min(i + loop_chunk_size, n_tokens)
             hidden_states_chunk = hidden_states[token_start_idx:token_end_idx]
             labels_chunk = labels[token_start_idx:token_end_idx]
-            old_log_probs_chunk = old_log_probs[token_start_idx:token_end_idx]
-            if kl_loss_coeff > 0:
-                ref_log_chunk = ref_log_probs[token_start_idx:token_end_idx]
-            advantages_chunk = advantages[token_start_idx:token_end_idx]
             mask_chunk = loss_mask[token_start_idx:token_end_idx]
+            old_log_probs_chunk = old_log_probs[token_start_idx:token_end_idx] * mask_chunk
+            if kl_loss_coeff > 0:
+                ref_log_chunk = ref_log_probs[token_start_idx:token_end_idx] * mask_chunk
+            advantages_chunk = advantages[token_start_idx:token_end_idx]
 
             # Calculate the current logits_chunk,  not fused linear
             logits_chunk_cast = paddle.matmul(hidden_states_chunk, lm_head_weight_cast, transpose_y=transpose_y)
@@ -782,13 +840,14 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
                 token_loss_chunk = F.cross_entropy(logits_chunk, labels_chunk, reduction="none")
                 softmax_output_chunk = F.softmax(logits_chunk, axis=-1)
 
-            log_probs_chunk = -token_loss_chunk.squeeze(axis=-1)
+            log_probs_chunk = -token_loss_chunk.squeeze(axis=-1) * mask_chunk
             # calculate gradient, note sign
             grad_logits_chunk = labels_one_hot.astype("float32") - softmax_output_chunk
             grad_logits_chunk = grad_logits_chunk.astype(dtype)
 
             # ratio
             ratio_chunk = paddle.exp(log_probs_chunk - old_log_probs_chunk)
+
             clipped_ratio_chunk = paddle.clip(
                 ratio_chunk, min=1.0 - clip_range_ratio_low, max=1.0 + clip_range_ratio_high
             )
@@ -833,6 +892,7 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             if kl_loss_coeff > 0:
                 # [3] kl loss
                 delta_chunk = ref_log_chunk - log_probs_chunk
+
                 exp_delta_chunk = paddle.exp(delta_chunk)
                 kl_loss_estimate_chunk = exp_delta_chunk - delta_chunk - 1
                 kl_loss_clipped_chunk = (
@@ -852,6 +912,17 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
                     (1 - exp_delta_chunk) * kl_within_clip_chunk * mask_chunk * kl_loss_coeff / divisor
                 )
                 d_loss_d_logits_chunk += d_kl_log_probs_chunk.unsqueeze(-1) * d_log_probs_d_logits_chunk
+
+            if print_entropy_loss:
+                # [2] entropy loss
+                log_prob_chunk = paddle.log(paddle.clip(softmax_output_chunk, min=1e-12))
+                entropy_loss_chunk = -(softmax_output_chunk * log_prob_chunk).sum(axis=-1) * mask_chunk
+                # entropy_loss_chunk shape is [bs, seqlen, vocab_size // tensor_parallel_degree], do all_reduce sum here
+                if tensor_parallel_degree > 1 and tensor_parallel_output:
+                    paddle.distributed.all_reduce(
+                        entropy_loss_chunk, op=paddle.distributed.ReduceOp.SUM, group=model_parallel_group
+                    )
+                total_entropy_loss += entropy_loss_chunk.sum() / divisor
 
             # grads
             if grad_hidden_states is not None:

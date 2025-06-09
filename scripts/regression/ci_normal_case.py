@@ -116,7 +116,7 @@ def run_normal_case(case_path):
     """
     case_name = case_path.split("/")[-1]
     model_info = get_mode_info(case_path)
-    depoly_path = model_info["deploy_path"]
+    deploy_path = model_info["deploy_path"]
     prepare_exec_file = model_info["prepare_exec_file"]
     eval_exec_file = model_info["eval_exec_file"]
     predict_exec_file = model_info["predict_exec_file"]
@@ -144,7 +144,7 @@ def run_normal_case(case_path):
         eval_output = subprocess.getstatusoutput("python %s --init_checkpoint_dir ./output/" % (eval_exec_file))
         save_log(eval_output[0], eval_output[1], case_name, eval_exec_file.split(".")[0])
     else:
-        print("Evalation Skipped")
+        print("Evaluation Skipped")
     if predict_exec_file:
         predict_output = subprocess.getstatusoutput("python %s --init_checkpoint_dir ./output/" % (predict_exec_file))
         save_log(predict_output[0], predict_output[1], case_name, predict_exec_file.split(".")[0])
@@ -159,7 +159,7 @@ def run_normal_case(case_path):
         print("Export model Skipped")
     if infer_exec_file:
         infer_output = subprocess.getstatusoutput(
-            "cd %s && python %s --inference_model_dir ../../inference_model/" % (depoly_path, infer_exec_file)
+            "cd %s && python %s --inference_model_dir ../../inference_model/" % (deploy_path, infer_exec_file)
         )
         save_log(infer_output[0], infer_output[1], case_name, infer_exec_file.split(".")[0])
     else:

@@ -323,7 +323,8 @@ std::vector<paddle::Tensor> MlaAttn(
             block_size, // block_size
             max_block_per_seq, // max_blocks_per_seq (prefix cache)
             page_param_.max_context_len_, // prefill_len
-            nullptr); // block_tables (prefix cache)
+            nullptr,
+            softmax_scale * sqrt(dim_qk)); // block_tables (prefix cache)
 
     // std::cout << "fmha kernel done " <<std::endl;
   }
@@ -425,7 +426,7 @@ std::vector<paddle::Tensor> MlaAttn(
             const_cast<TKV*>(key_cache_xft.data()),
             const_cast<TKV*>(value_cache_xft.data()),
             attn_param_.kv_head_num_,
-            attn_param_.scale_,
+            softmax_scale,
             block_tables_xft.data(),
             attn_param_.context_len_vp_,
             attn_param_.valid_batch_vp_,

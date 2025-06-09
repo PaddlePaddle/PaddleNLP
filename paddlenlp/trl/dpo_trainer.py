@@ -133,6 +133,8 @@ class DPOTrainer(Trainer):
             dpo_inputs["chosen_labels"] = batch["chosen_labels"]
             dpo_inputs["rejected_labels"] = batch["rejected_labels"]
             dpo_inputs["response_indexs"] = batch["response_indexs"]
+            if "score_deltas" in batch:
+                dpo_inputs["score_deltas"] = batch["score_deltas"]
             if self.dpo_config.reference_free:
                 reference_chosen_logps = paddle.zeros([1])
                 reference_rejected_logps = paddle.zeros([1])
@@ -167,7 +169,7 @@ class DPOTrainer(Trainer):
                     with paddle.no_grad():
                         logits = ref_model(**dpo_inputs)
                 reference_chosen_logps, reference_rejected_logps = self.dpo_criterion(logits, labels)
-            labels = labels[:3] + (reference_chosen_logps, reference_rejected_logps)
+            labels = labels[:-2] + (reference_chosen_logps, reference_rejected_logps)
             logits = model(**dpo_inputs)
             policy_chosen_logps, policy_rejected_logps, sft_loss, dpo_loss, loss = self.dpo_criterion(logits, labels)
 
@@ -331,7 +333,7 @@ class DPOTrainer(Trainer):
             reference_chosen_logps = [paddle.zeros([1]) for _ in range(model.accumulate_steps)]
             reference_rejected_logps = [paddle.zeros([1]) for _ in range(model.accumulate_steps)]
         if model.is_pipeline_last_stage(ignore_virtual=model._layers._num_virtual_pipeline_stages > 1):
-            labels = labels[:3] + (reference_chosen_logps, reference_rejected_logps)
+            labels = labels[:-2] + (reference_chosen_logps, reference_rejected_logps)
         with paddle.no_grad():
             with self.autocast_smart_context_manager():
                 loss = model.eval_batch(data=[inputs, labels], compute_loss=True)
@@ -439,7 +441,7 @@ class DPOTrainer(Trainer):
             reference_chosen_logps = [paddle.zeros([1]) for _ in range(model.accumulate_steps)]
             reference_rejected_logps = [paddle.zeros([1]) for _ in range(model.accumulate_steps)]
         if model.is_pipeline_last_stage(ignore_virtual=model._layers._num_virtual_pipeline_stages > 1):
-            labels = labels[:3] + (reference_chosen_logps, reference_rejected_logps)
+            labels = labels[:-2] + (reference_chosen_logps, reference_rejected_logps)
         train_inputs = [inputs, labels]
         train_inputs = model._prepare_training(train_inputs, self.optimizer, self.lr_scheduler)
         model.optimizer = None  # we do not use `PipelineParallel` to handler optimizer step
@@ -544,6 +546,7 @@ def prepare_pipeline_dpo_inputs_func(inputs):
         "chosen_labels",
         "rejected_labels",
         "response_indexs",
+        "score_deltas",
         "reference_chosen_logps",
         "reference_rejected_logps",
     ]

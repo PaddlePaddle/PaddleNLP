@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import copy
 import inspect
 from contextlib import contextmanager
@@ -31,10 +30,8 @@ from ...transformers import (
     PretrainedTokenizer,
 )
 from ...transformers.model_utils import dtype_guard
-from ...trl.llm_utils import init_dist_env
 from ..trainer.trainer_utils import process_row
 from .offload_utils import offload_tensor_to_cpu, reload_tensor_to_gpu
-from .reshard_utils import init_rollout_env
 
 try:
     from llm.predict.predictor import (
@@ -73,14 +70,14 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
     def __init__(
         self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None, **kwargs
     ):
+        self.args = kwargs.pop("training_args", None)
+        self.is_available = kwargs.pop("is_available", False)
         super().__init__(config, tokenizer, model, **kwargs)
-        self.args = kwargs["training_args"]
 
     def enable(self, model, offload_model=True):
         if self.is_available:
             return
-        with paddle.LazyGuard():
-            self.set_state_dict(model, offload_model)
+        self.set_state_dict(model, offload_model)
         self.is_available = True
 
     def disable(self, model, onload_model=True):
@@ -90,82 +87,28 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
             model.to(paddle.device.get_device())
         self.is_available = False
 
-    @contextmanager
-    def update_predictor_params(self, **kwargs):
-        # update predictor config
-        if kwargs:
-            old_predictor_config = copy.deepcopy(self.config)
-            for key, new_value in kwargs.items():
-                if hasattr(self.config, key):
-                    old_value = getattr(self.config, key)
-                    if old_value != new_value:
-                        setattr(self.config, key, new_value)
-                        if key == "top_p":
-                            self.update_model_inputs("top_p", new_value)
-                        if key == "temperature":
-                            self.update_model_inputs("temperature", new_value)
-        yield
-        if kwargs:
-            if self.config.top_p != old_predictor_config:
-                self.update_model_inputs("top_p", old_predictor_config.top_p)
-            if self.config.temperature != old_predictor_config:
-                self.update_model_inputs("temperature", old_predictor_config.temperature)
-            self.config = old_predictor_config
-
-    def update_model_inputs(self, key, value):
-        assert key in self.model_inputs, f"{key} is not in model_inputs!"
-        old_value = self.model_inputs.pop(key)
-        self.model_inputs[key] = paddle.full(shape=old_value.shape, fill_value=value, dtype=old_value.dtype)
-
     @paddle.no_grad()
-    def predict(self, input_ids: paddle.Tensor = None, **kwargs):
-        bs = input_ids.shape[0]
+    def predict(self, input_ids: paddle.Tensor = None, repeat_num=1, **kwargs):
         input_ids_list = []
         for row in input_ids:
             row_ids = process_row(row, remove_value=self.tokenizer.pad_token_id, remove_side="left").tolist()
             input_ids_list.append(row_ids)
 
-        with self.update_predictor_params(**kwargs):
-            self._preprocess(input_text=None, input_ids=input_ids_list)
-            self.init_cache_kvs()
-            all_tokens = []
-            if (
-                self.args.rollout_tensor_parallel_degree != self.args.tensor_parallel_degree
-                or self.args.pipeline_parallel_degree > 1
-            ):
-                ori_all_reduce = dist.all_reduce
-                ori_broadcast = dist.broadcast
-                with init_rollout_env(self.args.rollout_tensor_parallel_degree):
-                    hcg = fleet.get_hybrid_communicate_group()
-                    tp_group = hcg.get_model_parallel_group()
-                    dist.all_reduce = lambda x: ori_all_reduce(x, group=tp_group)
-                    dist.broadcast = lambda x, rank: ori_broadcast(
-                        x, src=tp_group.ranks[0], group=hcg.get_model_parallel_group()
-                    )
-                    while self.model_inputs["not_need_stop"]:
-                        next_tokens = self._infer(self.model_inputs)[:bs]
-                        all_tokens.append(next_tokens)
-                dist.all_reduce = ori_all_reduce
-                dist.broadcast = ori_broadcast
-            else:
-                while self.model_inputs["not_need_stop"]:
-                    next_tokens = self._infer(self.model_inputs)[:bs]
-                    all_tokens.append(next_tokens)
-
-        # remove cache kvs
-        self.cache_kvs = None
-        self.model_inputs["cache_kvs"] = None
-        paddle.device.cuda.empty_cache()
-
-        outputs = paddle.concat(all_tokens, axis=-1)
-        outputs = paddle.where(
-            outputs < 0, paddle.to_tensor(self.tokenizer.pad_token_id, dtype=outputs.dtype), outputs
-        )
-        return outputs
+        if self.config.dynamic_insert:
+            outputs = self.predict_dy_insert(
+                input_ids=input_ids_list,
+                return_tokens=True,
+                all_rank_return=True,
+                detokenize=False,
+                repeat_num=repeat_num,
+                **kwargs,
+            )[-1]
+            return paddle.to_tensor(outputs, dtype=input_ids.dtype)
+        else:
+            raise NotImplementedError("dynamic_insert is False is not supported.")
 
     @paddle.no_grad()
     def set_state_dict(self, model, offload_model=True):
-        self.model.set_state_dict(model.state_dict())
         if offload_model:
             offload_place = paddle.CUDAPinnedPlace()
             state_dict = model.state_dict()
@@ -173,6 +116,10 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
                 cpu_arg = v._copy_to(offload_place, blocking=False)
                 cpu_arg._share_buffer_to(v)
         paddle.device.synchronize()
+        paddle.device.cuda.empty_cache()
+        with paddle.LazyGuard():
+            with dtype_guard(self.config.dtype):
+                self.model.set_state_dict(model.state_dict())
 
 
 policy_predictor: PolicyPredictor = None
@@ -185,7 +132,7 @@ def create_predictor(trainer: Trainer):
         min_length=trainer.args.min_dec_len,
         max_length=trainer.args.max_dec_len,
         total_max_length=trainer.args.max_src_len + trainer.args.max_dec_len,
-        batch_size=trainer.args.per_device_rollout_batch_size * trainer.args.num_return_sequences,
+        batch_size=trainer.args.rollout_max_num_seqs,
         top_p=trainer.args.top_p,
         temperature=trainer.args.temperature,
         repetition_penalty=trainer.args.repetition_penalty,
@@ -193,46 +140,42 @@ def create_predictor(trainer: Trainer):
         inference_model=True,
         dtype=trainer.amp_dtype,
         output_via_mq=False,
+        dynamic_insert=True,
+        quant_type=trainer.args.rollout_quant_type,
     )
     model_args = ModelArgument()
     config = copy.deepcopy(trainer.model.config)
     config.sequence_parallel = False
     config.use_fused_head_and_loss_fn = False
     config.use_fused_rms_norm = False
-    need_reshard = (
-        trainer.args.rollout_tensor_parallel_degree != trainer.args.tensor_parallel_degree
-        or trainer.args.pipeline_parallel_degree > 1
-    )
-    if need_reshard:
-        init_context = init_rollout_env(trainer.args.rollout_tensor_parallel_degree)
-    else:
-        tensor_parallel_rank, tensor_parallel_degree = init_dist_env()
-        init_context = contextlib.nullcontext()
-    with init_context:
-        if need_reshard:
-            hcg = fleet.get_hybrid_communicate_group()
-            tensor_parallel_degree = hcg.get_model_parallel_world_size()
-            tensor_parallel_rank = hcg.get_model_parallel_rank()
-        with dtype_guard(predictor_args.dtype):
-            model = AutoInferenceModelForCausalLM.from_config(
-                config=config,
-                predictor_args=predictor_args,
-                model_args=model_args,
-                dtype=predictor_args.dtype,
-                tensor_parallel_degree=tensor_parallel_degree,
-                tensor_parallel_rank=tensor_parallel_rank,
-                low_cpu_mem_usage=True,
-            )
-            model.save_output = False
-            predictor = PolicyPredictor(
-                predictor_args,
-                tokenizer=trainer.tokenizer,
-                model=model,
-                model_args=model_args,
-                init_cache_kvs=False,
-                training_args=trainer.args,
-            )
-            predictor.is_available = False
+
+    if getattr(trainer, "reshard_controller", None) is not None:
+        trainer.reshard_controller.set_rollout_env("[create_predictor]")
+    hcg = fleet.get_hybrid_communicate_group()
+    tensor_parallel_degree = hcg.get_model_parallel_world_size()
+    tensor_parallel_rank = hcg.get_model_parallel_rank()
+    with dtype_guard(predictor_args.dtype):
+        model = AutoInferenceModelForCausalLM.from_config(
+            config=config,
+            predictor_args=predictor_args,
+            model_args=model_args,
+            dtype=predictor_args.dtype,
+            tensor_parallel_degree=tensor_parallel_degree,
+            tensor_parallel_rank=tensor_parallel_rank,
+            low_cpu_mem_usage=True,
+        )
+        predictor = PolicyPredictor(
+            predictor_args,
+            tokenizer=trainer.tokenizer,
+            model=model,
+            model_args=model_args,
+            init_cache_kvs=False,
+            training_args=trainer.args,
+            is_available=False,
+        )
+    if getattr(trainer, "reshard_controller", None) is not None:
+        trainer.reshard_controller.set_train_env("[after create_predictor]")
+
     return predictor
 
 
@@ -263,21 +206,28 @@ def infer_guard(trainer, offload_model=True):
         if not policy_predictor.is_available:
             policy_predictor.enable(model, offload_model=offload_model)
 
-    need_reshard = (
-        trainer.args.rollout_tensor_parallel_degree != trainer.args.tensor_parallel_degree
-        or trainer.args.pipeline_parallel_degree > 1
-    )
-    if not need_reshard:
-        is_distributed = True
-        try:
-            hcg = dist.fleet.get_hybrid_communicate_group()
-        except Exception:
-            is_distributed = False
+    is_distributed = True
+    try:
+        hcg = dist.fleet.get_hybrid_communicate_group()
+    except Exception:
+        is_distributed = False
 
+    if getattr(trainer, "reshard_controller", None) is not None:
+        trainer.reshard_controller.set_rollout_env("[infer_guard hack broadcast & all_reduce]")
+
+        ori_all_reduce = dist.all_reduce
+        ori_broadcast = dist.broadcast
+        hcg = fleet.get_hybrid_communicate_group()
+        tp_group = hcg.get_model_parallel_group()
+        dist.all_reduce = lambda x, **kwargs: ori_all_reduce(x, group=tp_group)
+        dist.broadcast = lambda x, rank, **kwargs: ori_broadcast(x, src=tp_group.ranks[0], group=tp_group)
+        yield
+        dist.all_reduce = ori_all_reduce
+        dist.broadcast = ori_broadcast
+    else:
         if is_distributed:
             ori_all_reduce = dist.all_reduce
             ori_broadcast = dist.broadcast
-
             dist.all_reduce = lambda x: ori_all_reduce(x, group=hcg.get_model_parallel_group())
             dist.broadcast = lambda x, rank: ori_broadcast(
                 x, src=hcg.get_model_parallel_group_src_rank(), group=hcg.get_model_parallel_group()
@@ -287,9 +237,12 @@ def infer_guard(trainer, offload_model=True):
             dist.broadcast = ori_broadcast
         else:
             yield
-    else:
-        yield
     policy_predictor.disable(model, onload_model=offload_model)
+
+
+def get_policy_predictor():
+    global policy_predictor
+    return policy_predictor
 
 
 class InferEvalModel:
@@ -344,6 +297,7 @@ class InferEvalModel:
 
     def generate(self, *args, **kwargs):
         do_eval = kwargs.pop("do_eval", False)
+        repeat_num = kwargs.pop("repeat_num", 1)
         if policy_predictor is None or not policy_predictor.is_available:
             return self.model.generate(*args, **kwargs)
 
@@ -358,6 +312,9 @@ class InferEvalModel:
                     "temperature": 1.0,
                 }
             )
-        outputs = policy_predictor.predict(input_ids=input_ids, **kwargs)
+        outputs = policy_predictor.predict(input_ids=input_ids, repeat_num=repeat_num, **kwargs)
+        if repeat_num > 1:
+            input_ids = input_ids.repeat_interleave(repeat_num, axis=0)
+
         outputs = paddle.concat([input_ids, outputs], axis=-1)
         return (outputs,)

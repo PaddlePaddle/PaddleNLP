@@ -119,7 +119,7 @@ class ChineseCLIPConverter(Converter):
                 ["text_model.embeddings.LayerNorm.weight", "text_model.embeddings.layer_norm.weight"],
                 ["text_model.embeddings.LayerNorm.bias", "text_model.embeddings.layer_norm.bias"],
                 ["text_projection.weight", "text_projection", "transpose"],
-                # donot add pooler
+                # do not add pooler
                 # ["text_model.pooler.dense.weight", "text_model.pooler.dense.weight", "transpose"],
                 # ["text_model.pooler.dense.bias", "text_model.pooler.dense.bias"],
             ]

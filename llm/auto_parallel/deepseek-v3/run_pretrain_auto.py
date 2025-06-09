@@ -82,7 +82,7 @@ class PreTrainingArguments(AutoTrainingArguments):
     sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
     virtual_pipeline_seg_method: str = field(
         default="DeepseekV2DecoderLayerAuto",
-        metadata={"help": "The seg method of spliting pp layer for virtual pipeline."},
+        metadata={"help": "The seg method of splitting pp layer for virtual pipeline."},
     )
     # NOTE(gongenlei): new add autotuner_benchmark
     autotuner_benchmark: bool = field(

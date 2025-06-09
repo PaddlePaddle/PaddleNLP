@@ -25,7 +25,7 @@ This project enabled BERT-Base pre-training and SQuAD fine-tuning task using [Pa
    The sequence length used in pretraining phase1 and phase2 are: 128 and 384. Following steps are provided for dataset generation.
 
    ```bash
-   # Here we use a specific commmit, the latest commit should also be fine.
+   # Here we use a specific commit, the latest commit should also be fine.
    git clone https://github.com/NVIDIA/DeepLearningExamples.git
    git checkout 88eb3cff2f03dad85035621d041e23a14345999e
 

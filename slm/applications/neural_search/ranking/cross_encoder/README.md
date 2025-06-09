@@ -63,7 +63,7 @@
 
 ```
 ernie_matching/
-├── deply # 部署
+├── deploy # 部署
     ├── cpp
         ├── rpc_client.py # RPC 客户端的bash脚本
         ├── http_client.py # http 客户端的bash文件

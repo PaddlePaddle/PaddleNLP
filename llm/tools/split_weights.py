@@ -31,7 +31,7 @@ def parse_arguments():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", default=None, type=str, required=True, help="The directory of model.")
-    parser.add_argument("--output_path", default=None, type=str, help="The directory of splited model")
+    parser.add_argument("--output_path", default=None, type=str, help="The directory of split model")
     parser.add_argument("--model_rank_id", default=None, type=int, help="Input model mp degree.")
     parser.add_argument("--dtype", default="float16", type=str, help="The dtype of model weights.")
     return parser.parse_args()

@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 class TermTreeNode(object):
-    """Defination of term node. All members are protected, to keep rigorism of data struct.
+    """Definition of term node. All members are protected, to keep rigorism of data struct.
 
     Args:
         sid (str): term id of node.
@@ -34,7 +34,7 @@ class TermTreeNode(object):
             Defaults to None.
         sub_type (Optional[List[str]], optional): grouped by some term. Defaults to None.
         sub_term (Optional[List[str]], optional): some lower term. Defaults to None.
-        data (Optional[Dict[str, Any]], optional): to sore full imformation of a term. Defaults to None.
+        data (Optional[Dict[str, Any]], optional): to sore full information of a term. Defaults to None.
 
     """
 

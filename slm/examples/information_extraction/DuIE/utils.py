@@ -66,7 +66,7 @@ def decoding(
         complex_relation_label = [8, 10, 26, 32, 46]
         complex_relation_affi_label = [9, 11, 27, 28, 29, 33, 47]
 
-        # flatten predictions then retrival all valid subject id
+        # flatten predictions then retrieval all valid subject id
         flatten_predictions = []
         for layer_1 in predictions:
             for layer_2 in layer_1:

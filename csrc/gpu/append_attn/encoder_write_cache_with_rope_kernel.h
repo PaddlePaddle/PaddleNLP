@@ -36,6 +36,7 @@ void EncoderWriteCacheWithRopeKernel(
     const paddle::optional<paddle::Tensor>& cache_v_scale,
     const paddle::optional<paddle::Tensor>& cache_k_zp,
     const paddle::optional<paddle::Tensor>& cache_v_zp,
+    const paddle::optional<paddle::Tensor>& excess_blocks,
     const std::string& cache_quant_type_str,
     const int num_blocks,
     const int max_seq_len,
@@ -48,6 +49,7 @@ void EncoderWriteCacheWithRopeKernel(
   auto num_heads = meta_data.q_num_heads;
   auto kv_num_heads = meta_data.kv_num_heads;
   auto head_dim = meta_data.head_dims;
+  int bsz = cum_offsets.dims()[0];
   if (rotary_embs) {
     if (num_heads == kv_num_heads) {
       rotary_qk_variable(
@@ -93,9 +95,12 @@ void EncoderWriteCacheWithRopeKernel(
                                     *qkv_out,
                                     block_tables,
                                     padding_offsets,
+                                    cum_offsets,
                                     seq_lens_encoder,
                                     seq_lens_decoder,
                                     max_seq_len,
+                                    bsz,
+                                    excess_blocks,
                                     stream,
                                     key_cache_out,
                                     value_cache_out);

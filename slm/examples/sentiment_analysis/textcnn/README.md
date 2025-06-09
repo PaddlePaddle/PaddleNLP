@@ -133,11 +133,14 @@ python export_model.py --vocab_path=./robot_chat_word_dict.txt --params_path=./c
 其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
 
 导出模型之后，可以用于部署，deploy/python/predict.py 文件提供了 python 部署预测示例。运行方式：
-
+开启 PIR 机制(3.0.0默认)：
+```shell
+python deploy/python/predict.py --model_file=static_graph_params.json --params_file=static_graph_params.pdiparams
+```
+未开启 PIR：
 ```shell
 python deploy/python/predict.py --model_file=static_graph_params.pdmodel --params_file=static_graph_params.pdiparams
 ```
-
 ### 模型预测
 
 启动预测：

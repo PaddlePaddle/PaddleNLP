@@ -102,7 +102,7 @@ class GenerationInferenceModel(GenerationMixin):
             config.get("logits_processors", None),
             precache_input_spec,
         ]
-        # use "==" to distingusih between chatglm and chatglm_v2.
+        # use "==" to distinguish between chatglm and chatglm_v2.
         if self.config["model_type"] and "chatglm" == self.config.model_type.lower():
             input_spec[2] = paddle.static.InputSpec(
                 shape=[None, None, None], dtype="int64", name="position_ids"
@@ -229,7 +229,7 @@ class GenerationInferenceModel(GenerationMixin):
                 )
             model_kwargs["seq_len_decoder"] = paddle.where(
                 model_kwargs["stop_flags"],
-                model_kwargs["seq_len_decoder"] - model_kwargs["seq_len_decoder"],
+                paddle.zeros_like(model_kwargs["seq_len_decoder"]),
                 model_kwargs["seq_len_decoder"],
             )
         else:
@@ -258,7 +258,7 @@ class GenerationInferenceModel(GenerationMixin):
 
             model_kwargs["seq_len_decoder"] = paddle.where(
                 model_kwargs["stop_flags"],
-                model_kwargs["seq_len_decoder"] - model_kwargs["seq_len_decoder"],
+                paddle.zeros_like(model_kwargs["seq_len_decoder"]),
                 model_kwargs["seq_len_decoder"],
             )
 
@@ -277,6 +277,7 @@ class GenerationInferenceModel(GenerationMixin):
     ):
         step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
         batch_idx = paddle.full(shape=[1], dtype="int32", fill_value=-1)
+        model_kwargs["batch_idx"] = batch_idx
 
         # fake temp next_tokens
         batch = input_ids.shape[0] if input_ids is not None else inputs_embeds.shape[0]
@@ -360,7 +361,7 @@ class GenerationInferenceModel(GenerationMixin):
 
             save_with_output(
                 next_tokens,
-                batch_idx,
+                model_kwargs["batch_idx"],
                 step_idx_ori,
                 "real_time_save.temp_ids",
                 self.config.tensor_parallel_rank,
@@ -532,9 +533,6 @@ class GenerationBlockInferenceModel(GenerationMixin):
             cache_v_dequant_scales,
             tgt_mask_spec,
         ]
-        input_spec.extend(
-            [paddle.static.InputSpec(shape=[1], dtype="int32", name="queue_id")]
-        )  # queue_id for save_output
         if config.get("speculate_method", None) is not None:
             speculate_spec = [
                 paddle.static.InputSpec(shape=[None, None], dtype="int64", name="draft_tokens"),
@@ -611,7 +609,6 @@ class GenerationBlockInferenceModel(GenerationMixin):
         k_dequant_scales=None,
         v_dequant_scales=None,
         tgt_mask=None,
-        queue_id=None,
         draft_tokens=None,
         accept_tokens=None,
         accept_num=None,
@@ -620,7 +617,6 @@ class GenerationBlockInferenceModel(GenerationMixin):
     ):
 
         model_kwargs["input_ids"] = input_ids
-        model_kwargs["queue_id"] = queue_id
         model_kwargs["penalty_score"] = penalty_score
         model_kwargs["frequency_score"] = frequency_score
         model_kwargs["presence_score"] = presence_score
@@ -773,7 +769,6 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 save_output(
                     next_tokens,
                     model_kwargs["not_need_stop"],
-                    model_kwargs["queue_id"],
                     self.config.tensor_parallel_rank,
                 )
             return next_tokens
@@ -1180,7 +1175,6 @@ class GenerationAvxInferenceModel(GenerationMixin):
         **model_kwargs,
     ):
         step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
-        batch_idx = paddle.full(shape=[1], dtype="int32", fill_value=-1)
 
         # fake temp next_tokens
         batch = input_ids.shape[0] if input_ids is not None else inputs_embeds.shape[0]
@@ -1254,7 +1248,7 @@ class GenerationAvxInferenceModel(GenerationMixin):
 
             save_with_output(
                 next_tokens,
-                batch_idx,
+                model_kwargs["batch_idx"],
                 step_idx_ori,
                 "real_time_save.temp_ids",
                 self.config.tensor_parallel_rank,

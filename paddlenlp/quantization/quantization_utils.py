@@ -154,16 +154,17 @@ def convert_to_weight_quantize_state_dict(state_dict, name, quantization_config,
         return state_dict
     if weight_name in state_dict:
         target_weight = state_dict.pop(weight_name).cast(dtype).cuda()
-        if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+
+        if weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]:
             quant_weight, quant_scale = quantize(
                 target_weight,
                 weight_quantize_algo,
                 "weight",
                 quantization_config,
-                apply_hadamard=quantization_config.apply_hadamard,
                 side="left",
+                apply_hadamard=quantization_config.apply_hadamard,
             )
-            act_scale = paddle.ones([], dtype=dtype).cuda()
+            act_scale = paddle.ones([1], dtype=dtype).cuda()
             act_scale.stop_gradient = True
             state_dict[act_scale_name] = act_scale
         else:
@@ -224,7 +225,14 @@ def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quantiz
         if weight_quantize_algo is None:
             continue
         # Convert state dict
-        if weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8linear", "a8w4linear"]:
+        if weight_quantize_algo in [
+            "weight_only_int8",
+            "weight_only_int4",
+            "llm.int8",
+            "a8w8linear",
+            "a8w4linear",
+            "fp8linear",
+        ]:
             convert_to_weight_quantize_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo)
         elif weight_quantize_algo in ["fp4", "nf4"]:
             convert_to_qlora_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo)
@@ -257,7 +265,7 @@ def update_loaded_state_dict_keys(state_dict, quantization_linear_list, quantiza
             else:
                 state_dict.append(quant_scale_name)
                 weight_quantize_algo = parse_weight_quantize_algo(quantization_config, name)
-                if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+                if weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]:
                     state_dict.append(act_scale_name)
 
         else:
