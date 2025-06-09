@@ -21,7 +21,6 @@ env:
   NLP_DIR: /workspace/PaddleNLP
   HF_DATASETS_CACHE: /ssd1/paddlenlp/huggingface/datasets
   TRANSFORMERS_CACHE: /ssd1/paddlenlp/huggingface
-  no_proxy: "localhost,bj.bcebos.com,su.bcebos.com,bcebos.com,apiin.im.baidu.com,gitee.com,aliyun.com,.baidu.com,.tuna.tsinghua.edu.cn"
 
 defaults:
   run:
