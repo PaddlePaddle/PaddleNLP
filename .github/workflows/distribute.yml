@@ -46,7 +46,7 @@ jobs:
           git remote add upstream https://github.com/PaddlePaddle/PaddleNLP.git
           git fetch upstream ${BRANCH}
           git merge ${BRANCH}
-          git diff --numstat upstream/${BRANCH} |awk '{print $NF}'
+          git diff --numstat ${BRANCH} |awk '{print $NF}'
           git log --pretty=oneline -10
 
       - name: Check docker image and run container
