@@ -33,10 +33,17 @@ def matmul_hadU(X):
     return input.reshape(X.shape)
 
 
-def create_hadamard_matrix(block_size, dtype):
-    Q = paddle.diag(paddle.ones((block_size), dtype=dtype))
-    block = matmul_hadU(Q)
-    return block
+def random_hadamard_matrix(size, dtype, quantization_config):
+    if quantization_config.hadamard_block_size < 0:
+        A = paddle.randint(low=0, high=2, shape=[size, size]).astype("float32") * 2 - 1
+        Q, _ = paddle.linalg.qr(A)
+        return Q.astype(dtype), 1
+    else:
+        assert size % quantization_config.hadamard_block_size == 0, "Please choose a correct block_size"
+        Q = paddle.diag(paddle.ones((quantization_config.hadamard_block_size,), dtype="float32"))
+        block = matmul_hadU(Q)
+        print("random_hadamard_matrix", block, quantization_config.hadamard_block_size)
+        return block, quantization_config.hadamard_block_size
 
 
 def hadamard_matmul(input, side, hadamard_matrix, block_size):
@@ -56,14 +63,32 @@ def hadamard_matmul(input, side, hadamard_matrix, block_size):
     return output
 
 
-def apply_hadamard_matmul(x, side, block_size):
+def apply_hadamard_matmul(x, side, quantization_config=None, dequant=False):
     if getattr(infohub, "hadamard") is None:
         setattr(infohub, "hadamard", {})
 
-    if block_size in infohub.hadamard:
-        hadamard_matrix = infohub.hadamard[block_size]
+    if quantization_config.hadamard_block_size < 0:
+        if side == "left":
+            block_size = x.shape[0]
+        else:
+            block_size = x.shape[-1]
     else:
-        hadamard_matrix = create_hadamard_matrix(block_size, x.dtype)
-        infohub.hadamard[block_size] = hadamard_matrix
-    target_x = hadamard_matmul(x, side, hadamard_matrix, block_size)
-    return target_x
+        block_size = quantization_config.hadamard_block_size
+
+    if block_size in infohub.hadamard:
+        hadamard_matrix, hadamard_scale = infohub.hadamard[block_size]
+    else:
+        hadamard_matrix, hadamard_scale = random_hadamard_matrix(block_size, x.dtype, quantization_config)
+        infohub.hadamard[block_size] = (hadamard_matrix, hadamard_scale)
+
+    if hadamard_scale > 1:
+        target_x = hadamard_matmul(x, side, hadamard_matrix, block_size)
+    else:
+        if dequant:
+            hadamard_matrix = hadamard_matrix.T
+        if side == "right":
+            target_x = x @ hadamard_matrix
+        else:
+            target_x = hadamard_matrix.T @ x
+
+    return target_x, hadamard_scale

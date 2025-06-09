@@ -153,6 +153,66 @@ def adamw_triton(
     N = param.numel().item()
     BLOCK_SIZE = 512
     grid = lambda meta: (triton.cdiv(N, BLOCK_SIZE),)
+    adamw_kernel[grid](
+        param,
+        grad,
+        moment1,
+        moment2,
+        lr,
+        beta1,
+        beta2,
+        epsilon,
+        coeff,
+        beta1_pow,
+        beta2_pow,
+        master_weight,
+        N,
+        skip_update_param,
+        DTYPE_MAPPING[param.dtype],
+        DTYPE_MAPPING[moment1.dtype],
+        BLOCK_SIZE,
+    )
+    beta1_pow[:], beta2_pow[:] = beta1 * beta1_pow[:], beta2 * beta2_pow[:]
+
+
+param = paddle.rand([4096, 4096], dtype="bfloat16")
+master_weight = param.astype("float32")
+grad = paddle.rand([4096, 4096], dtype="bfloat16")
+learning_rate = paddle.to_tensor(1e-4, dtype="float32")
+moment1 = paddle.rand([4096, 4096], dtype="bfloat16")
+moment2 = paddle.rand([4096, 4096], dtype="bfloat16")
+beta1_pow = paddle.to_tensor([1.0], dtype="float32")
+beta2_pow = paddle.to_tensor([1.0], dtype="float32")
+beta1 = 0.9
+beta2 = 0.9
+epsilon = 1e-6
+lr_ratio = 1.0
+coeff = 0.9
+with_decay = True
+skip_update = False
+multi_precision = True
+
+
+adamw_triton(
+    param,
+    grad,
+    learning_rate,
+    moment1,
+    moment2,
+    beta1_pow,
+    beta2_pow,
+    master_weight,
+    skip_update,
+    beta1,
+    beta2,
+    epsilon,
+    lr_ratio,
+    coeff,
+    with_decay,
+    multi_precision,
+    True,
+)
+=======
     if skip_update_param:
         adamw_kernel_skip[grid](
             grad,

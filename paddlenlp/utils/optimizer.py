@@ -163,6 +163,7 @@ class AdamWMini(AdamW):
 
 
 class AdamWCustom(AdamW):
+
     def __init__(self, quantization_config, tensorwise_offload_optimizer, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.quant_scale_mapping = {}
@@ -415,6 +416,155 @@ class AdamWCustom(AdamW):
         beta1_pow[:], beta2_pow[:] = beta1 * beta1_pow[:], beta2 * beta2_pow[:]
         return
 
+
+class AdamWInt8(AdamW):
+    """
+    AdamW optimizer with build-in support for INT8 weight quantization during training.
+    It maintains FP32 master weights for updates, applies quantization in-place and optionally supports low-precision moment accumulators.
+    """
+
+    def __init__(self, quantization_config, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.quantization_config = quantization_config
+        # mapping from float weight to its quant_scale tensor
+        self._quant_scale_map = {}
+        # build map when parameters are set
+        for group in self._param_groups:
+            for p in group["params"]:
+                name = p.name
+                if "quantization_linear" in name and name.endswith("w_1"):
+                    scale_name = name.replace("w_1", "w_0")
+                    self._quant_scale_map[p.name] = scale_name
+
+    def _create_master_weight(self, param):
+        # build or fetch FP32 master weight
+        if param.name in self._master_weights:
+            return self._master_weights[param.name]
+        # if this param is quantized_weight, dequantize first
+        if param.name in self._quant_scale_map:
+            scale = self._parameter_map[self._quant_scale_map[param.name]]
+            fp32_w = dequantize(
+                param, scale, tensor_type="weight", apply_hadmard=self.quantization_config.applly_hadamard, side="left"
+            ).astype("float32")
+        else:
+            fp32_w = paddle.cast(param, "float32")
+        fp32_w.name = self._gen_master_weight_var_name(param)
+        self._master_weights[param.name] = fp32_w
+        return fp32_w
+
+    def _append_optimize_op(self, block, param_and_grad):
+        assert isinstance(block, (framework.Block, pir.Block))
+        param, grad = param_and_grad
+        # determine weight decay
+        with_decay = self._apply_decay_param_fun(param.name) if self._apply_decay_param_fun else True
+
+        # accumulators
+        m1 = self._get_accumulator_master(self._moment1_acc_str, param)
+        m2 = self._get_accumulator_master(self._moment2_acc_str, param)
+        b1_pow = self._get_accumulator_master(self._beta1_pow_acc_str, param)
+        b2_pow = self._get_accumulator_master(self._beta2_pow_acc_str, param)
+
+        # create master weight if needed
+        master_w = None
+        if self._multi_precision and self._is_dtype_fp16_or_bf16(param.dtype):
+            master_w = self._create_master_weight(param)
+
+        scale_tensor = None
+        if param.name in self._quant_scale_map:
+            scale_name = self._quant_scale_map[param.name]
+            scale_tensor = self._parameter_map[scale_name]
+
+        lr = self._create_param_lr(param_and_grad)
+
+        if in_dynamic_or_pir_mode():
+            lr_ratio = 1.0 if self._lr_ratio is None else self._lr_ratio(param)
+            beta1 = self._beta1.item(0) if isinstance(self._beta1, Variable) else self._beta1
+            beta2 = self._beta2.item(0) if isinstance(self._beta2, Variable) else self._beta2
+            found_inf = self._get_auxiliary_var("found_inf") if in_pir_mode() else None
+
+            # call Low-level kernel (Triton if available)
+            apply_op = adamw_triton if adamw_triton else self._apply_adam_python
+            skip_quant_update = scale_tensor is not None
+            apply_op(
+                param,
+                grad,
+                lr,
+                m1,
+                m2,
+                b1_pow,
+                b2_pow,
+                master_w,
+                found_inf,
+                beta1,
+                beta2,
+                self._epsilon,
+                lr_ratio,
+                self._weight_decay,
+                with_decay,
+                bool(master_w is not None),
+                skip_quant_update,
+            )
+
+            # after update, quantize back weights
+            if skip_quant_update:
+                quantized, new_scale = quantize(
+                    master_w if master_w is not None else param,
+                    algo=self.quantization_config.weight_quantize_algo,
+                    tensor_type="weight",
+                    quant_config=self.quantization_config,
+                    apply_hadamard=self.quantization_config.apply_hadamard,
+                    side="left",
+                )
+                param.set_value(quantized)
+                scale_tensor.set_value(new_scale)
+        else:
+            raise NotImplementedError("AdamWInt8 only supports dynamic or PIR mode.")
+
+    def _is_dtype_fp16_or_bf16(self, dtype):
+        return dtype in (core.VarDesc.VarType.FP16, core.VarDesc.VarType.BF16)
+
+    def _apply_adam_python(
+        self,
+        param,
+        grad,
+        learning_rate,
+        m1,
+        m2,
+        b1_pow,
+        b2_pow,
+        master_w,
+        skip_update,
+        beta1,
+        beta2,
+        epsilon,
+        lr_ratio,
+        weight_decay,
+        with_decay,
+        multi_precision,
+        skip_update_param,
+    ):
+        # fallback Python implementation
+        if skip_update:
+            return
+        lr = learning_rate * lr_ratio
+        # select weight
+        w = master_w if (multi_precision and master_w is not None) else param
+        # weight decay
+        wd = weight_decay if with_decay else 0.0
+        w.mul_(1 - lr * wd)
+        # update moments
+        m1[:] = beta1 * m1 + (1 - beta1) * grad
+        m2[:] = beta2 * m2 + (1 - beta2) * grad * grad
+        denom = paddle.sqrt(m2 / (1 - b2_pow)) + epsilon
+        step = (m1 / denom) * (lr / (1 - b1_pow))
+        w[:] -= step
+        # write back to param if needed
+        if master_w is not None and not skip_update_param:
+            param.set_value(w.astype(param.dtype))
+
+        # update powers
+        b1_pow[:] *= beta1
+        b2_pow[:] *= beta2
     def offload_optim(self, p):
         find_master = self._multi_precision and self._is_dtype_fp16_or_bf16(p.dtype)
         if find_master:
