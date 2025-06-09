@@ -125,13 +125,6 @@ def global_mesh_starts_with_pp():
     else:
         return mesh
 
-# hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi
-# output_attentions、use_cache 可以由config控制且有默认值， delete掉
-# inputs_embeds、past_key_values 动手PP组网没有使用，delete掉，使用默认值
-
-# attn_mask_startend_row_indices 自动并行组网没有使用，不考虑
-
-
 def parse_args(args):
     attention_mask, position_ids, alibi = None, None, None
     if isinstance(args, tuple):
@@ -200,7 +193,7 @@ def manual_model_split(model, stage_idx, group, mode, pp_degree):
         local_chunk_id = stage_idx // pp_degree
         if stage_idx == 0: # 第一个model_chunk输入特殊处理
             new_model = _Pipeline_model_chunk(layer_lists[:chunk_size])
-            def forward0(
+            def forward_in_first_stage(
                 self,
                 input_ids=None,
                 labels=None,
@@ -218,16 +211,16 @@ def manual_model_split(model, stage_idx, group, mode, pp_degree):
                 for idx, (decoder_layer) in enumerate(self.layers):
                     outputs = decoder_layer(outputs)
                 return outputs
-            new_model.forward = forward0.__get__(new_model)
+            new_model.forward = forward_in_first_stage.__get__(new_model)
         else:
             new_model = _Pipeline_model_chunk(layer_lists[stage_idx * chunk_size : (stage_idx + 1) * chunk_size])
-            def forward1(self, *args, **kwargs):
+            def forward_in_middle_stages(self, *args, **kwargs):
                 outputs = args
                 # decoder layers
                 for idx, (decoder_layer) in enumerate(self.layers):
                     outputs = decoder_layer(outputs)
                 return outputs
-            new_model.forward = forward1.__get__(new_model)
+            new_model.forward = forward_in_middle_stages.__get__(new_model)
         stage = PipelineStage(
             new_model,
             stage_idx,
