@@ -557,6 +557,7 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
             ips_base=-1
             mem_base=-1
             check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+        done
     done
     echo "=========== $FUNCNAME run  end ==========="
 }
