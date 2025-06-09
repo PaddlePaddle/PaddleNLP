@@ -27,6 +27,8 @@ import paddle.nn.functional as F
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
+from paddle.distributed.auto_parallel.pipelining.schedules import ScheduleGPipe, Schedule1F1B, ScheduleInterleaved1F1B
+from paddle.distributed.auto_parallel.pipelining.stage import PipelineStage
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -88,6 +90,7 @@ except:
     flash_attention = None
 
 __all__ = [
+    "get_pp_schedule",
     "LlamaForCausalLM3DAutoPP",
 ]
 
@@ -172,6 +175,82 @@ def return_args(
         ret = ret[0]
 
     return ret
+
+class _Pipeline_model_chunk(nn.Layer):
+    def __init__(self, layers):
+        super(_Pipeline_model_chunk, self).__init__()
+        self.layers = layers
+    def forward(self, *args, **kwargs):
+        for layer in self.layers:
+            x = layer(kwargs["input_ids"])
+        return x
+    
+def manual_model_split(model, stage_idx, group, mode, pp_degree):
+
+    num_hidden_layers = model.config.num_hidden_layers
+    virtual_pp_degree = model.config.virtual_pp_degree if mode == "VPP" else 1
+    chunk_size = num_hidden_layers // virtual_pp_degree // pp_degree
+    chunk_num = virtual_pp_degree * pp_degree
+    layer_lists = None
+
+    layer_lists = model.layers
+    # 构建stages
+    def _build_stage(model, stage_idx, group):
+        new_model = None
+        local_chunk_id = stage_idx // pp_degree
+        if stage_idx == 0: # 第一个model_chunk输入特殊处理
+            new_model = _Pipeline_model_chunk(layer_lists[:chunk_size])
+            def forward0(
+                self,
+                input_ids=None,
+                labels=None,
+                position_ids=None,
+                attention_mask=None,
+                inputs_embeds=None,
+                use_cache=False,
+                past_key_values=None,
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None,
+            ):
+                outputs = tuple([input_ids, attention_mask, position_ids])
+                # decoder layers
+                for idx, (decoder_layer) in enumerate(self.layers):
+                    outputs = decoder_layer(outputs)
+                return outputs
+            new_model.forward = forward0.__get__(new_model)
+        else:
+            new_model = _Pipeline_model_chunk(layer_lists[stage_idx * chunk_size : (stage_idx + 1) * chunk_size])
+            def forward1(self, *args, **kwargs):
+                outputs = args
+                # decoder layers
+                for idx, (decoder_layer) in enumerate(self.layers):
+                    outputs = decoder_layer(outputs)
+                return outputs
+            new_model.forward = forward1.__get__(new_model)
+        stage = PipelineStage(
+            new_model,
+            stage_idx,
+            chunk_num,
+            group=group
+        )
+        return stage
+    stages = []
+    for i in range(virtual_pp_degree):  
+        stage = _build_stage(model, stage_idx+i*pp_degree, group)
+        stages.append(stage)
+    return stages
+
+def get_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group):
+    assert mode in ["VPP", "1F1B", "GPipe"]
+    stages = manual_model_split(model, group.rank, group, mode, pp_degree)
+    if mode == "VPP":
+        schedule = ScheduleInterleaved1F1B(stages, n_microbatches = n_microbatches, loss_fn = loss_fn)
+    elif mode == "1F1B":
+        schedule = Schedule1F1B(stages[0], n_microbatches = n_microbatches, loss_fn = loss_fn)
+    else:
+        schedule = ScheduleGPipe(stages[0], n_microbatches = n_microbatches, loss_fn = loss_fn)
+    return schedule
 
 
 colwise_placements = [dist.Replicate(), dist.Shard(1)]

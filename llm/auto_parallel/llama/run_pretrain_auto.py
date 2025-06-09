@@ -47,10 +47,10 @@ from paddlenlp.transformers import (
     LlamaPretrainingCriterionNet,
 )
 from paddlenlp.utils.log import logger
-from paddle.distributed.auto_parallel.pipelining.schedules import ScheduleGPipe
 
 MODEL_CLASSES = {
-    "llama": (LlamaConfig, LlamaForCausalLM3DAutoPP, LlamaPretrainingCriterion3DAuto),
+    "llama": (LlamaConfig, LlamaForCausalLM3DAuto, LlamaPretrainingCriterion3DAuto),
+    "llama_hybrid_pp": (LlamaConfig, LlamaForCausalLM3DAutoPP, LlamaPretrainingCriterion3DAuto),
     "llama_network": (LlamaConfig, LlamaForCausalLMNet, LlamaPretrainingCriterionNet),
 }
 
