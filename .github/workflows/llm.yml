@@ -112,7 +112,6 @@ jobs:
           index = https://pip.baidu-int.com/search/
           index-url = https://pip.baidu-int.com/simple/
           trusted-host = pip.baidu-int.com" > /etc/pip.conf
-          nvidia-smi
           '
           docker exec -t ${{ env.container_name }} /bin/bash -c '
           ldconfig
