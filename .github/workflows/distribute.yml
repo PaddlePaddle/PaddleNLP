@@ -95,6 +95,7 @@ jobs:
           docker exec -t ${{ env.container_name }} /bin/bash -c '
           ldconfig
           set -e
+          sleep 1d
           timeout 80m bash PaddleNLP/scripts/distribute/run_ci.sh ${paddle_whl}
           '
 

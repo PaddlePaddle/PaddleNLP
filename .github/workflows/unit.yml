@@ -60,10 +60,10 @@ jobs:
       - name: Parse GPU ID from runner label
         id: parse-gpu
         run: |
-          echo "Runner labels: $RUNNER_LABELS"
-          if [[ "$RUNNER_LABELS" == *"gpu-0-3"* ]]; then
+          echo "Runner labels: $MACHINE_TAG"
+          if [[ "$MACHINE_TAG" == *"gpu-0-3"* ]]; then
             echo "cudaid=0,1,2,3" >> ${{ github.env }}
-          elif [[ "$RUNNER_LABELS" == *"gpu-4-7"* ]]; then
+          elif [[ "$MACHINE_TAG" == *"gpu-4-7"* ]]; then
             echo "cudaid=4,5,6,7" >> ${{ github.env }}
           else
             echo "Unknown runner label, fallback to default CUDA"
@@ -118,6 +118,7 @@ jobs:
           ldconfig
           set -e
           # rm -rf tests/utils/test_import_utils.py
+          sleep 1d
           timeout 50m bash PaddleNLP/scripts/unit_test/ci_unit.sh ${paddle}
           '
 
