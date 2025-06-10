@@ -43,7 +43,8 @@ jobs:
           git config --global user.email "paddle_ci@example.com"
           git pull
           git submodule update --init --recursive --force
-          git fetch origin pull/${PR_ID}/head:test && git checkout test
+          git fetch origin pull/${PR_ID}/head
+          git checkout -b PR_${PR_ID} FETCH_HEAD
           git remote add upstream https://github.com/PaddlePaddle/PaddleNLP.git
           git fetch upstream ${BRANCH}
           git merge ${BRANCH}
@@ -117,7 +118,7 @@ jobs:
             echo "$file: https://paddle-github-action.bj.bcebos.com/PR/Auto-Parallel/${PR_ID}/${COMMIT_ID}/logs/$file"
           done
           '
-          
+
       - name: Terminate and delete the container
         if: always()
         run: |
