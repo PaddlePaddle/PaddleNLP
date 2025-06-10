@@ -236,7 +236,7 @@ class _BaseAutoModelClass:
         # Get class name corresponds to this configuration
         if is_standard_config(config):
             architectures = deepcopy(config["architectures"])
-            init_class = architectures.pop() if len(architectures) > 0 else None
+            init_class = architectures.pop() if architectures is not None and len(architectures) > 0 else None
         else:
             init_class = config.pop("init_class", None)
         init_class = init_class[:-5] if init_class is not None and init_class.endswith("Model") else init_class
@@ -254,7 +254,7 @@ class _BaseAutoModelClass:
         else:
             # From pretrained_model_name_or_path
             for model_flag, name in SORTED_MAPPING_NAMES.items():
-                if name in pretrained_model_name_or_path.lower():
+                if type(pretrained_model_name_or_path) is str and name in pretrained_model_name_or_path.lower():
                     model_name = model_flag + "Model"
                     break
         if model_name is None:
