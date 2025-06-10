@@ -493,21 +493,32 @@ def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=No
     assert (
         size % tensor_parallel_degree == 0
     ), f"The chosen size {size} is not compatible with sharding on {tensor_parallel_degree} shards. for tensor shape {weight.shape}"
-
     if is_column:
         total_size = weight.shape[-1]
         chunk_size = total_size // tensor_parallel_degree
-        start = tensor_parallel_rank * chunk_size
-        end = (tensor_parallel_rank + 1) * chunk_size
-        tensor = weight[..., start:end].clone()
-        return tensor
+        if tensor_parallel_rank is not None:
+            start = tensor_parallel_rank * chunk_size
+            end = (tensor_parallel_rank + 1) * chunk_size
+            splited_weights = weight[..., start:end].clone()
+            return splited_weights
+        else:
+            splited_weights = [
+                weight[..., i * chunk_size : (i + 1) * chunk_size] for i in range(tensor_parallel_degree)
+            ]
+            return splited_weights
     else:
         total_size = weight.shape[0]
         chunk_size = total_size // tensor_parallel_degree
-        start = tensor_parallel_rank * chunk_size
-        end = (tensor_parallel_rank + 1) * chunk_size
-        tensor = weight[start:end, ...].clone()
-        return tensor
+        if tensor_parallel_rank is not None:
+            start = tensor_parallel_rank * chunk_size
+            end = (tensor_parallel_rank + 1) * chunk_size
+            splited_weights = weight[start:end, ...].clone()
+            return splited_weights
+        else:
+            splited_weights = [
+                weight[i * chunk_size : (i + 1) * chunk_size, ...] for i in range(tensor_parallel_degree)
+            ]
+            return splited_weights
 
 
 """
