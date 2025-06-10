@@ -14,7 +14,7 @@
 
 from typing import Optional
 
-from aistudio_sdk.hub import download
+from aistudio_sdk.file_download import model_file_download
 
 
 class UnauthorizedError(Exception):
@@ -47,21 +47,9 @@ def aistudio_download(
         download_kwargs["revision"] = revision
     if cache_dir is not None:
         download_kwargs["cache_dir"] = cache_dir
-    res = download(
+    return model_file_download(
         repo_id=repo_id,
-        filename=filename,
-        **download_kwargs,
+        file_path=filename,
+        revision=revision,
+        local_dir=cache_dir if cache_dir is not None else None
     )
-    if "path" in res:
-        return res["path"]
-    else:
-        if res["error_code"] == 10001:
-            raise ValueError("Illegal argument error")
-        elif res["error_code"] == 10002:
-            raise UnauthorizedError(
-                "Unauthorized Access. Please ensure that you have provided the AIStudio Access Token and you have access to the requested asset"
-            )
-        elif res["error_code"] == 12001:
-            raise EntryNotFoundError(f"Cannot find the requested file '{filename}' in repo '{repo_id}'")
-        else:
-            raise Exception(f"Unknown error: {res}")
