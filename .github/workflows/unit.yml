@@ -13,6 +13,7 @@ env:
   TASK: paddlenlp-CI-${{ github.event.pull_request.number }}-unit
   ci_scripts: /workspace/PaddleNLP/scripts/unit_test
   BRANCH: ${{ github.event.pull_request.base.ref }}
+  AGILE_COMPILE_BRANCH: ${{ github.event.pull_request.base.ref }}
   CI_name: unit-ci
   no_proxy: "localhost,bj.bcebos.com,su.bcebos.com,bcebos.com,apiin.im.baidu.com,gitee.com,aliyun.com,.baidu.com,.tuna.tsinghua.edu.cn"
   HF_ENDPOINT: https://hf-mirror.com
