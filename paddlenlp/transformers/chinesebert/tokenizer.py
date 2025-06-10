@@ -301,7 +301,7 @@ class ChineseBertTokenizer(BertTokenizer):
 
         offset_mapping = self.build_offset_mapping_with_special_tokens(token_offset_mapping, token_pair_offset_mapping)
 
-        # Build output dictionnary
+        # Build output dictionary
         encoded_inputs["input_ids"] = sequence
         encoded_inputs["pinyin_ids"] = self.get_pinyin_ids(text, text_pair, offset_mapping)
 
@@ -505,7 +505,7 @@ class ChineseBertTokenizer(BertTokenizer):
                     sequence = self.build_inputs_with_special_tokens(ids, pair_ids)
                     token_type_ids = self.create_token_type_ids_from_sequences(ids, pair_ids)
 
-                    # Build output dictionnary
+                    # Build output dictionary
                     encoded_inputs["input_ids"] = sequence
                     # add_pinyin_ids
                     encoded_inputs["pinyin_ids"] = self.get_pinyin_ids(text, text_pair, offset_mapping)

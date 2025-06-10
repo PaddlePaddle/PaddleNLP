@@ -113,7 +113,7 @@ def upload(data_files, chunk_size, separator, filters):
 if __name__ == "__main__":
     block = gr.Blocks()
     with block as demo:
-        gr.Markdown("""<h1><center>PaddleNLP Piplines ChatFiles</center></h1>""")
+        gr.Markdown("""<h1><center>PaddleNLP Pipelines ChatFiles</center></h1>""")
         with gr.Row():
             with gr.Column(scale=1):
                 model_choose = gr.Accordion("模型选择")

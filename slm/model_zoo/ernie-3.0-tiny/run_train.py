@@ -261,7 +261,7 @@ def main():
 
             intent_accuracy = intent_right / sample_num * 100
             accuracy = slot_right / sample_num * 100
-            logger.info("accuray: %.2f, intent_accuracy: %.2f" % (accuracy, intent_accuracy))
+            logger.info("accuracy: %.2f, intent_accuracy: %.2f" % (accuracy, intent_accuracy))
             model.train()
 
             return accuracy

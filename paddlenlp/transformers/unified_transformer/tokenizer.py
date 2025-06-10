@@ -642,7 +642,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         if return_role_ids:
             history_role_ids = knowledge_role_ids + history_role_ids
 
-        # Build output dictionnary
+        # Build output dictionary
         encoded_inputs = {}
         encoded_inputs["input_ids"] = history_ids + response_ids
 
@@ -660,7 +660,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         if pad_length > 0:
             encoded_inputs["input_ids"] = [self.pad_token_id] * pad_length + encoded_inputs["input_ids"]
         if return_tensors:
-            # Add dimention for batch_size
+            # Add dimension for batch_size
             encoded_inputs["input_ids"] = paddle.to_tensor(encoded_inputs["input_ids"]).unsqueeze(0)
 
         if return_token_type_ids:
@@ -668,7 +668,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             if pad_length > 0:
                 encoded_inputs["token_type_ids"] = [self.pad_token_id] * pad_length + encoded_inputs["token_type_ids"]
             if return_tensors:
-                # Add dimention for batch_size
+                # Add dimension for batch_size
                 encoded_inputs["token_type_ids"] = paddle.to_tensor(encoded_inputs["token_type_ids"]).unsqueeze(0)
 
         if return_length:
@@ -688,7 +688,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             if pad_length > 0:
                 encoded_inputs["position_ids"] = [self.pad_token_id] * pad_length + encoded_inputs["position_ids"]
             if return_tensors:
-                # Add dimention for batch_size
+                # Add dimension for batch_size
                 encoded_inputs["position_ids"] = paddle.to_tensor(encoded_inputs["position_ids"]).unsqueeze(0)
 
         if return_attention_mask:
@@ -705,7 +705,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 new_mask[-sequence_length:, -sequence_length:] = attention_mask
                 encoded_inputs["attention_mask"] = new_mask
             if return_tensors:
-                # Add dimentions for batch_size and num_heads
+                # Add dimensions for batch_size and num_heads
                 encoded_inputs["attention_mask"] = paddle.to_tensor(encoded_inputs["attention_mask"]).unsqueeze((0, 1))
 
         return encoded_inputs

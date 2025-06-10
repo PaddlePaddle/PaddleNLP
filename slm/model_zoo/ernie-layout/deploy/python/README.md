@@ -22,7 +22,7 @@ pip install -r requirements.txt
 
 #### Data Preparation
 
-- Dowload the sample images and put in ``./images``
+- Download the sample images and put in ``./images``
 
 ```shell
 wget https://bj.bcebos.com/paddlenlp/datasets/document_intelligence/images.zip && unzip images.zip

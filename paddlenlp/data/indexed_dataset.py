@@ -55,7 +55,7 @@ def get_available_dataset_impl():
 
 def make_dataset(path, impl, skip_warmup=False):
     if CompatibleIndexedDataset.exists(path):
-        print("Using old dataet (.npy & .npz)")
+        print("Using old dataset (.npy & .npz)")
         return CompatibleIndexedDataset(path)
     elif not IndexedDataset.exists(path):
         print(f"Dataset does not exist: {path}")
@@ -903,7 +903,7 @@ class CompatibleIndexedDataset(paddle.io.Dataset):
 
         self._path = path
 
-        # All documment ids, extend as 1-D array.
+        # All document ids, extend as 1-D array.
         self._token_ids = np.load(path + "_ids.npy", mmap_mode="r", allow_pickle=True)
         process_data = np.load(path + "_idx.npz")
         self._sizes = process_data["lens"]

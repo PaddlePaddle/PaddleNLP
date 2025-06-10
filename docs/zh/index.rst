@@ -128,6 +128,10 @@
    :caption: 实践教程
 
    AI Studio Notebook <tutorials/overview>
+   大模型预训练新手指南 <llm/docs/pretrain_tutorial.md>
+   大模型精调新手指南 <llm/docs/finetune_tutorial.md>
+   大模型对齐新手指南 <llm/docs/alignment_tutorial.md>
+   大模型量化新手指南 <llm/docs/quantization_tutorial.md>
 
 .. toctree::
    :maxdepth: 1

@@ -233,7 +233,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
                         )
                     else:
                         tp_actions = model.get_tensor_parallel_convert_actions(
-                            model.config, model_keys, ignore_error=True
+                            model.config, model_keys, ignore_error=True, is_optim=True
                         )
                     if not is_master_weights:
                         tp_actions = mapping_optimizer_tp_actions(tp_actions, expected_keys)

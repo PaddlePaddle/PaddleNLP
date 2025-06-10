@@ -94,7 +94,7 @@ python -m paddle.distributed.launch --gpus "0" train.py --config ./config/transf
   - `waik`表示 waik 策略，这里设置为3（以 wait-3模型为例）
   - `training_file`表示训练集，数据格式同上文
   - `validation_file`表示验证集，数据格式同上文
-  - `init_from_checkpoint`表示模型目录，从该 checkpoint 恢复训练，这里设置`waik=-1`模型的 ckeckpoint
+  - `init_from_checkpoint`表示模型目录，从该 checkpoint 恢复训练，这里设置`waik=-1`模型的 checkpoint
   - `init_from_pretrain_model`表示模型目录，从该 checkpoint 开始 finetune 下游任务，这里设置为空
   - `device`选择训练用的设备，支持 cpu/gpu/xpu，默认为 gpu
   - `use_amp`表示混合精度训练，示例设置为 False

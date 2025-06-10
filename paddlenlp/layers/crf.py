@@ -248,7 +248,7 @@ class LinearChainCrfLoss(nn.Layer):
         self.crf = crf
         if isinstance(crf, paddle.Tensor):
             raise ValueError(
-                "From paddlenlp >= 2.0.0b4, the first param of LinearChainCrfLoss shoule be a LinearChainCrf object. For input parameter 'crf.transitions', you can remove '.transitions' to 'crf'"
+                "From paddlenlp >= 2.0.0b4, the first param of LinearChainCrfLoss should be a LinearChainCrf object. For input parameter 'crf.transitions', you can remove '.transitions' to 'crf'"
             )
 
     def forward(self, inputs, lengths, labels, old_version_labels=None):

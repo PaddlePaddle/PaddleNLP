@@ -139,13 +139,13 @@ def cut_chinese_sent(para):
 
 
 class TermTreeNode(object):
-    """Defination of term node. All members are protected, to keep rigorism of data struct.
+    """Definition of term node. All members are protected, to keep rigorism of data struct.
 
     Args:
         sid (str): term id of node.
         term (str): term, common name of this term.
         base (str): `cb` indicates concept base, `eb` indicates entity base.
-        term_type (Optional[str], optional): type of this term, constructs hirechical of `term` node. Defaults to None.
+        term_type (Optional[str], optional): type of this term, constructs hierarchical of `term` node. Defaults to None.
         hyper (Optional[str], optional): parent type of a `type` node. Defaults to None.
         node_type (str, optional): type statement of node, `type` or `term`. Defaults to "term".
         alias (Optional[List[str]], optional): alias of this term. Defaults to None.
@@ -153,7 +153,7 @@ class TermTreeNode(object):
             Defaults to None.
         sub_type (Optional[List[str]], optional): grouped by some term. Defaults to None.
         sub_term (Optional[List[str]], optional): some lower term. Defaults to None.
-        data (Optional[Dict[str, Any]], optional): to sore full imformation of a term. Defaults to None.
+        data (Optional[Dict[str, Any]], optional): to sore full information of a term. Defaults to None.
 
     """
 
@@ -565,7 +565,7 @@ def levenstein_distance(s1: str, s2: str) -> int:
 
 
 class BurkhardKellerNode(object):
-    """Node implementatation for BK-Tree. A BK-Tree node stores the information of current word, and its approximate words calculated by levenstein distance.
+    """Node implementation for BK-Tree. A BK-Tree node stores the information of current word, and its approximate words calculated by levenstein distance.
 
     Args:
         word (str): word of current node.
@@ -577,7 +577,7 @@ class BurkhardKellerNode(object):
 
 
 class BurkhardKellerTree(object):
-    """Implementataion of BK-Tree"""
+    """Implementation of BK-Tree"""
 
     def __init__(self):
         self.root = None
@@ -648,7 +648,7 @@ class BurkhardKellerTree(object):
 
 
 class TriedTree(object):
-    """Implementataion of TriedTree"""
+    """Implementation of TriedTree"""
 
     def __init__(self):
         self.tree = {}
@@ -762,7 +762,7 @@ class Customization(object):
 
 class SchemaTree(object):
     """
-    Implementataion of SchemaTree
+    Implementation of SchemaTree
     """
 
     def __init__(self, name="root", children=None):
@@ -779,7 +779,7 @@ class SchemaTree(object):
         return self.name
 
     def add_child(self, node):
-        assert isinstance(node, SchemaTree), "The children of a node should be an instacne of SchemaTree."
+        assert isinstance(node, SchemaTree), "The children of a node should be an instance of SchemaTree."
         self.children.append(node)
 
 
@@ -910,7 +910,7 @@ class WordTagRelationExtractor(object):
             self._schema[head_role_type]["g_t_map"][group_name] = trip_config["tail_role"]
 
     def _judge_jux(self, wordtag_item):
-        """Judge whether `wordtag_item` is a relevance componet between two juxtaposed items.
+        """Judge whether `wordtag_item` is a relevance component between two juxtaposed items.
 
         Args:
             wordtag_item (dict): input item.
@@ -935,7 +935,7 @@ class WordTagRelationExtractor(object):
             status_flag (bool, optional): if True, on the juxtaposed item, or on chain item. Defaults to None.
 
         Returns:
-            int: end postion of juxtable items.
+            int: end position of juxtable items.
         """
         if search_list is None:
             search_list = self._all_items
@@ -1765,7 +1765,7 @@ class ImageReader(object):
             inputs_def=inputs_def,
         )
 
-    def ppocr2example(self, ocr_res, img_path, querys):
+    def ppocr2example(self, ocr_res, img_path, queries):
         examples = []
         segments = []
         for rst in ocr_res:
@@ -1861,7 +1861,7 @@ class ImageReader(object):
                     )
 
         qas_id = 0
-        for query in querys:
+        for query in queries:
             example = Example(
                 keys=[query],
                 key_labels=[0],
@@ -1882,7 +1882,7 @@ class ImageReader(object):
             qas_id += 1
         return examples
 
-    def box2example(self, ocr_res, img_path, querys):
+    def box2example(self, ocr_res, img_path, queries):
         """
         ocr_res = [[word_str, [x1, y1, x2, y2]], [word_str, [x1, y1, x2, y2]], ...]
         """
@@ -1919,7 +1919,7 @@ class ImageReader(object):
         doc_segment_ids = [[0]] * len(doc_tokens)
 
         qas_id = 0
-        for query in querys:
+        for query in queries:
             example = Example(
                 keys=[query],
                 key_labels=[0],
@@ -2147,11 +2147,11 @@ class ImageReader(object):
         ]
         return return_list
 
-    def data_generator(self, ocr_res, img_path, querys, batch_size, ocr_type="ppocr", phase="infer"):
+    def data_generator(self, ocr_res, img_path, queries, batch_size, ocr_type="ppocr", phase="infer"):
         if ocr_type == "ppocr":
-            self.examples[phase] = self.ppocr2example(ocr_res, img_path, querys)
+            self.examples[phase] = self.ppocr2example(ocr_res, img_path, queries)
         elif ocr_type == "word_boxes":
-            self.examples[phase] = self.box2example(ocr_res, img_path, querys)
+            self.examples[phase] = self.box2example(ocr_res, img_path, queries)
         self.features[phase] = sum([self.example2feature(e, self.tokenizer) for e in self.examples[phase]], [])
         for batch_data in self._prepare_batch_data(self.features[phase], batch_size, phase=phase):
             yield self._pad_batch_records(batch_data)

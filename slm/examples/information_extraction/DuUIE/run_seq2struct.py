@@ -271,7 +271,7 @@ def eval_all_tasks(eval_tasks, model, tokenizer, generate_max_length):
     eval_overall_results = dict()
     eval_overall_predictions = dict()
     for task_name, eval_task in eval_tasks.items():
-        # Evaulate single task
+        # Evaluate single task
         logger.info(f"Evaluate {task_name} ...")
         eval_results, eval_prediction = evaluate(
             model=model,

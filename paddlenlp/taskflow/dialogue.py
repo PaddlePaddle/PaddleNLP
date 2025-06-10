@@ -155,7 +155,7 @@ class DialogueTask(Task):
                 inputs = [list(self.context)]
                 return inputs
             else:
-                raise ValueError("In the interactive mode, the input data shold be a string")
+                raise ValueError("In the interactive mode, the input data should be a string")
         elif not isinstance(inputs[0], list):
             raise ValueError("If not in the interactive mode, the input data should be a list.")
         return inputs

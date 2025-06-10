@@ -252,7 +252,7 @@ def do_train():
                 print("\n=====start evaluating ckpt of %d steps=====" % global_step)
                 precision, recall, f1 = evaluate(model, criterion, test_data_loader, eval_file_path, "eval")
                 print("precision: %.2f\t recall: %.2f\t f1: %.2f\t" % (100 * precision, 100 * recall, 100 * f1))
-                print("saving checkpoing model_%d.pdparams to %s " % (global_step, args.output_dir))
+                print("saving checkpoint model_%d.pdparams to %s " % (global_step, args.output_dir))
                 paddle.save(model.state_dict(), os.path.join(args.output_dir, "model_%d.pdparams" % global_step))
                 model.train()  # back to train mode
 

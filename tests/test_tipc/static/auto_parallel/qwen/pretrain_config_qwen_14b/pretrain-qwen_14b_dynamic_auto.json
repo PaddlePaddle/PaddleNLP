@@ -25,7 +25,7 @@
     "min_learning_rate": 5e-06,
     "scale_loss": 1024,
     "warmup_steps": 30,
-    "logging_steps": 2,
+    "logging_steps": 5,
     "max_steps": 200,
     "save_steps": 1000,
     "eval_steps": 10000,

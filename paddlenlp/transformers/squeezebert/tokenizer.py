@@ -37,7 +37,7 @@ class SqueezeBertTokenizer(PretrainedTokenizer):
         do_lower_case (bool): Whether the text strips accents and convert to
             lower case. Default: `True`.
             Default: True.
-        unk_token (str): The special token for unkown words. Default: "[UNK]".
+        unk_token (str): The special token for unknown words. Default: "[UNK]".
         sep_token (str): The special token for separator token . Default: "[SEP]".
         pad_token (str): The special token for padding. Default: "[PAD]".
         cls_token (str): The special token for cls. Default: "[CLS]".

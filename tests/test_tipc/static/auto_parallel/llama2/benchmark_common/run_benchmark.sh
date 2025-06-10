@@ -265,6 +265,7 @@ export FLAGS_use_cinn=1
 export FLAGS_dist_prim_all=1
 export FLAGS_prim_forward_blacklist="pd_op.stack;pd_op.squeeze;pd_op.swiglu;pd_op.squared_l2_norm"
 export FLAGS_prim_backward_blacklist="swiglu_grad"
+export FLAGS_merge_all_horizontal_groups=1
 
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@

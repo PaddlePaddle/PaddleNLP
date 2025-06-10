@@ -117,7 +117,7 @@ class DataArguments:
     )
     lang: Optional[str] = field(
         default="en",
-        metadata={"help": "Languge type of the dataset"},
+        metadata={"help": "Language type of the dataset"},
     )
 
 

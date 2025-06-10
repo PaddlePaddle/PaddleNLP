@@ -252,7 +252,7 @@ class RelationScorer(Scorer):
         """[summary]
 
         Args:
-            gold_list (List[List[Dict]]): List of Sentece, each sentence contains a List of Relation Dict
+            gold_list (List[List[Dict]]): List of Sentence, each sentence contains a List of Relation Dict
                 [
                     [
                         {
@@ -264,7 +264,7 @@ class RelationScorer(Scorer):
                 ]
 
         Returns:
-            List[Dict]: List of Sentece, each sentence contains two List (offset, string) of Relation Tuple
+            List[Dict]: List of Sentence, each sentence contains two List (offset, string) of Relation Tuple
                 [
                     {
                         'offset': [('Part-whole', 'Geo-political', (0,), 'Geo-political', (2,)), ... ],
@@ -304,7 +304,7 @@ class RelationScorer(Scorer):
         """[summary]
 
         Args:
-            pred_list (List[Dict]): List of Sentece, each sentence contains two List (offset, string) of Relation List
+            pred_list (List[Dict]): List of Sentence, each sentence contains two List (offset, string) of Relation List
                 [
                     {
                         'offset': [['Part-whole', 'Geo-political', [0], 'Geo-political', [2]]],
@@ -312,7 +312,7 @@ class RelationScorer(Scorer):
                     }, ...
                 ]
         Returns:
-            List[Dict]: List of Sentece, each sentence contains two List (offset, string) of Relation Tuple
+            List[Dict]: List of Sentence, each sentence contains two List (offset, string) of Relation Tuple
                 [
                     {
                         'offset': [('Part-whole', 'Geo-political', (0,), 'Geo-political', (2,))],
@@ -340,14 +340,14 @@ class RelationScorer(Scorer):
         """[summary]
 
         Args:
-            gold_instance_list (List[Dict]): List of Sentece, each sentence contains two List (offset, string) of Relation Tuple
+            gold_instance_list (List[Dict]): List of Sentence, each sentence contains two List (offset, string) of Relation Tuple
                 [
                     {
                         'offset': [('Part-whole', 'Geo-political', (0,), 'Geo-political', (2,)), ... ],
                         'string': [('Part-whole', 'Geo-political', 'MULTAN', 'Geo-political', 'Pakistan'), ...]
                     }
                 ]
-            pred_instance_list ([type]): List of Sentece, each sentence contains two List (offset, string) of Relation Tuple
+            pred_instance_list ([type]): List of Sentence, each sentence contains two List (offset, string) of Relation Tuple
                 [
                     {
                         'offset': [('Part-whole', 'Geo-political', (0,), 'Geo-political', (2,))],
@@ -412,9 +412,9 @@ class EventScorer(Scorer):
         """[summary]
 
         Args:
-            gold_list (List[List[Dict]]): List of Sentece, each sentence contains a List of Event Dict
+            gold_list (List[List[Dict]]): List of Sentence, each sentence contains a List of Event Dict
                 [
-                    [ # Sentance
+                    [ # Sentence
                         { # Event Record
                             'type': 'Die',
                             'offset': [16],
@@ -429,7 +429,7 @@ class EventScorer(Scorer):
                 ]
 
         Returns:
-            List[Dict]: List of Sentece, each sentence contains Four List of Event Tuple
+            List[Dict]: List of Sentence, each sentence contains Four List of Event Tuple
                 [
                     {
                         'offset_trigger': [('Die', (16,)), ('Convict', (30,))],
@@ -457,7 +457,7 @@ class EventScorer(Scorer):
         """[summary]
 
         Args:
-            pred_list (List[Dict]): List of Sentece, each sentence contains two List (offset, string) of Event List
+            pred_list (List[Dict]): List of Sentence, each sentence contains two List (offset, string) of Event List
                 [
                     {
                         'offset': [{'type': 'Attack', 'roles': [['Attacker', [5, 6]], ['Place', [23]], ['Target', [17]]], 'trigger': [16]}],
@@ -466,7 +466,7 @@ class EventScorer(Scorer):
                     ...
                 ]
         Returns:
-            List[Dict]: List of Sentece, each sentence contains four List (offset, string) X (trigger, role) of Event List
+            List[Dict]: List of Sentence, each sentence contains four List (offset, string) X (trigger, role) of Event List
                 [
                     {
                         'offset_trigger': [('Attack', (16,))],
@@ -500,7 +500,7 @@ class EventScorer(Scorer):
         """[summary]
 
         Args:
-            gold_instance_list (List[Dict]): List of Sentece, each sentence contains Four List of Event Tuple
+            gold_instance_list (List[Dict]): List of Sentence, each sentence contains Four List of Event Tuple
                 [
                     {
                         'offset_trigger': [('Die', (16,)), ('Convict', (30,))],
@@ -510,7 +510,7 @@ class EventScorer(Scorer):
                     },
                     ...
                 ]
-            pred_instance_list (List[Dict]): List of Sentece, each sentence contains four List (offset, string) X (trigger, role) of Event List
+            pred_instance_list (List[Dict]): List of Sentence, each sentence contains four List (offset, string) X (trigger, role) of Event List
                 [
                     {
                         'offset_trigger': [('Attack', (16,))],
