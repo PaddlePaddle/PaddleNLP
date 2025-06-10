@@ -42,11 +42,6 @@ def aistudio_download(
     if revision is None:
         revision = "master"
     filename = _add_subfolder(filename, subfolder)
-    download_kwargs = {}
-    if revision is not None:
-        download_kwargs["revision"] = revision
-    if cache_dir is not None:
-        download_kwargs["cache_dir"] = cache_dir
     return model_file_download(
         repo_id=repo_id,
         file_path=filename,
