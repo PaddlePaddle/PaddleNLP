@@ -116,12 +116,12 @@ jobs:
           index = https://pip.baidu-int.com/search/
           index-url = https://pip.baidu-int.com/simple/
           trusted-host = pip.baidu-int.com" > /etc/pip.conf
-          cd ${{ github.workspace }}/PaddleNLP && git config --global --add safe.directory $PWD
           '
           docker exec -t ${{ env.container_name }} /bin/bash -c '
           ldconfig
           set -e
-          timeout 2h bash PaddleNLP/scripts/regression/run_ci.sh python${python_version} ${paddle_whl}
+          cd ${{ github.workspace }}/PaddleNLP && git config --global --add safe.directory $PWD
+          timeout 2h bash scripts/regression/run_ci.sh python${python_version} ${paddle_whl}
           '
 
       - name: Upload and display logs

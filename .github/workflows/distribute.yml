@@ -92,12 +92,12 @@ jobs:
           pip config set global.cache-dir "/home/.cache/pip"
           ln -sf $(which python${python_version}) /usr/bin/python
           python -m pip install bce-python-sdk==0.8.74
-          cd ${{ github.workspace }}/PaddleNLP && git config --global --add safe.directory $PWD
           '
           docker exec -t ${{ env.container_name }} /bin/bash -c '
           ldconfig
           set -e
-          timeout 80m bash PaddleNLP/scripts/distribute/run_ci.sh ${paddle_whl}
+          cd ${{ github.workspace }}/PaddleNLP && git config --global --add safe.directory $PWD
+          timeout 80m bash scripts/distribute/run_ci.sh ${paddle_whl}
           '
 
       - name: Upload and display logs
