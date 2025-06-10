@@ -292,13 +292,13 @@ std::vector<paddle::Tensor> fused_stack_transpose_quant(
   dim3 grid((M / 128) * (K / 128), 1, N);
   dim3 block(32, 32);
 
-#define LAUNCH_KERNEL(KERNEL)                             \
-  KERNEL<<<grid, block>>>(X_ptrs_gpu.data<int64_t>(),     \
-                          out.data<phi::float8_e4m3fn>(), \
-                          scale.data<float>(),            \
-                          M,                              \
-                          K,                              \
-                          FastDiv(K / 128))
+#define LAUNCH_KERNEL(KERNEL)                                               \
+  KERNEL<<<grid, block, 0, X[0].stream()>>>(X_ptrs_gpu.data<int64_t>(),     \
+                                            out.data<phi::float8_e4m3fn>(), \
+                                            scale.data<float>(),            \
+                                            M,                              \
+                                            K,                              \
+                                            FastDiv(K / 128))
   if (Transpose) {
     LAUNCH_KERNEL(FusedStackTransposeQuantKernel);
   } else {

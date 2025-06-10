@@ -275,7 +275,7 @@ void fused_transpose_split_quant(const paddle::Tensor& X,
 
 #define LAUNCH_KERNEL(POW_2_SCALES, VEC_SIZE)                                \
   FusedTransposeSplitQuantKernel<phi::float8_e4m3fn, POW_2_SCALES, VEC_SIZE> \
-      <<<grid, block>>>(                                                     \
+      <<<grid, block, 0, X.stream()>>>(                                      \
           X.data<phi::bfloat16>(), meta_gpu.data<int64_t>(), num_experts, K);
 #define LAUNCH_KERNEL_PARTIAL(VEC_SIZE) \
   if (pow_2_scales) {                   \
