@@ -96,7 +96,7 @@ jobs:
           docker exec -t ${{ env.container_name }} /bin/bash -c '
           ldconfig
           set -e
-          cd ${{ github.workspace }}/PaddleNLP && git config --global --add safe.directory $PWD
+          cd /workspace/PaddleNLP && git config --global --add safe.directory $PWD
           timeout 80m bash scripts/distribute/run_ci.sh ${paddle_whl}
           '
 

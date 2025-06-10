@@ -120,7 +120,7 @@ jobs:
           ldconfig
           set -e
           # rm -rf tests/utils/test_import_utils.py
-          cd ${{ github.workspace }}/PaddleNLP && git config --global --add safe.directory $PWD
+          cd /workspace/PaddleNLP && git config --global --add safe.directory $PWD
           timeout 50m bash scripts/unit_test/ci_unit.sh ${paddle_whl}
           '
 
