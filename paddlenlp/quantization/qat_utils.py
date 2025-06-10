@@ -106,7 +106,7 @@ def quantize(
             scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.scale_epsilon
             if group is not None:
                 paddle.distributed.all_reduce(scale, op=paddle.distributed.ReduceOp.MAX, group=group, sync_op=True)
-            quant_x = (target_x / scale).astype(quantization_config.fp8_format[tensor_type]).T
+            quant_x = (target_x / scale).astype(quantization_config.fp8_format[tensor_type]).view("int8").T
             scale = (scale / hadamard_scale).reshape([1])
         else:
             raise NotImplementedError(f"Unknown {weight_quantize_algo}.")
@@ -130,7 +130,7 @@ def dequantize(
         if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
             x = quant_x.T.astype(scale.dtype)
         elif weight_quantize_algo in ["fp8linear"]:
-            x = quant_x.T.astype(scale.dtype)
+            x = quant_x.view(quantization_config.fp8_format[tensor_type]).T.astype(scale.dtype)
         else:
             raise NotImplementedError(f"Unknown weight_quantize_algo: {weight_quantize_algo}")
         if apply_hadamard:
@@ -225,6 +225,7 @@ def fp8_forward(
         training=training,
         group=group,
     )
+    w_fp8 = w_fp8.view(quantization_config.fp8_format["weight"])
     if SUPPORT_FP8:
         out = fp8_fp8_half_gemm_fused(
             x_fp8,
@@ -277,7 +278,6 @@ def fp8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scal
                 side="left",
                 apply_hadamard=False,
             )
-            grad_output_fp8 = grad_output_fp8.view(ctx.quantization_config.fp8_format["grad_output"])
             quant_weight = quant_weight.view(ctx.quantization_config.fp8_format["weight"])
             if SUPPORT_TE:
                 grad_output_shape = grad_output_fp8.shape
@@ -327,7 +327,6 @@ def fp8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scal
                 quantization_config=ctx.quantization_config,
                 apply_hadamard=False,
             )
-            quant_x = quant_x.view(ctx.quantization_config.fp8_format["activation"])
             if SUPPORT_TE:
                 quant_x = quant_x.view((-1, quant_x.shape[-1]))
                 grad_output_fp8 = grad_output_fp8.view((-1, grad_output_fp8.shape[-1]))
@@ -341,8 +340,8 @@ def fp8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scal
                     padding_size = ALIGNMENT_SIZE - current_size % ALIGNMENT_SIZE
                     # Create padding zeros with matching shape and dtype
                     padding_shape = [padding_size, tensor.shape[1]]
-                    padding = paddle.zeros(padding_shape, dtype="int8")
-                    padded_tensor = paddle.concat([tensor.view("int8"), padding], axis=0).view(dtype)
+                    padding = paddle.zeros(padding_shape, dtype=dtype)
+                    padded_tensor = paddle.concat([tensor, padding], axis=0)
                     return padded_tensor
 
                 if quant_x.shape[0] % ALIGNMENT_SIZE != 0:
