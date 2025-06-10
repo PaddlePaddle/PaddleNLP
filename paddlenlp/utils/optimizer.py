@@ -335,8 +335,13 @@ class AdamWMini(AdamW):
                 update = (mom1 / denom) * (-(lr / (1.0 - beta1_pow)))
                 p += paddle.reshape(update, param.shape)
 
-            else:
-                # Other blocks
+            elif (
+                any(embd_name in name for embd_name in self.embd_names)
+                or any(output_name in name for output_name in self.output_names)
+                or any(wv_name in name for wv_name in self.wv_names)
+                or any(mlp_name in name for mlp_name in self.mlp_names)
+                or any(attn_proj_name in name for attn_proj_name in self.attn_proj_names)
+            ):
                 mom1 = moment1
                 mom2 = moment2  # Already shaped correctly
 
@@ -346,6 +351,17 @@ class AdamWMini(AdamW):
                     mom2 = mom2 * beta2 + (1.0 - beta2) * (grad * grad).mean(axis=1, keepdim=True)
                 else:
                     mom2 = mom2 * beta2 + (1.0 - beta2) * (grad * grad).mean(axis=0, keepdim=True)
+
+                denom = mom2.sqrt() / ((1.0 - beta2_pow).sqrt()) + epsilon
+                p += (mom1 / denom) * (-(lr / (1.0 - beta1_pow)))
+
+            else:
+                # Other blocks
+                mom1 = moment1
+                mom2 = moment2  # Already shaped correctly
+
+                mom1 = mom1 * beta1 + (1.0 - beta1) * grad
+                mom2 = mom2 * beta2 + (1.0 - beta2) * (grad * grad).mean()
 
                 denom = mom2.sqrt() / ((1.0 - beta2_pow).sqrt()) + epsilon
                 p += (mom1 / denom) * (-(lr / (1.0 - beta1_pow)))
