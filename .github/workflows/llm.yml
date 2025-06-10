@@ -119,7 +119,7 @@ jobs:
           '
           docker exec -t ${{ env.container_name }} /bin/bash -c '
           ldconfig
-          set -e
+          set -x
           cd ${{ github.workspace }}/PaddleNLP && git config --global --add safe.directory $PWD
           timeout 2h bash scripts/regression/run_ci.sh python${python_version} ${paddle_whl}
           '
