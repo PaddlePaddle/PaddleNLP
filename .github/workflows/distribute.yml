@@ -30,6 +30,7 @@ jobs:
         env:
           work_dir: ${{ github.workspace }}
         run: |
+          sudo rm -rf * .[^.]*
           echo "Downloading PaddleNLP.tar.gz"
           wget -q --no-proxy  https://paddle-qa.bj.bcebos.com/CodeSync/develop/PaddleNLP.tar --no-check-certificate
           echo "Extracting PaddleNLP.tar.gz"
