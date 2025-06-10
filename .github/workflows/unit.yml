@@ -86,6 +86,7 @@ jobs:
             -v /home/.cache/pip:/home/.cache/pip \
             -v /ssd1/paddlenlp:/ssd1/paddlenlp \
             -e BRANCH \
+            -e AGILE_COMPILE_BRANCH \
             -e PR_ID \
             -e COMMIT_ID \
             -e work_dir \
@@ -105,7 +106,8 @@ jobs:
         run: |
           docker exec -t ${{ env.container_name }} /bin/bash -c '
           ldconfig
-          ln -sf $(which python${python_version}) /usr/bin/python
+          unlink /usr/bin/python3
+          ln -sf $(which python${python_version}) /usr/bin/python3
           python -m pip install bce-python-sdk==0.8.74
           pip config set global.cache-dir "/home/.cache/pip"
           echo "[global]
@@ -113,13 +115,13 @@ jobs:
           index = https://pip.baidu-int.com/search/
           index-url = https://pip.baidu-int.com/simple/
           trusted-host = pip.baidu-int.com" > /etc/pip.conf
+          cd ${{ github.workspace }}/PaddleNLP && git config --global --add safe.directory $PWD
           '
           docker exec -t ${{ env.container_name }} /bin/bash -c '
           ldconfig
           set -e
           # rm -rf tests/utils/test_import_utils.py
-          sleep 1d
-          timeout 50m bash PaddleNLP/scripts/unit_test/ci_unit.sh ${paddle}
+          timeout 50m bash PaddleNLP/scripts/unit_test/ci_unit.sh ${paddle_whl}
           '
 
       - name: Upload and display logs
@@ -136,11 +138,11 @@ jobs:
             mkdir ${{ env.home_path }}/bos
             tar xf ${{ env.home_path }}/bos_new.tar.gz -C ${{ env.home_path }}/bos
           fi
-          cd /workspace/case_logs
-          for FILE in /workspace/case_logs/*; do
+          cd /workspace/PaddleNLP/unittest_logs
+          for FILE in /workspace/unittest_logs/*; do
             file=$(basename "$FILE")
-            python ${{ env.bos_file }} $file paddle-github-action/PR/Auto-Parallel/${PR_ID}/${COMMIT_ID}/logs
-            echo "$file: https://paddle-github-action.bj.bcebos.com/PR/Auto-Parallel/${PR_ID}/${COMMIT_ID}/logs/$file"
+            python ${{ env.bos_file }} $file paddlenlp/PaddleNLP_CI/paddlenlp-github-action/unit/${PR_ID}/${COMMIT_ID}/logs
+            echo "$file: https://paddlenlp.bj.bcebos.com/PaddleNLP_CI/paddlenlp-github-action/unit/${PR_ID}/${COMMIT_ID}/logs/$file"
           done
           '
 
