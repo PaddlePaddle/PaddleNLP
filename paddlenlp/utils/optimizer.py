@@ -122,9 +122,10 @@ class AdamWMini(AdamW):
         elif any(wqk_name in name for wqk_name in self.wqk_names):
             # One accumulator per head for Q/K blocks
             total_size = paddle.numel(p)
-            shape = [total_size // self.head_numel, self.head_numel]
-            self._add_accumulator(self._moment1_acc_str, p, dtype=acc_dtype, shape=shape)
-            self._add_accumulator(self._moment2_acc_str, p, dtype=acc_dtype, shape=shape)
+            shape_moment1 = [total_size // self.head_numel, self.head_numel]
+            shape_moment2 = [total_size // self.head_numel, 1]
+            self._add_accumulator(self._moment1_acc_str, p, dtype=acc_dtype, shape=shape_moment1)
+            self._add_accumulator(self._moment2_acc_str, p, dtype=acc_dtype, shape=shape_moment2)
             self._add_accumulator(
                 name=self._beta1_pow_acc_str,
                 param=p,
@@ -151,7 +152,11 @@ class AdamWMini(AdamW):
             or any(attn_proj_name in name for attn_proj_name in self.attn_proj_names)
         ):
             # One accumulator per neuron for other blocks
-            shape = [p.shape[0], 1] if len(p.shape) > 1 else [1]
+            if any(embd_name in name for embd_name in self.embd_names):
+                shape = [p.shape[0], 1] if len(p.shape) > 1 else [1]
+            else:
+                shape = [1, p.shape[1]] if len(p.shape) > 1 else [1]
+
             self._add_accumulator(self._moment1_acc_str, p, dtype=acc_dtype)
             self._add_accumulator(self._moment2_acc_str, p, dtype=acc_dtype, shape=shape)
             self._add_accumulator(
@@ -336,7 +341,11 @@ class AdamWMini(AdamW):
                 mom2 = moment2  # Already shaped correctly
 
                 mom1 = mom1 * beta1 + (1.0 - beta1) * grad
-                mom2 = mom2 * beta2 + (1.0 - beta2) * (grad * grad).mean(axis=1, keepdim=True)
+
+                if any(embd_name in name for embd_name in self.embd_names):
+                    mom2 = mom2 * beta2 + (1.0 - beta2) * (grad * grad).mean(axis=1, keepdim=True)
+                else:
+                    mom2 = mom2 * beta2 + (1.0 - beta2) * (grad * grad).mean(axis=0, keepdim=True)
 
                 denom = mom2.sqrt() / ((1.0 - beta2_pow).sqrt()) + epsilon
                 p += (mom1 / denom) * (-(lr / (1.0 - beta1_pow)))
