@@ -9,10 +9,11 @@ def fused_transpose_split_quant_ref(x, tokens_per_expert, pow_2_scales):
     x = x.reshape([shape[0]//128, 128, shape[1]])
     amax = x.astype('float32').abs().max(axis=1)
 
-    scale = paddle.where(amax == 0, 1.0, 448.0 / amax)
+    scale = 448.0 / amax
     if pow_2_scales:
         _, exp = paddle.frexp(scale)
         scale = paddle.ldexp(paddle.to_tensor([1.0]), exp - 1)
+    scale = paddle.where(amax == 0, 1.0, scale)
 
     out = x * scale.unsqueeze(1)
     out = out.reshape(shape).astype('float8_e4m3fn')
