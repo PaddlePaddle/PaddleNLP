@@ -229,19 +229,9 @@ class _BaseAutoModelClass:
     # TODO: Refactor into AutoConfig when available
     @classmethod
     def _get_model_class_from_config(cls, pretrained_model_name_or_path, config_file_path, config=None):
-        model_config = config
         if config is None:
             with io.open(config_file_path, encoding="utf-8") as f:
                 config = json.load(f)
-
-        # Try to get model class from config class before attempting to fetch model class from default modules
-        # since custom models may not locate in paddlenlp.transformers.{name}.modeling
-        if not isinstance(model_config, PretrainedConfig) and pretrained_model_name_or_path is not None:
-            model_config = AutoConfig.from_pretrained(pretrained_model_name_or_path)
-        if type(model_config) in MODEL_MAPPING.keys():
-            model_class = MODEL_MAPPING[type(model_config)]
-            if not isinstance(model_class, (list, tuple)):
-                return model_class
 
         # Get class name corresponds to this configuration
         if is_standard_config(config):
@@ -268,6 +258,13 @@ class _BaseAutoModelClass:
                     model_name = model_flag + "Model"
                     break
         if model_name is None:
+            # Try to get model class from config class
+            if not isinstance(config, PretrainedConfig) and pretrained_model_name_or_path is not None:
+                config = AutoConfig.from_pretrained(pretrained_model_name_or_path)
+            if type(config) in MODEL_MAPPING.keys():
+                model_class = MODEL_MAPPING[type(config)]
+                if not isinstance(model_class, (list, tuple)):
+                    return model_class
             raise AttributeError(
                 f"Unable to parse 'architectures' or 'init_class' from {config_file_path}. Also unable to infer model class from 'pretrained_model_name_or_path'"
             )
