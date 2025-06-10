@@ -60,7 +60,7 @@ class ErnieMTest(TestCase):
 
         #     main()
 
-        # # if using gpu, test infering with precision_mode 'fp16'
+        # # if using gpu, test inferring with precision_mode 'fp16'
         # if is_slow_test():
         #     infer_config.update({"infer_config": "fp16"})
         #     with argv_context_guard(infer_config):

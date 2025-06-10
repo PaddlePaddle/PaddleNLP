@@ -16,9 +16,9 @@
 
 # Lint as: python3
 
-import os
-import json
 import hashlib
+import json
+import os
 
 import datasets
 
@@ -26,7 +26,7 @@ logger = datasets.logging.get_logger(__name__)
 
 _DESCRIPTION = """\
 The training set from the competition of Insurance DocVQA organized by China Pacific Insurance. \
-The submission is now closed so we split original dataset into three parts for model evluation. \
+The submission is now closed so we split original dataset into three parts for model evaluation. \
 There are 4,187 training images, 500 validation images, and 500 test images.
 """
 

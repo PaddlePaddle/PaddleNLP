@@ -29,7 +29,7 @@ from paddle.nn.layer.layers import Layer
 _ReduceMode: TypeAlias = Literal['mean', 'sum', 'none']
 
 
-# TODO: this function is rewrited from paddle.nn.functional.cross_entropy,
+# TODO: this function is rewrote from paddle.nn.functional.cross_entropy,
 # but better to merge into only one.
 def parallel_cross_entropy(
     input: Tensor,

@@ -248,7 +248,7 @@ class ReformerModelTester:
 
         model = ReformerModel(config=config)
         model.eval()
-        # set all position encodings to zero so that postions don't matter
+        # set all position encodings to zero so that positions don't matter
         with paddle.no_grad():
             embedding = model.embeddings.position_embeddings.embedding
             embedding.weight = paddle.create_parameter(

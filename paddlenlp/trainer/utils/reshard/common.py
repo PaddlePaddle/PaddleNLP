@@ -256,7 +256,7 @@ class NodeModelState:
         """
         change the key of model_weights dict from param_name to (structure_name, param_name);
         change the key of opt dict from opt_name to (structure_name, param_name, opt_name);
-        chnage the key of master weights dict from param_name to (structure_name, param_name)
+        change the key of master weights dict from param_name to (structure_name, param_name)
         """
         # pack key for pp convert
         def _opt_name_to_tname(tensor_names, opt_names):

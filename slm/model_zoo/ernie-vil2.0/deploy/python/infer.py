@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import distutils.util
+import argparse
 import os
 
-import fastdeploy as fd
 import numpy as np
+import paddle.inference as paddle_infer
 from PIL import Image
+from scipy.special import softmax
 
 from paddlenlp.transformers import ErnieViLProcessor
 from paddlenlp.utils.env import (
@@ -27,161 +28,92 @@ from paddlenlp.utils.env import (
 
 
 def parse_arguments():
-    import argparse
-
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_dir", required=True, help="The directory of model.")
-    parser.add_argument(
-        "--device",
-        type=str,
-        default="gpu",
-        choices=["gpu", "cpu", "kunlunxin"],
-        help="Type of inference device, support 'cpu', 'kunlunxin' or 'gpu'.",
-    )
-    parser.add_argument(
-        "--backend",
-        type=str,
-        default="onnx_runtime",
-        choices=["onnx_runtime", "paddle", "openvino", "tensorrt", "paddle_tensorrt"],
-        help="The inference runtime backend.",
-    )
-    parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
-    parser.add_argument("--temperature", type=float, default=4.30022621, help="The temperature of the model.")
-    parser.add_argument("--max_length", type=int, default=128, help="The max length of sequence.")
-    parser.add_argument("--log_interval", type=int, default=10, help="The interval of logging.")
-    parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
-    parser.add_argument(
-        "--encode_type",
-        type=str,
-        default="text",
-        choices=[
-            "image",
-            "text",
-        ],
-        help="The encoder type.",
-    )
-    parser.add_argument(
-        "--image_path",
-        default="000000039769.jpg",
-        type=str,
-        help="image_path used for prediction",
-    )
+    parser.add_argument("--model_dir", required=True, help="Directory with .json and .pdiparams")
+    parser.add_argument("--device", default="gpu", choices=["gpu", "cpu"], help="Device for inference")
+    parser.add_argument("--batch_size", type=int, default=1)
+    parser.add_argument("--temperature", type=float, default=4.3)
+    parser.add_argument("--max_length", type=int, default=128)
+    parser.add_argument("--encode_type", choices=["text", "image"], default="text")
+    parser.add_argument("--image_path", type=str, default="data/datasets/Flickr30k-CN/image/36979.jpg")
     return parser.parse_args()
 
 
-class ErnieVil2Predictor(object):
+class PaddleErnieViLPredictor:
     def __init__(self, args):
+        self.args = args
         self.processor = ErnieViLProcessor.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
-        self.runtime = self.create_fd_runtime(args)
-        self.batch_size = args.batch_size
-        self.max_length = args.max_length
-        self.encode_type = args.encode_type
+        self.predictor, self.input_names, self.output_names = self.load_predictor()
 
-    def create_fd_runtime(self, args):
-        option = fd.RuntimeOption()
-        if args.encode_type == "text":
-            model_path = os.path.join(args.model_dir, f"get_text_features{PADDLE_INFERENCE_MODEL_SUFFIX}")
-            params_path = os.path.join(args.model_dir, f"get_text_features{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
+    def load_predictor(self):
+        model_file = os.path.join(
+            self.args.model_dir, f"get_{self.args.encode_type}_features{PADDLE_INFERENCE_MODEL_SUFFIX}"
+        )
+        params_file = os.path.join(
+            self.args.model_dir, f"get_{self.args.encode_type}_features{PADDLE_INFERENCE_WEIGHTS_SUFFIX}"
+        )
+
+        config = paddle_infer.Config(model_file, params_file)
+        if self.args.device == "gpu":
+            config.enable_use_gpu(100, 0)
         else:
-            model_path = os.path.join(args.model_dir, f"get_image_features{PADDLE_INFERENCE_MODEL_SUFFIX}")
-            params_path = os.path.join(args.model_dir, f"get_image_features{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
-        option.set_model_path(model_path, params_path)
-        if args.device == "kunlunxin":
-            option.use_kunlunxin()
-            option.use_paddle_lite_backend()
-            return fd.Runtime(option)
-        if args.device == "cpu":
-            option.use_cpu()
-        else:
-            option.use_gpu()
-        if args.backend == "paddle":
-            option.use_paddle_infer_backend()
-        elif args.backend == "onnx_runtime":
-            option.use_ort_backend()
-        elif args.backend == "openvino":
-            option.use_openvino_backend()
-        else:
-            option.use_trt_backend()
-            if args.backend == "paddle_tensorrt":
-                option.enable_paddle_to_trt()
-                option.enable_paddle_trt_collect_shape()
-            trt_file = os.path.join(args.model_dir, "{}_infer.trt".format(args.encode_type))
-            if args.encode_type == "text":
-                option.set_trt_input_shape(
-                    "input_ids",
-                    min_shape=[1, args.max_length],
-                    opt_shape=[args.batch_size, args.max_length],
-                    max_shape=[args.batch_size, args.max_length],
-                )
-            else:
-                option.set_trt_input_shape(
-                    "pixel_values",
-                    min_shape=[1, 3, 224, 224],
-                    opt_shape=[args.batch_size, 3, 224, 224],
-                    max_shape=[args.batch_size, 3, 224, 224],
-                )
-            if args.use_fp16:
-                option.enable_trt_fp16()
-                trt_file = trt_file + ".fp16"
-            option.set_trt_cache_file(trt_file)
-        return fd.Runtime(option)
+            config.disable_gpu()
+        config.disable_glog_info()
+        config.switch_ir_optim(True)
+
+        predictor = paddle_infer.create_predictor(config)
+        input_names = predictor.get_input_names()
+        output_names = predictor.get_output_names()
+        return predictor, input_names, output_names
 
     def preprocess(self, inputs):
-        if self.encode_type == "text":
-            dataset = [np.array([self.processor(text=text)["input_ids"] for text in inputs], dtype="int64")]
+        if self.args.encode_type == "text":
+            input_ids = [self.processor(text=t)["input_ids"] for t in inputs]
+            input_ids = np.array(input_ids, dtype="int64")
+            return {"input_ids": input_ids}
         else:
-            dataset = [np.array([self.processor(images=image)["pixel_values"][0] for image in inputs])]
-        input_map = {}
-        for input_field_id, data in enumerate(dataset):
-            input_field = self.runtime.get_input_info(input_field_id).name
-            input_map[input_field] = data
-        return input_map
+            pixel_values = [self.processor(images=img)["pixel_values"][0] for img in inputs]
+            pixel_values = np.stack(pixel_values)
+            return {"pixel_values": pixel_values.astype("float32")}
 
-    def postprocess(self, infer_data):
-        logits = np.array(infer_data[0])
-        out_dict = {
-            "features": logits,
-        }
-        return out_dict
-
-    def infer(self, input_map):
-        results = self.runtime.infer(input_map)
-        return results
+    def infer(self, input_dict):
+        for name in self.input_names:
+            input_tensor = self.predictor.get_input_handle(name)
+            input_tensor.copy_from_cpu(input_dict[name])
+        self.predictor.run()
+        output_tensor = self.predictor.get_output_handle(self.output_names[0])
+        return output_tensor.copy_to_cpu()
 
     def predict(self, inputs):
         input_map = self.preprocess(inputs)
-        infer_result = self.infer(input_map)
-        output = self.postprocess(infer_result)
+        output = self.infer(input_map)
         return output
 
 
 def main():
     args = parse_arguments()
-    texts = [
-        "猫的照片",
-        "狗的照片",
-    ]
-    args.batch_size = 2
-    predictor = ErnieVil2Predictor(args)
-    outputs = predictor.predict(texts)
-    print(outputs)
-    text_feats = outputs["features"]
-    image = Image.open(args.image_path)
+
+    # 文本推理
+    args.encode_type = "text"
+    predictor_text = PaddleErnieViLPredictor(args)
+    texts = ["猫的照片", "狗的照片"]
+    args.batch_size = len(texts)
+    text_features = predictor_text.predict(texts)
+
+    # 图像推理
     args.encode_type = "image"
     args.batch_size = 1
-    predictor = ErnieVil2Predictor(args)
-    images = [image]
-    outputs = predictor.predict(images)
-    image_feats = outputs["features"]
-    print(image_feats)
-    from scipy.special import softmax
+    predictor_image = PaddleErnieViLPredictor(args)
+    image = Image.open(args.image_path).convert("RGB")
+    image_features = predictor_image.predict([image])
 
-    image_feats = image_feats / np.linalg.norm(image_feats, ord=2, axis=-1, keepdims=True)
-    text_feats = text_feats / np.linalg.norm(text_feats, ord=2, axis=-1, keepdims=True)
-    # Get from dygraph， refer to predict.py
-    exp_data = np.exp(args.temperature)
-    m = softmax(np.matmul(exp_data * text_feats, image_feats.T), axis=0).T
-    print(m)
+    # 特征归一化 + 相似度计算
+    image_features = image_features / np.linalg.norm(image_features, axis=-1, keepdims=True)
+    text_features = text_features / np.linalg.norm(text_features, axis=-1, keepdims=True)
+
+    sim_logits = softmax(np.exp(args.temperature) * np.matmul(text_features, image_features.T), axis=0).T
+    print("相似度矩阵（image→text）:")
+    print(sim_logits)
 
 
 if __name__ == "__main__":

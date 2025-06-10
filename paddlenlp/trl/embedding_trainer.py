@@ -136,7 +136,7 @@ class EmbeddingTrainer(Trainer):
             self.scaler.scale(loss).backward()
         else:
             loss.backward()
-        # get represetation gradient cache
+        # get representation gradient cache
         accum_q_grads = [q.grad for q in self.accum_q_features]
         accum_p_grads = [p.grad for p in self.accum_p_features]
         del q_reps, p_reps

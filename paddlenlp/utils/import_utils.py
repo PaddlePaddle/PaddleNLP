@@ -333,7 +333,7 @@ def install_package(
 
 
 def uninstall_package(package_name: str, module_name: Optional[str] = None):
-    """uninstall the pacakge from site-packages.
+    """uninstall the package from site-packages.
 
     To remove the cache of source package module & class & method, it should:
         1. remove the source files of packages under the `site-packages` dir.
@@ -365,7 +365,7 @@ def uninstall_package(package_name: str, module_name: Optional[str] = None):
 
 
 def import_module(module_name: str) -> Optional[Type]:
-    """import moudle base on the model
+    """import module base on the model
     Args:
         module_name (str): the name of target module
     """

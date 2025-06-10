@@ -91,7 +91,7 @@ class SentiData(DatasetBuilder):
 
 def create_dataloader(dataset, trans_fn=None, mode="train", batch_size=1, batchify_fn=None):
     """
-    Creats dataloader.
+    Creates dataloader.
 
     Args:
         dataset(obj:`paddle.io.Dataset`): Dataset instance.

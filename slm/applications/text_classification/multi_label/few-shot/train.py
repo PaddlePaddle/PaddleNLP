@@ -42,7 +42,7 @@ class DataArguments:
 
 @dataclass
 class ModelArguments:
-    model_name_or_path: str = field(default="ernie-3.0-base-zh", metadata={"help": "The build-in pretrained model or the path to local model."})
+    model_name_or_path: str = field(default="ernie-3.0-base-zh", metadata={"help": "The built-in pretrained model or the path to local model."})
     export_type: str = field(default='paddle', metadata={"help": "The type to export. Support `paddle` and `onnx`."})
 # yapf: enable
 
@@ -94,7 +94,7 @@ def main():
         micro_f1_score, macro_f1_score = metric.accumulate()
         return {"micro_f1_score": micro_f1_score, "macro_f1_score": macro_f1_score}
 
-    # Deine the early-stopping callback.
+    # Define the early-stopping callback.
     callbacks = [EarlyStoppingCallback(early_stopping_patience=4, early_stopping_threshold=0.0)]
 
     # Initialize the trainer.

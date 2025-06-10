@@ -464,7 +464,7 @@ class BaseDocumentStore(BaseComponent):
         """
         Run requests of document stores
 
-        Comment: We will gradually introduce the primitives. The doument stores also accept dicts and parse them to documents.
+        Comment: We will gradually introduce the primitives. The document stores also accept dicts and parse them to documents.
         In the future, however, only documents themselves will be accepted. Parsing the dictionaries in the run function
         is therefore only an interim solution until the run function also accepts documents.
 

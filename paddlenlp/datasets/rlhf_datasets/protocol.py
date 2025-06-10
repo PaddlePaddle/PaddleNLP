@@ -393,7 +393,7 @@ class DataProto:
             meta_info_keys (list, optional): a list of keys indicating the meta info to pop
 
         Returns:
-            DataProto: the DataProto with the poped batch_keys and meta_info_keys
+            DataProto: the DataProto with the popped batch_keys and meta_info_keys
         """
         assert batch_keys is not None
         if meta_info_keys is None:

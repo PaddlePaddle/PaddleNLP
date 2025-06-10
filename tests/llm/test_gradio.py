@@ -72,7 +72,7 @@ class UITest(unittest.TestCase):
                 continue
             return port
 
-        raise ValueError("can not get valiable port in [8000, 8200]")
+        raise ValueError("can not get available port in [8000, 8200]")
 
     def wait_until_server_is_ready(self):
         while True:

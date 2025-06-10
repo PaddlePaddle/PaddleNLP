@@ -442,7 +442,7 @@ class UIEPredictor(object):
 
 class SchemaTree(object):
     """
-    Implementataion of SchemaTree
+    Implementation of SchemaTree
     """
 
     def __init__(self, name="root", children=None):

@@ -149,6 +149,6 @@ class CLIPTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         # CLIP always lower cases letters
         pass
 
-    @unittest.skip(reason="CLIP donot check pretrained_model_lists")
+    @unittest.skip(reason="CLIP do not check pretrained_model_lists")
     def test_pretrained_model_lists(self):
         pass

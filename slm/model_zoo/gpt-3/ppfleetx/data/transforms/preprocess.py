@@ -210,7 +210,7 @@ class RandFlipImage(object):
 
 
 class NormalizeImage(object):
-    """normalize image such as substract mean, divide std"""
+    """normalize image such as subtract mean, divide std"""
 
     def __init__(self, scale=None, mean=None, std=None, order="chw", output_fp16=False, channel_num=3):
         if isinstance(scale, str):

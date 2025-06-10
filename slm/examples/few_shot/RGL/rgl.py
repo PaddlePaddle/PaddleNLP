@@ -39,10 +39,10 @@ from paddlenlp.utils.log import logger
 parser = argparse.ArgumentParser('Implementation of RGL paper.')
 parser.add_argument('--seed', type=int, default=1000, help='Random seed.')
 parser.add_argument('--device', type=str, default='gpu', choices=['gpu', 'cpu'], help='Device for training, default to gpu.')
-parser.add_argument('--dataset', type=str, default='SST-2', help='The build-in few-shot dataset.')
+parser.add_argument('--dataset', type=str, default='SST-2', help='The built-in few-shot dataset.')
 parser.add_argument('--data_path', type=str, default=None, help='The path to local dataset in .tsv files.')
 
-parser.add_argument('--model_name_or_path', type=str, default='roberta-large', help='The build-in pretrained LM or the path to local model parameters.')
+parser.add_argument('--model_name_or_path', type=str, default='roberta-large', help='The built-in pretrained LM or the path to local model parameters.')
 parser.add_argument('--template', type=str, default="{'text':'text_a'} It was {'mask'}.", help='The input template.')
 parser.add_argument('--verbalizer', type=str, default="{'0':'terrible', '1':'great'}", help='The label mapping of output.')
 parser.add_argument('--alpha', type=float, default=0, help='The weight of link prediction loss in RGL.')

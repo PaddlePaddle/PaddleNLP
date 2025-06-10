@@ -251,7 +251,7 @@ class DataCollatorForSeq2Seq:
 
     def __call__(self, data, return_tensors=None):
 
-        new_data = []  # To avoid the orgin data being covered
+        new_data = []  # To avoid the origin data being covered
 
         for ins in data:
 
@@ -384,7 +384,7 @@ class DataCollatorForMultiTaskSeq2Seq:
 
     def __call__(self, data, return_tensors=None):
 
-        new_data = []  # To avoid the orgin data being covered
+        new_data = []  # To avoid the origin data being covered
 
         for ins in data:
 

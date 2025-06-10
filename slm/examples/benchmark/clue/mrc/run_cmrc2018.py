@@ -129,7 +129,7 @@ def parse_args():
         "--gradient_accumulation_steps",
         type=int,
         default=2,
-        help="Number of updates steps to accumualte before performing a backward/update pass.",
+        help="Number of updates steps to accumulate before performing a backward/update pass.",
     )
     args = parser.parse_args()
     return args
@@ -222,7 +222,7 @@ def run(args):
     if args.do_train:
         assert (
             args.batch_size % args.gradient_accumulation_steps == 0
-        ), "Please make sure argmument `batch_size` must be divisible by `gradient_accumulation_steps`."
+        ), "Please make sure argument `batch_size` must be divisible by `gradient_accumulation_steps`."
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()

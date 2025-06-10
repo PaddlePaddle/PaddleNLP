@@ -59,7 +59,7 @@ def get_feedback():
 def delete_feedback():
     """
     This endpoint allows the API user to delete all the
-    feedback that has been sumbitted through the
+    feedback that has been submitted through the
     `POST /feedback` endpoint
     """
     all_labels = DOCUMENT_STORE.get_all_labels()

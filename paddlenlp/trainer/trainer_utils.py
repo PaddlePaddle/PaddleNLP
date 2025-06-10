@@ -84,7 +84,7 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
     """
 
     # NOTE: For parameter init seed:
-    # seed: dp/mp_undistributed_paramter/sharding is same; others is different
+    # seed: dp/mp_undistributed_parameter/sharding is same; others is different
     # For compute seed(dropout):
     # global seed: only mp group is same.
     # local seed: all groups are different
@@ -318,8 +318,6 @@ class OptimizerNames(ExplicitEnum):
     ADAFACTOR = "adafactor"
     ADAMW_MINI = "adamw_mini"
     ADAMW_CUSTOM = "adamw_custom"
-    ADAMW_16BIT_MOMENT = "adamw_16bit_moment"
-    AdamW_Qweight = "adamw_qweight"
 
 
 class ShardingOption(ExplicitEnum):
@@ -1218,7 +1216,7 @@ def split_parallel_config(parallel_config):
 
 
 def download_recovery_ckpt_from_pdc(recovery_checkpoint_path, timeout):
-    """Download checkpoint from PDC for resuming training after failover. Longjob envrionment is necessary.
+    """Download checkpoint from PDC for resuming training after failover. Longjob environment is necessary.
 
     Args:
         recovery_checkpoint_path (`str`):

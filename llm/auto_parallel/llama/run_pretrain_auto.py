@@ -86,7 +86,8 @@ class PreTrainingArguments(AutoTrainingArguments):
     )
     sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
     virtual_pipeline_seg_method: str = field(
-        default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of splitting pp layer for virtual pipeline."}
+        default="LlamaDecoderLayerAuto",
+        metadata={"help": "The seg method of splitting pp layer for virtual pipeline."},
     )
     # NOTE(gongenlei): new add autotuner_benchmark
     autotuner_benchmark: bool = field(
@@ -449,8 +450,14 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    if training_args.enable_linear_fused_grad_add:
-        from fused_layers import mock_layers
+    do_enable_sp_async_reduce_scatter = (
+        training_args.enable_auto_parallel
+        and training_args.tensor_parallel_degree > 1
+        and training_args.sequence_parallel
+        and "enable_sp_async_reduce_scatter" in training_args.tensor_parallel_config
+    )
+    if training_args.enable_linear_fused_grad_add and not do_enable_sp_async_reduce_scatter:
+        from llm.utils.fused_layers import mock_layers
 
         mock_layers()
 
@@ -557,7 +564,11 @@ def main():
 
     print("Final pre-training config:", config)
 
-    if "replace_with_parallel_cross_entropy" in training_args.tensor_parallel_config and config.tensor_parallel_degree > 1 and config.to_static is False:
+    if (
+        "replace_with_parallel_cross_entropy" in training_args.tensor_parallel_config
+        and config.tensor_parallel_degree > 1
+        and config.to_static is False
+    ):
         from llm.utils.replace_ops import replace_cross_entropy
 
         replace_cross_entropy()
@@ -581,6 +592,13 @@ def main():
                 layer.enable_recompute = True
 
         model.apply(fn)
+
+    if do_enable_sp_async_reduce_scatter:
+        from llm.utils.sp_async_reduce_scatter import (
+            mock_layers_sp_async_reduce_scatter,
+        )
+
+        mock_layers_sp_async_reduce_scatter(model)
 
     # Create the learning_rate scheduler and optimizer
     if training_args.decay_steps is None:

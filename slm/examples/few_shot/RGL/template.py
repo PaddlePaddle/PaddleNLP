@@ -68,7 +68,7 @@ class Template(nn.Layer):
         return [1 if "mask" in p else 0 for p in self.template]
 
     def get_default_shortenable_ids(self):
-        """List to denote whther an item in template can be truncated."""
+        """List to denote whether an item in template can be truncated."""
         idx = []
         for p in self.template:
             if "shortenable" in p:

@@ -220,7 +220,7 @@ class MobileBertTokenizer(BertTokenizer):
                     sequence = self.build_inputs_with_special_tokens(ids, pair_ids)
                     token_type_ids = self.create_token_type_ids_from_sequences(ids, pair_ids)
 
-                    # Build output dictionnary
+                    # Build output dictionary
                     encoded_inputs["input_ids"] = sequence
                     if return_token_type_ids:
                         encoded_inputs["token_type_ids"] = token_type_ids

@@ -126,7 +126,7 @@ def convert_example_to_feature(example, tokenizer, max_seq_len=512, is_test=Fals
         elif dataset_name == "chnsenticorp":
             label = example["label"]
         else:
-            raise RuntimeError(f"Got unkown datatset name {dataset_name}, it must be processed on your own.")
+            raise RuntimeError(f"Got unknown dataset name {dataset_name}, it must be processed on your own.")
 
         return {"input_ids": input_ids, "token_type_ids": token_type_ids, "label": label}
     else:

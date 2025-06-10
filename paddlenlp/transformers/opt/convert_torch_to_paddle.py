@@ -70,7 +70,7 @@ def convert_configs(model_dir: str, output_dir: str | None = None):
 
 
 def convert_weights(model_dir: str, output_dir: str | None = None):
-    # 1. serach the pytorch_model weight files
+    # 1. search the pytorch_model weight files
     files = [
         file_name
         for file_name in os.listdir(model_dir)

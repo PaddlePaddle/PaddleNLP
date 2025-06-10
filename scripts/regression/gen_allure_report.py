@@ -64,7 +64,7 @@ def gen_allure_report():
         if ret:
             print("allure generate report failed")
         else:
-            print("allure generate report sucess")
+            print("allure generate report success")
         os.environ["REPORT_SERVER_USERNAME"] = os.getenv("REPORT_SERVER_USERNAME")
         os.environ["REPORT_SERVER_PASSWORD"] = os.getenv("REPORT_SERVER_PASSWORD")
         os.environ["REPORT_SERVER"] = os.getenv("REPORT_SERVER")
