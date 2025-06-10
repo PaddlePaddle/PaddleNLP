@@ -32,13 +32,7 @@ try:
 except ImportError:
     SUPPORT_TE = False
 
-try:
-    from paddle.linalg import fp8_fp8_half_gemm_fused
-
-    SUPPORT_FP8 = True
-except:
-    SUPPORT_FP8 = False
-
+from paddle.linalg import fp8_fp8_half_gemm_fused
 
 QMIN_QMAX_MAPPING = {
     "a8w8linear_activation": (-128, 127),
@@ -226,44 +220,15 @@ def fp8_forward(
         group=group,
     )
     w_fp8 = w_fp8.view(quantization_config.fp8_format["weight"])
-    if SUPPORT_FP8:
-        out = fp8_fp8_half_gemm_fused(
-            x_fp8,
-            w_fp8,
-            transpose_x=False,
-            transpose_y=True,
-            bias=bias,
-            scale=x_scale * w_scale,
-            output_dtype=dtype,
-        )
-    elif SUPPORT_TE:
-        x_shape = x_fp8.shape
-        x_fp8 = x_fp8.view((-1, x_fp8.shape[-1]))
-        fwd_scales = paddle.concat([x_scale.astype("float32"), w_scale.astype("float32")])
-        out, _ = fp8_gemm(
-            A=w_fp8,
-            A_scale_inv=fwd_scales,
-            A_fp8_tensor=FP8FwdTensors.GEMM1_WEIGHT,
-            A_dtype=TE_DType[w_fp8.dtype],
-            B=x_fp8,
-            B_scale_inv=fwd_scales,
-            B_fp8_tensor=FP8FwdTensors.GEMM1_INPUT,
-            B_dtype=TE_DType[x_fp8.dtype],
-            out_dtype=dtype,
-            workspace=get_workspace(),
-            bias=bias,
-            use_bias=True if bias is not None else False,
-            use_split_accumulator=True,
-        )
-        x_fp8 = x_fp8.view(x_shape)
-        out = out.view((*x_shape[:-1], -1))
-    else:
-        x = x_fp8.astype(dtype) * x_scale
-        w = w_fp8.astype(dtype) * w_scale
-        out = paddle.matmul(x, w.T).astype(dtype)
-        if bias is not None:
-            out += bias
-
+    out = fp8_fp8_half_gemm_fused(
+        x_fp8,
+        w_fp8,
+        transpose_x=False,
+        transpose_y=True,
+        bias=bias,
+        scale=x_scale * w_scale,
+        output_dtype=dtype,
+    )
     return out, x_fp8, x_scale
 
 
