@@ -92,7 +92,7 @@ jobs:
           docker exec -t ${{ env.container_name }} /bin/bash -c '
           ldconfig
           set -e
-          timeout 80m PaddleNLP/scripts/distribute/run_ci.sh ${paddle_whl}
+          timeout 80m bash PaddleNLP/scripts/distribute/run_ci.sh ${paddle_whl}
           '
 
       - name: Upload and display logs

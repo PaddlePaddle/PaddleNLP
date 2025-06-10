@@ -117,7 +117,7 @@ jobs:
           docker exec -t ${{ env.container_name }} /bin/bash -c '
           ldconfig
           set -e
-          timeout 2h bash scripts/regression/run_ci.sh ${python} ${paddle}
+          timeout 2h bash PaddleNLP/scripts/regression/run_ci.sh ${python} ${paddle}
           '
 
       - name: Upload and display logs
