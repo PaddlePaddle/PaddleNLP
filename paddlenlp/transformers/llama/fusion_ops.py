@@ -183,6 +183,7 @@ def fusion_flash_attention(
     _, kv_seq_len, _, head_dim = value_states.shape
     version = paddle.version.full_version
     if version != "0.0.0" and version <= "2.5.2":
+    # if True:
         if alibi is not None:
             raise ValueError("Flash Attention doesn't support alibi")
         if config.context_parallel_degree > 1:

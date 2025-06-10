@@ -81,105 +81,6 @@ def enable_fuse_ffn_qkv_pass():
     else:
         return False
 
-
-# def is_pp_enable():
-#     mesh = fleet.auto.get_mesh()
-#     return "pp" in mesh.dim_names
-
-# #  [NOTE] 需要移除这个
-# def get_mesh(pp_idx=0):
-#     mesh = fleet.auto.get_mesh()
-#     if "pp" in mesh.dim_names:
-#         mesh = mesh.get_mesh_with_dim("pp", pp_idx)
-#     return mesh
-
-
-# def global_mesh_starts_with_pp():
-#     mesh = fleet.auto.get_mesh()
-#     if is_pp_enable():
-#         return mesh.get_mesh_with_dim("pp")
-#     else:
-#         return mesh
-
-# from paddle.distributed.auto_parallel.api import dtensor_to_local, dtensor_from_local, unshard_dtensor
-# import paddle.distributed as dist
-# import copy
-# import paddle
-# from contextlib import contextmanager
-
-# from paddlenlp.experimental.galvatron.runtime.redistributed import split_batch_with_sequence_parallel
-# from ...experimental.galvatron.runtime.redistributed import split_batch_with_sequence_parallel, gather_batch_with_sequence_parallel
-# from paddlenlp.trainer.trainer_utils import _exec_mode_guard
-
-# def _switch_mode(mode="dynamic"):
-#     assert mode in ["dynamic", "static"]
-#     if mode == "dynamic":
-#         paddle.disable_static()
-#     else:
-#         paddle.enable_static()
-
-
-# @contextmanager
-# def _exec_mode_guard(mode="dynamic"):
-#     origin_mode = "dynamic" if paddle.in_dynamic_mode() else "static"
-#     _switch_mode(mode)
-#     try:
-#         yield
-#     finally:
-# #         _switch_mode(origin_mode)
-    # copy_dtensor = copy.deepcopy(dtensor)
-    # print(f'[DEBUG] {desc}')
-    # print(dtensor)
-    # local_tensor = dtensor_to_local(dtensor, dtensor.process_mesh, dtensor.placements)
-    # print(f'{local_tensor}')
-    # # attr = dir(dtensor)
-    # print(f'attr: {attr}')
-    # local_tensor = dtensor._local_value()
-    # print(local_tensor)
-    
-# def print_embedding(dtensor):
-#     return
-    # print(f'[DEBUG] embedding dtensor')
-    # # print(dtensor)
-    # print(f'dtensor global shape: {dtensor.shape}')
-    # print(f'dtensor local shape: {dtensor._local_shape}')
-    # local_tensor = dtensor_to_local(dtensor, dtensor.process_mesh, dtensor.placements)
-    # local_tensor = local_tensor[1:2]
-    # # local_tensor_numpy = local_tensor.numpy()
-    # # print(f'[DEBUG] local_tensor_numpy : {local_tensor_numpy}')
-    # rank = dist.get_rank()
-    # if rank in [0, 1, 2, 3]:
-    #     dtensor_copy = dtensor
-    #     new_mesh = dist.ProcessMesh([[0, 1, 2, 3]], dim_names=['dp', 'tp'])
-    #     from paddlenlp.experimental.galvatron.runtime.redistributed import split_batch_with_sequence_parallel, gather_batch_with_sequence_parallel
-    #     new_tensor = gather_batch_with_sequence_parallel(dtensor_copy, new_mesh)
-    #     print(f'new tensor is {new_tensor}')
-    #     print(f'shape: {new_tensor.shape}, local_shape: {new_tensor._local_shape}, placements: {new_tensor.placements}')
-        
-    # new_dtensor = dtensor_from_local(
-    #     local_tensor,
-    #     mesh=new_mesh,
-    #     placements=dtensor.placements,
-    # )
-    # print(f'[DEBUG] new dtensor')
-    # # print(f'new_dtensor:{new_dtensor}') 
-    # print(f'shape: {new_dtensor.shape}, local_shape: {new_dtensor._local_shape}, placements: {new_dtensor.placements}')
-    # print(f'values is {new_dtensor.values}')
-    # print(f'var: {new_dtensor.var}')
-    # print(f'type(new_dtensor): {type(new_dtensor)}')
-    # with _exec_mode_guard('dynamic'):
-    #     value = new_dtensor._local_values()
-    #     print(f'[DEBUG] new_dtensor._local_values(): {value}')
-    # new_dtensor_detach = new_dtensor.detach()
-    # # with _exec_mode_guard("dynamic"):
-    # print(f'new_dtensor_detach: {new_dtensor_detach}')
-    # print(f'{local_tensor}')
-    # print(f'local tensor shape is {local_tensor._local_shape}')
-    # dtensor_attr = dir(dtensor)
-    # print(f'dtensor attr: {dtensor_attr}')
-    # local_tensor_attr = dir(local_tensor)
-    # print(f'local_tensor attr: {local_tensor_attr}')
-
 def scaled_dot_product_attention(
     query_states,
     config,
@@ -278,6 +179,7 @@ class LlamaRMSNormFineGrained(nn.Layer):
 
     def forward(self, hidden_states):
         if self.config.use_fused_rms_norm:
+            # print(f'[linguangming] hidden_states mesh is {hidden_states.process_mesh}, self.weight mesh is {self.weight.process_mesh}')
             return fusion_ops.fusion_rms_norm(
                 hidden_states, self.weight, self.variance_epsilon, self.config.use_fast_layer_norm
             )
@@ -696,6 +598,7 @@ class LlamaDecoderLayerFineGrained(nn.Layer):
             cache (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
         """
         # [bs, seq_len, embed_dim] or [seq_len / n, bs, embed_dim] (if sequence_parallel)
+        # print(f'[linguangming] enter decoder, hidden_states mesh is {hidden_states.process_mesh}' )
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
 
@@ -951,11 +854,32 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
                 if self.pp_division[i][0] == layer_index:
                     return True
             return False
+        
+        def rank_stage_id():
+            world_size = dist.get_world_size()
+            stage_num = len(self.pp_division)
+            stage_card_num = world_size // stage_num
+            rank = dist.get_rank()
+            stage_id = rank // stage_card_num
+            return stage_id
+        
+        def layer_stage_id(layer_index):
+            for i in range(len(self.pp_division)):
+                if layer_index in self.pp_division[i]:
+                    return i
+            return -1
 
         decoder_layers = []
         self.is_pipeline_stage_first_layer = [False for _ in range(config.num_hidden_layers)]
+        from paddlenlp.experimental.galvatron.runtime.redistributed import DummyLayer
         for i in range(config.num_hidden_layers):
-            decoder_layers.append(LlamaDecoderLayerFineGrained(config, i not in self.no_recompute_layers, self.meshs[i + 1])) # i + 1 because the first mesh is for embedding
+            decoder_layer = LlamaDecoderLayerFineGrained(config, i not in self.no_recompute_layers, self.meshs[i + 1])
+            if layer_stage_id(i) == rank_stage_id():
+                decoder_layers.append(decoder_layer)
+            else:
+                # If the layer is not in the current stage, we use a dummy layer to avoid errors
+                decoder_layers.append(DummyLayer(self.meshs[i + 1]))
+            # decoder_layers.append(LlamaDecoderLayerFineGrained(config, i not in self.no_recompute_layers, self.meshs[i + 1])) # i + 1 because the first mesh is for embedding
             self.is_pipeline_stage_first_layer[i] = is_pipeline_stage_first_layer_func(i)   
 
         self.layers = nn.LayerList(decoder_layers)
@@ -1097,23 +1021,43 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
             
         hidden_states = inputs_embeds
         hidden_states = dist.reshard(hidden_states, self.meshs[0], self.placements) # [NOTE] 此处修改
+        print(f'after embedding hidden_states is {hidden_states}')
         
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
         for idx, (decoder_layer) in enumerate(self.layers):
+            rank = dist.get_rank()
+            # if idx == 0 or idx == 1 or idx == 2:
+            #     if rank not in [0, 1, 2, 3]:
+            #         print(f'[linguangming] [modeling_fine_grained.py], skip decoder_layer {idx} because rank {rank} is not in [0, 1, 2, 3]')
+            #         continue
+            print(f'[linguangming] [modeling_fine_grained.py], rank {rank} start to call decoder_layer {idx}')
+            # print(f'[linguangming] [modeling_fine_grained.py], hidden_states: {hidden_states}')
             # 此处增添逻辑，如果hidden_states的mesh和现在的mesh不一致的话，就做数据重分布
+            # print(f'[linguangming] [modeling_fine_grained.py], hidden_states mesh: {hidden_states.process_mesh}, decoder_layer mesh: {decoder_layer.mesh}')
             hidden_states_mesh = hidden_states.process_mesh
             if hidden_states_mesh.shape[0] != decoder_layer.mesh.shape[0]:
-                # rank = dist.get_rank()
-                # if rank in hidden_states_mesh.process_ids:
                 print(f'should call redistributed')
                 from paddlenlp.experimental.galvatron.runtime.redistributed import SpiltBatchFwdGatherBatchBwd, GatherBatchFwdSplitBatchBwd
                 if hidden_states_mesh.shape[0] < decoder_layer.mesh.shape[0]: # dp degree increase
                     hidden_states = SpiltBatchFwdGatherBatchBwd.apply(hidden_states, decoder_layer.mesh)
                 elif hidden_states_mesh.shape[0] > decoder_layer.mesh.shape[0]: # dp degree decrease
                     hidden_states = GatherBatchFwdSplitBatchBwd.apply(hidden_states, decoder_layer.mesh)
+                # if dist.get_rank() not in hidden_states.process_mesh.process_ids:
+                #     if dist.get_rank() in [0, 1, 2, 3]:
+                #         print(f'[linguangming] [modeling_fine_grained.py], rank {rank} is not in hidden_states mesh {hidden_states.process_mesh}, skip decoder_layer {idx}')
+                #         comm_activate_tensor = paddle.zeros((1,), dtype=hidden_states.dtype)
+                #         comm_activate_mesh = dist.ProcessMesh([[0, 1, 2, 3]], dim_names=["dp", 'tp'])
+                #         comm_activate_dtensor = dist.shard_tensor(comm_activate_tensor, comm_activate_mesh, [dist.Replicate(), dist.Replicate()])
+                #         comm_activate_tensor.stop_gradient = True
+                #     else:
+                #         print(f'[linguangming] [modeling_fine_grained.py], rank {rank} is not in hidden_states mesh {hidden_states.process_mesh}, skip decoder_layer {idx}')
+                #         comm_activate_tensor = paddle.zeros((1,), dtype=hidden_states.dtype)
+                #         comm_activate_mesh = dist.ProcessMesh([[4, 5, 6, 7]], dim_names=["dp", 'tp'])
+                #         comm_activate_dtensor = dist.shard_tensor(comm_activate_tensor, comm_activate_mesh, [dist.Replicate(), dist.Replicate()])
+                #         comm_activate_tensor.stop_gradient = True
                 
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
@@ -1156,34 +1100,43 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
             
             # pp stage, hidden_states transfer to next stage
             if self.is_pipeline_stage_first_layer[idx]:
+                print(f'[linguangming] [modeling_fine_grained.py], rank {rank} is pipeline stage first layer {idx}, hidden_states mesh: {hidden_states.process_mesh}, decoder_layer mesh: {decoder_layer.mesh}')
                 hidden_states = dist.reshard(hidden_states, decoder_layer.mesh, self.placements)
-
-            if (
-                self.enable_recompute
-                and idx not in self.no_recompute_layers
-                and has_gradient
-                and self.recompute_granularity == "full"
-            ):
-                layer_outputs = recompute(
-                    decoder_layer,
-                    hidden_states,
-                    position_ids_input,
-                    attention_mask_input,
-                    output_attentions,
-                    past_key_value,
-                    use_cache,
-                    alibi_input,
-                )
-            else:
-                layer_outputs = decoder_layer(
-                    hidden_states,
-                    position_ids_input,
-                    attention_mask_input,
-                    output_attentions,
-                    past_key_value,
-                    use_cache,
-                    alibi_input,
-                )
+            
+            from paddlenlp.experimental.galvatron.runtime.redistributed import DummyLayer
+            if isinstance(decoder_layer, DummyLayer):
+                if self.enable_recompute and idx not in self.no_recompute_layers and has_gradient and self.recompute_granularity == "full":
+                    layer_outputs = recompute(decoder_layer, hidden_states)
+                else:
+                    print(f'[linguangming] [modeling_fine_grained.py], rank {rank}, running dummy layer {idx}')
+                    layer_outputs = decoder_layer(hidden_states)
+            else:    
+                if (
+                    self.enable_recompute
+                    and idx not in self.no_recompute_layers
+                    and has_gradient
+                    and self.recompute_granularity == "full"
+                ):
+                    layer_outputs = recompute(
+                        decoder_layer,
+                        hidden_states,
+                        position_ids_input,
+                        attention_mask_input,
+                        output_attentions,
+                        past_key_value,
+                        use_cache,
+                        alibi_input,
+                    )
+                else:
+                    layer_outputs = decoder_layer(
+                        hidden_states,
+                        position_ids_input,
+                        attention_mask_input,
+                        output_attentions,
+                        past_key_value,
+                        use_cache,
+                        alibi_input,
+                    )
 
             if type(layer_outputs) is tuple:
                 hidden_states = layer_outputs[0]

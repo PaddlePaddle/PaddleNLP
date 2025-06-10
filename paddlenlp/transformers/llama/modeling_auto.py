@@ -1034,7 +1034,9 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                 [dist.Replicate() for _ in range(len(global_mesh._shape))],
             )
         hidden_states = inputs_embeds
+        # print(f'[linguangming] hidden_states is {hidden_states}')
         hidden_states = dist.reshard(hidden_states, get_mesh(), self.placements)
+        # return tuple(hidden_states)
 
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
@@ -1085,6 +1087,16 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                     self.placements,
                 )
 
+            # if dist.get_rank() in [4, 5, 6, 7] and idx == 0:
+            #     continue # 不执行
+            
+            # if dist.get_rank() in [4, 5, 6, 7] and idx in [0, 1]:
+            #     print(f'[linguangming] skip idx {idx} rank {dist.get_rank()}')
+            #     continue
+            # if dist.get_rank() in [0, 1, 2, 3] and idx in [2, 3]:
+            #     print(f'[linguangming] skip idx {idx} rank {dist.get_rank()}')
+            #     continue
+            
             if (
                 self.enable_recompute
                 and idx not in self.no_recompute_layers

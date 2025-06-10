@@ -1960,7 +1960,7 @@ class Trainer:
                 apply_decay_param_fun=apply_decay_param_fun,
                 parameters=params,
                 weight_decay=self.args.weight_decay,
-                grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm) if self.args.max_grad_norm > 0 else None,
+                grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm) if self.args.max_grad_norm > 0 else None,  # NOTE 此处手动设置了grad_clip 这个地方应该需要重新手写一个梯度裁切
                 **optimizer_kwargs,
             )
 

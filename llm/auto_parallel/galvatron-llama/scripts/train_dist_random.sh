@@ -2,7 +2,10 @@ set -x
 unset CUDA_VISIBLE_DEVICES
 
 # task_name="A100_1_4_1_none_FALSE_64_16_4_4_O1_TRUE_16"
-task_name="ddp"
+# task_name="zero2-modify"
+# task_name="flash-attn"
+# task_name="recompute"
+task_name="pp"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
@@ -36,26 +39,27 @@ TRAIN_ARGS="
 "
 
 # [seq_length] [num_hidden_layers]
-MODEL_ARGS="
-    --model_name_or_path "llama" \
-    --num_hidden_layers 4 \
-    --intermediate_size 11008 \
-    --vocab_size 32000 \
-    --hidden_size 4096 \
-    --seq_length 1024 \
-    --num_attention_heads 32 \
-"
+MODEL_ARGS=(
+    --model_name_or_path "llama"
+    --num_hidden_layers 4
+    --intermediate_size 11008
+    --vocab_size 32000
+    --hidden_size 4096
+    --seq_length 1024
+    --num_attention_heads 32
+)
+#   --no_recompute_layers 3 7 11
 
 # [mbsz, accumulation_steps] [recompute] [amp]
 CONFIG_ARGS="
-    --per_device_train_batch_size 1 \
-    --gradient_accumulation_steps 4 \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 8 \
     --recompute false \
     --recompute_use_reentrant true \
     --recompute_granularity full \
     --pp_recompute_interval 0 \
     --bf16 true \
-    --fp16_opt_level "O2" \
+    --fp16_opt_level "O1" \
     --amp_master_grad false \
     --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
     --amp_custom_white_list "lookup_table" "lookup_table_v2" \
@@ -64,11 +68,11 @@ CONFIG_ARGS="
 # [dp_deg, dp_type] [tp_deg, megatron-sp] [pp_deg, 1F1B] [parallel_configs]
 PARALLEL_ARGS=(
     --to_static 1
-    --sharding_parallel_degree 8
-    --sharding ""
-    --tensor_parallel_degree 1
+    --sharding_parallel_degree 2
+    --sharding "stage2"
+    --tensor_parallel_degree 2
     --sequence_parallel true
-    --pipeline_parallel_degree 1
+    --pipeline_parallel_degree 2
     --virtual_pp_degree 1
     --pipeline_schedule_mode "1F1B"
     --sep_parallel_degree 1
@@ -83,7 +87,7 @@ DEFAULT_OPTIMIZER_ARGS="
     --fuse_attention_ffn true \
     --fuse_attention_qkv true \
     --fused_linear_param_grad_add 1 \
-    --fuse_sequence_parallel_allreduce false \
+    --fuse_sequence_parallel_allreduce true \
     --use_flash_attention true \
     --use_fused_rope true \
     --use_fused_rms_norm true \
@@ -104,8 +108,14 @@ RUNTIME_PROFILE_ARGS="
     --save_memory_flag 0 \
 "
 
+# [debug] 
+DEBUG_ARGS="
+    --job_schedule_profiler_start 1 \
+    --job_schedule_profiler_end 5 \
+"   
+
 $LAUNCHER \
-    $MODEL_ARGS \
+    "${MODEL_ARGS[@]}" \
     $TRAIN_ARGS \
     $CONFIG_ARGS \
     "${PARALLEL_ARGS[@]}" \

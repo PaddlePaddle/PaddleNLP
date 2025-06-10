@@ -19,10 +19,10 @@ LAUNCHER="${LAUNCHER} --log_dir output/$task_name""_log ${TRAINER} --output_dir 
 TRAIN_ARGS="
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
-    --max_grad_norm 1.0 \
+    --max_grad_norm -1.0 \
     --learning_rate 3e-05 \
     --min_learning_rate 3e-06 \
-    --max_steps 5 \
+    --max_steps 10 \
     --logging_steps 1 \
     --continue_training 0 \
     --do_train true \
@@ -50,7 +50,7 @@ MODEL_ARGS="
 
 # [mbsz, accumulation_steps] [recompute] [amp]
 CONFIG_ARGS="
-    --per_device_train_batch_size 2 \
+    --per_device_train_batch_size 4 \
     --gradient_accumulation_steps 4 \
     --recompute false \
     --recompute_use_reentrant true \

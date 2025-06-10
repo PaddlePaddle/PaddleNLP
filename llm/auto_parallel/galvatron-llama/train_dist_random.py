@@ -404,6 +404,9 @@ def main():
         model = model_class.from_config(config, dtype="float32")
         criterion = criterion_class(config)
 
+    print("[auto-parallel] Model initialized")
+    print(f'model is {model}')
+
     if training_args.recompute: # As described in the corresponding model definition, Recompute defaults to False and is controlled by Trainer
         def fn(layer):
             if hasattr(layer, "enable_recompute") and (layer.enable_recompute is False or layer.enable_recompute == 0):

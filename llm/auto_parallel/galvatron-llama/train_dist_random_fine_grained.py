@@ -435,6 +435,7 @@ def main():
     # one demo
     if pp == 2 and tp == 2 and dp == 2:
         meshs[2] = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", "mp"])
+        meshs[6] = dist.ProcessMesh([[4], [5], [6], [7]], dim_names=["dp", "mp"])
     elif pp == 2 and tp == 1 and dp == 4:
         meshs[2] = dist.ProcessMesh([[0, 1, 2, 3]], dim_names=['dp', 'mp'])
     elif pp == 2 and tp == 4 and dp == 1:
@@ -443,6 +444,8 @@ def main():
         meshs[2] = dist.ProcessMesh([[0, 1, 2, 3], [4, 5, 6, 7]], dim_names=['dp', 'mp'])
     elif pp == 1 and tp == 4 and dp == 2:
         meshs[2] = dist.ProcessMesh([[0, 1], [2, 3], [4, 5], [6, 7]], dim_names=['dp', 'mp'])
+        meshs[3] = dist.ProcessMesh([[0, 1], [2, 3], [4, 5], [6, 7]], dim_names=['dp', 'mp'])
+        meshs[6] = dist.ProcessMesh([[0], [1], [2], [3], [4], [5], [6], [7]], dim_names=['dp', 'mp']) # 第五层
     else:
         assert False, f"Unsupported pp={pp}, tp={tp}, dp={dp} configuration for now."
     
@@ -453,6 +456,9 @@ def main():
     with paddle.LazyGuard():
         model = model_class.from_config(config, dtype="float32", meshs=meshs, pp_division=pp_division)
         criterion = criterion_class(config)
+
+    print("[auto-parallel] Model and criterion initialized.")
+    print(f"Model: {model}")
 
     if training_args.recompute: # As described in the corresponding model definition, Recompute defaults to False and is controlled by Trainer
         def fn(layer):
