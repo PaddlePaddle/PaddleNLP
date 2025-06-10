@@ -43,8 +43,5 @@ def aistudio_download(
         revision = "master"
     filename = _add_subfolder(filename, subfolder)
     return model_file_download(
-        repo_id=repo_id,
-        file_path=filename,
-        revision=revision,
-        local_dir=cache_dir if cache_dir is not None else None
+        repo_id=repo_id, file_path=filename, revision=revision, local_dir=cache_dir if cache_dir is not None else None
     )
