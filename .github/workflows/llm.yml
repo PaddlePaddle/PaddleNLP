@@ -1,0 +1,148 @@
+name: PaddleNLP LLM CI
+
+on:
+  push:
+    branches: [develop, release/*]
+  pull_request:
+
+env:
+  PR_ID: ${{ github.event.pull_request.number }}
+  COMMIT_ID: ${{ github.event.pull_request.head.sha }}
+  work_dir: /workspace/PaddleNLP
+  PADDLENLP_ROOT: /workspace/PaddleNLP
+  TASK: paddlenlp-CI-${{ github.event.pull_request.number }}-llm
+  ci_scripts: /workspace/PaddleNLP/scripts/regression
+  BRANCH: ${{ github.event.pull_request.base.ref }}
+  AGILE_COMPILE_BRANCH: ${{ github.event.pull_request.base.ref }}
+  CI_name: llm-ci
+  no_proxy: "localhost,bj.bcebos.com,su.bcebos.com,bcebos.com,apiin.im.baidu.com,gitee.com,aliyun.com,.baidu.com,.tuna.tsinghua.edu.cn"
+  HF_ENDPOINT: https://hf-mirror.com
+  STUDIO_GIT_HOST: http://git.prod.idc-to-cloud.aistudio.baidu-int.com
+  PPNLP_HOME: /ssd1/paddlenlp
+  NLP_DIR: /workspace/PaddleNLP
+  HF_DATASETS_CACHE: /ssd1/paddlenlp/huggingface/datasets
+  TRANSFORMERS_CACHE: /ssd1/paddlenlp/huggingface
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  llm-ci:
+    name: llm-test
+    runs-on: [self-hosted, 4gpu]
+    steps:
+      - name: Download PaddleNLP
+        env:
+          work_dir: ${{ github.workspace }}
+        run: |
+          echo "Downloading PaddleNLP.tar.gz"
+          wget -q --no-proxy  https://paddle-qa.bj.bcebos.com/CodeSync/develop/PaddleNLP.tar --no-check-certificate
+          echo "Extracting PaddleNLP.tar.gz"
+          tar xf PaddleNLP.tar && rm -rf PaddleNLP.tar
+          # wget -q --no-proxy https://paddle-qa.bj.bcebos.com/paddlenlp/Bos.zip --no-check-certificate
+          # unzip -P "$(cat ${{ github.workspace }}/../../../bos_key)" Bos.zip
+          # mkdir paddlenlp && mv Bos/* ./paddlenlp/
+          source ${{ github.workspace }}/../../../proxy
+          cd PaddleNLP
+          git config --global user.name "PaddleCI"
+          git config --global user.email "paddle_ci@example.com"
+          git pull
+          git submodule update --init --recursive --force
+          git fetch origin pull/${PR_ID}/head:test && git checkout test
+          git remote add upstream https://github.com/PaddlePaddle/PaddleNLP.git
+          git fetch upstream ${BRANCH}
+          git merge ${BRANCH}
+          git diff --numstat ${BRANCH} |awk '{print $NF}'
+          git log --pretty=oneline -10
+      
+      - name: Parse GPU ID from runner label
+        id: parse-gpu
+        run: |
+          echo "Runner labels: $RUNNER_LABELS"
+          if [[ "$RUNNER_LABELS" == *"gpu-0-3"* ]]; then
+            echo "cudaid=0,1,2,3" >> ${{ github.env }}
+          elif [[ "$RUNNER_LABELS" == *"gpu-4-7"* ]]; then
+            echo "cudaid=4,5,6,7" >> ${{ github.env }}
+          else
+            echo "Unknown runner label, fallback to default CUDA"
+            echo "cudaid=0,1,2,3" >> ${{ github.env }}
+          fi
+      
+      - name: Check docker image and run container
+        env:
+          CACHE_DIR: /home/data/cfs/.cache
+          FLAGS_dynamic_static_unified_comm: "True"
+          python_version: "3.10"
+          paddle_whl: https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuSome-LinuxCentos-Gcc82-Cuda118-Cudnn86-Trt85-Py310-CINN-Compile/latest/paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl
+        run: |
+          container_name=${TASK}-${core_index}-$(date +%Y%m%d-%H%M%S)
+          echo "container_name=${container_name}" >> ${{ github.env }}
+          docker_image=iregistry.baidu-int.com/paddlecloud/base-images:paddlecloud-ubuntu18.04-gcc8.2-cuda11.8-cudnn8.6-nccl2.15.5-20250311
+          nvidia-docker run -d -t --name ${container_name} --net=host -v /dev/shm:/dev/shm --shm-size=32G \
+            -v ${{ github.workspace }}/../../..:${{ github.workspace }}/../../.. \
+            -v ${{ github.workspace }}:/workspace \
+            -v /home/.cache/pip:/home/.cache/pip \
+            -v /ssd1/paddlenlp:/ssd1/paddlenlp \
+            -e BRANCH \
+            -e PR_ID \
+            -e COMMIT_ID \
+            -e work_dir \
+            -e PADDLENLP_ROOT \
+            -e ci_scripts \
+            -e no_proxy \
+            -e CI_name \
+            -e paddle_whl \
+            -e FLAGS_dynamic_static_unified_comm \
+            -e python_version \
+            -e CUDA_VISIBLE_DEVICES=${{ env.cudaid }} \
+            -w /workspace --runtime=nvidia ${docker_image}
+
+      - name: Test
+        env:
+          work_dir: ${{ github.workspace }}
+        run: |
+          docker exec -t ${{ env.container_name }} /bin/bash -c '
+          ldconfig
+          ln -sf $(which python${python_version}) /usr/bin/python
+          python -m pip install bce-python-sdk==0.8.74
+          pip config set global.cache-dir "/home/.cache/pip"
+          echo "[global]
+          timeout = 60
+          index = https://pip.baidu-int.com/search/
+          index-url = https://pip.baidu-int.com/simple/
+          trusted-host = pip.baidu-int.com" > /etc/pip.conf
+          '
+          docker exec -t ${{ env.container_name }} /bin/bash -c '
+          ldconfig
+          set -e
+          timeout 2h bash PaddleNLP/scripts/regression/run_ci.sh ${python} ${paddle}
+          '
+
+      - name: Upload and display logs
+        if: always()
+        env:
+          home_path: ${{ github.workspace }}/..
+          bos_file: ${{ github.workspace }}/../bos/BosClient.py
+        run: |
+          docker exec -t ${{ env.container_name }} /bin/bash -c '
+          export AK=paddle
+          export SK=paddle
+          if [ ! -f "${{ env.bos_file }}" ]; then
+            wget -q --no-proxy -O ${{ env.home_path }}/bos_new.tar.gz https://xly-devops.bj.bcebos.com/home/bos_new.tar.gz --no-check-certificate
+            mkdir ${{ env.home_path }}/bos
+            tar xf ${{ env.home_path }}/bos_new.tar.gz -C ${{ env.home_path }}/bos
+          fi
+          cd /workspace/case_logs
+          for FILE in /workspace/case_logs/*; do
+            file=$(basename "$FILE")
+            python ${{ env.bos_file }} $file paddle-github-action/PR/Auto-Parallel/${PR_ID}/${COMMIT_ID}/logs
+            echo "$file: https://paddle-github-action.bj.bcebos.com/PR/Auto-Parallel/${PR_ID}/${COMMIT_ID}/logs/$file"
+          done
+          '
+          
+      - name: Terminate and delete the container
+        if: always()
+        run: |
+          docker rm -f ${{ env.container_name }}
+        

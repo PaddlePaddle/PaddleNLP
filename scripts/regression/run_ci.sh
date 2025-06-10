@@ -38,6 +38,7 @@ target_lists_for_llm=(
     "tests/llm"
     "csrc"
     "scripts/regression"
+    ".github/workflows/llm.yml"
 )
 all_P0case_dic=(["msra_ner"]=15 
     ["glue"]=2 

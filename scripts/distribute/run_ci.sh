@@ -31,6 +31,7 @@ target_lists_for_gpt=(
     "llm/auto_parallel/gpt-3"
     "paddlenlp/transformers/gpt"
     "scripts/distribute"
+    ".github/workflows/distribute.yml"
 )
 
 target_lists_for_llama=(
@@ -38,6 +39,7 @@ target_lists_for_llama=(
     "paddlenlp/trainer/auto_trainer.py"
     "paddlenlp/transformers/llama"
     "scripts/distribute"
+    ".github/workflows/distribute.yml"
 )
 
 target_lists_for_deepseek=(
@@ -49,6 +51,7 @@ target_lists_for_deepseek=(
     "paddlenlp/transformers/moe_layer_auto.py"
     "paddlenlp/transformers/moe_gate_auto.py"
     "scripts/distribute"
+    ".github/workflows/distribute.yml"
 )
 
 target_path_for_ci_scripts="scripts/distribute"
