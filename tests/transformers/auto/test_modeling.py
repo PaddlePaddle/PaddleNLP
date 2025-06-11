@@ -64,17 +64,6 @@ class AutoModelTest(unittest.TestCase):
             reloaded_model = AutoModel.from_pretrained(model_save_path)
             self.assertIsInstance(reloaded_model, BertModel)
 
-    def test_from_pretrained_no_init_class_no_model_name(self):
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            model = copy.deepcopy(self.model)
-            model.save_pretrained(tmp_dir)
-            config = model.config.to_dict()
-            config.pop("architectures")
-            with open(os.path.join(tmp_dir, "config.json"), "w", encoding="utf-8") as writer:
-                writer.write(json.dumps(config, indent=2, sort_keys=True) + "\n")
-            with self.assertRaises(AttributeError):
-                AutoModel.from_pretrained(tmp_dir)
-
     def test_model_from_pretrained_cache_dir(self):
         model_name = "__internal_testing__/tiny-random-bert"
         with tempfile.TemporaryDirectory() as tempdir:

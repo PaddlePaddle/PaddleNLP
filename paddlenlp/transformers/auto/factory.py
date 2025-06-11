@@ -85,9 +85,6 @@ class _LazyAutoMapping(OrderedDict):
             import_from = import_from.tokenizer
         elif any(["Config" in name for name in [model_type, attr]]):
             import_from = import_from.configuration
-        else:
-            import_from = import_from.modeling
-            attr = f"{attr}Model" if not attr.endswith("Model") else attr
         return getattribute_from_module(import_from, attr)
 
     def keys(self):
