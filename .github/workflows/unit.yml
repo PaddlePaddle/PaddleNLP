@@ -120,12 +120,11 @@ jobs:
           docker exec -t ${{ env.container_name }} /bin/bash -c '
           ldconfig
           set -e
-          # rm -rf tests/utils/test_import_utils.py
           cd /workspace/PaddleNLP && git config --global --add safe.directory $PWD
           timeout 50m bash scripts/unit_test/ci_unit.sh ${paddle_whl}
           '
 
-     - name: Upload and display allure-reports
+      - name: Upload and display allure-reports
         if: always()
         env:
           home_path: ${{ github.workspace }}/..
@@ -139,12 +138,13 @@ jobs:
           cd /workspace/PaddleNLP/
           ${{ env.allure_file }}/bin/allure generate result -o report
           '
+          docker cp ${{ env.container_name }}:/workspace/PaddleNLP/report ./report
 
       - name: Upload Allure HTML report as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: result
-          path: result
+          name: allure-report
+          path: report
 
       - name: Terminate and delete the container
         if: always()
