@@ -1437,16 +1437,17 @@ class PPOTrainer(RLTrainerBase):
                     batch = self._balance_batch(batch)
 
                 # step 2-3: compute logprob for rollout data
-                with TimerScope(self.timers, RolloutStages.ROLLOUT_LOGPROB):
-                    with reload_and_offload_scope(self, self.reference_model):
-                        with TimerScope(self.timers, RolloutStages.ROLLOUT_REF_LOGPROB):
-                            ref_log_probs = self.reference_trainer.compute_logprob(batch, key='ref_log_probs')
-                            batch = batch.union(ref_log_probs)
+                with self.autocast_smart_context_manager():
+                    with TimerScope(self.timers, RolloutStages.ROLLOUT_LOGPROB):
+                        with reload_and_offload_scope(self, self.reference_model):
+                            with TimerScope(self.timers, RolloutStages.ROLLOUT_REF_LOGPROB):
+                                ref_log_probs = self.reference_trainer.compute_logprob(batch, key='ref_log_probs')
+                                batch = batch.union(ref_log_probs)
 
-                    with reload_and_offload_scope(self, self.actor_model):
-                        with TimerScope(self.timers, RolloutStages.ROLLOUT_OLD_LOGPROB):
-                            log_probs = self.actor_trainer.compute_logprob(batch, key='log_probs')
-                            batch = batch.union(log_probs)
+                        with reload_and_offload_scope(self, self.actor_model):
+                            with TimerScope(self.timers, RolloutStages.ROLLOUT_OLD_LOGPROB):
+                                log_probs = self.actor_trainer.compute_logprob(batch, key='log_probs')
+                                batch = batch.union(log_probs)
 
                 # step 2-2: compute reward for rollout data
                 with TimerScope(
