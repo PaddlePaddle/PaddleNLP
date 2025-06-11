@@ -70,11 +70,11 @@ from ..utils.comm_utils import (
     data_group_merge,
     data_group_split,
     filter_valid_reward_groups,
+    gather_and_pad_dataproto,
+    gather_tensor_list,
     get_timer_label,
     new_timer_log,
     split_batch_by_rank,
-    gather_tensor_list,
-    gather_and_pad_dataproto,
 )
 from ..utils.infer_utils import infer_guard
 from ..utils.offload_utils import reload_and_offload_scope, reload_tensor_to_gpu
@@ -84,12 +84,11 @@ from .actor_trainer import ActorReferenceTrainer
 from .critic_trainer import CriticTrainer
 from .reward_trainer import RewardTrainer
 from .rl_trainer import RLTrainerBase
-from .trainer_utils import (
+from .trainer_utils import (  # process_row,
     MuteDefaultFlowCallback,
     batch_retokenize,
     guard_set_args,
     is_same_tokenizer,
-    # process_row,
 )
 
 
@@ -172,7 +171,7 @@ class PPOMetric:
         metrics = TensorDict(
             {
                 k: (v.squeeze() if isinstance(v, paddle.Tensor) and v.shape == [1] else v)
-                for k, v in metrics.meta_info['metrics'].items()
+                for k, v in metrics.meta_info["metrics"].items()
             }
         )
         for name in self.metric_names:
@@ -210,7 +209,7 @@ class PPOMetric:
             else:
                 for i, name in enumerate(self.metric_names):
                     self.metrics[i].fill_(0.0)
-            return DataProto(meta_info={'metrics':out_metrics})
+            return DataProto(meta_info={"metrics": out_metrics})
 
 
 class PPOTrainer(RLTrainerBase):
@@ -1193,7 +1192,9 @@ class PPOTrainer(RLTrainerBase):
             tensor_list_from_local_batch = tensors_to_gather_per_key[key]
 
             # 代替 gather_and_pad
-            global_balanced_batch_dict[key] = gather_tensor_list(data_parallel_group, sharding_parallel_group)(DataProto.pad_or_concat_tensor_list)(tensor_list_from_local_batch, self.tokenizer.pad_token_id, key)
+            global_balanced_batch_dict[key] = gather_tensor_list(data_parallel_group, sharding_parallel_group)(
+                DataProto.pad_or_concat_tensor_list
+            )(tensor_list_from_local_batch, self.tokenizer.pad_token_id, key)
 
         # Truncate total_batch to match expected total batch size
         # Split total_batch evenly across all DP × Sharding ranks
@@ -1309,7 +1310,7 @@ class PPOTrainer(RLTrainerBase):
         if self.args.dynamic_sampling:
             total_valid_prompt = 0
             total_batch = defaultdict(list)
-        
+
         is_fleet_init = True
         try:
             hcg = fleet.get_hybrid_communicate_group()
@@ -1343,7 +1344,7 @@ class PPOTrainer(RLTrainerBase):
                     "eos_token_ids": eos_token_ids,
                     "pad_token_id": pad_token_id,
                 }
-                
+
                 # expand input_ids and raw_prompt_len for all sequences
                 batch_keys_to_pop = ["raw_label_ids_len", "raw_prompt_len", "input_ids"]
                 prompt_only_batch_expand = prompt_only_batch.select(
@@ -1374,7 +1375,9 @@ class PPOTrainer(RLTrainerBase):
                         for i in range(0, total_batch_size, per_device_rollout_batch_size):
                             micro_prompt_batch = prompt_only_batch[i : i + per_device_rollout_batch_size]
                             # generate for multi batches and then disable FuseMT model
-                            generated_batches: List[DataProto] = self.actor_trainer.generate_sequences(micro_prompt_batch)
+                            generated_batches: List[DataProto] = self.actor_trainer.generate_sequences(
+                                micro_prompt_batch
+                            )
                             # NOTE(drownfish19): do process for each micro_batch, prepare for split mode
                             micro_ret = self.remove_pad_tokens_after_generate(generated_batches)
                             micro_cleanup_batches, micro_indices, micro_label_ids_batches = micro_ret
@@ -1441,12 +1444,12 @@ class PPOTrainer(RLTrainerBase):
                     with TimerScope(self.timers, RolloutStages.ROLLOUT_LOGPROB):
                         with reload_and_offload_scope(self, self.reference_model):
                             with TimerScope(self.timers, RolloutStages.ROLLOUT_REF_LOGPROB):
-                                ref_log_probs = self.reference_trainer.compute_logprob(batch, key='ref_log_probs')
+                                ref_log_probs = self.reference_trainer.compute_logprob(batch, key="ref_log_probs")
                                 batch = batch.union(ref_log_probs)
 
                         with reload_and_offload_scope(self, self.actor_model):
                             with TimerScope(self.timers, RolloutStages.ROLLOUT_OLD_LOGPROB):
-                                log_probs = self.actor_trainer.compute_logprob(batch, key='log_probs')
+                                log_probs = self.actor_trainer.compute_logprob(batch, key="log_probs")
                                 batch = batch.union(log_probs)
 
                 # step 2-2: compute reward for rollout data
@@ -1511,7 +1514,9 @@ class PPOTrainer(RLTrainerBase):
                         for key in total_batch.keys():
                             tensor_list = total_batch[key]
 
-                            gathered_and_padded_tensor = gather_tensor_list(data_parallel_group, sharding_parallel_group)(DataProto.pad_or_concat_tensor_list)(tensor_list, pad_token_id, key)
+                            gathered_and_padded_tensor = gather_tensor_list(
+                                data_parallel_group, sharding_parallel_group
+                            )(DataProto.pad_or_concat_tensor_list)(tensor_list, pad_token_id, key)
 
                             total_batch[key] = gathered_and_padded_tensor
 
@@ -1552,7 +1557,9 @@ class PPOTrainer(RLTrainerBase):
                 if self.args.rl_algorithm in ["reinforce_plus_plus", "grpo"]:
                     local_batch = copy.deepcopy(batch)
                     select_keys = ["index", "rewards", "eos_mask", "log_probs", "ref_log_probs"]
-                    batch = gather_and_pad_dataproto(batch, data_parallel_group, sharding_parallel_group, eos_token_ids, pad_token_id, select_keys)
+                    batch = gather_and_pad_dataproto(
+                        batch, data_parallel_group, sharding_parallel_group, eos_token_ids, pad_token_id, select_keys
+                    )
                 else:
                     local_batch = batch
                     batch = batch
@@ -1603,9 +1610,9 @@ class PPOTrainer(RLTrainerBase):
                                 if self.is_step_end():
                                     self.state.global_step += 1
                                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
-                                    rl_info.meta_info['metrics'].update(self.get_step_loss(loss_prefix="train_"))
+                                    rl_info.meta_info["metrics"].update(self.get_step_loss(loss_prefix="train_"))
                                     rl_info = metric.update(rl_info)
-                                    self.timers and rl_info.meta_info['metrics'].update(
+                                    self.timers and rl_info.meta_info["metrics"].update(
                                         self.timers.info(self.timers.timers.keys(), reset=False)
                                     )
                                     # on_step_end
@@ -1727,7 +1734,7 @@ class PPOTrainer(RLTrainerBase):
             # use_ptx would double the gradient_accumulation_steps which causes
             # policy_loss and ptx_loss reduced by half. Moreover, ptx_loss should
             # be divided by ptx_coeff for logging.
-            logs.update(tr_loss.meta_info['metrics'])
+            logs.update(tr_loss.meta_info["metrics"])
             logs["global_step"] = int(self.state.global_step)
             logs["train_actor_lr"] = float(f"{self.actor_trainer._get_learning_rate():.3e}")
             if self.args.rl_algorithm == "ppo":
@@ -1753,7 +1760,7 @@ class PPOTrainer(RLTrainerBase):
 
         # To trigger evaluation and save but avoid log again
         with guard_set_args(self.control, {"should_log": False}):
-            super()._maybe_log_save_evaluate(tr_loss.meta_info['metrics'], model, epoch, ignore_keys_for_eval)
+            super()._maybe_log_save_evaluate(tr_loss.meta_info["metrics"], model, epoch, ignore_keys_for_eval)
 
     def get_advantages_and_returns(
         self,

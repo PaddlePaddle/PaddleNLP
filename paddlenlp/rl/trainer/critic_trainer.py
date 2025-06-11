@@ -15,8 +15,6 @@
 
 from __future__ import annotations
 
-import paddle
-
 from ...datasets.rlhf_datasets.protocol import DataProto
 from ...transformers import PretrainedTokenizer
 from ..models.ppo_model_utils import RLHFValueLoss, create_startend_row_indices
@@ -37,8 +35,8 @@ class CriticTrainer(RLTrainer):
         batch: DataProto,
         input_ids_tokenizer: PretrainedTokenizer = None,
     ) -> DataProto:
-        input_ids = batch.batch['input_ids']
-        position_ids = batch.batch['position_ids']
+        input_ids = batch.batch["input_ids"]
+        position_ids = batch.batch["position_ids"]
         # TODO: confirm actor_tokenizer or reward_tokenizer or critic_tokenizer
         # need retokenize?
         attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
@@ -51,7 +49,7 @@ class CriticTrainer(RLTrainer):
         reward_value = reward_value.squeeze(axis=-1)
         reward_value = reward_value[:, :-1]
 
-        return DataProto.from_single_dict({'reward_value': reward_value})
+        return DataProto.from_single_dict({"reward_value": reward_value})
 
     def update_critic(self, rl_batch: DataProto) -> DataProto:
         """
@@ -94,6 +92,4 @@ class CriticTrainer(RLTrainer):
                 with TimerScope(self.timers, CriticStages.CRITIC_TRAINING_STEP):
                     reward_critic_loss = self.full_training_step(**value_trainer_inputs)
 
-        return DataProto(meta_info={'metrics':{
-            'train_value_loss':reward_critic_loss
-        }})
+        return DataProto(meta_info={"metrics": {"train_value_loss": reward_critic_loss}})

@@ -83,9 +83,9 @@ class RewardTrainer(RLTrainer):
         batch: DataProto,
         input_ids_tokenizer: PretrainedTokenizer = None,
     ) -> Dict[str, paddle.Tensor]:
-        input_ids = batch.batch['input_ids']
-        position_ids = batch.batch['position_ids']
-        label_ids = batch.batch['label_ids']
+        input_ids = batch.batch["input_ids"]
+        position_ids = batch.batch["position_ids"]
+        label_ids = batch.batch["label_ids"]
         prompt = batch.batch["prompt"]
         if not self.args.use_rm_server:
             if self.tokenizer is not input_ids_tokenizer:

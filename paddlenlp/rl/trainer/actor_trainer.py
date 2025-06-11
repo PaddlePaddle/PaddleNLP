@@ -61,9 +61,9 @@ class ActorReferenceTrainerBase(RLTrainer):
         Raises:
             None.
         """
-        input_ids = batch.batch['input_ids']
-        position_ids = batch.batch['position_ids']
-        prompt = batch.batch.get('prompt', None)
+        input_ids = batch.batch["input_ids"]
+        position_ids = batch.batch["position_ids"]
+        prompt = batch.batch.get("prompt", None)
         if self.args.use_fused_head_and_loss_fn:
             return self.compute_fused_logprob(
                 input_ids=input_ids,
@@ -160,10 +160,12 @@ class ActorReferenceTrainerBase(RLTrainer):
             logits = None
             paddle.device.cuda.empty_cache()
 
-        return DataProto.from_single_dict({key:paddle.concat(log_probs_list, axis=0)}, meta_info={'temperature':self.args.temperature})
+        return DataProto.from_single_dict(
+            {key: paddle.concat(log_probs_list, axis=0)}, meta_info={"temperature": self.args.temperature}
+        )
 
     def compute_fused_logprob(
-        self, input_ids: paddle.Tensor, key, position_ids: paddle.Tensor = None, prompt = None, loop_chunk_size=1024
+        self, input_ids: paddle.Tensor, key, position_ids: paddle.Tensor = None, prompt=None, loop_chunk_size=1024
     ) -> DataProto:
         log_probs_list = []
         batch_size, sequence_length = input_ids.shape
@@ -308,7 +310,9 @@ class ActorReferenceTrainerBase(RLTrainer):
             log_prob_chunks = None
             paddle.device.cuda.empty_cache()
 
-        return DataProto.from_single_dict({key:paddle.concat(log_probs_list, axis=0)}, meta_info={'temperature':self.args.temperature})
+        return DataProto.from_single_dict(
+            {key: paddle.concat(log_probs_list, axis=0)}, meta_info={"temperature": self.args.temperature}
+        )
 
     def update_actor(self, rl_batch: DataProto) -> DataProto:
         # inputs shared by policy and value trainer
@@ -358,39 +362,43 @@ class ActorReferenceTrainerBase(RLTrainer):
             max_generated_length = mask_cast.sum(axis=-1).max()
             min_generated_length = mask_cast.sum(axis=-1).min()
 
-        return DataProto(meta_info={'metrics':{
-            # when using PipelienParallel, the loss returned is 0 when not reach
-            # accumulated step and the loss returned at accumulated step is a
-            # mixed loss.
-            "train_policy_loss": actor_loss,
-            **(
-                {
-                    "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
-                    "train_kl_loss": self.info_buffer.get("kl_loss"),
-                    "train_entropy_loss": self.info_buffer.get("entropy_loss"),
+        return DataProto(
+            meta_info={
+                "metrics": {
+                    # when using PipelienParallel, the loss returned is 0 when not reach
+                    # accumulated step and the loss returned at accumulated step is a
+                    # mixed loss.
+                    "train_policy_loss": actor_loss,
+                    **(
+                        {
+                            "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
+                            "train_kl_loss": self.info_buffer.get("kl_loss"),
+                            "train_entropy_loss": self.info_buffer.get("entropy_loss"),
+                        }
+                        if self.args.rl_algorithm == "grpo"
+                        else {}
+                    ),
+                    "train_reward": ori_rewards,  # use original reward to log
+                    **(
+                        {
+                            "train_norm_reward": rewards,
+                            "train_kl_reward": kl_rewards,
+                            "train_norm_reward_with_kl": rewards_with_kl,
+                            "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
+                            "train_entropy_loss": self.info_buffer.get("entropy_loss"),
+                            **({"train_values": values} if self.args.rl_algorithm == "ppo" else {}),
+                            "train_returns": returns,
+                        }
+                        if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
+                        else {}
+                    ),
+                    "train_kl_divergence": kl_divergence,
+                    "train_mean_generated_length": mean_generated_length,
+                    "train_max_generated_length": max_generated_length,
+                    "train_min_generated_length": min_generated_length,
                 }
-                if self.args.rl_algorithm == "grpo"
-                else {}
-            ),
-            "train_reward": ori_rewards,  # use original reward to log
-            **(
-                {
-                    "train_norm_reward": rewards,
-                    "train_kl_reward": kl_rewards,
-                    "train_norm_reward_with_kl": rewards_with_kl,
-                    "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
-                    "train_entropy_loss": self.info_buffer.get("entropy_loss"),
-                    **({"train_values": values} if self.args.rl_algorithm == "ppo" else {}),
-                    "train_returns": returns,
-                }
-                if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
-                else {}
-            ),
-            "train_kl_divergence": kl_divergence,
-            "train_mean_generated_length": mean_generated_length,
-            "train_max_generated_length": max_generated_length,
-            "train_min_generated_length": min_generated_length,
-        }})
+            }
+        )
 
 
 class ActorReferenceTrainer(ActorReferenceTrainerBase):
@@ -432,9 +440,7 @@ class ActorReferenceTrainer(ActorReferenceTrainerBase):
                         if self.args.use_rm_server
                         else {}
                     ),  # tgt response
-                    "index": np.array(
-                        [str(uuid.uuid4())] * len(seq), dtype=object
-                    ),
+                    "index": np.array([str(uuid.uuid4())] * len(seq), dtype=object),
                 }
             )
             for idx, seq in enumerate(sequences)

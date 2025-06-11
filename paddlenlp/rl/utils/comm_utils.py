@@ -15,8 +15,7 @@
 import sys
 from collections import defaultdict
 from enum import Enum, auto
-from typing import Dict, List, Sequence, Union
-from functools import wraps  
+from functools import wraps
 
 import numpy as np
 import paddle
@@ -751,6 +750,7 @@ def masked_whiten(values, mask, shift_mean=True):
         whitened += mean
     return whitened
 
+
 def gather_and_pad(tensor, dp_group=None, sd_group=None, pad_index=0.0, pad=True, padding_side="right"):
     """Gather tensor from all devices."""
 
@@ -808,6 +808,7 @@ def gather_and_pad(tensor, dp_group=None, sd_group=None, pad_index=0.0, pad=True
     else:
         return DataProto.pad_tensor(gathered_tensor, pad_index=pad_index, dtype=dtype, padding_side=padding_side)
 
+
 def filter_valid_reward_groups(combined_batch: DataProto, total_batch, rollout_n, variance_threshold=1e-6):
     """
     Filters out invalid prompt groups based on reward variance, and appends the valid samples to total_batch.
@@ -826,7 +827,11 @@ def filter_valid_reward_groups(combined_batch: DataProto, total_batch, rollout_n
     """
 
     # Choose the reward key to filter by
-    select_key = "rewards_before_length_penalty" if "rewards_before_length_penalty" in combined_batch.batch.keys() else "rewards"
+    select_key = (
+        "rewards_before_length_penalty"
+        if "rewards_before_length_penalty" in combined_batch.batch.keys()
+        else "rewards"
+    )
 
     rewards = combined_batch.batch[select_key].flatten()  # paddle.Tensor
     indices = combined_batch.non_tensor_batch["index"].flatten()  # numpy.ndarray
@@ -977,6 +982,7 @@ def process_prompt_and_response(micro_batch, pad_token_id=0):
             micro_batch[key] = paddle.slice(micro_batch[key], axes=[1], starts=[0], ends=[max_response_len])
     return micro_batch
 
+
 def gather_tensor(tensor, dp_group=None, sd_group=None):
     """Gather tensor from all devices."""
 
@@ -994,7 +1000,7 @@ def gather_tensor(tensor, dp_group=None, sd_group=None):
 
     if (dp_group is None and sd_group is None) or (dp_group.nranks == 1 and sd_group.nranks == 1):
         return tensor
-        
+
     def map_func(weight):
         if isinstance(weight, paddle.Tensor):
             weight = weight.numpy()
@@ -1023,16 +1029,17 @@ def gather_tensor(tensor, dp_group=None, sd_group=None):
     return gathered_tensor
 
 
-from functools import wraps
-
 def gather_tensor_list(dp_group=None, sd_group=None):
     def decorator(func):
         @wraps(func)
         def wrapper(tensors_list, *args, **kwargs):
             gathered = gather_tensor(tensors_list, dp_group, sd_group)
             return func(gathered, *args, **kwargs)
+
         return wrapper
+
     return decorator
+
 
 def gather_and_pad_dataproto(batch, dp_group, sd_group, eos_token_ids, pad_token_id, select_keys) -> "DataProto":
     new_batch = {}
@@ -1040,7 +1047,7 @@ def gather_and_pad_dataproto(batch, dp_group, sd_group, eos_token_ids, pad_token
 
     if "eos_mask" in select_keys:
         eos_mask = make_eos_mask(
-            batch.batch["input_ids"][:, batch.batch["prompt"].shape[-1]:],
+            batch.batch["input_ids"][:, batch.batch["prompt"].shape[-1] :],
             eos_token_ids=eos_token_ids,
         ).to(batch.batch["log_probs"].dtype)
 
