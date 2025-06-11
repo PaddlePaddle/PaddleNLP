@@ -499,7 +499,10 @@ def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=No
         if tensor_parallel_rank is not None:
             start = tensor_parallel_rank * chunk_size
             end = (tensor_parallel_rank + 1) * chunk_size
-            splited_weights = weight[..., start:end].clone()
+            if isinstance(weight, paddle.Tensor):
+                splited_weights = weight[start:end, ...].clone()
+            else:
+                splited_weights = weight[start:end, ...]
             return splited_weights
         else:
             splited_weights = [
@@ -512,7 +515,10 @@ def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=No
         if tensor_parallel_rank is not None:
             start = tensor_parallel_rank * chunk_size
             end = (tensor_parallel_rank + 1) * chunk_size
-            splited_weights = weight[start:end, ...].clone()
+            if isinstance(weight, paddle.Tensor):
+                splited_weights = weight[start:end, ...].clone()
+            else:
+                splited_weights = weight[start:end, ...]
             return splited_weights
         else:
             splited_weights = [
