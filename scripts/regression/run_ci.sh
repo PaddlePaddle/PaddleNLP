@@ -240,12 +240,17 @@ if [[ ${#P0case_list[*]} -ne 0 ]];then
         echo -e "\033[32m ---- P0case Success \033[0m"
     fi
     ####################################
-    cd ${nlp_dir}
-    echo -e "\033[35m ---- Generate Allure Report  \033[0m"
-    unset http_proxy && unset https_proxy
-    cp scripts/regression/gen_allure_report.py ./
-    python gen_allure_report.py > /dev/null
-    echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
+    if [ -n "${AGILE_JOB_BUILD_ID}" ]; then
+        cd ${nlp_dir}
+        echo -e "\033[35m ---- Generate Allure Report  \033[0m"
+        unset http_proxy && unset https_proxy
+        cp scripts/regression/gen_allure_report.py ./
+        python gen_allure_report.py > /dev/null
+        echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
+    else
+        echo "AGILE_JOB_BUILD_ID is empty, skip generate allure report"
+    fi
+    
     ####################################
     # run coverage
     # cd ${nlp_dir}/tests/
