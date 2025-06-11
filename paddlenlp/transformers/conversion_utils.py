@@ -374,16 +374,10 @@ def naive_fuse_split_tp(
         if tensor_parallel_rank is None:
             ret = []
             for tensor_parallel_rank in range(tensor_parallel_degree):
-                if isinstance(weight, paddle.Tensor):
-                    ret.append(paddle.concat(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis))
-                else:
-                    ret.append(np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis))
+                ret.append(np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis))
             return ret
 
-        if isinstance(weight, paddle.Tensor):
-            return paddle.concat(splited, axis=axis, name=None)
-        else:
-            return np.concatenate(splited, axis=axis)
+        return np.concatenate(splited, axis=axis)
 
     if isinstance(weight, paddle.Tensor):
 
@@ -403,7 +397,16 @@ def naive_fuse_split_tp(
             result = paddle.concat(slices, axis=axis)
             return result
 
-        return slice_concat_by_axis(weight, fuse_tensor_parts, tensor_parallel_degree, tensor_parallel_rank, axis=axis)
+        if tensor_parallel_rank is not None:
+            return slice_concat_by_axis(
+                weight, fuse_tensor_parts, tensor_parallel_degree, tensor_parallel_rank, axis=axis
+            )
+        else:
+            splited = paddle.split(weight, fuse_tensor_parts * tensor_parallel_degree, axis=axis)
+            ret = []
+            for tensor_parallel_rank in range(tensor_parallel_degree):
+                ret.append(paddle.concat(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis))
+            return ret
     else:
         splited = np.split(weight, fuse_tensor_parts * tensor_parallel_degree, axis=axis)
 
@@ -500,9 +503,9 @@ def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=No
             start = tensor_parallel_rank * chunk_size
             end = (tensor_parallel_rank + 1) * chunk_size
             if isinstance(weight, paddle.Tensor):
-                splited_weights = weight[start:end, ...].clone()
+                splited_weights = weight[..., start:end].clone()
             else:
-                splited_weights = weight[start:end, ...]
+                splited_weights = weight[..., start:end]
             return splited_weights
         else:
             splited_weights = [
