@@ -177,6 +177,7 @@ class RemBertSelfOutput(nn.Layer):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states, input_tensor):
+        hidden_states = hidden_states[0]
         hidden_states = self.dense(hidden_states)
         hidden_states = self.dropout(hidden_states)
         hidden_states = self.layer_norm(hidden_states + input_tensor)

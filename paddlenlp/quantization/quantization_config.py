@@ -41,6 +41,7 @@ class QuantizationConfig:
         qlora_weight_double_quant_block_size: Block size for quant_scale of weight quant_scale.
         weight_quant_method: The method for weight quantization.
         act_quant_method: The method for activation quantization.
+        apply_online_actscale_step: Use online (per-step) activation scales for the first N steps. During these steps, activation scales are also collected to compute their mean for later use.
     """
 
     def __init__(
@@ -64,13 +65,14 @@ class QuantizationConfig:
         dtype=None,
         ignore_modules=None,
         group_size=-1,
-        apply_hadamard=True,
+        apply_hadamard=False,
+        hadamard_block_size=32,
         quant_input_grad=False,
         quant_weight_grad=False,
-        skip_first_act_scale_step=20,
-        moving_rate=0.01,
-        epsilon=1e-8,
+        apply_online_actscale_step=200,
+        actscale_moving_rate=0.01,
         fp8_format_type="hybrid",
+        scale_epsilon=1e-8,
         **kwargs,
     ):
         if weight_quantize_algo is not None:
@@ -139,12 +141,17 @@ class QuantizationConfig:
         self.ignore_modules = ignore_modules
         self.group_size = group_size
         self.apply_hadamard = apply_hadamard
+        self.hadamard_block_size = hadamard_block_size
         self.quant_input_grad = quant_input_grad
         self.quant_weight_grad = quant_weight_grad
-        self.skip_first_act_scale_step = skip_first_act_scale_step
-        self.moving_rate = moving_rate
-        self.epsilon = epsilon
-        self.fp8_format = fp8_format_mapping[fp8_format_type]
+        self.apply_online_actscale_step = apply_online_actscale_step
+        self.actscale_moving_rate = actscale_moving_rate
+        self.fp8_format_type = fp8_format_type
+        self.scale_epsilon = scale_epsilon
+
+    @property
+    def fp8_format(self):
+        return fp8_format_mapping[self.fp8_format_type]
 
     def is_weight_quantize(self):
         if isinstance(self.weight_quantize_algo, dict):
@@ -214,6 +221,7 @@ class QuantizationConfig:
         config_dict = self.to_dict()
 
         # get the default config dict
+
         default_config_dict = QuantizationConfig().to_dict()
 
         serializable_config_dict = {}
