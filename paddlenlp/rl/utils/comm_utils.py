@@ -751,30 +751,6 @@ def masked_whiten(values, mask, shift_mean=True):
         whitened += mean
     return whitened
 
-
-# def pad_tensor(tensor_list, pad_index=0.0, dtype="bfloat16", padding_side="right"):
-#     max_size = max([i.shape[-1] for i in tensor_list])
-#     data_num = sum([i.shape[0] for i in tensor_list])
-#     if isinstance(tensor_list[0], paddle.Tensor):
-#         new_tensor = paddle.full((data_num, max_size), pad_index, dtype=dtype)
-#     elif isinstance(tensor_list[0], np.ndarray):
-#         new_tensor = np.full((data_num, max_size), pad_index, dtype=dtype)
-
-#     offset = 0
-#     for idx, i in enumerate(tensor_list):
-#         # new_tensor[offset : offset + i.shape[0], : i.shape[-1]] = i
-#         data_length = i.shape[-1]
-
-#         if padding_side == "right":
-#             new_tensor[offset : offset + i.shape[0], :data_length] = i
-#         elif padding_side == "left":
-#             new_tensor[offset : offset + i.shape[0], -data_length:] = i
-#         else:
-#             raise ValueError("padding_side must be 'right' or 'left'")
-#         offset += i.shape[0]
-#     return new_tensor
-
-
 def gather_and_pad(tensor, dp_group=None, sd_group=None, pad_index=0.0, pad=True, padding_side="right"):
     """Gather tensor from all devices."""
 
@@ -831,46 +807,6 @@ def gather_and_pad(tensor, dp_group=None, sd_group=None, pad_index=0.0, pad=True
             return np.concatenate(flatten_list(gathered_tensor), axis=0)
     else:
         return DataProto.pad_tensor(gathered_tensor, pad_index=pad_index, dtype=dtype, padding_side=padding_side)
-
-
-# def combine_micro_batches_into_batch(micro_batches: List[DataProto], pad_token_id=0) -> DataProto:
-#     """combine micro batches to get a complete batch"""
-#     if not isinstance(micro_batches, list):
-#         return micro_batches
-#     combined_batch = {}
-
-#     for micro_batch in micro_batches:
-#         for key, value in micro_batch.items():
-#             if isinstance(value, list):
-#                 if isinstance(value[0], paddle.Tensor):
-#                     if key == "label_ids":
-#                         value = [paddle.unsqueeze(v, axis=0) if v.ndim == 1 else v for v in value]
-#                         concat_value = DataProto.pad_tensor(
-#                             value,
-#                             pad_index=pad_token_id,
-#                             dtype=value[0].dtype,
-#                             padding_side="left",
-#                         )
-#                     else:
-#                         concat_value = paddle.concat(value, axis=0)
-#                 elif isinstance(value[0], np.ndarray):
-#                     concat_value = np.concatenate(value, axis=0)
-#                 combined_batch.setdefault(key, []).append(concat_value)
-#             else:
-#                 combined_batch.setdefault(key, []).append(value)
-
-#     for key, values in combined_batch.items():
-#         if len(combined_batch[key][0].shape) > 1:
-#             pad_index = pad_token_id
-#             padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
-#             combined_batch[key] = gather_and_pad(values, pad_index=pad_index, padding_side=padding_side)
-#         elif isinstance(values[0], paddle.Tensor):
-#             combined_batch[key] = paddle.concat(values, axis=0)
-#         elif isinstance(values[0], np.ndarray):
-#             combined_batch[key] = np.concatenate(values, axis=0)
-
-#     return combined_batch
-
 
 def filter_valid_reward_groups(combined_batch: DataProto, total_batch, rollout_n, variance_threshold=1e-6):
     """
@@ -1041,67 +977,6 @@ def process_prompt_and_response(micro_batch, pad_token_id=0):
             micro_batch[key] = paddle.slice(micro_batch[key], axes=[1], starts=[0], ends=[max_response_len])
     return micro_batch
 
-
-# def split_batch_into_micro_batches(total_batch: DataProto, batch_size, pad_token_id=0):
-#     """
-#     Splits total_batch into micro-batches of size `batch_size`.
-
-#     Args:
-#         total_batch (dict): Dictionary containing full batched tensors.
-#         batch_size (int): Micro batch size per device.
-
-#     Returns:
-#         list of dict: A list of micro-batches.
-#     """
-#     micro_batches = []
-#     num_micro_batches = total_batch.batch["input_ids"].shape[0] // batch_size
-#     if total_batch.batch["input_ids"].shape[0] % batch_size != 0:
-#         num_micro_batches += 1
-#     if num_micro_batches <= 0:
-#         logger.warning(
-#             "The total batch size is smaller than the batch size, please consider using a smaller batch size or a larger global_batch_size."
-#         )
-#         num_micro_batches = 1
-
-#     for i in range(num_micro_batches):
-#         micro_batch = {}
-#         for key, data in total_batch.batch.items():
-#             if isinstance(data, paddle.Tensor):
-#                 micro_batch[key] = data[i * batch_size : (i + 1) * batch_size]
-#             elif isinstance(data, np.ndarray):
-#                 micro_batch[key] = data[i * batch_size : (i + 1) * batch_size]
-#             elif isinstance(data, list):
-#                 micro_batch[key] = data[i * batch_size : (i + 1) * batch_size]
-#             else:
-#                 raise TypeError(f"Unsupported data type for key {key}: {type(data)}")
-
-#         # if os.getenv("PROCESS_PROMPT_AND_RESPONSE", "1").lower() in ["1", "t", "true", "yes", "y"]:
-#         #     micro_batch = process_prompt_and_response(micro_batch=micro_batch, pad_token_id=pad_token_id)
-
-#         micro_batches.append(DataProto.from_single_dict(micro_batch))
-
-#     return micro_batches
-
-
-# def make_eos_mask(response_id, eos_token_ids=0, dtype=paddle.int64):
-#     """
-#     end of sentence token can be int or list: 1 or [1, 2]
-#     e.g. eos_token=1
-#     response_id: [0, 0, 2, 42, 3, 5, 1, 0, 0]
-#     eos_mask:     [1, 1, 1, 1,  1, 1, 1, 0, 0]
-#     """
-#     if isinstance(eos_token_ids, int):
-#         eos_token_ids = [eos_token_ids]
-
-#     eos_mask = paddle.zeros_like(response_id, dtype=paddle.bool)
-#     for token_id in eos_token_ids:
-#         eos_mask |= response_id == token_id
-
-#     eos_mask = eos_mask.to("int64")
-#     eos_mask = (paddle.cumsum(eos_mask, axis=1) - eos_mask).to("bool")
-#     eos_mask = paddle.logical_not(eos_mask).to(dtype)
-#     return eos_mask
-
 def gather_tensor(tensor, dp_group=None, sd_group=None):
     """Gather tensor from all devices."""
 
@@ -1154,20 +1029,15 @@ def gather_tensor_list(dp_group=None, sd_group=None):
     def decorator(func):
         @wraps(func)
         def wrapper(tensors_list, *args, **kwargs):
-            # 只对第一个参数进行 gather
             gathered = gather_tensor(tensors_list, dp_group, sd_group)
             return func(gathered, *args, **kwargs)
         return wrapper
     return decorator
 
-# distribute_gather_and_pad_data 修改版
 def gather_and_pad_dataproto(batch, dp_group, sd_group, eos_token_ids, pad_token_id, select_keys) -> "DataProto":
     new_batch = {}
-
-    # 构建带 gather 的 pad/concat 函数
     gather_then_pad_or_concat = gather_tensor_list(dp_group, sd_group)(DataProto.pad_or_concat_tensor_list)
 
-    # 特殊处理 eos_mask
     if "eos_mask" in select_keys:
         eos_mask = make_eos_mask(
             batch.batch["input_ids"][:, batch.batch["prompt"].shape[-1]:],
@@ -1178,9 +1048,7 @@ def gather_and_pad_dataproto(batch, dp_group, sd_group, eos_token_ids, pad_token
 
     for key in select_keys:
         if key == "eos_mask":
-            continue  # 已处理
-
-        # 查找值来源
+            continue
         if key in batch.batch:
             value = batch.batch[key]
         elif key in batch.non_tensor_batch:
@@ -1188,13 +1056,11 @@ def gather_and_pad_dataproto(batch, dp_group, sd_group, eos_token_ids, pad_token
         else:
             raise KeyError(f"{key} not found in batch or non_tensor_batch")
 
-        # 保证传入的是 list
         if not isinstance(value, list):
             tensor_list = [value]
         else:
             tensor_list = value
 
-        # 使用组合函数 gather + pad/concat
         gathered = gather_then_pad_or_concat(tensor_list, pad_token_id, key=key)
 
         new_batch[key] = gathered

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import uuid
-from typing import Any, Dict, List
+from typing import List
 
 import numpy as np
 import paddle
@@ -310,7 +310,6 @@ class ActorReferenceTrainerBase(RLTrainer):
 
         return DataProto.from_single_dict({key:paddle.concat(log_probs_list, axis=0)}, meta_info={'temperature':self.args.temperature})
 
-    # 这个函数之前是按自己的理解写的，实际上这些变量是作为字典放在meta_info的metrics字典里的
     def update_actor(self, rl_batch: DataProto) -> DataProto:
         # inputs shared by policy and value trainer
         input_ids = rl_batch.batch["input_ids"].contiguous()  # length: src+tgt
@@ -359,7 +358,6 @@ class ActorReferenceTrainerBase(RLTrainer):
             max_generated_length = mask_cast.sum(axis=-1).max()
             min_generated_length = mask_cast.sum(axis=-1).min()
 
-        # [1] 一维张量 和 [] 标量不能放在batch里，可以.reshape([1])，verl是放在了metrics中
         return DataProto(meta_info={'metrics':{
             # when using PipelienParallel, the loss returned is 0 when not reach
             # accumulated step and the loss returned at accumulated step is a
@@ -428,7 +426,7 @@ class ActorReferenceTrainer(ActorReferenceTrainerBase):
             DataProto.from_single_dict(
                 {
                     "prompt": input_ids[idx * len(seq) : (idx + 1) * len(seq)],  # src prompt
-                    "input_ids": seq,  # 该 prompt 输入 Actor 生成的所有 response
+                    "input_ids": seq,
                     **(
                         {"label_ids": label_ids[idx * len(seq) : (idx + 1) * len(seq)]}
                         if self.args.use_rm_server
@@ -436,7 +434,7 @@ class ActorReferenceTrainer(ActorReferenceTrainerBase):
                     ),  # tgt response
                     "index": np.array(
                         [str(uuid.uuid4())] * len(seq), dtype=object
-                    ),  # 每个 response 的唯一标识（这不都一样吗？），这个存储到 non_tensor_batch 里了
+                    ),
                 }
             )
             for idx, seq in enumerate(sequences)

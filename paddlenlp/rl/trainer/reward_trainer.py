@@ -25,7 +25,7 @@ from paddle.distributed import fleet
 from paddle.io import Dataset
 
 from ...data import DataCollator
-from ...datasets.rlhf_datasets.protocol import DataProto, TensorDict
+from ...datasets.rlhf_datasets.protocol import DataProto
 from ...trainer.trainer import (
     EvalPrediction,
     TrainerCallback,

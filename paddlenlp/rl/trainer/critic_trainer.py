@@ -15,11 +15,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
-
 import paddle
 
-from ...datasets.rlhf_datasets.protocol import DataProto, TensorDict
+from ...datasets.rlhf_datasets.protocol import DataProto
 from ...transformers import PretrainedTokenizer
 from ..models.ppo_model_utils import RLHFValueLoss, create_startend_row_indices
 from ..utils.comm_utils import CriticStages
@@ -96,7 +94,6 @@ class CriticTrainer(RLTrainer):
                 with TimerScope(self.timers, CriticStages.CRITIC_TRAINING_STEP):
                     reward_critic_loss = self.full_training_step(**value_trainer_inputs)
 
-        # return DataProto.from_single_dict({'train_value_loss':reward_critic_loss})
         return DataProto(meta_info={'metrics':{
             'train_value_loss':reward_critic_loss
         }})
