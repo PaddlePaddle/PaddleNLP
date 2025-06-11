@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from copy import copy
+
 import numpy as np
 import paddle
 import paddle.distributed as dist
@@ -167,18 +169,28 @@ def mp_reshard(
         else:
             res = [src_tensor]
         if hasattr(tgt_tensor, "is_distributed") and tgt_tensor.is_distributed:
-            assert hasattr(tgt_tensor, "split_axis"), f"{tgt_tensor.name} has no split_axis!"
-            concat_tensor = paddle.concat(res, meta_dict["split_axis"])
+            merge_fn = meta_dict["merge_tensor_fn"]
+            concat_tensor = merge_fn(
+                res, transpose=False, is_old_qkv=False, is_naive_2fuse=False, is_naive_3fuse=False, keep_on_gpu=True
+            )
             del res
-            all_parts = paddle.split(concat_tensor, rollout_tp_group.nranks, tgt_tensor.split_axis)
+            split_fn = meta_dict["split_tensor_fn"]
+            split_part = split_fn(
+                concat_tensor, transpose=False, is_old_qkv=False, is_naive_2fuse=False, is_naive_3fuse=False
+            )
             del concat_tensor
-            return all_parts[rollout_tp_group.rank]
+
+            return split_part
         else:
-            return paddle.concat(res, meta_dict["split_axis"])
+            merge_fn = meta_dict["merge_tensor_fn"]
+            concat_tensor = merge_fn(
+                res, transpose=False, is_old_qkv=False, is_naive_2fuse=False, is_naive_3fuse=False, keep_on_gpu=True
+            )
+            return concat_tensor
     return src_tensor
 
 
-def init_reshard_mappings(model, training_args, pp_rank, pp_group):
+def init_reshard_mappings(model, training_args, pp_rank, pp_group, rollout_tp_group):
     global_meta_dict = {}
     if training_args.pipeline_parallel_degree > 1:
         model._layers._set_pipeline_name_mapping()
@@ -202,9 +214,6 @@ def init_reshard_mappings(model, training_args, pp_rank, pp_group):
         local_meta_dict[k]["is_distributed"] = False
         if hasattr(pipeline_tensor, "is_distributed"):
             local_meta_dict[k]["is_distributed"] = pipeline_tensor.is_distributed
-        local_meta_dict[k]["split_axis"] = None
-        if hasattr(pipeline_tensor, "split_axis"):
-            local_meta_dict[k]["split_axis"] = pipeline_tensor.split_axis
     if training_args.pipeline_parallel_degree > 1:
         gathered_local_meta_dict = []
         dist.all_gather_object(gathered_local_meta_dict, local_meta_dict, group=pp_group)
@@ -212,6 +221,26 @@ def init_reshard_mappings(model, training_args, pp_rank, pp_group):
         gathered_local_meta_dict = [local_meta_dict]
     for meta_dict in gathered_local_meta_dict:
         global_meta_dict.update(meta_dict)
+    if (
+        training_args.tensor_parallel_degree != training_args.rollout_tensor_parallel_degree
+        or training_args.pipeline_parallel_degree > 1
+    ):
+        model_class = type(model)
+        tensor_parallel_config = copy(model.config)
+        tensor_parallel_config.tensor_parallel_degree = training_args.rollout_tensor_parallel_degree
+        tensor_parallel_config.tensor_parallel_rank = rollout_tp_group.rank
+
+        if training_args.rollout_tensor_parallel_degree > 1:
+            split_tensor_fn_dict = model_class._get_tensor_parallel_mappings(
+                config=tensor_parallel_config, is_split=True
+            )
+            for k, v in split_tensor_fn_dict.items():
+                key = k if k in global_meta_dict else f"{model.config.model_type}.{k}"
+                global_meta_dict[key]["split_tensor_fn"] = v
+        merge_tensor_fn_dict = model_class._get_tensor_parallel_mappings(config=tensor_parallel_config, is_split=False)
+        for k, v in merge_tensor_fn_dict.items():
+            key = k if k in global_meta_dict else f"{model.config.model_type}.{k}"
+            global_meta_dict[key]["merge_tensor_fn"] = v
     return global_meta_dict
 
 

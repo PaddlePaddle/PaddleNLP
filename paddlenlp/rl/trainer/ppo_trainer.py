@@ -1660,7 +1660,6 @@ class PPOTrainer(RLTrainerBase):
                                     self.timers, get_timer_label(ActorStages.MICRO_STEPS) + f"_{micro_step}"
                                 ):
                                     rl_info = self.actor_trainer.update_actor(micro_batch)
-
                                 paddle.device.cuda.empty_cache()
 
                                 if self.args.rl_algorithm == "ppo":

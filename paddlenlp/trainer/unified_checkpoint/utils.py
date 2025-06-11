@@ -377,6 +377,8 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
             mp_moe = getattr(tensor, "mp_moe", False)
             if key in tp_actions and not mp_moe:
                 # Get tensor size
+                if tensor.place.is_cuda_pinned_place():
+                    tensor = tensor._copy_to(paddle.CUDAPlace(int(paddle.get_device().split(":")[1])), False)
                 tensor_bytes = tensor.numel().item() * dtype_byte_size(tensor.dtype) * tp_group.nranks
                 if tensor_bytes >= 5 * 1024 * 1024 * 1024:  # temporarily set 5GB as threshold
                     tensor = merge_large_tensor_parallel(tensor, tp_group, tp_actions[key], j, is_dst)
