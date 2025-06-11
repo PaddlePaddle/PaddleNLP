@@ -28,9 +28,11 @@ try:
         paddle.float8_e4m3fn: tex.DType.kFloat8E4M3,
         paddle.float8_e5m2: tex.DType.kFloat8E5M2,
     }
-    USE_FP8_GEMM = True
+    SUPPORT_TE = True
 except ImportError:
-    USE_FP8_GEMM = False
+    SUPPORT_TE = False
+
+from paddle.linalg import fp8_fp8_half_gemm_fused
 
 QMIN_QMAX_MAPPING = {
     "a8w8linear_activation": (-128, 127),
@@ -83,7 +85,7 @@ def quantize(
         if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
             quant_x = paddle.clip((target_x / scale).round(), qmin, qmax).astype("int8")
         elif weight_quantize_algo in ["fp8linear"]:
-            quant_x = (target_x / scale).astype(quantization_config.fp8_format[tensor_type]).view("int8")
+            quant_x = (target_x / scale).astype(quantization_config.fp8_format[tensor_type])
         else:
             raise NotImplementedError(f"Unknown {weight_quantize_algo}.")
     elif tensor_type == "weight":
@@ -217,37 +219,16 @@ def fp8_forward(
         training=training,
         group=group,
     )
-    x_fp8 = x_fp8.view(quantization_config.fp8_format["activation"])
     w_fp8 = w_fp8.view(quantization_config.fp8_format["weight"])
-
-    if USE_FP8_GEMM:
-        x_shape = x_fp8.shape
-        x_fp8 = x_fp8.view((-1, x_fp8.shape[-1]))
-        fwd_scales = paddle.concat([x_scale.astype("float32"), w_scale.astype("float32")])
-        out, _ = fp8_gemm(
-            A=w_fp8,
-            A_scale_inv=fwd_scales,
-            A_fp8_tensor=FP8FwdTensors.GEMM1_WEIGHT,
-            A_dtype=TE_DType[w_fp8.dtype],
-            B=x_fp8,
-            B_scale_inv=fwd_scales,
-            B_fp8_tensor=FP8FwdTensors.GEMM1_INPUT,
-            B_dtype=TE_DType[x_fp8.dtype],
-            out_dtype=dtype,
-            workspace=get_workspace(),
-            bias=bias,
-            use_bias=True if bias is not None else False,
-            use_split_accumulator=True,
-        )
-        x_fp8 = x_fp8.view(x_shape)
-        out = out.view((*x_shape[:-1], -1))
-    else:
-        x = x_fp8.astype(dtype) * x_scale
-        w = w_fp8.astype(dtype) * w_scale
-        out = paddle.matmul(x, w.T).astype(dtype)
-        if bias is not None:
-            out += bias
-
+    out = fp8_fp8_half_gemm_fused(
+        x_fp8,
+        w_fp8,
+        transpose_x=False,
+        transpose_y=True,
+        bias=bias,
+        scale=x_scale * w_scale,
+        output_dtype=dtype,
+    )
     return out, x_fp8, x_scale
 
 
@@ -262,12 +243,11 @@ def fp8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scal
                 side="left",
                 apply_hadamard=False,
             )
-            grad_output_fp8 = grad_output_fp8.view(ctx.quantization_config.fp8_format["grad_output"])
             quant_weight = quant_weight.view(ctx.quantization_config.fp8_format["weight"])
-            if USE_FP8_GEMM:
+            if SUPPORT_TE:
                 grad_output_shape = grad_output_fp8.shape
                 grad_output_fp8 = grad_output_fp8.view((-1, grad_output_fp8.shape[-1]))
-                fwd_scales = paddle.stack([x_scale.astype("float32"), quant_scale.astype("float32")])
+                fwd_scales = paddle.concat([x_scale.astype("float32"), quant_scale.astype("float32")])
                 bwd_scales = grad_output_scale[None].astype("float32")
                 input_grad, _ = fp8_gemm(
                     A=quant_weight.T,
@@ -312,12 +292,29 @@ def fp8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scal
                 quantization_config=ctx.quantization_config,
                 apply_hadamard=False,
             )
-            quant_x = quant_x.view(ctx.quantization_config.fp8_format["activation"])
-            if USE_FP8_GEMM:
+            if SUPPORT_TE:
                 quant_x = quant_x.view((-1, quant_x.shape[-1]))
                 grad_output_fp8 = grad_output_fp8.view((-1, grad_output_fp8.shape[-1]))
-                fwd_scales = paddle.stack([x_scale.astype("float32"), quant_scale.astype("float32")])
+                fwd_scales = paddle.concat([x_scale.astype("float32"), quant_scale.astype("float32")])
                 bwd_scales = grad_output_scale[None].astype("float32")
+                # FP8 gemm need k % 16 = 0
+                ALIGNMENT_SIZE = 16
+
+                def pad_tensor_to_multiple(tensor, dtype):
+                    current_size = tensor.shape[0]
+                    padding_size = ALIGNMENT_SIZE - current_size % ALIGNMENT_SIZE
+                    # Create padding zeros with matching shape and dtype
+                    padding_shape = [padding_size, tensor.shape[1]]
+                    padding = paddle.zeros(padding_shape, dtype=dtype)
+                    padded_tensor = paddle.concat([tensor, padding], axis=0)
+                    return padded_tensor
+
+                if quant_x.shape[0] % ALIGNMENT_SIZE != 0:
+                    quant_x = pad_tensor_to_multiple(quant_x, ctx.quantization_config.fp8_format["activation"])
+                    grad_output_fp8 = pad_tensor_to_multiple(
+                        grad_output_fp8, ctx.quantization_config.fp8_format["grad_output"]
+                    )
+
                 weight_grad, _ = fp8_gemm(
                     A=grad_output_fp8.T,
                     A_scale_inv=bwd_scales,

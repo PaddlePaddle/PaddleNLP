@@ -20,7 +20,6 @@ quant_inference_mapping = {"avg": "abs_max", "abs_max_channel_wise": "abs_max_ch
 fp8_format_mapping = {
     "hybrid": {"weight": "float8_e4m3fn", "activation": "float8_e4m3fn", "grad_output": "float8_e5m2"},
     "e4m3": {"weight": "float8_e4m3fn", "activation": "float8_e4m3fn", "grad_output": "float8_e4m3fn"},
-    "e5m2": {"weight": "float8_e5m2", "activation": "float8_e5m2", "grad_output": "float8_e5m2"},
 }
 
 
