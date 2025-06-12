@@ -168,7 +168,7 @@ jobs:
   upload-reports:
     name: upload-reports
     needs: [llm-ci]
-    runs-on: [self-hosted]
+    runs-on: ubuntu-24.04
     steps:
       - name: wget report
         if: always()
