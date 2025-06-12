@@ -17,7 +17,7 @@ import copy
 
 import paddle
 
-from paddlenlp.utils.log import logger
+from .log import logger
 
 TensorHolder = collections.namedtuple("TensorHolder", ["shape", "dtype", "name"])
 

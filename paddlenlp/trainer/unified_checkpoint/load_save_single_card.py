@@ -19,24 +19,21 @@ import os
 
 import paddle
 
-from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
-from paddlenlp.transformers.model_utils import (
-    _load_state_dict_into_model,
-    load_state_dict,
-)
-from paddlenlp.transformers.utils import (
+from ...peft import LoRAModel, PrefixModelForCausalLM
+from ...transformers.model_utils import _load_state_dict_into_model, load_state_dict
+from ...transformers.utils import (
     dtype_byte_size,
     get_checkpoint_shard_files,
     is_safetensors_available,
 )
-from paddlenlp.utils.env import (
+from ...utils.env import (
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
     SAFE_OPTIMIZER_INDEX_NAME,
     SAFE_PEFT_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
 )
-from paddlenlp.utils.log import logger
-from paddlenlp.utils.nested import nested_copy
+from ...utils.log import logger
+from ...utils.nested import nested_copy
 
 if is_safetensors_available():
     from safetensors.numpy import save_file as safe_save_file

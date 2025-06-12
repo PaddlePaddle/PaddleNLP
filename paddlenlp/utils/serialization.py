@@ -25,7 +25,7 @@ import paddle
 from _io import BufferedReader
 from safetensors import deserialize
 
-from paddlenlp.utils.env import PYTORCH_WEIGHTS_NAME, SAFE_WEIGHTS_NAME
+from .env import PYTORCH_WEIGHTS_NAME, SAFE_WEIGHTS_NAME
 
 MZ_ZIP_LOCAL_DIR_HEADER_SIZE = 30
 
@@ -206,7 +206,7 @@ def dumpy(*args, **kwarsg):
 
 
 def load_torch(path: str, **pickle_load_args):
-    from paddlenlp.transformers.utils import device_guard
+    from ..transformers.utils import device_guard
 
     if path.endswith(PYTORCH_WEIGHTS_NAME) or os.path.split(path)[-1].startswith("pytorch_model-"):
         import torch

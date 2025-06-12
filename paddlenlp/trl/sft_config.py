@@ -16,10 +16,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from paddlenlp.trainer import TrainingArguments
-from paddlenlp.trainer.trainer_utils import IntervalStrategy
-from paddlenlp.trainer.utils.doc import add_start_docstrings
-from paddlenlp.transformers.configuration_utils import llmmetaclass
+from ..trainer import TrainingArguments
+from ..trainer.trainer_utils import IntervalStrategy
+from ..trainer.utils.doc import add_start_docstrings
+from ..transformers.configuration_utils import llmmetaclass
 
 __all__ = ["SFTConfig"]
 

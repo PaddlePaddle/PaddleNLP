@@ -15,36 +15,36 @@
 
 import os
 
-from paddlenlp.version import git
+from paddleformers.version import git
 
 commit = "unknown"
 
-paddlenlp_dir = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-if commit.endswith("unknown") and git.is_git_repo(paddlenlp_dir) and git.have_git():
-    commit = git.git_revision(paddlenlp_dir).decode("utf-8")
-    if git.is_dirty(paddlenlp_dir):
+paddleformers_dir = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+if commit.endswith("unknown") and git.is_git_repo(paddleformers_dir) and git.have_git():
+    commit = git.git_revision(paddleformers_dir).decode("utf-8")
+    if git.is_dirty(paddleformers_dir):
         commit += ".dirty"
-del paddlenlp_dir
+del paddleformers_dir
 
 
 __all__ = ["show"]
 
 
 def show():
-    """Get the corresponding commit id of paddlenlp.
+    """Get the corresponding commit id of paddleformers.
 
     Returns:
-        The commit-id of paddlenlp will be output.
+        The commit-id of paddleformers will be output.
 
-        full_version: version of paddlenlp
+        full_version: version of paddleformers
 
 
     Examples:
         .. code-block:: python
 
-            import paddlenlp
+            import paddleformers
 
-            paddlenlp.version.show()
+            paddleformers.version.show()
             # commit: 1ef5b94a18773bb0b1bba1651526e5f5fc5b16fa
 
     """

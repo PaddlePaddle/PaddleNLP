@@ -17,8 +17,8 @@ import os
 from dataclasses import asdict, dataclass, field
 from typing import List, Optional
 
-from paddlenlp.utils.env import MERGE_CONFIG_NAME
-from paddlenlp.utils.log import logger
+from ..utils.env import MERGE_CONFIG_NAME
+from ..utils.log import logger
 
 
 @dataclass

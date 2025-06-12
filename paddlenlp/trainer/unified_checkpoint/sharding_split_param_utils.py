@@ -24,21 +24,16 @@ from paddle.distributed import fleet
 from safetensors import safe_open
 from tqdm.auto import tqdm
 
-from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
-from paddlenlp.transformers.model_utils import (
-    _add_variant,
-    load_state_dict,
-    unwrap_model,
-)
-from paddlenlp.transformers.utils import device_guard
-from paddlenlp.utils.env import (
+from ...peft import LoRAModel, PrefixModelForCausalLM
+from ...transformers.model_utils import _add_variant, load_state_dict, unwrap_model
+from ...transformers.utils import device_guard
+from ...utils.env import (
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
     SAFE_MASTER_WEIGHTS_NAME,
     SAFE_OPTIMIZER_INDEX_NAME,
     SAFE_OPTIMIZER_NAME,
 )
-from paddlenlp.utils.nested import nested_copy
-
+from ...utils.nested import nested_copy
 from .utils import (
     FP32_MASTER,
     generate_base_static_name,

@@ -20,7 +20,7 @@ import time
 
 import paddle
 
-from paddlenlp.utils.log import logger
+from ...utils.log import logger
 
 
 def _save_optimizer(obj, name_mapping, path, saved_signal_path, protocol):

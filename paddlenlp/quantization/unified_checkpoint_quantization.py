@@ -16,7 +16,15 @@ import numpy as np
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.quantization.checkpoint_quantization_utils import (
+from ..utils.env import (
+    ASYMMETRY_QUANT_SCALE_MAX,
+    ASYMMETRY_QUANT_SCALE_MIN,
+    MOMENT1_KEYNAME,
+    MOMENT2_KEYNAME,
+    SYMMETRY_QUANT_SCALE,
+)
+from ..utils.log import logger
+from .checkpoint_quantization_utils import (
     asymmetry_qdq_weight,
     cal_ratio,
     group_wise_quant_dequant,
@@ -24,14 +32,6 @@ from paddlenlp.quantization.checkpoint_quantization_utils import (
     qdq_weight,
     split_int8,
 )
-from paddlenlp.utils.env import (
-    ASYMMETRY_QUANT_SCALE_MAX,
-    ASYMMETRY_QUANT_SCALE_MIN,
-    MOMENT1_KEYNAME,
-    MOMENT2_KEYNAME,
-    SYMMETRY_QUANT_SCALE,
-)
-from paddlenlp.utils.log import logger
 
 
 def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict, use_pd=False):

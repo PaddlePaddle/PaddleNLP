@@ -24,8 +24,7 @@ from paddle.distributed.fleet.utils.sequence_parallel_utils import (
 )
 from paddle.nn.quant import llm_int8_linear, weight_dequantize, weight_only_linear
 
-from paddlenlp.utils import infohub
-
+from ..utils import infohub
 from .qat_utils import QATFunc
 
 try:

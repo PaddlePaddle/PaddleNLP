@@ -15,8 +15,8 @@
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.utils.log import logger
-from paddlenlp.utils.nested import (
+from ..utils.log import logger
+from ..utils.nested import (
     nested_broadcast_tensor,
     nested_copy_place,
     nested_empty_tensor,
@@ -129,7 +129,7 @@ class DistDataLoader(paddle.io.DataLoader):
         if self._need_data:
             return super().__len__()
         else:
-            raise ValueError("raise error for `paddlenlp.trainer.trainer_utils.has_length`")
+            raise ValueError("raise error for `paddleformers.trainer.trainer_utils.has_length`")
 
     def __iter__(self):
         return self

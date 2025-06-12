@@ -178,7 +178,7 @@ class DataCollatorWithPadding:
     Data collator that will dynamically pad the inputs to the longest sequence in the batch.
 
     Args:
-        tokenizer (`paddlenlp.transformers.PretrainedTokenizer`):
+        tokenizer (`paddleformers.transformers.PretrainedTokenizer`):
             The tokenizer used for encoding the data.
     """
 

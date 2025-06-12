@@ -54,7 +54,7 @@ class Stack(object):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import Stack
+                from paddleformers.data import Stack
                 a = [1, 2, 3, 4]
                 b = [3, 4, 5, 6]
                 c = [5, 6, 7, 8]
@@ -120,7 +120,7 @@ class Pad(object):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import Pad
+                from paddleformers.data import Pad
                 a = [1, 2, 3, 4]
                 b = [5, 6, 7]
                 c = [8, 9]
@@ -214,7 +214,7 @@ class Tuple(object):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import Stack, Pad, Tuple
+                from paddleformers.data import Stack, Pad, Tuple
                 data = [
                         [[1, 2, 3, 4], [1]],
                         [[5, 6, 7], [0]],
@@ -294,7 +294,7 @@ class Dict(object):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import Stack, Pad, Dict
+                from paddleformers.data import Stack, Pad, Dict
                 data = [
                         {'labels':[1], 'token_ids':[1, 2, 3, 4]},
                         {'labels':[0], 'token_ids':[5, 6, 7]},

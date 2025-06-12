@@ -32,8 +32,7 @@ from huggingface_hub.utils import (
 
 logger = logging.getLogger(__name__)
 
-from paddlenlp.utils.env import MODEL_HOME
-
+from ..env import MODEL_HOME
 from .common import (
     DEFAULT_ETAG_TIMEOUT,
     DEFAULT_REQUEST_TIMEOUT,

@@ -26,8 +26,7 @@ import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
 
-from paddlenlp.transformers import AutoConfig
-
+from ...transformers import AutoConfig
 from ...transformers.conversion_utils import ConversionMixin
 from ...transformers.model_utils import (
     PretrainedModel,

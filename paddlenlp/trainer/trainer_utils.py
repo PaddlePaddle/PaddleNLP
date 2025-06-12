@@ -40,8 +40,7 @@ from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.io import IterableDataset
 from paddle.optimizer.lr import LambdaDecay
 
-from paddlenlp.ops import Topology
-
+from ..ops import Topology
 from ..trainer.argparser import strtobool
 from ..transformers.tokenizer_utils_base import BatchEncoding
 from ..utils.env import PREFIX_CHECKPOINT_DIR, _re_checkpoint  # noqa for compatibility

@@ -24,9 +24,9 @@ from safetensors import safe_open
 from safetensors.numpy import save_file
 from tqdm.auto import tqdm
 
-from paddlenlp.peft import LoRAConfig
-from paddlenlp.utils import device_guard
-from paddlenlp.utils.env import (
+from ..peft import LoRAConfig
+from ..utils import device_guard
+from ..utils.env import (
     LORA_WEIGHTS_NAME,
     PADDLE_MASTER_WEIGHTS_NAME,
     PADDLE_WEIGHTS_NAME,
@@ -36,9 +36,8 @@ from paddlenlp.utils.env import (
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
 )
-from paddlenlp.utils.log import logger
-from paddlenlp.utils.safetensors import fast_safe_open
-
+from ..utils.log import logger
+from ..utils.safetensors import fast_safe_open
 from .merge_method import MergeMethod
 from .merge_utils import divide_lora_key_list, divide_positions
 from .sparsify_method import SparsifyMethod

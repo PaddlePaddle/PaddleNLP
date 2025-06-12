@@ -23,7 +23,7 @@ from distutils.dir_util import copy_tree
 from enum import Enum
 from typing import List
 
-from paddlenlp.utils.log import logger
+from .log import logger
 
 PDC_AGENT_BIN = "/root/paddlejob/tools/agent"
 HASH_SUM_BIN = "/root/paddlejob/afs_tool/bin/b3sum"

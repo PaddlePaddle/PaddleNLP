@@ -27,12 +27,8 @@ from paddle.distributed import fleet
 from paddle.distributed.auto_parallel.static.dist_input_spec import DistributedInputSpec
 from paddle.static import InputSpec
 
-from paddlenlp.peft.lora.lora_model import AVAILABLE_LAYERS
-from paddlenlp.trainer import Trainer
-from paddlenlp.transformers.model_utils import unwrap_model
-from paddlenlp.trl import AutoDPOCriterion
-from paddlenlp.utils import infohub
-
+from ..peft.lora.lora_model import AVAILABLE_LAYERS
+from ..trainer import Trainer
 from ..trainer.trainer_callback import TrainerState
 from ..trainer.trainer_utils import (
     ShardingOption,
@@ -44,6 +40,9 @@ from ..trainer.utils.helper import (  # nested_truncate,
     distributed_file,
     distributed_isfile,
 )
+from ..transformers.dpo_criterion import AutoDPOCriterion
+from ..transformers.model_utils import unwrap_model
+from ..utils import infohub
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import TRAINER_STATE_NAME
 from ..utils.log import logger

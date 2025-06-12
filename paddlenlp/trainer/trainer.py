@@ -214,7 +214,7 @@ except:
 
     def in_auto_parallel_align_mode():
         """
-        hack for paddlenlp develop branch.
+        hack for paddleformers develop branch.
         """
         return False
 
@@ -224,14 +224,14 @@ __all__ = ["Trainer"]
 
 class Trainer:
     """
-    Trainer is a simple but feature-complete training and eval loop for PaddlePaddle, optimized for PaddleNLP.
+    Trainer is a simple but feature-complete training and eval loop for PaddlePaddle, optimized for PaddleFormers.
 
     Args:
         model ([`PretrainedModel`] or `paddle.nn.Layer`, *optional*):
             The model to train, evaluate or use for predictions.
 
             [`Trainer`] is optimized to work with the [`PretrainedModel`] provided by the library. You can still use
-            your own models defined as `paddle.nn.Layer` as long as they work the same way as the PaddleNLP
+            your own models defined as `paddle.nn.Layer` as long as they work the same way as the PaddleFormers
             models.
         criterion(`paddle.nn.Layer`, *optional*):
             The model may only output the loggit, if you want do more computation for the output of model, you can
@@ -1138,7 +1138,7 @@ class Trainer:
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
 
                 # Skip past any already trained steps if resuming training
-                # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
+                # for paddleformers.utils.batch_sampler.DistributedBatchSampler
                 # We use consumed_samples to reset the status
                 if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
                     train_dataloader.batch_sampler, NlpDistributedBatchSampler
@@ -2083,7 +2083,7 @@ class Trainer:
         Returns the optimizer class and optimizer parameters based on the training arguments.
 
         Args:
-            args (`paddlenlp.training_args.TrainingArguments`):
+            args (`paddleformers.training_args.TrainingArguments`):
                 The training arguments for the training session.
 
         """
@@ -3789,11 +3789,11 @@ class Trainer:
         if args is None:
             args = self.args
             key = "Training"
-        import paddlenlp
+        import paddleformers
 
         logger.debug("{:^40}".format("{} Configuration Arguments".format(key)))
         logger.debug("{:30}: {}".format("paddle commit id", paddle.version.commit))
-        logger.debug("{:30}: {}".format("paddlenlp commit id", paddlenlp.version.commit))
+        logger.debug("{:30}: {}".format("paddleformers commit id", paddleformers.version.commit))
 
         for a in dir(args):
             if a[:2] != "__":  # don't print double underscore methods

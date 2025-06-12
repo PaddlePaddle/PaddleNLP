@@ -22,23 +22,23 @@ import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 
-from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
-from paddlenlp.transformers.model_utils import _load_state_dict_into_model
-from paddlenlp.transformers.utils import device_guard, is_safetensors_available
-from paddlenlp.utils.env import (
+from ...peft import LoRAModel, PrefixModelForCausalLM
+from ...transformers.model_utils import _load_state_dict_into_model
+from ...transformers.utils import device_guard, is_safetensors_available
+from ...utils.env import (
     PADDLE_MASTER_WEIGHTS_INDEX_NAME,
     PADDLE_OPTIMIZER_INDEX_NAME,
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
     SAFE_OPTIMIZER_INDEX_NAME,
 )
-from paddlenlp.utils.log import logger
-from paddlenlp.utils.nested import nested_copy
+from ...utils.log import logger
+from ...utils.nested import nested_copy
 
 if is_safetensors_available():
     if sys.platform.startswith("win"):
         from safetensors import safe_open
     else:
-        from paddlenlp.utils.safetensors import fast_safe_open as safe_open
+        from ...utils.safetensors import fast_safe_open as safe_open
 
 from .utils import (
     FP32_MASTER,

@@ -446,7 +446,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         logger.info("Load prefix weight successfully")
 
     def _get_tensor_parallel_convert_actions(self, loaded_keys=None, is_split=False, ignore_error=False):
-        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+        from ...transformers.conversion_utils import split_or_merge_func
 
         fn = split_or_merge_func(
             is_split=is_split,

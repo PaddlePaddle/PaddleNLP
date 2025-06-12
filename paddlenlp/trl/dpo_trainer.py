@@ -17,11 +17,11 @@ import paddle
 import paddle.nn.functional as F
 from paddle.distributed import fleet
 
-from paddlenlp.peft.lora.lora_model import AVAILABLE_LAYERS
-from paddlenlp.trainer import Trainer
-from paddlenlp.transformers.model_utils import unwrap_model
-from paddlenlp.trl import DPOCriterion
-from paddlenlp.utils import infohub
+from ..peft.lora.lora_model import AVAILABLE_LAYERS
+from ..trainer import Trainer
+from ..transformers.dpo_criterion import DPOCriterion
+from ..transformers.model_utils import unwrap_model
+from ..utils import infohub
 
 DPO_INFO_KEYS = [
     "reference_chosen_logps",

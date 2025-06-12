@@ -502,21 +502,6 @@ class PretrainedConfig:
     model_type: str = ""
     is_composition: bool = False
 
-    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-    # TODO(wj-Mcat): this comment should be removed after this feature is accepted by PaddleNLP teams
-    # `pretrained_init_configuration` can be `dict` or `url`: eg:
-    #     {
-    #         "bert-base-uncased": {
-    #             "vocab_size": 30522,
-    #             "hidden_size": 768,
-    #         },
-    #         "bert-large-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/model_config.json"
-    #     }
-    #
-    # advantages:
-    #     1. reuse the concept: `pretrained_init_configuration` and extend it
-    #     2. make code more concise when support resource file
-    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     pretrained_init_configuration = {}
 
     # global attribute mapping
@@ -872,7 +857,7 @@ class PretrainedConfig:
                 if cache_dir is not None:
                     config_path = os.path.join(cache_dir, pretrained_model_name_or_path, "config.json")
                 else:
-                    from paddlenlp.utils.env import MODEL_HOME
+                    from ..utils.env import MODEL_HOME
 
                     config_path = os.path.join(MODEL_HOME, pretrained_model_name_or_path, "config.json")
                 if not os.path.exists(config_path):

@@ -27,11 +27,11 @@ import paddle.incubate.multiprocessing as mp
 from paddle.distributed import fleet
 from sklearn.metrics import accuracy_score
 
-from paddlenlp.datasets import ZeroPaddingIterableDataset
-from paddlenlp.generation import GenerationConfig
-from paddlenlp.trainer import TrainerCallback
-from paddlenlp.trainer.trainer_utils import IterableDatasetShard
-from paddlenlp.transformers import (
+from ..datasets import ZeroPaddingIterableDataset
+from ..generation import GenerationConfig
+from ..trainer import TrainerCallback
+from ..trainer.trainer_utils import IterableDatasetShard
+from ..transformers import (
     AutoTokenizer,
     ChatGLMv2Tokenizer,
     DeepseekV2ForCausalLMPipe,
@@ -41,8 +41,8 @@ from paddlenlp.transformers import (
     Qwen2ForCausalLMPipe,
     Qwen2MoeForCausalLMPipe,
 )
-from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
-from paddlenlp.utils.log import logger
+from ..transformers.tokenizer_utils import PretrainedTokenizer
+from ..utils.log import logger
 
 
 def compute_metrics(eval_preds):
@@ -58,7 +58,7 @@ def compute_metrics(eval_preds):
 
 def get_prefix_tuning_params(model):
     if model.base_model_prefix == "chatglm":
-        from paddlenlp.peft.prefix import chatglm_postprocess_past_key_value
+        from ..peft.prefix import chatglm_postprocess_past_key_value
 
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.num_hidden_layers
@@ -66,7 +66,7 @@ def get_prefix_tuning_params(model):
         postprocess_past_key_value = chatglm_postprocess_past_key_value
         multi_query_group_num = None
     elif model.base_model_prefix == "chatglm_v2":
-        from paddlenlp.peft.prefix import chatglm_postprocess_past_key_value
+        from ..peft.prefix import chatglm_postprocess_past_key_value
 
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.num_layers
@@ -74,7 +74,7 @@ def get_prefix_tuning_params(model):
         postprocess_past_key_value = chatglm_postprocess_past_key_value
         multi_query_group_num = model.config.multi_query_group_num  # num_key_value_heads
     elif model.base_model_prefix == "bloom":
-        from paddlenlp.peft.prefix import bloom_postprocess_past_key_value
+        from ..peft.prefix import bloom_postprocess_past_key_value
 
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.n_layer
@@ -82,7 +82,7 @@ def get_prefix_tuning_params(model):
         postprocess_past_key_value = bloom_postprocess_past_key_value
         multi_query_group_num = None
     elif model.base_model_prefix == "llama":
-        from paddlenlp.peft.prefix import llama_postprocess_past_key_value
+        from ..peft.prefix import llama_postprocess_past_key_value
 
         num_attention_heads = model.config.n_head
         num_hidden_layers = model.config.n_layer
@@ -90,7 +90,7 @@ def get_prefix_tuning_params(model):
         postprocess_past_key_value = llama_postprocess_past_key_value
         multi_query_group_num = None
     elif model.base_model_prefix == "mistral":
-        from paddlenlp.peft.prefix import mistral_postprocess_past_key_value
+        from ..peft.prefix import mistral_postprocess_past_key_value
 
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.num_hidden_layers
@@ -98,7 +98,7 @@ def get_prefix_tuning_params(model):
         postprocess_past_key_value = mistral_postprocess_past_key_value
         multi_query_group_num = model.config.num_key_value_heads
     elif model.base_model_prefix == "qwen":
-        from paddlenlp.peft.prefix import qwen_postprocess_past_key_value
+        from ..peft.prefix import qwen_postprocess_past_key_value
 
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.num_hidden_layers
@@ -106,7 +106,7 @@ def get_prefix_tuning_params(model):
         postprocess_past_key_value = qwen_postprocess_past_key_value
         multi_query_group_num = None
     elif model.base_model_prefix == "qwen2":
-        from paddlenlp.peft.prefix import qwen_postprocess_past_key_value
+        from ..peft.prefix import qwen_postprocess_past_key_value
 
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.num_hidden_layers
@@ -270,7 +270,7 @@ class ZeroPaddingIterDatasetCallback(TrainerCallback):
             dataset = train_dataloader.dataset.dataset
         else:
             raise ValueError(
-                "Unexpected dataset format: ZeroPaddingIterDatasetCallback expects `paddlenlp.datasets.ZeroPaddingIterableDataset`"
+                "Unexpected dataset format: ZeroPaddingIterDatasetCallback expects `..datasets.ZeroPaddingIterableDataset`"
             )
         if state.trial_params is None:
             state.trial_params = {}
@@ -668,7 +668,7 @@ def read_res(
     result_queue: mp.Queue,
     done_event: mp.Event,
 ):
-    from paddlenlp.utils.env import USE_FAST_TOKENIZER
+    from ..utils.env import USE_FAST_TOKENIZER
 
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side="left", use_fast=USE_FAST_TOKENIZER)
 
@@ -708,7 +708,7 @@ def read_res_dynamic_insert(
     total_request_num: int,
     detokenize: bool,
 ):
-    from paddlenlp.utils.env import USE_FAST_TOKENIZER
+    from ..utils.env import USE_FAST_TOKENIZER
 
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side="left", use_fast=USE_FAST_TOKENIZER)
 
@@ -755,13 +755,13 @@ def speculate_read_res(
     result_queue: mp.Queue,
     done_event: mp.Event,
 ):
-    from paddlenlp.utils.env import USE_FAST_TOKENIZER
+    from ..utils.env import USE_FAST_TOKENIZER
 
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side="left", use_fast=USE_FAST_TOKENIZER)
     paddle.device.set_device("cpu")
     paddle.disable_static()
     outputs = []
-    from paddlenlp.utils.env import MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
+    from ..utils.env import MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 
     for _ in range(SPECULATE_MAX_BSZ):
         outputs.append([])
@@ -939,4 +939,4 @@ def set_triton_cache(model_name_or_path, mode):
                     so_full_path = os.path.join(root, file)
                     paddle.utils.cpp_extension.load_op_meta_info_and_register_op(so_full_path)
     else:
-        os.environ["TRITON_KERNEL_CACHE_DIR"] = f"/root/.paddlenlp/{triton_dir}"
+        os.environ["TRITON_KERNEL_CACHE_DIR"] = f"/root/.paddleformers/{triton_dir}"

@@ -26,10 +26,9 @@ from paddle import Tensor
 from paddle.common_ops_import import convert_dtype
 from paddle.utils import map_structure
 
-from paddlenlp.transformers.model_outputs import ModelOutput
-from paddlenlp.transformers.utils import get_scale_by_dtype
-from paddlenlp.utils.log import logger
-
+from ..transformers.model_outputs import ModelOutput
+from ..transformers.utils import get_scale_by_dtype
+from ..utils.log import logger
 from .configuration_utils import DEFAULT_MAX_NEW_TOKENS, GenerationConfig
 from .logits_process import (
     ForcedBOSTokenLogitsProcessor,

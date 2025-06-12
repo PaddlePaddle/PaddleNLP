@@ -42,7 +42,7 @@ class JiebaTokenizer(BaseTokenizer):
     method to covert text to token ids.
 
     Args:
-        vocab(paddlenlp.data.Vocab): An instance of :class:`paddlenlp.data.Vocab`.
+        vocab(paddleformers.data.Vocab): An instance of :class:`paddleformers.data.Vocab`.
     """
 
     def __init__(self, vocab):
@@ -73,9 +73,9 @@ class JiebaTokenizer(BaseTokenizer):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import Vocab, JiebaTokenizer
+                from paddleformers.data import Vocab, JiebaTokenizer
                 # The vocab file. The sample file can be downloaded firstly.
-                # wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
+                # wget https://bj.bcebos.com/paddleformers/data/senta_word_dict.txt
                 vocab_file_path = './senta_word_dict.txt'
                 # Initialize the Vocab
                 vocab = Vocab.load_vocabulary(
@@ -112,9 +112,9 @@ class JiebaTokenizer(BaseTokenizer):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import Vocab, JiebaTokenizer
+                from paddleformers.data import Vocab, JiebaTokenizer
                 # The vocab file. The sample file can be downloaded firstly.
-                # wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
+                # wget https://bj.bcebos.com/paddleformers/data/senta_word_dict.txt
                 vocab_file_path = './senta_word_dict.txt'
                 # Initialize the Vocab
                 vocab = Vocab.load_vocabulary(

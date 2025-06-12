@@ -21,17 +21,16 @@ import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 
-from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
-from paddlenlp.trainer.trainer_utils import ExplicitEnum, ShardingOption
-from paddlenlp.trainer.utils.helper import distributed_isfile
-from paddlenlp.transformers.model_utils import (
+from ...peft import LoRAModel, PrefixModelForCausalLM
+from ...trainer.utils.helper import distributed_isfile
+from ...transformers.model_utils import (
     PretrainedModel,
     get_parameter_dtype,
     unwrap_model,
 )
-from paddlenlp.transformers.utils import dtype_byte_size
-from paddlenlp.utils.distributed import distributed_allgather, distributed_gather
-from paddlenlp.utils.env import (
+from ...transformers.utils import dtype_byte_size
+from ...utils.distributed import distributed_allgather, distributed_gather
+from ...utils.env import (
     BETA1_KEYNAME,
     BETA2_KEYNAME,
     MOMENT1_KEYNAME,
@@ -44,9 +43,10 @@ from paddlenlp.utils.env import (
     SAFE_PEFT_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
 )
-from paddlenlp.utils.log import logger
-from paddlenlp.utils.nested import flatten_list
-from paddlenlp.utils.tools import get_env_device
+from ...utils.log import logger
+from ...utils.nested import flatten_list
+from ...utils.tools import get_env_device
+from ..trainer_utils import ExplicitEnum, ShardingOption
 
 FP32_MASTER = "fp32_master_0"
 optimizer_scalar_name = [

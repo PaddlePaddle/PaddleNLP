@@ -26,8 +26,7 @@ from typing import Dict, List, Optional, Union
 import numpy as np
 from tqdm.auto import tqdm
 
-from paddlenlp.utils.log import logger
-
+from ..utils.log import logger
 from .trainer_utils import IntervalStrategy, has_length
 from .training_args import TrainingArguments
 

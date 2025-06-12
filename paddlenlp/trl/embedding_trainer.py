@@ -18,15 +18,15 @@ import paddle
 from paddle.base import core
 from paddle.distributed import fleet
 
-from paddlenlp.trainer import Trainer
-from paddlenlp.transformers.contrastive_loss import (
+from ..trainer import Trainer
+from ..transformers.contrastive_loss import (
     MatryoshkaContrastiveLoss,
     MatryoshkaInfclLoss,
     SimpleContrastiveLoss,
     SimpleInfclLoss,
 )
-from paddlenlp.transformers.embedding_utils import dist_gather_tensor_with_gradient
-from paddlenlp.utils import empty_device_cache
+from ..transformers.embedding_utils import dist_gather_tensor_with_gradient
+from ..utils import empty_device_cache
 
 __all__ = ["EmbeddingTrainer"]
 

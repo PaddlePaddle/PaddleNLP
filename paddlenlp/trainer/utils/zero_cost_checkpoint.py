@@ -34,14 +34,9 @@ from paddle.incubate.tensor.manipulation import (
 )
 from paddle.optimizer.fusion_utils import FusionStorageHelper
 
-from paddlenlp.trainer.trainer_callback import TrainerCallback
-from paddlenlp.transformers.model_utils import (
-    _add_variant,
-    get_parameter_dtype,
-    unwrap_model,
-)
-from paddlenlp.transformers.utils import device_guard
-from paddlenlp.utils.env import (
+from ...transformers.model_utils import _add_variant, get_parameter_dtype, unwrap_model
+from ...transformers.utils import device_guard
+from ...utils.env import (
     CONFIG_NAME,
     MODEL_META_NAME,
     PADDLE_OPTIMIZER_NAME,
@@ -51,9 +46,10 @@ from paddlenlp.utils.env import (
     TRAINER_STATE_NAME,
     TRAINING_ARGS_NAME,
 )
-from paddlenlp.utils.fault_tolerance import FC_DUMP_ERROR, PC_DUMP_ERROR
-from paddlenlp.utils.log import logger
-from paddlenlp.utils.pdc_sdk import FLASH_DEVICE
+from ...utils.fault_tolerance import FC_DUMP_ERROR, PC_DUMP_ERROR
+from ...utils.log import logger
+from ...utils.pdc_sdk import FLASH_DEVICE
+from ..trainer_callback import TrainerCallback
 
 
 def md5(tensor):
@@ -810,7 +806,7 @@ class ZeroCostCheckpointWorker:
 
     def _filter_moe_no_sync_optimizer_params(self, model_meta, optimzier_state_dict):
         """
-        filter optimizer params which should not sync, copy from paddlenlp.Trainer
+        filter optimizer params which should not sync, copy from ...Trainer
         """
         filter_optimzier_state_dict = OrderedDict()
         assert "master_weights" in optimzier_state_dict, optimzier_state_dict.keys()

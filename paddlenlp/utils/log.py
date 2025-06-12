@@ -41,14 +41,14 @@ log_config = {
 
 class Logger(object):
     """
-    Default logger in PaddleNLP
+    Default logger in PaddleFormers
 
     Args:
-        name(str) : Logger name, default is 'PaddleNLP'
+        name(str) : Logger name, default is 'PaddleFormers'
     """
 
     def __init__(self, name: str = None):
-        name = "PaddleNLP" if not name else name
+        name = "PaddleFormers" if not name else name
         self.logger = logging.getLogger(name)
 
         for key, conf in log_config.items():
@@ -137,10 +137,10 @@ class Logger(object):
 
 class MetricsDumper(object):
     """
-    Default JSONDumper in PaddleNLP
+    Default JSONDumper in PaddleFormers
 
     Args:
-        name(str) : Logger name, default is 'PaddleNLP'
+        name(str) : Logger name, default is 'PaddleFormers'
     """
 
     def __init__(self, filename: str = None):

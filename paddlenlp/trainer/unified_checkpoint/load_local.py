@@ -20,22 +20,21 @@ import os
 import paddle
 from tqdm.auto import tqdm
 
-from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
-from paddlenlp.transformers.model_utils import (
+from ...peft import LoRAModel, PrefixModelForCausalLM
+from ...transformers.model_utils import (
     _load_state_dict_into_model,
     faster_set_state_dict,
     load_state_dict,
 )
-from paddlenlp.transformers.utils import get_checkpoint_shard_files
-from paddlenlp.utils.env import (
+from ...transformers.utils import get_checkpoint_shard_files
+from ...utils.env import (
     PADDLE_MASTER_WEIGHTS_INDEX_NAME,
     PADDLE_OPTIMIZER_INDEX_NAME,
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
     SAFE_OPTIMIZER_INDEX_NAME,
 )
-from paddlenlp.utils.log import logger
-from paddlenlp.utils.nested import nested_copy
-
+from ...utils.log import logger
+from ...utils.nested import nested_copy
 from .sharding_split_param_utils import load_unified_optimizer_split_param
 from .utils import (
     FP32_MASTER,

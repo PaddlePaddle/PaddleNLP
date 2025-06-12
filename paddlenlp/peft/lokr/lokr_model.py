@@ -23,11 +23,10 @@ import paddle
 import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
-from paddlenlp.transformers import AutoConfig, PretrainedModel
-from paddlenlp.transformers.model_utils import _add_variant, dtype_guard
-from paddlenlp.utils.log import logger
-
+from ...transformers import AutoConfig, PretrainedModel
+from ...transformers.model_utils import _add_variant, dtype_guard
 from ...utils.env import LOKR_WEIGHTS_NAME
+from ...utils.log import logger
 from .lokr_config import LoKrConfig
 
 

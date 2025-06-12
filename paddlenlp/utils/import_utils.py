@@ -24,12 +24,11 @@ from contextlib import contextmanager
 from typing import Optional, Tuple, Type, Union
 
 import pip
-
-from paddlenlp.utils.log import logger
+from paddleformers.utils.log import logger
 
 _original_import = builtins.__import__
 _imported_modules = {}
-_paddlenlp_ops_updated = False
+_paddleformers_ops_updated = False
 _original_attributes = {}
 pybind_ops_list = [
     "update_inputs_v2",
@@ -44,24 +43,24 @@ pybind_ops_list = [
 
 
 def custom_import(name, *args, **kwargs):
-    global _paddlenlp_ops_updated, _imported_modules, _original_attributes
+    global _paddleformers_ops_updated, _imported_modules, _original_attributes
     global pybind_ops_list
 
-    if _paddlenlp_ops_updated:
+    if _paddleformers_ops_updated:
         if name in _imported_modules:
             return _imported_modules[name]
 
     module = _original_import(name, *args, **kwargs)
 
-    if not _paddlenlp_ops_updated and os.getenv("DYNAMIC_INFERENCE_MODE", "1").lower() in [
+    if not _paddleformers_ops_updated and os.getenv("DYNAMIC_INFERENCE_MODE", "1").lower() in [
         "1",
         "true",
         "t",
         "yes",
         "y",
     ]:
-        if name == "paddlenlp_ops":
-            # logger.debug("Using Pybind paddlenlp_ops!")
+        if name == "paddleformers_ops":
+            # logger.debug("Using Pybind paddleformers_ops!")
             if name not in _original_attributes:
                 bak_dict = {}
                 for ops_name in pybind_ops_list:
@@ -73,7 +72,7 @@ def custom_import(name, *args, **kwargs):
                 if hasattr(module, pybind_ops_name):
                     setattr(module, ops_name, getattr(module, pybind_ops_name))
 
-            _paddlenlp_ops_updated = True
+            _paddleformers_ops_updated = True
 
     _imported_modules[name] = module
     return module
@@ -81,7 +80,7 @@ def custom_import(name, *args, **kwargs):
 
 @contextmanager
 def dynamic_graph_pybind_context():
-    global _original_import, _paddlenlp_ops_updated
+    global _original_import, _paddleformers_ops_updated
     original_import = builtins.__import__
 
     try:
@@ -90,12 +89,12 @@ def dynamic_graph_pybind_context():
     finally:
         builtins.__import__ = original_import
 
-        if "paddlenlp_ops" in _original_attributes:
-            paddlenlp_ops_module = sys.modules.get("paddlenlp_ops")
-            if paddlenlp_ops_module:
-                for attr, value in _original_attributes["paddlenlp_ops"].items():
-                    setattr(paddlenlp_ops_module, attr, value)
-                _paddlenlp_ops_updated = False
+        if "paddleformers_ops" in _original_attributes:
+            paddleformers_ops_module = sys.modules.get("paddleformers_ops")
+            if paddleformers_ops_module:
+                for attr, value in _original_attributes["paddleformers_ops"].items():
+                    setattr(paddleformers_ops_module, attr, value)
+                _paddleformers_ops_updated = False
 
 
 def auto_dynamic_graph_pybind(func):
@@ -273,12 +272,12 @@ def is_tokenizers_available() -> bool:
     return is_package_available("tokenizers")
 
 
-def is_paddlenlp_ops_available() -> bool:
-    """check if `paddlenlp_ops` ia available
+def is_paddleformers_ops_available() -> bool:
+    """check if `paddleformers_ops` ia available
     Returns:
-        bool: if `paddlenlp_ops` is available
+        bool: if `paddleformers_ops` is available
     """
-    return is_package_available("paddlenlp_ops")
+    return is_package_available("paddleformers_ops")
 
 
 def is_transformers_available() -> bool:

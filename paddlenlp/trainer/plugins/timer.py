@@ -17,7 +17,7 @@ import time
 
 import paddle
 
-from paddlenlp.utils.log import logger
+from ...utils.log import logger
 
 try:
     from paddle.distributed.fleet.utils.timer_helper import _GPUEventTimer
