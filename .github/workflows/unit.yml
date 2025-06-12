@@ -155,9 +155,9 @@ jobs:
           done
           cd /workspace/PaddleNLP/
           ${{ env.allure_file }}/bin/allure generate result -o report
-          tar -czf allure-report.tar.gz report
-          python ${{ env.bos_file }} allure-report.tar.gz paddle-github-action/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs
-          echo "allure-report: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs/allure-report.tar.gz"
+          tar -czf results.tar.gz report model_logs/*
+          python ${{ env.bos_file }} results.tar.gz paddle-github-action/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs
+          echo "results: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs/results.tar.gz"
           '
 
       - name: Terminate and delete the container
@@ -170,11 +170,11 @@ jobs:
     needs: [unit-ci]
     runs-on: ubuntu-24.04
     steps:
-      - name: wget report
+      - name: wget files
         if: always()
         run: |
-          wget -q --no-proxy  https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs/allure-report.tar.gz --no-check-certificate
-          tar -xzf allure-report.tar.gz
+          wget -q --no-proxy  https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs/results.tar.gz --no-check-certificate
+          tar -xzf results.tar.gz
 
       - name: Upload Allure HTML report as artifact
         if: always()
@@ -184,3 +184,12 @@ jobs:
           path: report
           if-no-files-found: ignore
 
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: llm-log
+          path: |
+            commit_info.txt
+            *.log
+          if-no-files-found: ignore

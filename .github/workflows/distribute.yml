@@ -1,4 +1,4 @@
-name: PaddleNLP-Distributed-CI
+name: PaddleNLP Distributed CI
 
 on:
   push:
