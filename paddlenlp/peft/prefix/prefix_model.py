@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import gc
+import inspect
 import os
 import tempfile
 from functools import partial
@@ -24,7 +24,6 @@ import paddle
 import paddle.nn as nn
 from paddle.distributed import fleet
 
-from ...prompt.prompt_utils import signature
 from ...transformers.model_utils import (
     _add_variant,
     _load_state_dict_into_model,
@@ -40,6 +39,15 @@ from ...utils.env import (
 )
 from ...utils.log import logger
 from .prefix_config import PrefixConfig
+
+
+def signature(function):
+    """
+    Obtain the input arguments of the given function.
+    """
+    sig = inspect.signature(function)
+    args = [p.name for p in sig.parameters.values() if p.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD]
+    return args
 
 
 class PrefixModelForCausalLM(paddle.nn.Layer):

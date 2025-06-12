@@ -43,127 +43,13 @@ __all__ = [
     "AutoModelForConditionalGeneration",
 ]
 
-MAPPING_NAMES = OrderedDict(
-    [
-        # Base model mapping
-        ("Albert", "albert"),
-        ("BigBird", "bigbird"),
-        ("BlenderbotSmall", "blenderbot_small"),
-        ("Blenderbot", "blenderbot"),
-        ("ChatGLMv2", "chatglm_v2"),
-        ("ChatGLM", "chatglm"),
-        ("ChineseCLIP", "chineseclip"),
-        ("ChineseBert", "chinesebert"),
-        ("ConvBert", "convbert"),
-        ("CTRL", "ctrl"),
-        ("DistilBert", "distilbert"),
-        ("DalleBart", "dallebart"),
-        ("DeepseekV2", "deepseek_v2"),
-        ("DeepseekV3", "deepseek_v3"),
-        ("Electra", "electra"),
-        ("ErnieViL", "ernie_vil"),
-        ("ErnieCtm", "ernie_ctm"),
-        ("ErnieDoc", "ernie_doc"),
-        ("ErnieGen", "ernie_gen"),
-        ("ErnieGram", "ernie_gram"),
-        ("ErnieLayout", "ernie_layout"),
-        ("ErnieM", "ernie_m"),
-        ("ErnieCode", "ernie_code"),
-        ("Ernie", "ernie"),
-        ("FNet", "fnet"),
-        ("Funnel", "funnel"),
-        ("Llama", "llama"),
-        ("LayoutXLM", "layoutxlm"),
-        ("LayoutLMv2", "layoutlmv2"),
-        ("LayoutLM", "layoutlm"),
-        ("Luke", "luke"),
-        ("MBart", "mbart"),
-        ("MegatronBert", "megatronbert"),
-        ("MobileBert", "mobilebert"),
-        ("MPNet", "mpnet"),
-        ("NeZha", "nezha"),
-        ("Nystromformer", "nystromformer"),
-        ("PPMiniLM", "ppminilm"),
-        ("ProphetNet", "prophetnet"),
-        ("Reformer", "reformer"),
-        ("RemBert", "rembert"),
-        ("Roberta", "roberta"),
-        ("RoFormerv2", "roformerv2"),
-        ("RoFormer", "roformer"),
-        ("Skep", "skep"),
-        ("SqueezeBert", "squeezebert"),
-        ("TinyBert", "tinybert"),
-        ("UnifiedTransformer", "unified_transformer"),
-        ("UNIMO", "unimo"),
-        ("XLNet", "xlnet"),
-        ("XLM", "xlm"),
-        ("XLMRoberta", "xlm_roberta"),
-        ("GPT", "gpt"),
-        ("GLM", "glm"),
-        ("MT5", "mt5"),
-        ("T5", "t5"),
-        ("Bert", "bert"),
-        ("Bart", "bart"),
-        ("CodeGen", "codegen"),
-        ("CLIPVision", "clip"),
-        ("CLIPText", "clip"),
-        ("CLIP", "clip"),
-        ("ChineseCLIPVision", "chineseclip"),
-        ("ChineseCLIPText", "chineseclip"),
-        ("ChineseCLIP", "chineseclip"),
-        ("Artist", "artist"),
-        ("OPT", "opt"),
-        ("Pegasus", "pegasus"),
-        ("DPT", "dpt"),
-        ("Bit", "bit"),
-        ("BlipText", "blip"),
-        ("BlipVision", "blip"),
-        ("Blip", "blip"),
-        ("Bloom", "bloom"),
-        ("QWen", "qwen"),
-        ("Mistral", "mistral"),
-        ("Mixtral", "mixtral"),
-        ("Qwen2", "qwen2"),
-        ("Qwen3", "qwen3"),
-        ("Qwen2Moe", "qwen2_moe"),
-        ("Qwen3Moe", "qwen3_moe"),
-        ("Gemma", "gemma"),
-        ("Yuan", "yuan"),
-        ("Mamba", "mamba"),
-        ("Jamba", "jamba"),
-    ]
-)
+MAPPING_NAMES = OrderedDict([])
 
-MAPPING_TASKS = OrderedDict(
-    [
-        ("Backbone", "AutoBackbone"),
-        ("Model", "AutoModel"),
-        ("ForPretraining", "AutoModelForPretraining"),
-        ("ForSequenceClassification", "AutoModelForSequenceClassification"),
-        ("ForTokenClassification", "AutoModelForTokenClassification"),
-        ("ForQuestionAnswering", "AutoModelForQuestionAnswering"),
-        ("ForMultipleChoice", "AutoModelForMultipleChoice"),
-        ("ForMaskedLM", "AutoModelForMaskedLM"),
-        ("ForCausalLM", "AutoModelForCausalLM"),
-        ("ForCausalLMPipe", "AutoModelForCausalLMPipe"),
-        ("Encoder", "AutoEncoder"),
-        ("Decoder", "AutoDecoder"),
-        ("Generator", "AutoGenerator"),
-        ("Discriminator", "AutoDiscriminator"),
-        ("ForConditionalGeneration", "AutoModelForConditionalGeneration"),
-    ]
-)
+MAPPING_TASKS = OrderedDict([])
 
-MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = OrderedDict(
-    [
-        # Model for Causal LM mapping
-        ("opt", "OPTForCausalLM"),
-    ]
-)
+MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = OrderedDict([])
 
-MODEL_FOR_CAUSAL_LM_INFERENCE_MAPPING_NAMES = OrderedDict(
-    [("llama-img2txt", "LlamaForMiniGPT4"), ("qwen-img2txt", "QWenForQWenVL"), ("opt-img2txt", "OPTForBlip2")]
-)
+MODEL_FOR_CAUSAL_LM_INFERENCE_MAPPING_NAMES = OrderedDict([])
 
 
 def get_name_mapping(task="Model"):

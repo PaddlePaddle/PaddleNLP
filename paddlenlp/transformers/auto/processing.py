@@ -27,16 +27,7 @@ __all__ = [
     "AutoProcessor",
 ]
 
-PROCESSOR_MAPPING_NAMES = OrderedDict(
-    [
-        ("ChineseCLIPProcessor", "chineseclip"),
-        ("CLIPProcessor", "clip"),
-        ("ErnieViLProcessor", "ernie_vil"),
-        ("CLIPSegProcessor", "clipseg"),
-        ("SpeechT5Processor", "speecht5"),
-        ("ClapProcessor", "clap"),
-    ]
-)
+PROCESSOR_MAPPING_NAMES = OrderedDict([])
 
 
 def get_configurations():

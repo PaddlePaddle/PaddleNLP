@@ -12,8 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
-
-from . import optimizer, triton_ops
-from .distributed import *
-from .einsum import *
+from .topo import Topology

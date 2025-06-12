@@ -27,14 +27,7 @@ __all__ = [
     "AutoImageProcessor",
 ]
 
-IMAGE_PROCESSOR_MAPPING_NAMES = OrderedDict(
-    [
-        ("ChineseCLIPImageProcessor", "chineseclip"),
-        ("CLIPImageProcessor", "clip"),
-        ("ErnieViLImageProcessor", "ernie_vil"),
-        ("ViTImageProcessor", "clipseg"),
-    ]
-)
+IMAGE_PROCESSOR_MAPPING_NAMES = OrderedDict([])
 
 
 def get_configurations():
