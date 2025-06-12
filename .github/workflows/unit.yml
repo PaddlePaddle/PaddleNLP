@@ -167,6 +167,7 @@ jobs:
 
   upload-reports:
     name: upload-reports
+    needs: [unit-ci]
     runs-on: [self-hosted]
     steps:
       - name: wget report

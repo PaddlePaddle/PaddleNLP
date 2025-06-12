@@ -167,6 +167,7 @@ jobs:
 
   upload-reports:
     name: upload-reports
+    needs: [llm-ci]
     runs-on: [self-hosted]
     steps:
       - name: wget report
