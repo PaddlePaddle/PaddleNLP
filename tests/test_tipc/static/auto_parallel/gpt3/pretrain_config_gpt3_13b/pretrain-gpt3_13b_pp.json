@@ -9,7 +9,7 @@
     "max_seq_length": 4096,
     "tensor_parallel_degree": 1,
     "gradient_accumulation_steps": 1,
-    "n_microbatches": 1,
+    "n_microbatches": 4,
     "pipeline_schedule_mode": "VPP",
     "virtual_pp_degree": 5,
     "pipeline_parallel_degree": 4,
