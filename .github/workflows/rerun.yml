@@ -14,20 +14,10 @@ jobs:
 
       - name: Rerun all failed jobs
         if: ${{ contains(github.event.comment.body, 'all-failed') }}
-        uses: ./.github/rerun-workflow
-        with:
-          PR_ID: ${{ github.event.issue.number }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OWNER: ${{ github.repository_owner }}
-          REPO: ${{ github.event.repository.name }}
-          JOB_NAME: 'all-failed'
-
-      - name: Rerun Approval
-        if: ${{ contains(github.event.comment.body, 'approval') }}
         uses: ./.github/actions/rerun-workflow
         with:
           PR_ID: ${{ github.event.issue.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
-          JOB_NAME: 'Check approval'
+          JOB_NAME: 'all-failed'
