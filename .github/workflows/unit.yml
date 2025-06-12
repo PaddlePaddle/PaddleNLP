@@ -165,7 +165,6 @@ jobs:
         run: |
           docker rm -f ${{ env.container_name }}
 
-jobs:
   upload-reports:
     name: upload-reports
     runs-on: [self-hosted]
