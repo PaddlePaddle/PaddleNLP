@@ -1175,6 +1175,8 @@ class GenerationAvxInferenceModel(GenerationMixin):
         **model_kwargs,
     ):
         step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
+        batch_idx = paddle.full(shape=[1], dtype="int32", fill_value=-1)
+        model_kwargs["batch_idx"] = batch_idx
 
         # fake temp next_tokens
         batch = input_ids.shape[0] if input_ids is not None else inputs_embeds.shape[0]
