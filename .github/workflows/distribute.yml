@@ -18,7 +18,7 @@ env:
   ci_scripts: /workspace/PaddleNLP/scripts/distribute
   BRANCH: ${{ github.event.pull_request.base.ref }}
   AGILE_COMPILE_BRANCH: ${{ github.event.pull_request.base.ref }}
-  CI_name: distribute-v100-ci
+  CI_name: distribute-ci
   no_proxy: "localhost,bj.bcebos.com,su.bcebos.com,bcebos.com,apiin.im.baidu.com,gitee.com,aliyun.com,.baidu.com,.tuna.tsinghua.edu.cn"
 
 defaults:
@@ -26,8 +26,8 @@ defaults:
     shell: bash
 
 jobs:
-  distribute-v100-ci:
-    name: distribute-v100-test
+  distribute-ci:
+    name: distribute-test
     runs-on: [self-hosted, Auto-Parallel]
     steps:
       - name: Download PaddleNLP
@@ -134,20 +134,21 @@ jobs:
 
   upload-products:
     name: upload-products
-    needs: [distribute-v100-ci]
-    runs-on: ubuntu-24.04
+    needs: [distribute-ci]
+    runs-on: ubuntu-latest
     steps:
       - name: wget files
         if: always()
         run: |
           wget -q --no-proxy  https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/distribute/${PR_ID}/${COMMIT_ID}/logs/products.tar.gz --no-check-certificate
+          mkdir -p case_logs
           tar -xzf products.tar.gz -C case_logs
 
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: distribute-v100-log
+          name: distribute-log
           path: |
             case_logs
           if-no-files-found: ignore

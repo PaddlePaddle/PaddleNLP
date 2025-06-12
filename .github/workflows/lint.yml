@@ -9,7 +9,7 @@ concurrency:
 jobs:
   Lint:
     name: Lint
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Download PaddleNLP
         uses: actions/checkout@v3

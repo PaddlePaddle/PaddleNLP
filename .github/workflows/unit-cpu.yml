@@ -11,9 +11,9 @@ jobs:
     name: unit-cpu-test
     runs-on: ubuntu-24.04
     permissions:
-      pull-requests: write
+      pull-requests: ubuntu-latest
       contents: read
-      id-token: write
+      id-token: ubuntu-latest
     steps:
       - name: Download PaddleNLP
         uses: actions/checkout@v3
@@ -31,13 +31,7 @@ jobs:
           make install
 
       - name: Test
-        run: |
-          PYTHONPATH=$(shell pwd) pytest -v \
-            -n auto \
-            --retries 1 --retry-delay 1 \
-            --durations 20 \
-            --cov paddlenlp \
-            --cov-report xml:coverage.xml > unittest_cpu.log 2>&1
+        run: make test
 
       - name: Upload logs
         if: always()
