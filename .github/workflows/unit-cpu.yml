@@ -9,11 +9,11 @@ concurrency:
 jobs:
   unit-cpu-ci:
     name: unit-cpu-test
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     permissions:
-      pull-requests: ubuntu-latest
+      pull-requests: write
       contents: read
-      id-token: ubuntu-latest
+      id-token: write
     steps:
       - name: Download PaddleNLP
         uses: actions/checkout@v3

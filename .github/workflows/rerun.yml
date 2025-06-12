@@ -1,0 +1,33 @@
+name: Re-run
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  re-run:
+    if: ${{ github.event.issue.pull_request && contains(github.event.comment.body, '/re-run')  && github.event.comment.user.login == github.event.issue.user.login }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Rerun all failed jobs
+        if: ${{ contains(github.event.comment.body, 'all-failed') }}
+        uses: ./.github/rerun-workflow
+        with:
+          PR_ID: ${{ github.event.issue.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          JOB_NAME: 'all-failed'
+
+      - name: Rerun Approval
+        if: ${{ contains(github.event.comment.body, 'approval') }}
+        uses: ./.github/actions/rerun-workflow
+        with:
+          PR_ID: ${{ github.event.issue.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          JOB_NAME: 'Check approval'
