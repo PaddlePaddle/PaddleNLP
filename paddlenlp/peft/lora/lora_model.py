@@ -52,7 +52,7 @@ from .lora_config import LoRAAutoConfig, LoRAConfig
 def get_lora_layers():
     try:
         if get_env_device() == "xpu":
-            # If paddle_xpu is not installed, just use PaddleNLP's native lora layers
+            # If paddle_xpu is not installed, just use PaddleFormers's native lora layers
             from paddle_xpu.layers.nn.lora_layers import (
                 XPUColumnParallelLoRALinear as ColumnParallelLoRALinear,
             )
@@ -168,7 +168,7 @@ class LoRAModel(nn.Layer):
 
     def _get_tensor_parallel_mappings(self, config, is_split=True):
 
-        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+        from ...transformers.conversion_utils import split_or_merge_func
 
         fn = split_or_merge_func(
             is_split=is_split,
@@ -616,7 +616,7 @@ class LoRAModel(nn.Layer):
             self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)
         if lora_module is None:
             raise ValueError(
-                f"LoRA strategy only supports paddle.nn.Linear or paddle.distributed.fleet.meta_parallel.ColumnParallelLinear or paddlenlp.transformers.sequence_utils. {module}({module_name} {type(module).__name__}) is not supported。"
+                f"LoRA strategy only supports paddle.nn.Linear or paddle.distributed.fleet.meta_parallel.ColumnParallelLinear or paddleformers.transformers.sequence_utils. {module}({module_name} {type(module).__name__}) is not supported。"
             )
         if getattr(lora_module, "weight", None) is not None:
             lora_module.weight = module.weight

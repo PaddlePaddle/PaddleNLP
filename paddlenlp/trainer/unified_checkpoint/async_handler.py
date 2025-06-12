@@ -21,16 +21,13 @@ from multiprocessing import shared_memory
 import paddle
 import paddle.distributed as dist
 
-from paddlenlp.transformers.utils import is_safetensors_available
-from paddlenlp.utils.log import logger
+from ...transformers.utils import is_safetensors_available
+from ...utils.log import logger
 
 if is_safetensors_available():
     from safetensors.numpy import save_file as safe_save_file
 
-from paddlenlp.quantization.unified_checkpoint_quantization import (
-    quant_unified_optimizer,
-)
-
+from ...quantization.unified_checkpoint_quantization import quant_unified_optimizer
 from .shared_memory_utils import (
     _read_state_dict_from_shm,
     _traverse_copy_to_shm,

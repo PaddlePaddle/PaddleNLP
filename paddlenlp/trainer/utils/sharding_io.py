@@ -31,16 +31,15 @@ try:
 except:
     DygraphShardingOptimizerV2 = None
 
-from paddlenlp.transformers.model_utils import (
+from ...transformers.model_utils import (
     _add_variant,
     get_parameter_dtype,
     unwrap_optimizer,
 )
-from paddlenlp.transformers.utils import paddlenlp_load
-from paddlenlp.utils.env import MODEL_META_NAME, SHARDING_META_NAME
-from paddlenlp.utils.log import logger
-from paddlenlp.utils.tools import get_env_device
-
+from ...transformers.utils import paddlenlp_load
+from ...utils.env import MODEL_META_NAME, SHARDING_META_NAME
+from ...utils.log import logger
+from ...utils.tools import get_env_device
 from . import reshard as reshard_util
 from .reshard import SHARDING_STRATEGY_V1, SHARDING_STRATEGY_V2, pp_reshard
 
@@ -65,7 +64,7 @@ def filter_sharded_params(state_dict, optimizer, sharding_group):
 
     sharding_rank = sharding_group.rank
     sharding_world_size = sharding_group.nranks
-    from paddlenlp.trainer.utils import reshard as reshard_util
+    from ...trainer.utils import reshard as reshard_util
 
     logger.info(f"filter sharded_params not placed in sharding_rank {sharding_rank} .")
     if not reshard_util.is_sharding_opt(optimizer):

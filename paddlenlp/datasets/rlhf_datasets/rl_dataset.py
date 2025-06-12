@@ -20,8 +20,8 @@ import paddle
 from datasets import load_dataset
 from paddle.io import Dataset
 
-from paddlenlp.transformers import PretrainedTokenizer
-from paddlenlp.transformers.tokenizer_utils import PaddingStrategy
+from ...transformers import PretrainedTokenizer
+from ...transformers.tokenizer_utils import PaddingStrategy
 
 
 def left_padding(sequences, padding_value=0, max_length=None):

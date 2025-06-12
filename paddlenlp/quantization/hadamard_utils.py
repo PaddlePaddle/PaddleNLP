@@ -14,7 +14,7 @@
 
 import paddle
 
-from paddlenlp.utils import infohub
+from ..utils import infohub
 
 
 def matmul_hadU(X):

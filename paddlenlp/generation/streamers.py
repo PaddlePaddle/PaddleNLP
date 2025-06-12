@@ -15,7 +15,7 @@
 from queue import Queue
 from typing import Optional
 
-from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
+from ..transformers.tokenizer_utils import PretrainedTokenizer
 
 
 class BaseStreamer:
@@ -45,8 +45,8 @@ class TextStreamer(BaseStreamer):
     Examples:
 
         ```python
-        >>> from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
-        >>> from paddlenlp.generation import TextStreamer
+        >>> from paddleformers.transformers import AutoModelForCausalLM, AutoTokenizer
+        >>> from paddleformers.generation import TextStreamer
 
         >>> tok = AutoTokenizer.from_pretrained("gpt2")
         >>> model = AutoModelForCausalLM.from_pretrained("gpt2")
@@ -166,8 +166,8 @@ class TextIteratorStreamer(TextStreamer):
     Examples:
 
         ```python
-        >>> from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
-        >>> from paddlenlp.generation import TextIteratorStreamer
+        >>> from paddleformers.transformers import AutoModelForCausalLM, AutoTokenizer
+        >>> from paddleformers.generation import TextIteratorStreamer
         >>> from threading import Thread
 
         >>> tok = AutoTokenizer.from_pretrained("gpt2")

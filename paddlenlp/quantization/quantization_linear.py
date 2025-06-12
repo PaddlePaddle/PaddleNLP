@@ -24,8 +24,7 @@ from paddle.distributed.fleet.utils.sequence_parallel_utils import (
 )
 from paddle.nn.quant import llm_int8_linear, weight_dequantize, weight_only_linear
 
-from paddlenlp.utils import infohub
-
+from ..utils import infohub
 from .qat_utils import QATFunc
 
 try:
@@ -465,7 +464,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
                     is_bias=False,
                 )
                 self.quant_scale.stop_gradient = True
-                if self.weight_quantize_algo not in ["fp8linear", "a8w4linear", "fp8linear"]:
+                if self.weight_quantize_algo in ["fp8linear", "a8w4linear", "a8w8linear"]:
                     self.quant_scale.is_distributed = False
                 else:
                     self.quant_scale.is_distributed = True if self.is_mp else False
@@ -609,7 +608,7 @@ class RowParallelQuantizationLinear(nn.Layer):
                     is_bias=False,
                 )
                 self.quant_scale.stop_gradient = True
-                if self.weight_quantize_algo not in ["fp8linear", "a8w4linear", "fp8linear"]:
+                if self.weight_quantize_algo in ["fp8linear", "a8w4linear", "a8w8linear"]:
                     self.quant_scale.is_distributed = False
                 else:
                     self.quant_scale.is_distributed = True if self.is_mp else False

@@ -19,9 +19,8 @@ import paddle
 from paddle.io import DataLoader, Dataset
 from tqdm import tqdm
 
-from paddlenlp.data import DataCollatorForSeq2Seq
-from paddlenlp.transformers import AutoTokenizer
-
+from ...data import DataCollatorForSeq2Seq
+from ...transformers import AutoTokenizer
 from .modeling_utils import ReftDataCollator
 
 device = "gpu" if paddle.is_compiled_with_cuda() else "cpu"

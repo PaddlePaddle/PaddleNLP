@@ -16,12 +16,12 @@ import os
 import sys
 from datetime import datetime
 
-PADDLENLP_STABLE_VERSION = "PADDLENLP_STABLE_VERSION"
+PADDLEFORMERS_STABLE_VERSION = "PADDLEFORMERS_STABLE_VERSION"
 
 # this version is used for develop and test.
 # release version will be added fixed version by setup.py.
-__version__ = "3.0.0b4.post"
-if os.getenv(PADDLENLP_STABLE_VERSION):
+__version__ = "0.0.0.post"
+if os.getenv(PADDLEFORMERS_STABLE_VERSION):
     __version__ = __version__.replace(".post", "")
 else:
     formatted_date = datetime.now().date().strftime("%Y%m%d")
@@ -31,36 +31,27 @@ else:
 # [VERSION_INFO]
 
 if "datasets" in sys.modules.keys():
-    from paddlenlp.utils.log import logger
+    from paddleformers.utils.log import logger
 
     logger.warning(
-        "Detected that datasets module was imported before paddlenlp. "
-        "This may cause PaddleNLP datasets to be unavailable in intranet. "
-        "Please import paddlenlp before datasets module to avoid download issues"
+        "Detected that datasets module was imported before paddleformers. "
+        "This may cause PaddleFormers datasets to be unavailable in intranet. "
+        "Please import paddleformers before datasets module to avoid download issues"
     )
 import paddle
 
 from . import (
     data,
-    dataaug,
     datasets,
-    experimental,
-    layers,
-    losses,
     mergekit,
-    metrics,
     ops,
     peft,
-    prompt,
     quantization,
-    seq2vec,
     trainer,
     transformers,
     trl,
     utils,
     version,
 )
-from .server import SimpleServer
-from .taskflow import Taskflow
 
 paddle.disable_signal_handler()

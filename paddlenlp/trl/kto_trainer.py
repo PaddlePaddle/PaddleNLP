@@ -18,10 +18,10 @@ from collections import OrderedDict, defaultdict
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.trainer import Trainer
-from paddlenlp.transformers.model_utils import unwrap_model
-from paddlenlp.trl import KTOCriterion
-from paddlenlp.utils import infohub
+from ..trainer import Trainer
+from ..transformers.kto_criterion import KTOCriterion
+from ..transformers.model_utils import unwrap_model
+from ..utils import infohub
 
 
 def disable_dropout_in_model(model: paddle.nn.Layer) -> None:
@@ -32,9 +32,9 @@ def disable_dropout_in_model(model: paddle.nn.Layer) -> None:
 
 
 try:
-    from paddlenlp.peft.lora.lora_model import AVAILABLE_LAYERS
+    from ..peft.lora.lora_model import AVAILABLE_LAYERS
 except:
-    from paddlenlp.peft.lora.lora_model import AVALIABLE_LAYERS
+    from ..peft.lora.lora_model import AVALIABLE_LAYERS
 
     AVAILABLE_LAYERS = AVALIABLE_LAYERS
 

@@ -20,16 +20,15 @@ import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 
-from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
-from paddlenlp.utils.env import (
+from ...utils.env import (
     PADDLE_MASTER_WEIGHTS_INDEX_NAME,
     PADDLE_OPTIMIZER_INDEX_NAME,
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
     SAFE_OPTIMIZER_INDEX_NAME,
 )
-from paddlenlp.utils.log import logger
-from paddlenlp.utils.nested import flatten_list
-
+from ...utils.log import logger
+from ...utils.nested import flatten_list
+from ..utils.helper import distributed_file, distributed_isfile
 from .utils import (
     get_expected_state_dict,
     is_sharding_split_param_mode,

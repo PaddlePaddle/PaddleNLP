@@ -27,8 +27,6 @@ from paddle.distributed import fleet
 from paddle.profiler.utils import switch_job_schedule_profiler
 from tqdm.auto import tqdm
 
-from paddlenlp.trainer import Trainer
-
 from ..transformers.model_utils import unwrap_model
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
@@ -41,6 +39,7 @@ from ..utils.env import (
 from ..utils.log import logger
 from .argparser import strtobool
 from .auto_training_args import AutoTrainingArguments
+from .trainer import Trainer
 from .trainer_callback import TrainerState
 from .trainer_utils import (  # set_hyrbid_parallel_seed,
     ShardingOption,

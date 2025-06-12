@@ -44,7 +44,7 @@ class ModelConfig:
     continue_training: bool = field(
         default=True,
         metadata={
-            "help": "Whether to train from existing paddlenlp model weights. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+            "help": "Whether to train from existing paddleformers model weights. If set True, the model_name_or_path argument must exist in the paddleformers models."
         },
     )
 

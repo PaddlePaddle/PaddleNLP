@@ -20,7 +20,6 @@ import os
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Dict, Optional, Tuple, Union
 
-from ...utils import is_tokenizers_available
 from ...utils.download import resolve_file_path
 from ...utils.import_utils import import_module
 from ...utils.log import logger
@@ -43,123 +42,7 @@ __all__ = [
 if TYPE_CHECKING:
     TOKENIZER_MAPPING_NAMES: OrderedDict[str, Tuple[Optional[str], Optional[str]]] = OrderedDict()
 else:
-    TOKENIZER_MAPPING_NAMES = OrderedDict(
-        [
-            ("albert", (("AlbertChineseTokenizer", "AlbertEnglishTokenizer"), None)),
-            ("bart", "BartTokenizer"),
-            (
-                "bert",
-                (
-                    "BertTokenizer",
-                    "BertTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            ("blenderbot", "BlenderbotTokenizer"),
-            (
-                "bloom",
-                (
-                    "BloomTokenizer",
-                    "BloomTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            ("clip", "CLIPTokenizer"),
-            ("codegen", "CodeGenTokenizer"),
-            ("convbert", "ConvBertTokenizer"),
-            ("ctrl", "CTRLTokenizer"),
-            ("distilbert", "DistilBertTokenizer"),
-            (
-                "deepseek_v2",
-                "DeepseekTokenizerFast" if is_tokenizers_available() else None,
-            ),
-            ("electra", "ElectraTokenizer"),
-            (
-                "ernie",
-                (
-                    "ErnieTokenizer",
-                    "ErnieTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            ("ernie_m", "ErnieMTokenizer"),
-            ("fnet", "FNetTokenizer"),
-            ("funnel", "FunnelTokenizer"),
-            (
-                "gemma",
-                (
-                    "GemmaTokenizer",
-                    "GemmaTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            ("jamba", "JambaTokenizer"),
-            ("layoutlm", "LayoutLMTokenizer"),
-            ("layoutlmv2", "LayoutLMv2Tokenizer"),
-            ("layoutxlm", "LayoutXLMTokenizer"),
-            (
-                "llama",
-                (
-                    ("LlamaTokenizer", "Llama3Tokenizer"),
-                    "LlamaTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            ("luke", "LukeTokenizer"),
-            ("mamba", "MambaTokenizer"),
-            ("mbart", (("MBartTokenizer", "MBart50Tokenizer"), None)),
-            ("mobilebert", "MobileBertTokenizer"),
-            ("mpnet", "MPNetTokenizer"),
-            ("nezha", "NeZhaTokenizer"),
-            ("pegasus", "PegasusChineseTokenizer"),
-            ("prophetnet", "ProphetNetTokenizer"),
-            ("reformer", "ReformerTokenizer"),
-            ("rembert", "RemBertTokenizer"),
-            ("roberta", "RobertaBPETokenizer"),
-            ("roformer", "RoFormerTokenizer"),
-            ("speecht5", "SpeechT5Tokenizer"),
-            ("squeezebert", "SqueezeBertTokenizer"),
-            ("t5", "T5Tokenizer"),
-            ("xlm", "XLMTokenizer"),
-            ("xlm_roberta", "XLMRobertaTokenizer"),
-            ("xlnet", "XLNetTokenizer"),
-            ("bert_japanese", "BertJapaneseTokenizer"),
-            ("bigbird", "BigBirdTokenizer"),
-            ("blenderbot_small", "BlenderbotSmallTokenizer"),
-            ("chatglm", "ChatGLMTokenizer"),
-            ("chatglm_v2", "ChatGLMv2Tokenizer"),
-            ("chinesebert", "ChineseBertTokenizer"),
-            ("dallebart", "DalleBartTokenizer"),
-            ("ernie_ctm", "ErnieCtmTokenizer"),
-            ("ernie_doc", "ErnieDocBPETokenizer"),
-            ("ernie_gram", "ErnieGramTokenizer"),
-            ("ernie_layout", "ErnieLayoutTokenizer"),
-            ("ernie_code", "ErnieCodeTokenizer"),
-            ("megatronbert", "MegatronBertTokenizer"),
-            ("nystromformer", "NystromformerTokenizer"),
-            ("ppminilm", "PPMiniLMTokenizer"),
-            ("roformerv2", "RoFormerv2Tokenizer"),
-            ("skep", "SkepTokenizer"),
-            ("tinybert", "TinyBertTokenizer"),
-            ("unified_transformer", "UnifiedTransformerTokenizer"),
-            ("unimo", "UNIMOTokenizer"),
-            (
-                "gpt",
-                (
-                    ("GPTTokenizer", "GPTChineseTokenizer"),
-                    "GPTTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            ("artist", "ArtistTokenizer"),
-            ("chineseclip", "ChineseCLIPTokenizer"),
-            ("ernie_vil", "ErnieViLTokenizer"),
-            ("glm", "GLMGPT2Tokenizer"),
-            ("qwen", "QWenTokenizer"),
-            (
-                "qwen2",
-                (
-                    "Qwen2Tokenizer",
-                    "Qwen2TokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            ("yuan", "YuanTokenizer"),
-        ]
-    )
+    TOKENIZER_MAPPING_NAMES = OrderedDict([])
 
 
 def get_mapping_tokenizers(tokenizers, with_fast=True):

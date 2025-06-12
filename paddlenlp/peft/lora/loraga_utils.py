@@ -23,18 +23,18 @@ try:
 except:
     pass
 
-from paddlenlp.peft import LoRAModel
-from paddlenlp.peft.lora.lora_layers import (
+from ...trainer import Trainer, TrainingArguments
+from ...trainer.trainer_utils import ShardingOption
+from ...transformers.model_utils import PretrainedModel, unwrap_model
+from ...utils.log import logger
+from .lora_layers import (
     ColumnParallelLoRALinear,
     ColumnSequenceParallelLoRALinear,
     LoRALinear,
     RowParallelLoRALinear,
     RowSequenceParallelLoRALinear,
 )
-from paddlenlp.trainer import Trainer, TrainingArguments
-from paddlenlp.trainer.trainer_utils import ShardingOption
-from paddlenlp.transformers.model_utils import PretrainedModel, unwrap_model
-from paddlenlp.utils.log import logger
+from .lora_model import LoRAModel
 
 
 class LoRAGATrainer(Trainer):

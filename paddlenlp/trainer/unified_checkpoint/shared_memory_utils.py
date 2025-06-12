@@ -19,7 +19,7 @@ from typing import List, Mapping, Tuple
 import numpy as np
 import paddle
 
-from paddlenlp.transformers.utils import device_guard
+from ...transformers.utils import device_guard
 
 
 @dataclass

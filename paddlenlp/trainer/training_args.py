@@ -48,7 +48,7 @@ except Exception:
 
     def in_auto_parallel_align_mode():
         """
-        hack for paddlenlp develop branch.
+        hack for paddleformers develop branch.
         """
         return False
 
@@ -89,16 +89,16 @@ class TrainingArguments:
         do_train (`bool`, *optional*, defaults to `False`):
             Whether to run training or not. This argument is not directly used by [`Trainer`], it's intended to be used
             by your training/evaluation scripts instead. See the [example
-            scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
+            scripts](https://github.com/PaddlePaddle/PaddleFormers/tree/develop/examples) for more details.
         do_eval (`bool`, *optional*):
             Whether to run evaluation on the validation set or not. Will be set to `True` if `evaluation_strategy` is
             different from `"no"`. This argument is not directly used by [`Trainer`], it's intended to be used by your
             training/evaluation scripts instead. See the [example
-            scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
+            scripts](https://github.com/PaddlePaddle/PaddleFormers/tree/develop/examples) for more details.
         do_predict (`bool`, *optional*, defaults to `False`):
             Whether to run predictions on the test set or not. This argument is not directly used by [`Trainer`], it's
             intended to be used by your training/evaluation scripts instead. See the [example
-            scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
+            scripts](https://github.com/PaddlePaddle/PaddleFormers/tree/develop/examples) for more details.
         do_export (`bool`, *optional*, defaults to `False`):
             Whether to export inference model or not. This argument is not directly used by [`Trainer`], it's
             intended to be used by your training/evaluation scripts instead.
@@ -388,7 +388,7 @@ class TrainingArguments:
         resume_from_checkpoint (`str`, *optional*):
             The path to a folder with a valid checkpoint for your model. This argument is not directly used by
             [`Trainer`], it's intended to be used by your training/evaluation scripts instead. See the [example
-            scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
+            scripts](https://github.com/PaddlePaddle/PaddleFormers/tree/develop/examples) for more details.
         auto_parallel_resume_form_hybrid_parallel (`bool`, *optional*):
             Whether hybrid parallel checkpoints be loaded in auto parallel mode.
         flatten_param_grads (`bool`, *optional*):
@@ -2455,11 +2455,11 @@ class TrainingArguments:
             args = self
             key = "Training"
 
-        import paddlenlp
+        import paddleformers
 
         logger.debug("{:^40}".format("{} Configuration Arguments".format(key)))
         logger.debug("{:30}: {}".format("paddle commit id", paddle.version.commit))
-        logger.debug("{:30}: {}".format("paddlenlp commit id", paddlenlp.version.commit))
+        logger.debug("{:30}: {}".format("paddleformers commit id", paddleformers.version.commit))
 
         for a in dir(args):
             if a[:2] != "__":  # don't print double underscore methods

@@ -19,18 +19,16 @@ import os
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
-from paddlenlp.trainer.argparser import strtobool
-from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
-from paddlenlp.transformers.model_utils import (
+from ...peft import LoRAModel, PrefixModelForCausalLM
+from ...transformers.model_utils import (
     PretrainedModel,
     _add_variant,
     load_state_dict,
     unwrap_model,
 )
-from paddlenlp.transformers.utils import dtype_byte_size
-from paddlenlp.utils import empty_device_cache, infohub
-from paddlenlp.utils.env import (
+from ...transformers.utils import dtype_byte_size
+from ...utils import empty_device_cache, infohub
+from ...utils.env import (
     LORA_WEIGHTS_NAME,
     MAX_QUANTIZATION_TIMES,
     PADDLE_MASTER_WEIGHTS_NAME,
@@ -46,9 +44,10 @@ from paddlenlp.utils.env import (
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
 )
-from paddlenlp.utils.log import logger
-from paddlenlp.utils.nested import nested_copy
-
+from ...utils.log import logger
+from ...utils.nested import nested_copy
+from ..argparser import strtobool
+from ..utils.helper import distributed_file, distributed_isfile
 from .async_handler import AsyncCheckpointHandler
 from .check_completion import check_unified_checkpoint, check_unified_optimizer
 from .load_dynamic import (

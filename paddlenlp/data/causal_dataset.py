@@ -9,8 +9,8 @@ import time
 import numpy as np
 import paddle
 
-from paddlenlp.data.blendable_dataset import BlendableDataset
-from paddlenlp.data.indexed_dataset import make_dataset as make_indexed_dataset
+from .blendable_dataset import BlendableDataset
+from .indexed_dataset import make_dataset as make_indexed_dataset
 
 local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 

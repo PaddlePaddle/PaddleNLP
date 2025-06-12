@@ -398,7 +398,7 @@ class SequenceBiasLogitsProcessor(LogitsProcessor):
     Examples:
 
     ```python
-    >>> from paddlenlp.transformers import AutoTokenizer, AutoModelForCausalLM
+    >>> from paddleformers.transformers import AutoTokenizer, AutoModelForCausalLM
 
     >>> model = AutoModelForCausalLM.from_pretrained("gpt2-en")
     >>> tokenizer = AutoTokenizer.from_pretrained("gpt2-en")
@@ -547,7 +547,7 @@ class NoBadWordsLogitsProcessor(SequenceBiasLogitsProcessor):
     Examples:
 
     ```python
-    >>> from paddlenlp.transformers import AutoTokenizer, AutoModelForCausalLM
+    >>> from paddleformers.transformers import AutoTokenizer, AutoModelForCausalLM
 
     >>> model = AutoModelForCausalLM.from_pretrained("gpt2-en")
     >>> tokenizer = AutoTokenizer.from_pretrained("gpt2-en")
@@ -578,7 +578,7 @@ class NoBadWordsLogitsProcessor(SequenceBiasLogitsProcessor):
     In a word, the cake is a bit of a surprise.
     ```
 
-    >>> from paddlenlp.transformers.generation import NoBadWordsLogitsProcessor, LogitsProcessorList
+    >>> from paddleformers.transformers.generation import NoBadWordsLogitsProcessor, LogitsProcessorList
     >>> logits_processors = LogitsProcessorList([NoBadWordsLogitsProcessor([[5,6]], eos_token_id=tokenizer.eos_token_id)])
     >>> output_ids = model.generate(
     ...     inputs["input_ids"], max_new_tokens=5, logits_processors=logits_processors, pad_token_id=tokenizer.eos_token_id

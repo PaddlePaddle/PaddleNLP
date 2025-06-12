@@ -24,9 +24,8 @@ from itertools import islice
 os.environ["HF_UPDATE_DOWNLOAD_COUNTS"] = "False"
 
 import datasets
+import paddleformers
 from multiprocess import Pool, RLock
-
-import paddlenlp
 
 try:
     import paddle.distributed as dist
@@ -39,18 +38,18 @@ from functools import partial
 from paddle.io import Dataset, IterableDataset
 from paddle.utils.download import _get_unique_endpoints
 
-from paddlenlp.utils.env import DATA_HOME
+from ..utils.env import DATA_HOME
 
 __all__ = ["MapDataset", "DatasetBuilder", "IterDataset", "load_dataset"]
 
-DATASETS_MODULE_PATH = "paddlenlp.datasets."
+DATASETS_MODULE_PATH = "paddleformers.datasets."
 
 # Patch for intranet
 from datasets import load_dataset as origin_load_dataset  # noqa: E402
 
 
 def load_from_ppnlp(path, *args, **kwargs):
-    ppnlp_path = paddlenlp.datasets.__path__[0]
+    ppnlp_path = paddleformers.datasets.__path__[0]
     new_path = os.path.split(path)[-1]
     new_path = os.path.join(ppnlp_path, "hf_datasets", new_path + ".py")
     if os.path.exists(new_path):
@@ -122,7 +121,7 @@ def load_from_hf(path, name=None, splits=None, **kwargs):
             hf_datasets = load_hf_dataset(path, name=name, split=splits, **kwargs)
 
     except FileNotFoundError:
-        raise FileNotFoundError("Couldn't find the dataset script for '" + path + "' on PaddleNLP or HuggingFace")
+        raise FileNotFoundError("Couldn't find the dataset script for '" + path + "' on PaddleFormers or HuggingFace")
     else:
         label_list = []
         if isinstance(hf_datasets, DatasetDict):
@@ -153,17 +152,15 @@ def load_from_hf(path, name=None, splits=None, **kwargs):
 
 def load_dataset(path_or_read_func, name=None, data_files=None, splits=None, lazy=None, **kwargs):
     """
-    This method will load a dataset, either form PaddleNLP library or from a
+    This method will load a dataset, either form PaddleFormers library or from a
     self-defined data loading script, by calling functions in `DatasetBuilder`.
 
-    For all the names of datasets in PaddleNLP library, see here:  `dataset_list
-    <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html>`__.
 
     Either `splits` or `data_files` must be specified.
 
     Args:
         path_or_read_func (str|callable): Name of the dataset processing script
-            in PaddleNLP library or a custom data reading function.
+            in custom data reading function.
         name (str, optional): Additional name to select a more specific dataset.
             Defaults to None.
         data_files (str|list|tuple|dict, optional): Defining the path of dataset
@@ -177,11 +174,6 @@ def load_dataset(path_or_read_func, name=None, data_files=None, splits=None, laz
 
     Returns:
         A `MapDataset` or `IterDataset` or a tuple of those.
-
-    For how to use this function, please see `dataset_load
-    <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_load.html>`__
-    and `dataset_self_defined
-    <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html>`__
 
     """
     if inspect.isfunction(path_or_read_func):
@@ -243,9 +235,6 @@ class MapDataset(Dataset):
         data (list|Dataset): An object with `__getitem__` and `__len__` methods. It could
             be a list or a subclass of `paddle.io.Dataset`.
         kwargs (dict, optional): Other information to be passed to the dataset.
-
-    For examples of this class, please see `dataset_self_defined
-    <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html>`__.
 
     """
 
@@ -408,8 +397,6 @@ class IterDataset(IterableDataset):
             subclass of `paddle.io.IterableDataset`.
         kwargs (dict, optional): Other information to be passed to the dataset.
 
-    For examples of this class, please see `dataset_self_defined
-    <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html>`__.
     """
 
     def __init__(self, data, **kwargs):
@@ -524,9 +511,6 @@ class DatasetBuilder:
 
     `_get_data()` function and `_read()` function should be implemented to download
     data file and read data file into a `Iterable` of the examples.
-
-    For how to define a custom `DatasetBuilder`, please see `contribute_dataset
-    <https://paddlenlp.readthedocs.io/zh/latest/community/contribute_dataset.html>`__.
     """
 
     lazy = False

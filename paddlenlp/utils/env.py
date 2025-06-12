@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-This module is used to store environmental variables in PaddleNLP.
-PPNLP_HOME              -->  the root directory for storing PaddleNLP related data. Default to ~/.paddlenlp. Users can change the
+This module is used to store environmental variables in PaddleFormers.
+PPNLP_HOME              -->  the root directory for storing PaddleFormers related data. Default to ~/.paddleformers. Users can change the
 ├                            default value through the PPNLP_HOME environment variable.
 ├─ MODEL_HOME              -->  Store model files.
 └─ DATA_HOME         -->  Store automatically downloaded datasets.
@@ -43,7 +43,7 @@ def _get_ppnlp_home():
                 raise RuntimeError("The environment variable PPNLP_HOME {} is not a directory.".format(home_path))
         else:
             return home_path
-    return os.path.join(_get_user_home(), ".paddlenlp")
+    return os.path.join(_get_user_home(), ".paddleformers")
 
 
 def _get_sub_home(directory, parent_home=_get_ppnlp_home()):

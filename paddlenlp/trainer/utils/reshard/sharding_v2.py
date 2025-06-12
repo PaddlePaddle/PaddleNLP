@@ -20,9 +20,8 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
 )
 from paddle.distributed.fleet.model import PipelineParallel
 
-from paddlenlp.utils.log import logger
-
 from ....transformers.model_utils import unwrap_optimizer
+from ....utils.log import logger
 
 try:
     from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (

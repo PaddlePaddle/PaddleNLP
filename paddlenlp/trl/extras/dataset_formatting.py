@@ -24,7 +24,7 @@ from ...transformers import AutoTokenizer
 FORMAT_MAPPING = {
     "chatml": [{"content": Value(dtype="string", id=None), "role": Value(dtype="string", id=None)}],
     "instruction": {"completion": Value(dtype="string", id=None), "prompt": Value(dtype="string", id=None)},
-    "paddlenlp": {"src": Value(dtype="string", id=None), "tgt": Value(dtype="string", id=None)},
+    "paddleformers": {"src": Value(dtype="string", id=None), "tgt": Value(dtype="string", id=None)},
 }
 
 
@@ -72,7 +72,7 @@ def instructions_formatting_function(tokenizer: AutoTokenizer):
     return format_dataset
 
 
-def paddlenlp_instructions_formatting_function(tokenizer: AutoTokenizer):
+def paddleformers_instructions_formatting_function(tokenizer: AutoTokenizer):
     r"""
     return a callable function that takes in an "instructions" dataset and returns a formatted dataset, based on the tokenizer
     apply chat template to the dataset
@@ -123,7 +123,7 @@ def get_formatting_func_from_dataset(dataset: Union[Dataset], tokenizer: AutoTok
         elif dataset.features == FORMAT_MAPPING["instruction"]:
             logging.info("Formatting dataset with instruction format")
             return instructions_formatting_function(tokenizer)
-        elif dataset.features == FORMAT_MAPPING["paddlenlp"]:
-            return paddlenlp_instructions_formatting_function(tokenizer)
+        elif dataset.features == FORMAT_MAPPING["paddleformers"]:
+            return paddleformers_instructions_formatting_function(tokenizer)
 
     return None

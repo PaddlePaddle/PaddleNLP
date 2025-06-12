@@ -21,14 +21,13 @@ from typing import Any, Dict, Optional, Union
 
 from huggingface_hub import hf_hub_download
 from paddle.common_ops_import import convert_dtype
+from paddleformers import __version__
 
-from paddlenlp import __version__
-from paddlenlp.transformers.configuration_utils import PretrainedConfig
-from paddlenlp.utils.download import resolve_file_path
-from paddlenlp.utils.log import logger
-
+from ..transformers.configuration_utils import PretrainedConfig
 from ..utils import GENERATION_CONFIG_NAME
+from ..utils.download import resolve_file_path
 from ..utils.downloader import hf_file_exists
+from ..utils.log import logger
 
 DEFAULT_MAX_NEW_TOKENS = 20
 
@@ -181,7 +180,7 @@ class GenerationConfig:
         self.fast_ptq_sampling = kwargs.pop("fast_ptq_sampling", False)
         self.decoder_start_token_id = kwargs.pop("decoder_start_token_id", None)
         self._from_model_config = kwargs.pop("_from_model_config", False)
-        self.paddlenlp_version = kwargs.pop("paddlenlp_version", __version__)
+        self.paddleformers_version = kwargs.pop("paddleformers_version", __version__)
 
         # Additional attributes without default values
         if not self._from_model_config:
@@ -210,7 +209,7 @@ class GenerationConfig:
         self_dict = self.__dict__.copy()
         other_dict = other.__dict__.copy()
         # ignore metadata
-        for metadata_field in ["_from_model_config", "paddlenlp_version"]:
+        for metadata_field in ["_from_model_config", "paddleformers_version"]:
             self_dict.pop(metadata_field, None)
             other_dict.pop(metadata_field, None)
         return self_dict == other_dict
@@ -352,7 +351,7 @@ class GenerationConfig:
                 This can be either:
 
                 - a string, the *model id* of a pretrained model configuration hosted inside a model repo on
-                  paddlenlp bos server. Valid model ids can be located at the root-level, like `bert-base-uncased`, or
+                   bos server. Valid model ids can be located at the root-level, like `bert-base-uncased`, or
                   namespaced under a user or organization name, like `dbmdz/bert-base-german-cased`.
                 - a path to a *directory* containing a configuration file saved using the
                   [`~PretrainedConfig.save_pretrained`] method, e.g., `./my_model_directory/`.
@@ -382,7 +381,7 @@ class GenerationConfig:
         Examples:
 
         ```python
-        >>> from paddlenlp.transformers import GenerationConfig
+        >>> from paddleformers.transformers import GenerationConfig
 
         >>> generation_config = GenerationConfig.from_pretrained("gpt2")
 
@@ -507,8 +506,8 @@ class GenerationConfig:
         """
         output = copy.deepcopy(self.__dict__)
 
-        # PaddleNLP version when serializing this file
-        output["paddlenlp_version"] = __version__
+        # PaddleFormers version when serializing this file
+        output["paddleformers_version"] = __version__
 
         self.dict_paddle_dtype_to_str(output)
         return output

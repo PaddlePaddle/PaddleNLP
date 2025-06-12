@@ -1,4 +1,0 @@
-protobuf==3.20.2 
-pydantic
-ray[tune]==2.5.1
-hyperopt>=0.2.5

@@ -25,9 +25,9 @@ import paddle.distributed as dist
 from paddle.distributed import fleet
 from paddle.distributed.parallel import sync_params_buffers
 
-from paddlenlp.utils.log import logger
-from paddlenlp.utils.nested import nested_broadcast_tensor_with_empty  # noqa: F401
-from paddlenlp.utils.nested import (
+from ...utils.log import logger
+from ...utils.nested import nested_broadcast_tensor_with_empty  # noqa: F401
+from ...utils.nested import (
     nested_broadcast_tensor,
     nested_empty_tensor,
     nested_reduce_tensor,

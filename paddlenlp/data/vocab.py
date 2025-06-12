@@ -185,7 +185,7 @@ class Vocab(object):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import Vocab
+                from paddleformers.data import Vocab
                 # The vocab file. The sample file can be downloaded firstly.
                 # wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
                 vocab_file_path = './senta_word_dict.txt'
@@ -241,7 +241,7 @@ class Vocab(object):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import Vocab
+                from paddleformers.data import Vocab
                 # The vocab file. The sample file can be downloaded firstly.
                 # wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
                 vocab_file_path = './senta_word_dict.txt'
@@ -307,7 +307,7 @@ class Vocab(object):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import Vocab
+                from paddleformers.data import Vocab
                 # The vocab file. The sample file can be downloaded firstly.
                 # wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
                 vocab_file_path = './senta_word_dict.txt'
@@ -345,7 +345,7 @@ class Vocab(object):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import Vocab
+                from paddleformers.data import Vocab
                 # The vocab file. The sample file can be downloaded firstly.
                 # wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
                 vocab_file_path = './senta_word_dict.txt'
@@ -402,7 +402,7 @@ class Vocab(object):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import Vocab
+                from paddleformers.data import Vocab
                 # The vocab file. The sample file can be downloaded firstly.
                 # wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
                 vocab_file_path = './senta_word_dict.txt'
@@ -475,7 +475,7 @@ class Vocab(object):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import Vocab
+                from paddleformers.data import Vocab
                 # The vocab file. The sample file can be downloaded firstly.
                 # wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
                 vocab_file_path = './senta_word_dict.txt'
@@ -533,7 +533,7 @@ class Vocab(object):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import Vocab
+                from paddleformers.data import Vocab
                 # The vocab file. The sample file can be downloaded firstly.
                 # wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
                 vocab_file_path = './senta_word_dict.txt'

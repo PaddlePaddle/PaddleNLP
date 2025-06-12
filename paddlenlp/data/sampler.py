@@ -118,7 +118,7 @@ class SamplerHelper(object):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import SamplerHelper
+                from paddleformers.data import SamplerHelper
                 from paddle.io import Dataset
 
                 class MyDataset(Dataset):
@@ -189,7 +189,7 @@ class SamplerHelper(object):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import SamplerHelper
+                from paddleformers.data import SamplerHelper
                 from paddle.io import Dataset
 
                 class MyDataset(Dataset):
@@ -269,7 +269,7 @@ class SamplerHelper(object):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import SamplerHelper
+                from paddleformers.data import SamplerHelper
                 from paddle.io import Dataset
 
                 class MyDataset(Dataset):
@@ -352,7 +352,7 @@ class SamplerHelper(object):
         Example:
             .. code-block:: python
 
-                from paddlenlp.data import SamplerHelper
+                from paddleformers.data import SamplerHelper
                 from paddle.io import Dataset
 
                 class MyDataset(Dataset):
