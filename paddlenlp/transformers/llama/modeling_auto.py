@@ -107,12 +107,46 @@ def get_mesh(pp_idx=0):
     return mesh
 
 
+def get_colwise_placements(use_sep=False):
+    # Note(luchang): now paddle auto parallel mode do not support
+    # shard one dim twice, so we can not use sep and tp at the same time.
+    if use_sep:
+        return [dist.Replicate(), dist.Replicate(), dist.Replicate()]
+    else:
+        return [dist.Replicate(), dist.Shard(1)]
+
+
+def get_rowise_placements(use_sep=False):
+    # Note(luchang): now paddle auto parallel mode do not support
+    # shard one dim twice, so we can not use sep and tp at the same time.
+    if use_sep:
+        return [dist.Replicate(), dist.Replicate(), dist.Replicate()]
+    else:
+        return [dist.Replicate(), dist.Shard(0)]
+
+
 def global_mesh_starts_with_pp():
     mesh = fleet.auto.get_mesh()
     if is_pp_enable():
         return mesh.get_mesh_with_dim("pp")
     else:
         return mesh
+
+
+def sep_reshard_layer(input, split_axis, concat_axis):
+    # do alltoall operation to reshard input from [Shard(concat_axis)] to [Shard[split_axis]]
+    sep_axis = input.process_mesh.dim_names.index("sep")
+
+    input_placements = input.placements
+    if input_placements[sep_axis] != dist.Shard(concat_axis):
+        raise ValueError(
+            f"Input placements for 'sep' axis should be Shard({split_axis}), but got {input_placements[sep_axis]}"
+        )
+
+    input_placements[sep_axis] = dist.Shard(split_axis)
+
+    out = dist.reshard(input, input.process_mesh, input_placements)
+    return out
 
 
 def scaled_dot_product_attention(
@@ -143,7 +177,14 @@ def scaled_dot_product_attention(
             )
         else:
             attn_output = fusion_ops.fusion_flash_attention(
-                query_states, config, key_states, value_states, attention_mask, output_attentions, alibi
+                query_states,
+                config,
+                key_states,
+                value_states,
+                attention_mask,
+                output_attentions,
+                alibi,
+                reshard_layer=sep_reshard_layer,
             )
             attn_weights = None
 
@@ -166,6 +207,10 @@ def scaled_dot_product_attention(
                 f" {attn_weights.shape}"
             )
 
+        # In sep mode, the attenion mask should be created in the runtime.
+        if config.sep_parallel_degree > 1:
+            attention_mask = None
+
         # NOTE: we only call get_triangle_upper_mask under PP setup
         # FIXME ZHUI when we use pipeline parallel, the attention_mask can be None
         # we just make it triangle_upper_mask
@@ -184,13 +229,12 @@ def scaled_dot_product_attention(
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
-        # [bsz, q_len, num_heads, head_dim] -> [bsz, q_len, num_heads * head_dim]
+
+        if config.sep_parallel_degree > 1:
+            attn_output = sep_reshard_layer(attn_output, split_axis=1, concat_axis=2)
+
         attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
         return (attn_output, attn_weights) if output_attentions else attn_output
-
-
-colwise_placements = [dist.Replicate(), dist.Shard(1)]
-rowise_placement = [dist.Replicate(), dist.Shard(0)]
 
 
 class LlamaRMSNormAuto(nn.Layer):
@@ -206,7 +250,7 @@ class LlamaRMSNormAuto(nn.Layer):
         self.weight = dist.shard_tensor(
             self.weight,
             get_mesh(self.ipp),
-            [dist.Replicate(), dist.Replicate()],
+            [dist.Replicate() for _ in range(len(get_mesh(self.ipp).dim_names))],
         )
         self.variance_epsilon = config.rms_norm_eps
         self.config = config
@@ -241,28 +285,28 @@ class LlamaMLPAuto(nn.Layer):
             self.gate_up_fused_proj.weight = dist.shard_tensor(
                 self.gate_up_fused_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                get_colwise_placements(config.sep_parallel_degree > 1),
             )
         else:
             self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.gate_proj.weight = dist.shard_tensor(
                 self.gate_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                get_colwise_placements(config.sep_parallel_degree > 1),
             )
 
             self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.up_proj.weight = dist.shard_tensor(
                 self.up_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                get_colwise_placements(config.sep_parallel_degree > 1),
             )
 
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
         self.down_proj.weight = dist.shard_tensor(
             self.down_proj.weight,
             get_mesh(self.ipp),
-            rowise_placement,
+            get_rowise_placements(config.sep_parallel_degree > 1),
         )
 
     def forward(self, x):
@@ -322,7 +366,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.qkv_proj.weight = dist.shard_tensor(
                 self.qkv_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                get_colwise_placements(config.sep_parallel_degree > 1),
             )
 
         else:
@@ -334,7 +378,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.q_proj.weight = dist.shard_tensor(
                 self.q_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                get_colwise_placements(config.sep_parallel_degree > 1),
             )
 
             self.k_proj = nn.Linear(
@@ -345,7 +389,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.k_proj.weight = dist.shard_tensor(
                 self.k_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                get_colwise_placements(config.sep_parallel_degree > 1),
             )
 
             self.v_proj = nn.Linear(
@@ -356,7 +400,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.v_proj.weight = dist.shard_tensor(
                 self.v_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                get_colwise_placements(config.sep_parallel_degree > 1),
             )
 
         self.o_proj = nn.Linear(
@@ -367,13 +411,17 @@ class LlamaAttentionAuto(nn.Layer):
         self.o_proj.weight = dist.shard_tensor(
             self.o_proj.weight,
             get_mesh(self.ipp),
-            rowise_placement,
+            get_rowise_placements(config.sep_parallel_degree > 1),
         )
 
         if config.rope:
             self._init_rope()
 
         self.config = config
+
+        if config.sep_parallel_degree > 1:
+            assert self.num_key_value_heads % config.sep_parallel_degree == 0
+            assert self.num_heads % config.sep_parallel_degree == 0
 
     def _init_rope(self):
         if self.config.rope_scaling_type is None:
@@ -428,9 +476,49 @@ class LlamaAttentionAuto(nn.Layer):
             )
 
         if self.fuse_attention_qkv and not enable_fuse_ffn_qkv_pass():
-            target_shape = [0, 0, self.num_key_value_heads, (self.num_key_value_groups + 2) * self.head_dim]
             mix_layer = self.qkv_proj(hidden_states)
-            mix_layer = paddle.reshape_(mix_layer, target_shape)
+
+            # NOTE for GQA attention fusion (compatible with MHA and MQA):
+            # The weight for qkv_proj is in shape like [hidden_size, hidden_size + 2 * num_kv_heads * head_dim].
+            # After the projection, the mix_layer is in shape like [b, s, hidden_size + 2 * num_kv_heads * head_dim].
+            # Reshape the mix_layer into a shape like [b, s, num_kv_heads, (num_groups + 2) * head_dim],
+            # where num_groups = num_q_heads // num_kv_heads.
+            # Split the mix_layer on the last axis into three sections [num_groups * head_dim, head_dim, head_dim]
+            # to represent the q, k and v respectively.
+            # The q is in the shape like [b, s, num_kv_heads, num_groups * head_dim].
+            # The k and v are in the shape like [b, s, num_kv_heads, head_dim].
+            # Under MHA, the q is ready for the following calculation since num_kv_heads == num_q_heads,
+            # But for the GQA or MQA, q should be reshaped into [b, s, num_q_heads, head_dim].
+            if self.config.sep_parallel_degree > 1:
+                if self.config.sequence_parallel:
+                    raise ValueError(
+                        "Sep parallel cannot be used with sequence parallel, "
+                        "because paddle auto parallel does not support "
+                        "reshard one dim twice."
+                    )
+
+                # [bs, seq_len / sep, num_head, head_dim] -> [bs, seq_len, num_head / sep, head_dim]
+                mix_layer = sep_reshard_layer(
+                    mix_layer,
+                    split_axis=2,
+                    concat_axis=1,
+                )
+                mix_layer = paddle.reshape_(
+                    mix_layer, [0, self.seq_length, -1, (self.num_key_value_groups + 2) * self.head_dim]
+                )  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
+            else:
+                if self.config.sequence_parallel:
+                    target_shape = [
+                        -1,
+                        self.seq_length,
+                        self.num_key_value_heads,
+                        (self.num_key_value_groups + 2) * self.head_dim,
+                    ]
+                else:
+                    target_shape = [0, 0, self.num_key_value_heads, (self.num_key_value_groups + 2) * self.head_dim]
+                    mix_layer = self.qkv_proj(hidden_states)
+                    mix_layer = paddle.reshape_(mix_layer, target_shape)
+
             query_states, key_states, value_states = paddle.split(
                 mix_layer,
                 num_or_sections=[self.num_key_value_groups * self.head_dim, self.head_dim, self.head_dim],
@@ -439,19 +527,53 @@ class LlamaAttentionAuto(nn.Layer):
             if self.gqa_or_mqa:
                 query_states = paddle.reshape(query_states, [0, 0, self.num_heads, self.head_dim])
         else:
-            target_query_shape = [0, 0, self.num_heads, self.head_dim]
-            target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
+            query_states = self.q_proj(hidden_states)
+            key_states = self.k_proj(hidden_states)
+            value_states = self.v_proj(hidden_states)
 
-            query_states = self.q_proj(hidden_states).reshape(shape=target_query_shape)
-            key_states = self.k_proj(hidden_states).reshape(shape=target_key_value_shape)
-            value_states = self.v_proj(hidden_states).reshape(shape=target_key_value_shape)
+            if self.config.sep_parallel_degree > 1:
+                if self.config.sequence_parallel:
+                    raise ValueError(
+                        "Sep parallel cannot be used with sequence parallel, "
+                        "because paddle auto parallel does not support "
+                        "reshard one dim twice."
+                    )
 
-        if self.config.sequence_parallel:
-            # [seq_len, bs, num_head * head_dim] -> [bs, seq_len, num_head * head_dim]  (if sequence_parallel)
-            # FA and rope not support sequence first
-            query_states = paddle.transpose(query_states, [1, 0, 2, 3])
-            key_states = paddle.transpose(key_states, [1, 0, 2, 3])
-            value_states = paddle.transpose(value_states, [1, 0, 2, 3])
+                query_states = sep_reshard_layer(
+                    query_states,
+                    split_axis=2,
+                    concat_axis=1,
+                )
+                key_states = sep_reshard_layer(
+                    key_states,
+                    split_axis=2,
+                    concat_axis=1,
+                )
+                value_states = sep_reshard_layer(
+                    value_states,
+                    split_axis=2,
+                    concat_axis=1,
+                )
+
+                query_states = paddle.reshape(
+                    query_states, shape=[0, self.seq_length, -1, self.head_dim]
+                )  # [bs, seq_len, num_head/k, head_dim], k is sep degree
+                key_states = paddle.reshape(query_states, shape=[0, self.seq_length, -1, self.head_dim])
+                value_states = paddle.reshape(value_states, shape=[0, self.seq_length, -1, self.head_dim])
+            else:
+                target_query_shape = [0, 0, self.num_heads, self.head_dim]
+                target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
+
+                query_states = query_states.reshape(shape=target_query_shape)
+                key_states = key_states.reshape(shape=target_key_value_shape)
+                value_states = value_states.reshape(shape=target_key_value_shape)
+
+                if self.config.sequence_parallel:
+                    # [seq_len, bs, num_head * head_dim] -> [bs, seq_len, num_head * head_dim]  (if sequence_parallel)
+                    # FA and rope not support sequence first
+                    query_states = paddle.transpose(query_states, [1, 0, 2, 3])
+                    key_states = paddle.transpose(key_states, [1, 0, 2, 3])
+                    value_states = paddle.transpose(value_states, [1, 0, 2, 3])
 
         kv_seq_len = key_states.shape[-3]
 
@@ -459,6 +581,10 @@ class LlamaAttentionAuto(nn.Layer):
             kv_seq_len += past_key_value[0].shape[-3]
 
         if self.config.rope:
+            if self.config.sep_parallel_degree > 1:
+                batch_size, seq_length, _, _ = query_states.shape
+                position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
+
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
                 batch_size, seq_length, num_heads, head_dim = query_states.shape
@@ -520,12 +646,20 @@ class LlamaAttentionAuto(nn.Layer):
             key_states = repeat_kv(key_states, self.num_key_value_groups)
             value_states = repeat_kv(value_states, self.num_key_value_groups)
 
+        attn_mask_placements = [dist.Shard(0), dist.Replicate()]
+        if self.config.sep_parallel_degree:
+            attn_mask_placements.append(dist.Replicate())
         attention_mask = (
-            dist.reshard(attention_mask, get_mesh(self.ipp), [dist.Shard(0), dist.Replicate()])
+            dist.reshard(attention_mask, get_mesh(self.ipp), attn_mask_placements)
             if attention_mask is not None
             else None
         )
-        alibi = dist.reshard(alibi, get_mesh(self.ipp), [dist.Shard(0), dist.Shard(1)]) if alibi is not None else None
+
+        alibi_placements = [dist.Shard(0), dist.Shard(1)]
+        if self.config.sep_parallel_degree > 1:
+            alibi_placements = [dist.Shard(0), dist.Replicate(), dist.Replicate()]
+
+        alibi = dist.reshard(alibi, get_mesh(self.ipp), alibi_placements) if alibi is not None else None
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
             self.enable_recompute
@@ -867,11 +1001,11 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             self.hidden_size,
         )
 
-        embedding_placements = (
-            [dist.Replicate(), dist.Shard(1)]
-            if self.config.tensor_parallel_degree > 1
-            else [dist.Replicate(), dist.Replicate()]
-        )
+        if config.tensor_parallel_degree > 1:
+            embedding_placements = [dist.Replicate(), dist.Shard(1)]
+        if config.sep_parallel_degree > 1:
+            embedding_placements = [dist.Replicate(), dist.Replicate(), dist.Replicate()]
+
         self.embed_tokens.weight = dist.shard_tensor(
             self.embed_tokens.weight,
             get_mesh(),
@@ -901,9 +1035,18 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
         self.gradient_checkpointing = False
 
-        self.placements = (
-            [dist.Shard(1), dist.Shard(0)] if self.config.sequence_parallel else [dist.Shard(0), dist.Replicate()]
-        )
+        self.placements = None
+        if self.config.context_parallel_degree > 1 or self.config.sep_parallel_degree > 1:
+            # [dp, sep, mp]
+            self.placements = (
+                [dist.Shard(1), dist.Replicate(), dist.Shard(0)]
+                if self.config.sequence_parallel
+                else [dist.Shard(0), dist.Shard(1), dist.Replicate()]
+            )
+        else:
+            self.placements = (
+                [dist.Shard(1), dist.Shard(0)] if self.config.sequence_parallel else [dist.Shard(0), dist.Replicate()]
+            )
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1052,32 +1195,19 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                 attention_mask_input = attention_mask
                 alibi_input = alibi
             else:
+                placements = [dist.Replicate() for _ in range(len(get_mesh(ipp)._shape))]
                 if position_ids is not None:
                     position_ids_input = dist.reshard(
                         position_ids,
                         get_mesh(ipp),
-                        [dist.Replicate(), dist.Replicate()],
+                        placements,
                     )
                 else:
                     position_ids_input = position_ids
                 attention_mask_input = (
-                    dist.reshard(
-                        attention_mask,
-                        get_mesh(ipp),
-                        [dist.Replicate(), dist.Replicate()],
-                    )
-                    if attention_mask is not None
-                    else None
+                    dist.reshard(attention_mask, get_mesh(ipp), placements) if attention_mask is not None else None
                 )
-                alibi_input = (
-                    dist.reshard(
-                        alibi,
-                        get_mesh(ipp),
-                        [dist.Replicate(), dist.Replicate()],
-                    )
-                    if alibi is not None
-                    else None
-                )
+                alibi_input = dist.reshard(alibi, get_mesh(ipp), placements) if alibi is not None else None
             if idx in self.next_pp_stage_indexes:
                 hidden_states = dist.reshard(
                     hidden_states,
@@ -1217,9 +1347,7 @@ class LlamaLMHeadAuto(nn.Layer):
             dtype=paddle.get_default_dtype(),
         )
         self.weight = dist.shard_tensor(
-            self.weight,
-            get_mesh(-1),
-            colwise_placements,
+            self.weight, get_mesh(-1), get_colwise_placements(config.sep_parallel_degree > 1)
         )
 
     def forward(self, hidden_states, tensor_parallel_output=None):

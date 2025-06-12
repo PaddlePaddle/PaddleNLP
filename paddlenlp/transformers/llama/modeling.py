@@ -1157,6 +1157,7 @@ class LlamaAttention(nn.Layer):
 
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
+
         attn_output = self.o_proj(attn_output)
 
         if not output_attentions:

@@ -404,6 +404,16 @@ def init_seed(seed: int = 1234, args=None):
                 order = ["pp", "dp", "sharding", "mp", "sep"]
             elif args.hybrid_parallel_topo_order == "sharding_first":
                 order = ["dp", "sharding", "pp", "mp", "sep"]
+
+            if args.context_parallel_degree is not None and args.context_parallel_degree > 1:
+                sep_degree = args.context_parallel_degree
+            elif args.sep_parallel_degree is not None and args.sep_parallel_degree > 1:
+                sep_degree = args.sep_parallel_degree
+            else:
+                sep_degree = 1
+
+            sep_degree = args.sep_parallel_degree if args.sep_parallel_degree > 1 else args.context_parallel_degree
+
             topo = Topology(
                 dist.get_rank(),
                 dist.get_world_size(),
@@ -412,6 +422,7 @@ def init_seed(seed: int = 1234, args=None):
                 mp_degree=args.tensor_parallel_degree,
                 sharding_degree=1,  # auto_parallel's sharding is not orthogonal with dp, mp and pp
                 order=order,
+                sep_degree=sep_degree,
             )
 
             global_seed, local_seed, random_seed = _get_distributed_seeds(args.seed, topo)
@@ -547,6 +558,8 @@ def main():
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
     config.sharding_parallel_degree = training_args.sharding_parallel_degree
     config.to_static = training_args.to_static
+    config.sep_parallel_degree = training_args.sep_parallel_degree
+    config.context_parallel_degree = training_args.context_parallel_degree
 
     if training_args.strategy.pipeline.enable and config.virtual_pp_degree > 1:
         pipeline = training_args.strategy.pipeline
