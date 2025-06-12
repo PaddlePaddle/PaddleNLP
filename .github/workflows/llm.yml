@@ -128,7 +128,7 @@ jobs:
           timeout 2h bash scripts/regression/run_ci.sh python${python_version} ${paddle_whl}
           '
 
-      - name: Upload and display allure-reports & logs
+      - name: Upload allure-reports & logs
         if: always()
         env:
           home_path: ${{ github.workspace }}/..
@@ -136,8 +136,6 @@ jobs:
           allure_file: ${{ github.workspace }}/../allure-2.19.0
         run: |
           docker exec -t ${{ env.container_name }} /bin/bash -c '
-          export AK=paddle
-          export SK=paddle
           if [ ! -f "${{ env.bos_file }}" ]; then
             wget -q --no-proxy -O ${{ env.home_path }}/bos_new.tar.gz https://xly-devops.bj.bcebos.com/home/bos_new.tar.gz --no-check-certificate
             mkdir ${{ env.home_path }}/bos
@@ -155,7 +153,7 @@ jobs:
           done
           cd /workspace/PaddleNLP/
           ${{ env.allure_file }}/bin/allure generate result -o report
-          tar -czf products.tar.gz report model_logs/*
+          tar -czf products.tar.gz report model_logs
           python ${{ env.bos_file }} products.tar.gz paddle-github-action/PR/PaddleNLP/llm/${PR_ID}/${COMMIT_ID}/logs
           echo "products: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/llm/${PR_ID}/${COMMIT_ID}/logs/products.tar.gz"
           '
@@ -165,8 +163,8 @@ jobs:
         run: |
           docker rm -f ${{ env.container_name }}
 
-  upload-reports:
-    name: upload-reports
+  upload-products:
+    name: upload-products
     needs: [llm-ci]
     runs-on: ubuntu-24.04
     steps:
@@ -176,7 +174,7 @@ jobs:
           wget -q --no-proxy  https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/llm/${PR_ID}/${COMMIT_ID}/logs/products.tar.gz --no-check-certificate
           tar -xzf products.tar.gz
 
-      - name: Upload Allure HTML report as artifact
+      - name: Upload Allure report
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -190,6 +188,5 @@ jobs:
         with:
           name: llm-log
           path: |
-            model_logs/commit_info.txt
-            model_logs/*.log
+            model_logs
           if-no-files-found: ignore

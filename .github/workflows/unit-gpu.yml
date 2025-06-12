@@ -1,4 +1,4 @@
-name: PaddleNLP Unit CI
+name: PaddleNLP Unit GPU CI
 
 on:
   push:
@@ -14,11 +14,11 @@ env:
   COMMIT_ID: ${{ github.event.pull_request.head.sha }}
   work_dir: /workspace/PaddleNLP
   PADDLENLP_ROOT: /workspace/PaddleNLP
-  TASK: paddlenlp-CI-${{ github.event.pull_request.number }}-unit
+  TASK: paddlenlp-CI-${{ github.event.pull_request.number }}-unit-gpu
   ci_scripts: /workspace/PaddleNLP/scripts/unit_test
   BRANCH: ${{ github.event.pull_request.base.ref }}
   AGILE_COMPILE_BRANCH: ${{ github.event.pull_request.base.ref }}
-  CI_name: unit-ci
+  CI_name: unit-gpu-ci
   no_proxy: "localhost,bj.bcebos.com,su.bcebos.com,bcebos.com,apiin.im.baidu.com,gitee.com,aliyun.com,.baidu.com,.tuna.tsinghua.edu.cn"
   HF_ENDPOINT: https://hf-mirror.com
   STUDIO_GIT_HOST: http://git.prod.idc-to-cloud.aistudio.baidu-int.com
@@ -32,8 +32,8 @@ defaults:
     shell: bash
 
 jobs:
-  unit-ci:
-    name: unit-test
+  unit-gpu-ci:
+    name: unit-gpu-test
     runs-on: [self-hosted, 4gpu]
     steps:
       - name: Download PaddleNLP
@@ -128,7 +128,7 @@ jobs:
           timeout 50m bash scripts/unit_test/ci_unit.sh ${paddle_whl}
           '
 
-      - name: Upload and display allure-reports & logs
+      - name: Upload allure-reports & logs
         if: always()
         env:
           home_path: ${{ github.workspace }}/..
@@ -136,8 +136,6 @@ jobs:
           allure_file: ${{ github.workspace }}/../allure-2.19.0
         run: |
           docker exec -t ${{ env.container_name }} /bin/bash -c '
-          export AK=paddle
-          export SK=paddle
           if [ ! -f "${{ env.bos_file }}" ]; then
             wget -q --no-proxy -O ${{ env.home_path }}/bos_new.tar.gz https://xly-devops.bj.bcebos.com/home/bos_new.tar.gz --no-check-certificate
             mkdir ${{ env.home_path }}/bos
@@ -150,14 +148,14 @@ jobs:
           cd /workspace/PaddleNLP/unittest_logs
           for FILE in /workspace/PaddleNLP/unittest_logs/*; do
             file=$(basename "$FILE")
-            python ${{ env.bos_file }} $file paddle-github-action/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs
-            echo "$file: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs/$file"
+            python ${{ env.bos_file }} $file paddle-github-action/PR/PaddleNLP/unit-gpu/${PR_ID}/${COMMIT_ID}/logs
+            echo "$file: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit-gpu/${PR_ID}/${COMMIT_ID}/logs/$file"
           done
           cd /workspace/PaddleNLP/
           ${{ env.allure_file }}/bin/allure generate result -o report
-          tar -czf products.tar.gz report unittest_logs/*
-          python ${{ env.bos_file }} products.tar.gz paddle-github-action/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs
-          echo "products: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs/products.tar.gz"
+          tar -czf products.tar.gz report unittest_logs
+          python ${{ env.bos_file }} products.tar.gz paddle-github-action/PR/PaddleNLP/unit-gpu/${PR_ID}/${COMMIT_ID}/logs
+          echo "products: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit-gpu/${PR_ID}/${COMMIT_ID}/logs/products.tar.gz"
           '
 
       - name: Terminate and delete the container
@@ -165,18 +163,18 @@ jobs:
         run: |
           docker rm -f ${{ env.container_name }}
 
-  upload-reports:
-    name: upload-reports
-    needs: [unit-ci]
+  upload-products:
+    name: upload-products
+    needs: [unit-gpu-ci]
     runs-on: ubuntu-24.04
     steps:
       - name: wget files
         if: always()
         run: |
-          wget -q --no-proxy  https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs/products.tar.gz --no-check-certificate
+          wget -q --no-proxy  https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit-gpu/${PR_ID}/${COMMIT_ID}/logs/products.tar.gz --no-check-certificate
           tar -xzf products.tar.gz
 
-      - name: Upload Allure HTML report as artifact
+      - name: Upload Allure report
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -188,8 +186,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: llm-log
+          name: unit-gpu-log
           path: |
-            unittest_logs/commit_info.txt
-            unittest_logs/*.log
+            unittest_logs
           if-no-files-found: ignore

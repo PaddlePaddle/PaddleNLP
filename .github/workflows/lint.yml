@@ -2,14 +2,20 @@ name: Lint
 
 on: [push, pull_request]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   Lint:
     name: Lint
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v3
+      - name: Download PaddleNLP
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
       - name: checkout develop
         run: |
           if ! git show-ref --quiet refs/heads/develop; then \
@@ -19,14 +25,18 @@ jobs:
           else
             echo "local develop branch exist, skipping"
           fi
-      - uses: actions/setup-python@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
           cache: 'pip' # caching pip dependencies
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           make install
-      - name: run the command
+
+      - name: Test
         run: make lint
     
