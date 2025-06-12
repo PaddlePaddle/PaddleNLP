@@ -147,17 +147,17 @@ jobs:
             wget -q --no-proxy -O ${{ env.home_path }}/allure-2.19.0.zip https://xly-devops.bj.bcebos.com/tools/allure-2.19.0.zip --no-check-certificate
             unzip ${{ env.home_path }}/allure-2.19.0.zip
           fi
-          cd /workspace/PaddleNLP/model_logs
-          for FILE in /workspace/PaddleNLP/model_logs/*; do
+          cd /workspace/PaddleNLP/unittest_logs
+          for FILE in /workspace/PaddleNLP/unittest_logs/*; do
             file=$(basename "$FILE")
             python ${{ env.bos_file }} $file paddle-github-action/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs
             echo "$file: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs/$file"
           done
           cd /workspace/PaddleNLP/
           ${{ env.allure_file }}/bin/allure generate result -o report
-          tar -czf results.tar.gz report model_logs/*
-          python ${{ env.bos_file }} results.tar.gz paddle-github-action/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs
-          echo "results: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs/results.tar.gz"
+          tar -czf products.tar.gz report unittest_logs/*
+          python ${{ env.bos_file }} products.tar.gz paddle-github-action/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs
+          echo "products: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs/products.tar.gz"
           '
 
       - name: Terminate and delete the container
@@ -173,8 +173,8 @@ jobs:
       - name: wget files
         if: always()
         run: |
-          wget -q --no-proxy  https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs/results.tar.gz --no-check-certificate
-          tar -xzf results.tar.gz
+          wget -q --no-proxy  https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit/${PR_ID}/${COMMIT_ID}/logs/products.tar.gz --no-check-certificate
+          tar -xzf products.tar.gz
 
       - name: Upload Allure HTML report as artifact
         if: always()
@@ -190,6 +190,6 @@ jobs:
         with:
           name: llm-log
           path: |
-            commit_info.txt
-            *.log
+            unittest_logs/commit_info.txt
+            unittest_logs/*.log
           if-no-files-found: ignore
