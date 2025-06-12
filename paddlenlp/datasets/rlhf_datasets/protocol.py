@@ -28,6 +28,7 @@ import pandas as pd
 from paddle.io import DataLoader
 
 from ...utils import logger
+from ...utils.nested import flatten_list
 
 original_concat = paddle.concat
 __all__ = [
@@ -507,8 +508,6 @@ class DataProto:
 
     @staticmethod
     def gather_tensor(tensor, dp_group=None, sd_group=None):
-        from ...utils.nested import flatten_list
-
         """Gather tensor from all devices."""
 
         if not isinstance(tensor, list):
@@ -579,8 +578,6 @@ class DataProto:
                                               If the input was Paddle Tensor, returns Paddle Tensor.
                                               If the input was NumPy array, returns NumPy array.
         """
-        from ...utils.nested import flatten_list
-
         if not gathered_list:
             raise ValueError("Input gathered_list cannot be empty.")
         is_paddle_tensor = isinstance(gathered_list[0], paddle.Tensor)
@@ -589,15 +586,8 @@ class DataProto:
         else:
             return np.concatenate(flatten_list(gathered_list), axis=0)
 
-    # 这个后面要改，从meta_info获取 pad_index
     @staticmethod
     def pad_tensor(tensor_list, pad_index, dtype, padding_side):
-        # pad = False if len(tensor_list[0].shape) == 1 else True
-        # pad_index = tokenizer.pad_token_id
-        # padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
-
-        # dtype = tensor_list[0].dtype
-
         max_size = max([i.shape[-1] for i in tensor_list])
         data_num = sum([i.shape[0] for i in tensor_list])
         if isinstance(tensor_list[0], paddle.Tensor):
@@ -621,12 +611,8 @@ class DataProto:
 
     @staticmethod
     def pad_or_concat_tensor_list(tensor_list, pad_index, key):
-        from ...utils.nested import flatten_list
-
         left_padding_key = ("prompt", "label_ids")
-        # 由于在 gather 后判断是否 pad，所以要用到 flatten_list
         pad = False if len(flatten_list(tensor_list)[0].shape) == 1 else True
-        # pad = False if len(tensor_list[0].shape) == 1 else True
         padding_side = "left" if (key in left_padding_key) else "right"
         dtype = flatten_list(tensor_list)[0].dtype
         if not pad:
@@ -998,75 +984,6 @@ class DataProto:
             non_tensor_batch=repeated_non_tensor_batch,
             meta_info=self.meta_info,
         )
-
-    @staticmethod
-    def process_row(row, remove_value=0, remove_side="both", eos_token_id=None):
-        """
-        Remove leading/trailing specific values from a tensor.
-
-        Args:
-            row (paddle.Tensor): The 1D tensor to be processed.
-            remove_value (int, optional): The value to be removed, default is 0.
-            remove_side (str, optional): The side to remove values from, can be "left" (remove leading only), "right" (remove trailing only),
-                or "both" (remove both leading and trailing), default is "both".
-
-        Returns:
-            paddle.Tensor: The processed 1D tensor.
-        """
-        if eos_token_id is not None and remove_value == eos_token_id:
-            # Special processing: Retain the index of the last eos_token_id
-            is_not_remove_value = row != remove_value
-            last_eos_idx = paddle.nonzero(row == eos_token_id).flatten()
-            if last_eos_idx.shape[0] > 0:
-                last_eos_idx = last_eos_idx[-1]
-                is_not_remove_value[last_eos_idx] = True
-        else:
-            is_not_remove_value = row != remove_value
-
-        non_zero_indices = paddle.nonzero(is_not_remove_value).flatten()
-        if non_zero_indices.shape[0] == 0:
-            # If the row is all zeros, log a warning and return the original row.
-            logger.warning("Row is all zeros, no trimming will be performed.")
-            return row
-        start_index = non_zero_indices[0]
-        end_index = non_zero_indices[-1]
-        # Slice the middle non-zero part.
-        if remove_side == "left":
-            trimmed_row = row[start_index:]
-        elif remove_side == "right":
-            trimmed_row = row[: end_index + 1]
-        elif remove_side == "both":
-            trimmed_row = row[start_index : end_index + 1]
-        else:
-            # If an unknown remove_side is provided, log a warning and use "both".
-            logger.warning("Unknown remove_side, using 'both' remove_side.")
-            trimmed_row = row[start_index : end_index + 1]
-
-        return trimmed_row
-
-    def remove_pad_tokens_after_generate(self, tokenizer, args):
-        cleanup_batch = [
-            DataProto.process_row(
-                row,
-                remove_value=tokenizer.pad_token_id,
-                remove_side="right",
-                eos_token_id=tokenizer.eos_token_id,
-            )
-            for row in self.batch["input_ids"]
-        ]
-        if args.use_rm_server:
-            label_ids_batch = [
-                DataProto.process_row(
-                    row,
-                    remove_value=tokenizer.pad_token_id,
-                    remove_side="left",
-                    eos_token_id=tokenizer.eos_token_id,
-                )
-                for row in self.batch["label_ids"]
-            ]
-        index = self.non_tensor_batch["index"]
-
-        return cleanup_batch, index, label_ids_batch
 
     def split_batch_into_micro_batches(self, batch_size, pad_token_id=0) -> List["DataProto"]:
         """

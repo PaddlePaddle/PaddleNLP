@@ -84,11 +84,12 @@ from .actor_trainer import ActorReferenceTrainer
 from .critic_trainer import CriticTrainer
 from .reward_trainer import RewardTrainer
 from .rl_trainer import RLTrainerBase
-from .trainer_utils import (  # process_row,
+from .trainer_utils import (
     MuteDefaultFlowCallback,
     batch_retokenize,
     guard_set_args,
     is_same_tokenizer,
+    process_row,
 )
 
 
@@ -1103,7 +1104,7 @@ class PPOTrainer(RLTrainerBase):
         for batch in generated_batches:
             cleanup_batches.extend(
                 [
-                    DataProto.process_row(
+                    process_row(
                         row,
                         remove_value=self.tokenizer.pad_token_id,
                         remove_side="right",
@@ -1115,7 +1116,7 @@ class PPOTrainer(RLTrainerBase):
             if self.args.use_rm_server:
                 label_ids_batches.extend(
                     [
-                        DataProto.process_row(
+                        process_row(
                             row,
                             remove_value=self.tokenizer.pad_token_id,
                             remove_side="left",
@@ -1191,7 +1192,6 @@ class PPOTrainer(RLTrainerBase):
         for key in tensors_to_gather_per_key.keys():
             tensor_list_from_local_batch = tensors_to_gather_per_key[key]
 
-            # 代替 gather_and_pad
             global_balanced_batch_dict[key] = gather_tensor_list(data_parallel_group, sharding_parallel_group)(
                 DataProto.pad_or_concat_tensor_list
             )(tensor_list_from_local_batch, self.tokenizer.pad_token_id, key)
