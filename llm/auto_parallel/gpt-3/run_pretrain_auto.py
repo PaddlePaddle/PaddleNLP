@@ -38,6 +38,7 @@ from paddlenlp.transformers import (
     CosineAnnealingWithWarmupDecay,
     GPTConfig,
     GPTForCausalLMAuto,
+    GPTForCausalLMAutoPP,
     GPTForCausalLMNet,
     GPTPretrainingCriterionAuto,
     GPTPretrainingCriterionNet,
@@ -48,6 +49,7 @@ from paddlenlp.utils.tools import get_env_device
 
 MODEL_CLASSES = {
     "gpt": (GPTConfig, GPTForCausalLMAuto, GPTPretrainingCriterionAuto),
+    "gpt_pp": (GPTConfig, GPTForCausalLMAutoPP, GPTPretrainingCriterionAuto),
     "gpt_network": (GPTConfig, GPTForCausalLMNet, GPTPretrainingCriterionNet),
 }
 
@@ -105,6 +107,10 @@ class PreTrainingArguments(AutoTrainingArguments):
             "help": "Pre-allocate one specific-capacity empty tensor "
             "and release it for avoiding memory fragmentation"
         },
+    )
+    n_microbatches: int = field(
+        default=1,
+        metadata={"help": "Control the num of microbatches in one pp step."},
     )
 
     def __post_init__(self):
