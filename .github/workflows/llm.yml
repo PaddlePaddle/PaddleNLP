@@ -141,10 +141,19 @@ jobs:
           docker cp ${{ env.container_name }}:/workspace/PaddleNLP/report ./report
 
       - name: Upload Allure HTML report as artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: allure-report
           path: report
+          if-no-files-found: ignore
+
+      - name: sleep for debug
+        if: always()
+        run: |
+          docker exec -t ${{ env.container_name }} /bin/bash -c '
+          sleep 1d
+          '
 
       - name: Terminate and delete the container
         if: always()

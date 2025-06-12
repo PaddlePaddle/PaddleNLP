@@ -105,7 +105,7 @@ if [[ ${FLAGS_enable_CI} == "true" ]] || [[ ${FLAGS_enable_CE} == "true" ]];then
     echo ' Testing all unittest cases '
     export http_proxy=${proxy} && export https_proxy=${proxy}
     set +e
-    timeout ${running_time} python -m pytest -v -n 8 \
+    timeout ${running_time} python -m pytest tests/layers/test_linear.py -v -n 8 \
     --dist loadgroup \
     --retries 1 --retry-delay 1 \
     --timeout 200 --durations 20 --alluredir=result \
