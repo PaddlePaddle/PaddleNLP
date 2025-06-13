@@ -40,7 +40,7 @@ unit-test:
 		--retries 1 --retry-delay 1 \
 		--durations 20 \
 		--cov paddlenlp \
-		--cov-report xml:coverage.xml > unittest_cpu.log 2>&1
+		--cov-report xml:coverage.xml 2>&1 | tee unittest_cpu.log
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 

@@ -1,4 +1,4 @@
-name: PaddleNLP Distribut CI (V100)
+name: PaddleNLP Distribute CI (V100)
 
 on:
   push:
@@ -135,6 +135,7 @@ jobs:
   upload-products:
     name: upload-products
     needs: [distribute-ci]
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: wget files

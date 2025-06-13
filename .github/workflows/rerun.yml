@@ -21,3 +21,43 @@ jobs:
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
           JOB_NAME: 'all-failed'
+
+      - name: Rerun LLM
+        if: ${{ contains(github.event.comment.body, 'LLM') }}
+        uses: ./.github/actions/rerun-workflow
+        with:
+          PR_ID: ${{ github.event.issue.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          JOB_NAME: 'PaddleNLP LLM CI / llm-test'
+
+      - name: Rerun Unit GPU
+        if: ${{ contains(github.event.comment.body, 'Unit GPU') }}
+        uses: ./.github/actions/rerun-workflow
+        with:
+          PR_ID: ${{ github.event.issue.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          JOB_NAME: 'PaddleNLP Unit GPU CI / unit-gpu-test'
+        
+      - name: Rerun Unit CPU
+        if: ${{ contains(github.event.comment.body, 'Unit CPU') }}
+        uses: ./.github/actions/rerun-workflow
+        with:
+          PR_ID: ${{ github.event.issue.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          JOB_NAME: 'PaddleNLP Unit CPU CI / unit-cpu-test'
+
+      - name: Rerun Distribute
+        if: ${{ contains(github.event.comment.body, 'Distribute') }}
+        uses: ./.github/actions/rerun-workflow
+        with:
+          PR_ID: ${{ github.event.issue.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          JOB_NAME: 'PaddleNLP Distribute CI / distribute-test'

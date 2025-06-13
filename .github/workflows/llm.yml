@@ -166,6 +166,7 @@ jobs:
   upload-products:
     name: upload-products
     needs: [llm-ci]
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: wget files
