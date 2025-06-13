@@ -660,8 +660,7 @@ llm(){
     export http_proxy=${proxy} && export https_proxy=${proxy}
     echo ' Testing all LLMs '
     cd ${nlp_dir}
-    # timeout 50m python -m pytest tests/llm/test_*.py -vv --timeout=300 --alluredir=result >${log_path}/llm.log 2>&1
-    timeout 50m python -m pytest tests/llm/test_grpo.py -vv --timeout=300 --alluredir=result >${log_path}/llm.log 2>&1
+    timeout 50m python -m pytest tests/llm/test_*.py -vv --timeout=300 --alluredir=result >${log_path}/llm.log 2>&1
     print_info $? llm
 }
 

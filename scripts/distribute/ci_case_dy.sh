@@ -84,27 +84,27 @@ function gpt_case_list_dygraph() {
         # The test name must have "gpt_" as a prefix, which will 
         # be used for tracking the execution status of the case.
         gpt_preprocess_data
-        # gpt_345M_single
-        # gpt_1.3B_dp
-        # gpt_6.7B_stage2_dp2_sharding4
-        # gpt_6.7B_stage3_dp2_sharding4
-        # gpt_6.7B_stage2_sharding8
-        # gpt_175B_DP1_MP4_PP2
-        # gpt_175B_DP1_MP4_PP2_sp
-        # gpt_175B_DP1_MP8_PP1
-        # gpt_175B_DP1_MP8_PP1_sp
-        # gpt_175B_DP1_MP1_PP8
-        # gpt_generation_345M_single
-        # gpt_generation_345M_hybrid
-        # gpt_345M_mp8_qat
-        # # gpt_export_345M_mp1
-        # # gpt_export_345M_mp2
-        # # gpt_export_qat_345M
-        # # gpt_inference_345M_single
-        # # gpt_inference_345M_dp8
-        # gpt_345M_single_finetune
-        # gpt_eval_WikiText
-        # gpt_eval_LAMBADA
+        gpt_345M_single
+        gpt_1.3B_dp
+        gpt_6.7B_stage2_dp2_sharding4
+        gpt_6.7B_stage3_dp2_sharding4
+        gpt_6.7B_stage2_sharding8
+        gpt_175B_DP1_MP4_PP2
+        gpt_175B_DP1_MP4_PP2_sp
+        gpt_175B_DP1_MP8_PP1
+        gpt_175B_DP1_MP8_PP1_sp
+        gpt_175B_DP1_MP1_PP8
+        gpt_generation_345M_single
+        gpt_generation_345M_hybrid
+        gpt_345M_mp8_qat
+        # gpt_export_345M_mp1
+        # gpt_export_345M_mp2
+        # gpt_export_qat_345M
+        # gpt_inference_345M_single
+        # gpt_inference_345M_dp8
+        gpt_345M_single_finetune
+        gpt_eval_WikiText
+        gpt_eval_LAMBADA
     )
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
