@@ -111,7 +111,7 @@ def get_colwise_placements(use_sep=False):
     # Note(luchang): now paddle auto parallel mode do not support
     # shard one dim twice, so we can not use sep and tp at the same time.
     if use_sep:
-        return [dist.Replicate(), dist.Replicate(), dist.Replicate()]
+        return [dist.Replicate(), dist.Shard(1), dist.Replicate()]
     else:
         return [dist.Replicate(), dist.Shard(1)]
 
@@ -120,7 +120,7 @@ def get_rowise_placements(use_sep=False):
     # Note(luchang): now paddle auto parallel mode do not support
     # shard one dim twice, so we can not use sep and tp at the same time.
     if use_sep:
-        return [dist.Replicate(), dist.Replicate(), dist.Replicate()]
+        return [dist.Replicate(), dist.Shard(0), dist.Replicate()]
     else:
         return [dist.Replicate(), dist.Shard(0)]
 
@@ -657,7 +657,7 @@ class LlamaAttentionAuto(nn.Layer):
 
         alibi_placements = [dist.Shard(0), dist.Shard(1)]
         if self.config.sep_parallel_degree > 1:
-            alibi_placements = [dist.Shard(0), dist.Replicate(), dist.Replicate()]
+            alibi_placements = [dist.Shard(0), dist.Shard(1), dist.Replicate()]
 
         alibi = dist.reshard(alibi, get_mesh(self.ipp), alibi_placements) if alibi is not None else None
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
@@ -1038,11 +1038,13 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         self.placements = None
         if self.config.context_parallel_degree > 1 or self.config.sep_parallel_degree > 1:
             # [dp, sep, mp]
-            self.placements = (
-                [dist.Shard(1), dist.Replicate(), dist.Shard(0)]
-                if self.config.sequence_parallel
-                else [dist.Shard(0), dist.Shard(1), dist.Replicate()]
-            )
+            if self.config.sequence_parallel:
+                raise ValueError(
+                    "sequance parallel cannot be used with sep, "
+                    "because paddle auto parallel does not support "
+                    "reshard one dim twice."
+                )
+            self.placements = [dist.Shard(0), dist.Shard(1), dist.Replicate()]
         else:
             self.placements = (
                 [dist.Shard(1), dist.Shard(0)] if self.config.sequence_parallel else [dist.Shard(0), dist.Replicate()]
