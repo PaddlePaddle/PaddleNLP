@@ -1,1 +1,0 @@
-../../../../../llm/server/docs/static_models.md

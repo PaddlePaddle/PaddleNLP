@@ -1,5 +1,5 @@
 name: 🐛 Docs Report
-description: PaddleNLP文档反馈
+description: PaddleFormers文档反馈
 title: "[Docs]: "
 labels: 
   - documentation
@@ -18,7 +18,7 @@ body:
       value: |
           - paddlepaddle:
           - paddlepaddle-gpu: 
-          - paddlenlp: 
+          - paddleformers: 
       render: Markdown
     validations:
       required: true

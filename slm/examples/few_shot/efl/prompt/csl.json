@@ -1,8 +1,0 @@
-{
-    "template": [
-        {"text": "给定以下几个词语：{'options': 'keyword', 'add_prompt': '[OPT]，'}{'text': 'candidate_label'}扩写成“{'text': 'abst'}”"}
-    ],
-    "verbalizer": [
-        {"0": "不能", "1": "可以"}
-    ]
-}

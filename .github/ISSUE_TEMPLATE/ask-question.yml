@@ -1,5 +1,5 @@
 name: 🐛 Ask Question
-description: 请描述您使用PaddleNLP时遇到的问题
+description: 请描述您使用PaddleFormers时遇到的问题
 title: "[Question]: "
 labels: 
   - question

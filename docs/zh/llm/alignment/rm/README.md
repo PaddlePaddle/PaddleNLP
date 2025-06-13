@@ -1,1 +1,0 @@
-../../../../../llm/alignment/rm/README.md

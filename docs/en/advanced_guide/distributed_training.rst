@@ -1,2 +1,0 @@
-Large-scale Distributed Training
-============

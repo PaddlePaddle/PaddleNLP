@@ -1,3 +1,0 @@
-# UnitTest for PaddleNLP
-
-TBD

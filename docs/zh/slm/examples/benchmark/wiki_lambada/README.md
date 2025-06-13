@@ -1,1 +1,0 @@
-../../../../../../slm/examples/benchmark/wiki_lambada/README.md

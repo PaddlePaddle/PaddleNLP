@@ -1,8 +1,0 @@
-{
-    "template": [
-        {"text": "{'mask'}{'mask'}{'soft'}{'text': 'text'}{'text': 'pronoun'}指的是{'text': 'entity'}"}
-    ],
-    "verbalizer": [
-        {"false": "错误", "true": "正确"}
-    ]
-}

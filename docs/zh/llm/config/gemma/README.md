@@ -1,1 +1,0 @@
-../../../../../llm/config/gemma/README.md

@@ -20,7 +20,7 @@ from datetime import datetime
 
 import setuptools
 
-PADDLENLP_STABLE_VERSION = "PADDLENLP_STABLE_VERSION"
+PADDLEFORMERS_STABLE_VERSION = "PADDLEFORMERS_STABLE_VERSION"
 
 
 def read_requirements_file(filepath):
@@ -62,34 +62,34 @@ def is_dirty(dir: str) -> bool:
 
 
 commit = "unknown"
-paddlenlp_dir = os.path.abspath(os.path.dirname(__file__))
-if commit.endswith("unknown") and is_git_repo(paddlenlp_dir) and have_git():
-    commit = git_revision(paddlenlp_dir).decode("utf-8")
-    if is_dirty(paddlenlp_dir):
+paddleformers_dir = os.path.abspath(os.path.dirname(__file__))
+if commit.endswith("unknown") and is_git_repo(paddleformers_dir) and have_git():
+    commit = git_revision(paddleformers_dir).decode("utf-8")
+    if is_dirty(paddleformers_dir):
         commit += ".dirty"
 
 
-def write_version_py(filename="paddlenlp/version/__init__.py"):
-    cnt = '''# THIS FILE IS GENERATED FROM PADDLENLP SETUP.PY
+def write_version_py(filename="paddleformers/version/__init__.py"):
+    cnt = '''# THIS FILE IS GENERATED FROM PADDLEFORMERS SETUP.PY
 commit           = '%(commit)s'
 
 __all__ = ['show']
 
 def show():
-    """Get the corresponding commit id of paddlenlp.
+    """Get the corresponding commit id of paddleformers.
 
     Returns:
-        The commit-id of paddlenlp will be output.
+        The commit-id of paddleformers will be output.
 
-        full_version: version of paddlenlp
+        full_version: version of paddleformers
 
 
     Examples:
         .. code-block:: python
 
-            import paddlenlp
+            import paddleformers
 
-            paddlenlp.version.show()
+            paddleformers.version.show()
             # commit: 1ef5b94a18773bb0b1bba1651526e5f5fc5b16fa
 
     """
@@ -112,8 +112,8 @@ def show():
 
 
 # only use this file to contral the version
-__version__ = "3.0.0b4.post"
-if os.getenv(PADDLENLP_STABLE_VERSION):
+__version__ = "0.0.0.post"
+if os.getenv(PADDLEFORMERS_STABLE_VERSION):
     __version__ = __version__.replace(".post", "")
 else:
     formatted_date = datetime.now().date().strftime("%Y%m%d")
@@ -121,7 +121,7 @@ else:
 
 
 # write the version information for the develop version
-def append_version_py(filename="paddlenlp/__init__.py"):
+def append_version_py(filename="paddleformers/__init__.py"):
     assert os.path.exists(filename), f"{filename} does not exist!"
 
     with open(filename, "r") as file:
@@ -133,14 +133,10 @@ def append_version_py(filename="paddlenlp/__init__.py"):
         file.write(modified_content)
 
 
-append_version_py(filename="paddlenlp/__init__.py")
+append_version_py(filename="paddleformers/__init__.py")
 
 extras = {}
 REQUIRED_PACKAGES = read_requirements_file("requirements.txt")
-extras["tests"] = read_requirements_file("tests/requirements.txt")
-extras["docs"] = read_requirements_file("docs/requirements.txt")
-extras["autonlp"] = read_requirements_file("paddlenlp/experimental/autonlp/requirements.txt")
-extras["dev"] = extras["tests"] + extras["docs"] + extras["autonlp"]
 
 
 def read(*names, **kwargs):
@@ -171,35 +167,27 @@ def get_package_data_files(package, data, package_dir=None):
 
 
 if commit != "unknown":
-    write_version_py(filename="paddlenlp/version/__init__.py")
+    write_version_py(filename="paddleformers/version/__init__.py")
 
 try:
     setuptools.setup(
-        name="paddlenlp",
+        name="paddleformers",
         version=__version__,
-        author="PaddleNLP Team",
-        author_email="paddlenlp@baidu.com",
+        author="PaddleFormers Team",
+        author_email="paddleformers@baidu.com",
         description="Easy-to-use and powerful NLP library with Awesome model zoo, supporting wide-range of NLP tasks from research to industrial applications, including Neural Search, Question Answering, Information Extraction and Sentiment Analysis end-to-end system.",
         long_description=read("README_en.md"),
         long_description_content_type="text/markdown",
-        url="https://github.com/PaddlePaddle/PaddleNLP",
+        url="https://github.com/PaddlePaddle/PaddleFormers",
         license_files=("LICENSE",),
         packages=setuptools.find_packages(
             where=".",
             exclude=("examples*", "tests*", "applications*", "fast_generation*", "model_zoo*"),
         ),
-        package_data={
-            "paddlenlp.ops": get_package_data_files(
-                "paddlenlp.ops", ["CMakeLists.txt", "README.md", "cmake", "fast_transformer", "patches", "optimizer"]
-            ),
-            "paddlenlp.transformers.layoutxlm": get_package_data_files(
-                "paddlenlp.transformers.layoutxlm", ["visual_backbone.yaml"]
-            ),
-            "paddlenlp.experimental": get_package_data_files("paddlenlp.experimental", ["transformers"]),
-        },
+        package_data={},
         setup_requires=["cython", "numpy"],
         install_requires=REQUIRED_PACKAGES,
-        entry_points={"console_scripts": ["paddlenlp = paddlenlp.cli:main"]},
+        entry_points={"console_scripts": ["paddleformers = paddleformers.cli:main"]},
         extras_require=extras,
         python_requires=">=3.8",
         classifiers=[
@@ -213,9 +201,9 @@ try:
         license="Apache 2.0",
     )
 except Exception as e:
-    git_checkout(paddlenlp_dir, "paddlenlp/version/__init__.py") if commit != "unknown" else None
-    git_checkout(paddlenlp_dir, "paddlenlp/__init__.py") if commit != "unknown" else None
+    git_checkout(paddleformers_dir, "paddleformers/version/__init__.py") if commit != "unknown" else None
+    git_checkout(paddleformers_dir, "paddleformers/__init__.py") if commit != "unknown" else None
     raise e
 
-git_checkout(paddlenlp_dir, "paddlenlp/version/__init__.py") if commit != "unknown" else None
-git_checkout(paddlenlp_dir, "paddlenlp/__init__.py") if commit != "unknown" else None
+git_checkout(paddleformers_dir, "paddleformers/version/__init__.py") if commit != "unknown" else None
+git_checkout(paddleformers_dir, "paddleformers/__init__.py") if commit != "unknown" else None

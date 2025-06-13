@@ -1,1 +1,0 @@
-../../../../../llm/application/information_extraction/README.md

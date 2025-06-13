@@ -1,4 +1,4 @@
-<!-- Demo: https://github.com/PaddlePaddle/PaddleNLP/pull/26 -->
+<!-- Demo: https://github.com/PaddlePaddle/PaddleFormers/pull/ -->
 #### Before submitting
 
 - [ ] Lint code. If there are lint issues, please format the code first.

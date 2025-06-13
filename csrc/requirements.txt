@@ -1,2 +1,0 @@
-cupy-cuda116
-pybind11

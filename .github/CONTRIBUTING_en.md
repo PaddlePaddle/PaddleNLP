@@ -1,8 +1,8 @@
 [简体中文🀄](../CONTRIBUTING.md) |  **English**🌎
 
-# Contributing to PaddleNLP
+# Contributing to PaddleFormers
 
-We highly welcome and value your contributions to `PaddleNLP`. The first step to start your contribution is to sign the [PaddlePaddle Contributor License Agreement](https://cla-assistant.io/PaddlePaddle/PaddleNLP).
+We highly welcome and value your contributions to `PaddleFormers`. The first step to start your contribution is to sign the [PaddlePaddle Contributor License Agreement](https://cla-assistant.io/PaddlePaddle/PaddleFormers).
 
 This document explains our workflow and work style:
 
@@ -10,7 +10,7 @@ This document explains our workflow and work style:
 
 ## Development Workflow
 
-PaddleNLP uses the [Git branching model](http://nvie.com/posts/a-successful-git-branching-model/).  The following steps guide usual contributions.
+PaddleFormers uses the [Git branching model](http://nvie.com/posts/a-successful-git-branching-model/).  The following steps guide usual contributions.
 
 #### 1. Fork
 
@@ -21,8 +21,8 @@ PaddleNLP uses the [Git branching model](http://nvie.com/posts/a-successful-git-
    To make a copy of your fork to your local computers, please run
 
    ```bash
-   git clone https://github.com/<your-github-account>/PaddleNLP
-   cd PaddleNLP
+   git clone https://github.com/<your-github-account>/PaddleFormers
+   cd PaddleFormers
    ```
 
 #### 3. Create the local feature branch
@@ -43,10 +43,10 @@ PaddleNLP uses the [Git branching model](http://nvie.com/posts/a-successful-git-
    make install
    ```
 
-   This will setup all the dependencies of `PaddleNLP` as well as the [`pre-commit`](http://pre-commit.com/) tool.
+   This will setup all the dependencies of `PaddleFormers` as well as the [`pre-commit`](http://pre-commit.com/) tool.
 
-   If you are working on the `examples` or `applications` module and require importing from `PaddleNLP`, make sure you install `PaddleNLP` in editable mode.
-   If `PaddleNLP` is already installed in the virtual environment, remove it with `pip uninstall paddlenlp` before reinstalling it in editable mode with
+   If you are working on the `examples` or `applications` module and require importing from `PaddleFormers`, make sure you install `PaddleFormers` in editable mode.
+   If `PaddleFormers` is already installed in the virtual environment, remove it with `pip uninstall PaddleFormers` before reinstalling it in editable mode with
    `pip install -e .`
 
 #### 5. Develop
@@ -118,7 +118,7 @@ PaddleNLP uses the [Git branching model](http://nvie.com/posts/a-successful-git-
    An experienced Git user pulls from the official repo often -- daily or even hourly, so they notice conflicts with others work early, and it's easier to resolve smaller conflicts.
 
    ```bash
-   git remote add upstream https://github.com/PaddlePaddle/PaddleNLP
+   git remote add upstream https://github.com/PaddlePaddle/PaddleFormers
    git pull upstream develop
    ```
 
@@ -130,7 +130,7 @@ PaddleNLP uses the [Git branching model](http://nvie.com/posts/a-successful-git-
    git push origin my-cool-stuff
    ```
 
-   The push allows you to create a pull request, requesting owners of this [official repo](https://github.com/PaddlePaddle/PaddleNLP) to pull your change into the official one.
+   The push allows you to create a pull request, requesting owners of this [official repo](https://github.com/PaddlePaddle/PaddleFormers) to pull your change into the official one.
 
    To create a pull request, please follow [these steps](https://help.github.com/articles/creating-a-pull-request/).
 

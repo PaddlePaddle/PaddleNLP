@@ -43,9 +43,9 @@ jobs:
         if: steps.check-branch.outputs.match == 'true' && steps.should-deploy.outputs.should_deploy == 'true'
         env:
           TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.paddlenlp }}
+          TWINE_PASSWORD: ${{ secrets.paddleformers }}
           PACKAGE: ${{ inputs.package }}
-          PADDLENLP_STABLE_VERSION: "true"
+          PaddleFormers_STABLE_VERSION: "true"
         run: |
           make deploy-$PACKAGE
 

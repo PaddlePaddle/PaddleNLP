@@ -1,12 +1,12 @@
-# Makefile for PaddleNLP
+# Makefile for PaddleFormers
 #
-# 	GitHb: https://github.com/PaddlePaddle/PaddleNLP
+# 	GitHb: https://github.com/PaddlePaddle/PaddleFormers
 # 	Author: Paddle Team https://github.com/PaddlePaddle
 #
 
 .PHONY: all
 all : lint test
-check_dirs := applications examples model_zoo paddlenlp pipelines ppdiffusers scripts tests 
+check_dirs := paddleformers scripts tests 
 # # # # # # # # # # # # # # # Format Block # # # # # # # # # # # # # # # 
 
 format:
@@ -39,7 +39,7 @@ unit-test:
 		-n auto \
 		--retries 1 --retry-delay 1 \
 		--durations 20 \
-		--cov paddlenlp \
+		--cov paddleformers \
 		--cov-report xml:coverage.xml
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -49,7 +49,6 @@ install:
 	pip install --pre paddlepaddle -i https://www.paddlepaddle.org.cn/packages/nightly/cpu/
 	pip install -r requirements-dev.txt
 	pip install -r requirements.txt
-	pip install -r paddlenlp/experimental/autonlp/requirements.txt
 	pre-commit install
 
 
@@ -61,8 +60,8 @@ deploy-ppdiffusers:
 deploy-paddle-pipelines:
 	cd pipelines && make install && make
 
-.PHONY: deploy-paddlenlp
-deploy-paddlenlp:
+.PHONY: deploy-paddleformers
+deploy-paddleformers:
 	# install related package
 	make install
 	# build

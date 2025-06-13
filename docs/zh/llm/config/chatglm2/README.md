@@ -1,1 +1,0 @@
-../../../../../llm/config/chatglm2/README.md

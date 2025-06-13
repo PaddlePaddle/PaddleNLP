@@ -1,3 +1,0 @@
-black[jupyter] == 23.3.0
-isort == 5.11.5
-pre-commit

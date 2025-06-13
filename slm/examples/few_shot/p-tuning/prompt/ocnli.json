@@ -1,8 +1,0 @@
-{
-    "template": [
-        {"text": "{'mask'}{'mask'}{'soft'}{'text': 'sentence1'}{'text': 'sentence2'}"}
-    ],
-    "verbalizer": [
-        {"contradiction": "不同", "entailment": "相似", "neutral": "无关"}
-    ]
-}

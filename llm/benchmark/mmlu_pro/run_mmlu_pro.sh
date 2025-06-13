@@ -1,1 +1,0 @@
-python3 evaluate_from_api.py --backend trtllm --ip $IP --port $PORT --output_dir ./eval_trtlllm

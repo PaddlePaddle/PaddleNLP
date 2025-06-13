@@ -1,1 +1,0 @@
-../../../../../llm/config/mistral/README.md

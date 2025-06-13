@@ -1,5 +1,0 @@
-{
-    "system": "<s>[INST] <<SYS>\n\n<</SYS>>",
-    "conversation": ["[INST] {{user}} [/INST]", "{{bot}}</s>"],
-    "query": "[INST] {{query}} [/INST]"
-}

@@ -1,1 +1,0 @@
-../../../../../llm/config/baichuan/README.md

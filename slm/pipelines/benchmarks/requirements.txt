@@ -1,3 +1,0 @@
-datasets
-mteb[beir]
-typer==0.9.0
