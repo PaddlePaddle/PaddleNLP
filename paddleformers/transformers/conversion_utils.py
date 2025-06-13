@@ -1311,7 +1311,7 @@ class ConversionMixin:
         is_split=True,
         ignore_error=False,
         base_model_prefix=None,
-        post_quantize=False,
+        post_quantize=True,
         is_optim=False,
     ):
         name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=is_split)
