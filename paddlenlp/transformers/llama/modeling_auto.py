@@ -111,7 +111,7 @@ def get_colwise_placements(use_sep=False):
     # Note(luchang): now paddle auto parallel mode do not support
     # shard one dim twice, so we can not use sep and tp at the same time.
     if use_sep:
-        return [dist.Replicate(), dist.Shard(1), dist.Replicate()]
+        return [dist.Replicate(), dist.Replicate(), dist.Replicate()]
     else:
         return [dist.Replicate(), dist.Shard(1)]
 
@@ -120,7 +120,7 @@ def get_rowise_placements(use_sep=False):
     # Note(luchang): now paddle auto parallel mode do not support
     # shard one dim twice, so we can not use sep and tp at the same time.
     if use_sep:
-        return [dist.Replicate(), dist.Shard(0), dist.Replicate()]
+        return [dist.Replicate(), dist.Replicate(), dist.Replicate()]
     else:
         return [dist.Replicate(), dist.Shard(0)]
 
