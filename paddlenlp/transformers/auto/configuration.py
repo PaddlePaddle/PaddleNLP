@@ -259,14 +259,14 @@ class _LazyConfigMapping(OrderedDict):
         module_name = model_type_to_module_name(key)
         if module_name not in self._modules:
             self._modules[module_name] = importlib.import_module(
-                f".{module_name}.configuration", "paddlenlp.transformers"
+                f".{module_name}.configuration", "paddleformers.transformers"
             )
         if hasattr(self._modules[module_name], value):
             return getattr(self._modules[module_name], value)
 
         # Some of the mappings have entries model_type -> config of another model type. In that case we try to grab the
         # object at the top level.
-        transformers_module = importlib.import_module("paddlenlp")
+        transformers_module = importlib.import_module("paddleformers")
         return getattr(transformers_module, value)
 
     def keys(self):
@@ -320,7 +320,7 @@ def get_configurations() -> Dict[str, List[Type[PretrainedConfig]]]:
         if not os.path.exists(configuration_path):
             continue
 
-        configuration_module = import_module(f"paddlenlp.transformers.{model_name}.configuration")
+        configuration_module = import_module(f"paddleformers.transformers.{model_name}.configuration")
         for key in dir(configuration_module):
             value = getattr(configuration_module, key)
             if inspect.isclass(value) and issubclass(value, PretrainedConfig):
@@ -366,10 +366,10 @@ class AutoConfig(PretrainedConfig):
                 return cls
 
         model_name = architectures[0]
-        model_class = import_module(f"paddlenlp.transformers.{model_name}")
+        model_class = import_module(f"paddleformers.transformers.{model_name}")
 
         # To make AutoConfig support loading config with custom model_class
-        # which is not in paddlenlp.transformers. Using "model_type" to load
+        # which is not in paddleformers.transformers. Using "model_type" to load
         # here actually conforms to what PretrainedConfig doc describes.
         if model_class is None and "model_type" in config:
             model_type = config["model_type"]
@@ -428,7 +428,7 @@ class AutoConfig(PretrainedConfig):
 
         Example:
             .. code-block::
-            from paddlenlp.transformers import AutoConfig
+            from paddleformers.transformers import AutoConfig
             config = AutoConfig.from_pretrained("bert-base-uncased")
             config.save_pretrained('./bert-base-uncased')
         """

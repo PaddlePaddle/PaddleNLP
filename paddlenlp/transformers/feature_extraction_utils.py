@@ -23,8 +23,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 import numpy as np
 import paddle
 
-from paddlenlp.utils.download import resolve_file_path
-
+from ..utils.download import resolve_file_path
 from ..utils.log import logger
 from .tokenizer_utils_base import TensorType
 

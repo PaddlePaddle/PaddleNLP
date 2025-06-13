@@ -44,7 +44,7 @@ def tuple_output(outputs: Tuple[Tensor], loss: Optional[Tensor] = None):
 
 def convert_encoder_output(encoder_output):
     """
-    Convert encoder_output from tuple to class:`~paddlenlp.transformers.model_outputs.BaseModelOutput`.
+    Convert encoder_output from tuple to class:`~paddleformers.transformers.model_outputs.BaseModelOutput`.
 
     Args:
         encoder_output (tuple or ModelOutput):

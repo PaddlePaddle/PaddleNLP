@@ -88,7 +88,7 @@ class SimpleInfclLoss(nn.Layer):
             Tensor: The computed loss.
         """
         try:
-            from paddlenlp_kernel.triton.inf_cl import cal_inf_loss
+            from paddleformers_kernel.triton.inf_cl import cal_inf_loss
         except ImportError:
             raise ImportError(
                 "Paddlenlp_kernels are not available, which means the inf_cl loss cannot be used. If you wish to use the inf_cl loss, please follow the instructions in the README.md on the `ops`."

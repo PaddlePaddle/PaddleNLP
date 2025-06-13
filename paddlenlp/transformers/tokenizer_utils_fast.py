@@ -277,7 +277,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         verbose: bool = True,
     ) -> Tuple[Dict[str, Any], List[EncodingFast]]:
         """
-        Convert the encoding representation (from low-level PaddleNLP TokenizerFast output) to a python Dict and a list
+        Convert the encoding representation (from low-level PaddleFormers TokenizerFast output) to a python Dict and a list
         of encodings, take care of building a batch from overflowing tokens.
 
         Overflowing tokens are converted to additional examples (like batches) so the output values of the dict are
@@ -407,7 +407,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         padding_side: Optional[Literal["right", "left"]],
     ):
         """
-        Define the truncation and the padding strategies for fast tokenizers (provided by PaddleNLP's fast_tokenizer
+        Define the truncation and the padding strategies for fast tokenizers (provided by PaddleFormers's fast_tokenizer
         library) and restore the tokenizer settings afterwards.
 
         The provided tokenizer has no padding / truncation strategy before the managed section. If your tokenizer set a

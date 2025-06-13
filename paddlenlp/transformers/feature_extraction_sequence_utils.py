@@ -20,9 +20,8 @@ from typing import Dict, List, Optional, Union
 import numpy as np
 import paddle
 
-from paddlenlp.transformers.tokenizer_utils_base import PaddingStrategy
-
 from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
+from .tokenizer_utils_base import PaddingStrategy
 
 
 class SequenceFeatureExtractor(FeatureExtractionMixin):

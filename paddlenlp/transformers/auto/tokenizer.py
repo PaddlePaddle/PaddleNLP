@@ -66,9 +66,9 @@ def get_configurations():
         all_tokenizers = get_mapping_tokenizers(values, with_fast=False)
         for key in all_tokenizers:
             try:
-                import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
+                import_class = importlib.import_module(f"paddleformers.transformers.{class_name}.tokenizer")
             except ImportError:
-                import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.tokenizer_fast")
+                import_class = importlib.import_module(f"paddleformers.transformers.{class_name}.tokenizer_fast")
             tokenizer_name = getattr(import_class, key)
             name = tuple(tokenizer_name.pretrained_init_configuration.keys())
             MAPPING_NAMES[name] = tokenizer_name
@@ -91,16 +91,18 @@ def tokenizer_class_from_name(class_name: str):
         if class_name in all_tokenizers:
             module_name = model_type_to_module_name(module_name)
             try:
-                module = importlib.import_module(f".{module_name}", "paddlenlp.transformers")
+                module = importlib.import_module(f".{module_name}", "paddleformers.transformers")
                 return getattr(module, class_name)
             except AttributeError:
                 try:
-                    module = importlib.import_module(f".{module_name}.tokenizer", "paddlenlp.transformers")
+                    module = importlib.import_module(f".{module_name}.tokenizer", "paddleformers.transformers")
 
                     return getattr(module, class_name)
                 except AttributeError:
                     try:
-                        module = importlib.import_module(f".{module_name}.tokenizer_fast", "paddlenlp.transformers")
+                        module = importlib.import_module(
+                            f".{module_name}.tokenizer_fast", "paddleformers.transformers"
+                        )
 
                         return getattr(module, class_name)
                     except AttributeError:
@@ -113,7 +115,7 @@ def tokenizer_class_from_name(class_name: str):
 
     # We did not fine the class, but maybe it's because a dep is missing. In that case, the class will be in the main
     # init and we return the proper dummy to get an appropriate error message.
-    main_module = importlib.import_module("paddlenlp")
+    main_module = importlib.import_module("paddleformers")
     if hasattr(main_module, class_name):
         return getattr(main_module, class_name)
 
@@ -245,7 +247,7 @@ class AutoTokenizer:
         if init_class:
             if init_class in cls._name_mapping:
                 class_name = cls._name_mapping[init_class]
-                import_class = import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
+                import_class = import_module(f"paddleformers.transformers.{class_name}.tokenizer")
                 tokenizer_class = None
                 try:
                     if tokenizer_class is None:
@@ -254,7 +256,7 @@ class AutoTokenizer:
                     raise ValueError(f"Tokenizer class {init_class} is not currently imported.")
                 return tokenizer_class
             else:
-                import_class = import_module("paddlenlp.transformers")
+                import_class = import_module("paddleformers.transformers")
                 tokenizer_class = getattr(import_class, init_class, None)
                 assert tokenizer_class is not None, f"Can't find tokenizer {init_class}"
                 return tokenizer_class
@@ -267,7 +269,7 @@ class AutoTokenizer:
                 if pattern in pretrained_model_name_or_path.lower():
                     init_class = key
                     class_name = cls._name_mapping[init_class]
-                    import_class = import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
+                    import_class = import_module(f"paddleformers.transformers.{class_name}.tokenizer")
                     tokenizer_class = getattr(import_class, init_class)
                     break
             return tokenizer_class
@@ -299,22 +301,22 @@ class AutoTokenizer:
         Example:
             .. code-block::
 
-                from paddlenlp.transformers import AutoTokenizer
+                from paddleformers.transformers import AutoTokenizer
 
                 # Name of built-in pretrained model
                 tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
                 print(type(tokenizer))
-                # <class 'paddlenlp.transformers.bert.tokenizer.BertTokenizer'>
+                # <class 'paddleformers.transformers.bert.tokenizer.BertTokenizer'>
 
                 # Name of community-contributed pretrained model
                 tokenizer = AutoTokenizer.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
                 print(type(tokenizer))
-                # <class 'paddlenlp.transformers.bert.tokenizer.BertTokenizer'>
+                # <class 'paddleformers.transformers.bert.tokenizer.BertTokenizer'>
 
                 # Load from local directory path
                 tokenizer = AutoTokenizer.from_pretrained('./my_bert/')
                 print(type(tokenizer))
-                # <class 'paddlenlp.transformers.bert.tokenizer.BertTokenizer'>
+                # <class 'paddleformers.transformers.bert.tokenizer.BertTokenizer'>
         """
         config = kwargs.pop("config", None)
         kwargs["_from_auto"] = True

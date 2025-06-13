@@ -33,7 +33,7 @@ IMAGE_PROCESSOR_MAPPING_NAMES = OrderedDict([])
 def get_configurations():
     MAPPING_NAMES = OrderedDict()
     for key, class_name in IMAGE_PROCESSOR_MAPPING_NAMES.items():
-        import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.image_processing")
+        import_class = importlib.import_module(f"paddleformers.transformers.{class_name}.image_processing")
         processor_name = getattr(import_class, key)
         name = tuple(processor_name.pretrained_init_configuration.keys())
         if MAPPING_NAMES.get(name, None) is None:
@@ -75,7 +75,7 @@ class AutoImageProcessor:
             init_class = init_class.replace("FeatureExtractor", "ImageProcessor")
             try:
                 class_name = cls._name_mapping[init_class]
-                import_class = import_module(f"paddlenlp.transformers.{class_name}.image_processing")
+                import_class = import_module(f"paddleformers.transformers.{class_name}.image_processing")
                 processor_class = getattr(import_class, init_class)
                 return processor_class
             except Exception:
@@ -88,7 +88,7 @@ class AutoImageProcessor:
                 if pattern in pretrained_model_name_or_path.lower():
                     init_class = key
                     class_name = cls._name_mapping[init_class]
-                    import_class = import_module(f"paddlenlp.transformers.{class_name}.image_processing")
+                    import_class = import_module(f"paddleformers.transformers.{class_name}.image_processing")
                     processor_class = getattr(import_class, init_class)
                     break
             return processor_class
@@ -120,7 +120,7 @@ class AutoImageProcessor:
 
         Example:
             .. code-block::
-            from paddlenlp.transformers import AutoImageProcessor
+            from paddleformers.transformers import AutoImageProcessor
             processor = AutoImageProcessor.from_pretrained("openai/clip-vit-base-patch32")
             processor.save_pretrained('clip_processor')
         """

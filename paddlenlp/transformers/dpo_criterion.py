@@ -20,15 +20,17 @@ import paddle.nn.functional as F
 from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy
 from paddle.distributed.fleet.utils.sequence_parallel_utils import GatherOp
 
-from paddlenlp.transformers import (
+from ..utils import infohub
+from .model_outputs import CausalLMOutputWithPast
+from .sequence_parallel_utils import (
     AllGatherVarlenOp,
+    sequence_parallel_sparse_mask_labels,
+)
+from .tensor_parallel_utils import (
     fused_head_and_loss_fn,
     parallel_linear,
     parallel_matmul,
-    sequence_parallel_sparse_mask_labels,
 )
-from paddlenlp.transformers.model_outputs import CausalLMOutputWithPast
-from paddlenlp.utils import infohub
 
 
 class DPOCriterion(nn.Layer):

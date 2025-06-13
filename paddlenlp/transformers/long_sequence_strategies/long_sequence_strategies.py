@@ -43,12 +43,14 @@ class LongSequenceStrategies:
         """
 
         """
-        paddlenlp.transformers.long_sequence_strategies.{strategy_type<->import_class)}.{stratety_name<->strategy_class)}
-        paddlenlp.transformers.long_sequence_strategies.{embedding_strategies}.{RoPE,...}
-        paddlenlp.transformers.long_sequence_strategies.{attention_strategies}.{ALiBi,...}
+        paddleformers.transformers.long_sequence_strategies.{strategy_type<->import_class)}.{stratety_name<->strategy_class)}
+        paddleformers.transformers.long_sequence_strategies.{embedding_strategies}.{RoPE,...}
+        paddleformers.transformers.long_sequence_strategies.{attention_strategies}.{ALiBi,...}
         """
         try:
-            import_class = importlib.import_module(f"paddlenlp.transformers.long_sequence_strategies.{strategy_type}")
+            import_class = importlib.import_module(
+                f"paddleformers.transformers.long_sequence_strategies.{strategy_type}"
+            )
         except ModuleNotFoundError:
             raise ModuleNotFoundError(
                 f"Wrong strategy type {strategy_type}. module only supports the following types: "

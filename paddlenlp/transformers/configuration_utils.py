@@ -338,10 +338,10 @@ class PretrainedConfig:
     Class attributes (overridden by derived classes):
 
     - **model_type** (`str`) -- An identifier for the model type, serialized into the JSON file, and used to recreate
-      the correct object in [`~paddlenlp.AutoConfig`].
+      the correct object in [`~paddleformers.AutoConfig`].
     - **is_composition** (`bool`) -- Whether the config class is composed of multiple sub-configs. In this case the
-      config has to be initialized from two or more configs of type [`~paddlenlp.PretrainedConfig`] like:
-      [`~paddlenlp.EncoderDecoderConfig`] or [`~RagConfig`].
+      config has to be initialized from two or more configs of type [`~paddleformers.PretrainedConfig`] like:
+      [`~paddleformers.EncoderDecoderConfig`] or [`~RagConfig`].
     - **keys_to_ignore_at_inference** (`List[str]`) -- A list of keys to ignore by default when looking at dictionary
       outputs of the model during inference.
     - **attribute_map** (`Dict[str, str]`) -- A dict that maps model specific attribute names to the standardized
@@ -366,7 +366,7 @@ class PretrainedConfig:
         output_attentions (`bool`, *optional*, defaults to `False`):
             Whether or not the model should returns all attentions.
         return_dict (`bool`, *optional*, defaults to `True`):
-            Whether or not the model should return a [`~paddlenlp.transformers.model_outputs.ModelOutput`] instead of a plain tuple.
+            Whether or not the model should return a [`~paddleformers.transformers.model_outputs.ModelOutput`] instead of a plain tuple.
         is_encoder_decoder (`bool`, *optional*, defaults to `False`):
             Whether the model is used as an encoder/decoder or not.
         is_decoder (`bool`, *optional*, defaults to `False`):
@@ -443,7 +443,7 @@ class PretrainedConfig:
         output_scores (`bool`, *optional*, defaults to `False`):
             Whether the model should return the logits when used for generation.
         return_dict_in_generate (`bool`, *optional*, defaults to `False`):
-            Whether the model should return a [`~paddlenlp.transformers.model_outputs.ModelOutput`] instead of a `paddlenlp.Tensor`.
+            Whether the model should return a [`~paddleformers.transformers.model_outputs.ModelOutput`] instead of a `paddleformers.Tensor`.
         forced_bos_token_id (`int`, *optional*):
             The id of the token to force as the first generated token after the `decoder_start_token_id`. Useful for
             multilingual models like [mBART](../model_doc/mbart) where the first generated token needs to be the target
@@ -628,7 +628,7 @@ class PretrainedConfig:
         self._name_or_path = str(kwargs.pop("name_or_path", ""))
 
         # Drop the transformers version info
-        self.paddlenlp_version = kwargs.pop("paddlenlp_version", None)
+        self.paddleformers_version = kwargs.pop("paddleformers_version", None)
 
         # Deal with gradient checkpointing
         if kwargs.get("gradient_checkpointing", False):
@@ -696,7 +696,7 @@ class PretrainedConfig:
     @property
     def use_return_dict(self) -> bool:
         """
-        `bool`: Whether or not return [`~paddlenlp.transformers.model_outputs.ModelOutput`] instead of tuples.
+        `bool`: Whether or not return [`~paddleformers.transformers.model_outputs.ModelOutput`] instead of tuples.
         """
         return self.return_dict
 
@@ -750,7 +750,7 @@ class PretrainedConfig:
                 This can be either:
 
                 - a string, the *model id* of a pretrained model configuration hosted inside a model repo on
-                  paddlenlp bos server. Valid model ids can be located at the root-level, like `bert-base-uncased`, or
+                  paddleformers bos server. Valid model ids can be located at the root-level, like `bert-base-uncased`, or
                   namespaced under a user or organization name, like `dbmdz/bert-base-german-cased`.
                 - a path to a *directory* containing a configuration file saved using the
                   [`~PretrainedConfig.save_pretrained`] method, e.g., `./my_model_directory/`.
@@ -1009,7 +1009,7 @@ class PretrainedConfig:
                 continue
             if (
                 key not in default_config_dict
-                or key == "paddlenlp_version"
+                or key == "paddleformers_version"
                 or value != default_config_dict[key]
                 or (key in class_config_dict and value != class_config_dict[key])
             ):
@@ -1041,14 +1041,14 @@ class PretrainedConfig:
         if "moe_group" in output:
             del output["moe_group"]
 
-        # PaddleNLP version when serializing the model
-        output["paddlenlp_version"] = __version__
+        # PaddleFormers version when serializing the model
+        output["paddleformers_version"] = __version__
 
         for key, value in output.items():
             # Deal with nested configs like CLIP
             if isinstance(value, PretrainedConfig):
                 value = value.to_dict()
-                del value["paddlenlp_version"]
+                del value["paddleformers_version"]
 
             output[key] = value
 
@@ -1198,7 +1198,7 @@ class PretrainedConfig:
 
 def get_configuration_file(configuration_files: List[str]) -> str:
     """
-    Get the configuration file to use for this version of paddlenlp.
+    Get the configuration file to use for this version of paddleformers.
 
     # TODO: there is not supported actual application models, but useful.
         this method has not been tested, so be caution to use this feature.
@@ -1225,9 +1225,9 @@ def get_configuration_file(configuration_files: List[str]) -> str:
     # **But**, we don't support version compare function now. so remove the hard dependency.
     from packaging import version
 
-    paddlenlp_version = version.parse(__version__)
+    paddleformers_version = version.parse(__version__)
     for v in available_versions:
-        if version.parse(v) <= paddlenlp_version:
+        if version.parse(v) <= paddleformers_version:
             configuration_file = configuration_files_map[v]
         else:
             # No point going further since the versions are sorted.

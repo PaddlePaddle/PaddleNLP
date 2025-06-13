@@ -39,19 +39,20 @@ from numpy import allclose, ndarray, transpose
 from paddle import Tensor
 from paddle.nn import Layer
 
-from paddlenlp.utils.distributed import distributed_allgather, distributed_gather
-from paddlenlp.utils.env import CONFIG_NAME, PYTORCH_WEIGHTS_NAME
-from paddlenlp.utils.import_utils import (
+from ..utils.distributed import distributed_allgather, distributed_gather
+from ..utils.env import CONFIG_NAME, PYTORCH_WEIGHTS_NAME
+from ..utils.import_utils import (
     is_package_available,
     is_torch_available,
     is_transformers_available,
 )
-from paddlenlp.utils.log import logger
-from paddlenlp.utils.serialization import load_torch
-from paddlenlp.utils.tools import get_env_device
+from ..utils.log import logger
+from ..utils.serialization import load_torch
+from ..utils.tools import get_env_device
 
 if TYPE_CHECKING:
-    from paddlenlp.transformers import PretrainedConfig, PretrainedModel
+    from .configuration_utils import PretrainedConfig
+    from .model_utils import PretrainedModel
 
 from ..utils import device_guard
 
@@ -114,7 +115,7 @@ def tensor_summary(tensor: Union[str, Tensor, PytorchTensor, tuple, list, ndarra
     if isinstance(tensor, str):
         return tensor
 
-    # Modeling Output from paddlenlp/transformers
+    # Modeling Output from paddleformers/transformers
     if isinstance(tensor, dict):
         tensor = list(tensor.values())
 
@@ -1596,8 +1597,8 @@ class Converter(ConversionMixin, LogitComparer):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         logger.warning(
-            "`paddlenlp.utils.converter` module will be deprecated soon, you "
-            "should change it to `paddlenlp.transformers.conversion_utils`"
+            "`paddleformers.utils.converter` module will be deprecated soon, you "
+            "should change it to `paddleformers.transformers.conversion_utils`"
         )
 
     @classmethod
@@ -1610,7 +1611,7 @@ class Converter(ConversionMixin, LogitComparer):
         Returns:
             int: the number of transformer layer
         """
-        from paddlenlp.transformers.configuration_utils import PretrainedConfig
+        from .configuration_utils import PretrainedConfig
 
         if isinstance(config_or_num_layers, (dict, PretrainedConfig)):
             num_layer = config_or_num_layers[cls.num_layer_key]

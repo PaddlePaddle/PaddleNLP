@@ -31,10 +31,7 @@ from tokenizers import (
 )
 from tokenizers.models import BPE, Unigram, WordPiece
 
-from paddlenlp.utils.import_utils import (
-    is_protobuf_available,
-    is_sentencepiece_available,
-)
+from ..utils.import_utils import is_protobuf_available, is_sentencepiece_available
 
 
 def import_protobuf(error_message=""):
@@ -267,7 +264,6 @@ class SpmConverter(Converter):
         return tokenizer
 
 
-# Copied from paddlenlp/transformers/gpt/tokenizer.py
 def bytes_to_unicode():
     """
     Returns list of utf-8 byte and a corresponding list of unicode strings.

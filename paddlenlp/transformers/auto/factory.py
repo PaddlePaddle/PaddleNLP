@@ -16,7 +16,7 @@
 import importlib
 from collections import OrderedDict
 
-from paddlenlp.transformers.auto.configuration import model_type_to_module_name
+from paddleformers.transformers.auto.configuration import model_type_to_module_name
 
 
 def getattribute_from_module(module, attr):
@@ -28,15 +28,15 @@ def getattribute_from_module(module, attr):
         return getattr(module, attr)
     # Some of the mappings have entries model_type -> object of another model type. In that case we try to grab the
     # object at the top level.
-    paddlenlp_module = importlib.import_module("paddlenlp")
+    paddleformers_module = importlib.import_module("paddleformers")
 
-    if module != paddlenlp_module:
+    if module != paddleformers_module:
         try:
-            return getattribute_from_module(paddlenlp_module, attr)
+            return getattribute_from_module(paddleformers_module, attr)
         except ValueError:
-            raise ValueError(f"Could not find {attr} neither in {module} nor in {paddlenlp_module}!")
+            raise ValueError(f"Could not find {attr} neither in {module} nor in {paddleformers_module}!")
     else:
-        raise ValueError(f"Could not find {attr} in {paddlenlp_module}!")
+        raise ValueError(f"Could not find {attr} in {paddleformers_module}!")
 
 
 class _LazyAutoMapping(OrderedDict):
@@ -82,7 +82,7 @@ class _LazyAutoMapping(OrderedDict):
             if any(["Tokenizer" in name for name in [model_type, attr]]):
                 try:
                     self._modules[module_name] = importlib.import_module(
-                        f".{module_name}.tokenizer", "paddlenlp.transformers"
+                        f".{module_name}.tokenizer", "paddleformers.transformers"
                     )
                 except ImportError:
                     pass
@@ -90,12 +90,12 @@ class _LazyAutoMapping(OrderedDict):
                 if any(["Config" in name for name in [model_type, attr]]):
                     try:
                         self._modules[module_name] = importlib.import_module(
-                            f".{module_name}.configuration", "paddlenlp.transformers"
+                            f".{module_name}.configuration", "paddleformers.transformers"
                         )
                     except ImportError:
                         pass
             if module_name not in self._modules:
-                self._modules[module_name] = importlib.import_module(f".{module_name}", "paddlenlp.transformers")
+                self._modules[module_name] = importlib.import_module(f".{module_name}", "paddleformers.transformers")
         return getattribute_from_module(self._modules[module_name], attr)
 
     def keys(self):

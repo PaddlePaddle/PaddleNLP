@@ -58,7 +58,18 @@ from paddle.nn import Embedding, Layer
 from paddle.utils.download import is_url as is_remote_url
 from tqdm.auto import tqdm
 
-from paddlenlp.utils.env import (
+from ..generation import GenerationConfig, GenerationMixin
+from ..quantization.quantization_utils import (
+    convert_to_quantize_state_dict,
+    convert_to_weight_quantize_state_dict,
+    parse_weight_quantize_algo,
+    replace_with_quantization_linear,
+    update_loaded_state_dict_keys,
+)
+from ..quantization.unified_checkpoint_quantization import dequant_unified_optimizer
+from ..utils import device_guard
+from ..utils.download import resolve_file_path
+from ..utils.env import (
     ASYMMETRY_QUANT_SCALE_MAX,
     ASYMMETRY_QUANT_SCALE_MIN,
     CONFIG_NAME,
@@ -72,19 +83,7 @@ from paddlenlp.utils.env import (
     SAFE_WEIGHTS_NAME,
     SYMMETRY_QUANT_SCALE,
 )
-from paddlenlp.utils.log import logger
-
-from ..generation import GenerationConfig, GenerationMixin
-from ..quantization.quantization_utils import (
-    convert_to_quantize_state_dict,
-    convert_to_weight_quantize_state_dict,
-    parse_weight_quantize_algo,
-    replace_with_quantization_linear,
-    update_loaded_state_dict_keys,
-)
-from ..quantization.unified_checkpoint_quantization import dequant_unified_optimizer
-from ..utils import device_guard
-from ..utils.download import resolve_file_path
+from ..utils.log import logger
 from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
 from .utils import (  # convert_ndarray_dtype,
@@ -98,7 +97,7 @@ from .utils import (  # convert_ndarray_dtype,
     get_checkpoint_shard_files,
     is_paddle_support_lazy_init,
     is_safetensors_available,
-    paddlenlp_load,
+    paddleformers_load,
     weight_name_suffix,
 )
 
@@ -129,12 +128,12 @@ def unwrap_optimizer(optimizer, optimizer_instances=()):
 if is_safetensors_available():
     from safetensors.numpy import save_file as safe_save_file
 
-    from paddlenlp.utils.safetensors import fast_load_file as safe_load_file
+    from ..utils.safetensors import fast_load_file as safe_load_file
 
     if sys.platform.startswith("win"):
         from safetensors import safe_open
     else:
-        from paddlenlp.utils.safetensors import fast_safe_open as safe_open
+        from ..utils.safetensors import fast_safe_open as safe_open
 
 
 def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> nn.Linear:
@@ -542,7 +541,7 @@ def load_state_dict(
 
             return state_dict
 
-    state_dict = paddlenlp_load(checkpoint_file, map_location="cpu")
+    state_dict = paddleformers_load(checkpoint_file, map_location="cpu")
     return state_dict
 
 
@@ -608,7 +607,7 @@ def register_base_model(cls):
     Example:
         .. code-block::
 
-            from paddlenlp.transformers import BertModel, register_base_model
+            from paddleformers.transformers import BertModel, register_base_model
 
             BertModel = register_base_model(BertModel)
             assert BertModel.base_model_class == BertModel
@@ -843,7 +842,7 @@ def load_sharded_checkpoint(model, folder, variant=None, strict=True, prefer_saf
             error_message += f"\nMissing key(s): {str_unexpected_keys}."
         raise RuntimeError(error_message)
 
-    loader = safe_load_file if load_safe else partial(paddlenlp_load, map_location="cpu")
+    loader = safe_load_file if load_safe else partial(paddleformers_load, map_location="cpu")
 
     for shard_file in shard_files:
         state_dict = loader(os.path.join(folder, shard_file))
@@ -928,7 +927,7 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix, model_t
     # TODO: add return status to state_dict
     with warnings.catch_warnings(record=True) as w:
         warnings.resetwarnings()
-        # paddlenlp hold  missing_keys , just ignore not found warnings.
+        # paddleformers hold  missing_keys , just ignore not found warnings.
         warnings.filterwarnings("ignore", message=r".*is not found in the provided dict.*")
         warnings.filterwarnings("ignore", message=r".*paddle.to_tensor.*")
         if len(model_to_load_state_dict) > 4000 and os.getenv("DISABLE_FASTER_SET_STATE_DICT", None) is None:
@@ -1056,8 +1055,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
       pretrained models (contrasts to models in local file system).
       It has the same key as resource_files_names (that is "model_state"),
       and the corresponding value is a dict with specific model name to model weights URL mapping
-      (such as "bert-base-uncased" ->
-      "https://bj.bcebos.com/paddlenlp/models/transformers/bert-base-uncased.pdparams").
     - **base_model_prefix** (str): Represents the attribute associated to the
       base model in derived classes of the same architecture adding layers on
       top of the base model. Note: A base model class is pretrained model class
@@ -1140,7 +1137,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # only execute when it's the base method
         if (
-            original_init.__module__ != "paddlenlp.transformers.model_utils"
+            original_init.__module__ != "paddleformers.transformers.model_utils"
             and self.__class__.init_weights is PretrainedModel.init_weights
         ):
             self.init_weights()
@@ -1551,7 +1548,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             logger.info("README.md not found, adding the default README.md")
             if not has_readme:
                 with open(os.path.join(root_dir, "README.md"), "w") as f:
-                    f.write(f"---\nlibrary_name: paddlenlp\n---\n# {repo_id}")
+                    f.write(f"---\nlibrary_name: paddleformers\n---\n# {repo_id}")
 
             # Upload model and return
             logger.info(f"Pushing to the {repo_id}. This might take a while")
@@ -2479,7 +2476,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         Example:
             .. code-block::
 
-                from paddlenlp.transformers import BertForSequenceClassification
+                from paddleformers.transformers import BertForSequenceClassification
 
                 # Name of built-in pretrained model
                 model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
@@ -2763,7 +2760,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         Example:
             .. code-block::
 
-                from paddlenlp.transformers import BertForSequenceClassification
+                from paddleformers.transformers import BertForSequenceClassification
 
                 model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
                 model.save_pretrained('./trained_model/')
@@ -3000,7 +2997,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         if "data_sharding_parallel" in auto_dist_degree and auto_dist_degree["data_sharding_parallel"]:
             # to avoid a circular import
-            from paddlenlp.trainer.trainer_utils import ShardingOption
+            from ..trainer.trainer_utils import ShardingOption
 
             level = 0
             if "sharding" in auto_dist_degree and auto_dist_degree["sharding"] is not None:
@@ -3221,7 +3218,7 @@ def load_sharded_checkpoint_as_one(folder, variant=None, return_numpy=False):
         index = json.load(f)
 
     shard_files = list(set(index["weight_map"].values()))
-    loader = safe_load_file if load_safe else partial(paddlenlp_load, map_location="np" if return_numpy else "cpu")
+    loader = safe_load_file if load_safe else partial(paddleformers_load, map_location="np" if return_numpy else "cpu")
 
     ret = {}
     for shard_file in tqdm(shard_files):

@@ -39,7 +39,7 @@ except ImportError:
     sequence_parallel_utils = None
 from paddle.distributed.fleet.layers.mpu import mp_layers, mp_ops
 
-from paddlenlp.transformers.linear_utils import (
+from .linear_utils import (
     ColumnParallelLinear,
     ColumnSequenceParallelLinear,
     RowParallelLinear,

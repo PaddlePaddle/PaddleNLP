@@ -19,7 +19,7 @@
 
 import os
 
-import paddlenlp.transformers
+import paddleformers
 
 
 class ProcessorMixin(object):
@@ -126,7 +126,7 @@ class ProcessorMixin(object):
         args = []
         for attribute_name in cls.attributes:
             class_name = getattr(cls, f"{attribute_name}_class")
-            attribute_class = getattr(paddlenlp.transformers, class_name)
+            attribute_class = getattr(paddleformers.transformers, class_name)
             args.append(attribute_class.from_pretrained(pretrained_model_name_or_path, **kwargs))
         return args
 

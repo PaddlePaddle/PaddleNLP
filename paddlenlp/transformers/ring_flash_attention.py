@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# paddlenlp/transformers/ring_attention.py
 
 import paddle
 import paddle.distributed as dist
@@ -223,13 +222,13 @@ def balanced_ring_flash_attention_bwd_func(
         attn_masks_list = paddle.split(attn_mask, num_or_sections=cp_size * 2, axis=3)
 
     try:
-        from paddlenlp_ops import flash_attn_bwd
+        from paddleformers_ops import flash_attn_bwd
     except (ImportError, ModuleNotFoundError):
-        from paddlenlp.utils.log import logger
+        from ..utils.log import logger
 
         logger.warning(
             "if you run ring_flash_attention.py, please ensure you install "
-            "the paddlenlp_ops by following the instructions "
+            "the paddleformers_ops by following the instructions "
             "provided at https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
         )
 

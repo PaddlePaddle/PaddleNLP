@@ -33,7 +33,7 @@ PROCESSOR_MAPPING_NAMES = OrderedDict([])
 def get_configurations():
     MAPPING_NAMES = OrderedDict()
     for key, class_name in PROCESSOR_MAPPING_NAMES.items():
-        import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.processing")
+        import_class = importlib.import_module(f"paddleformers.transformers.{class_name}.processing")
         processor_name = getattr(import_class, key)
         name = tuple(processor_name.pretrained_init_configuration.keys())
         if MAPPING_NAMES.get(name, None) is None:
@@ -83,7 +83,7 @@ class AutoProcessor:
         if init_class:
             try:
                 class_name = cls._name_mapping[init_class]
-                import_class = import_module(f"paddlenlp.transformers.{class_name}.processing")
+                import_class = import_module(f"paddleformers.transformers.{class_name}.processing")
                 processor_class = getattr(import_class, init_class)
                 return processor_class
             except Exception:
@@ -96,7 +96,7 @@ class AutoProcessor:
                 if pattern in pretrained_model_name_or_path.lower():
                     init_class = key
                     class_name = cls._name_mapping[init_class]
-                    import_class = import_module(f"paddlenlp.transformers.{class_name}.processor")
+                    import_class = import_module(f"paddleformers.transformers.{class_name}.processor")
                     processor_class = getattr(import_class, init_class)
                     break
             return processor_class
@@ -128,7 +128,7 @@ class AutoProcessor:
 
         Example:
             .. code-block::
-            from paddlenlp.transformers import AutoProcessor
+            from paddleformers.transformers import AutoProcessor
             processor = AutoProcessor.from_pretrained("openai/clip-vit-base-patch32")
             processor.save_pretrained('clip_processor')
         """

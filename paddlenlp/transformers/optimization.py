@@ -101,7 +101,7 @@ class LinearDecayWithWarmup(LambdaDecay):
 
         .. code-block:: python
 
-            from paddlenlp.transformers import LinearDecayWithWarmup
+            from paddleformers.transformers import LinearDecayWithWarmup
             lr, warmup_steps, max_steps = 0.1, 100, 1000
             lr_scheduler = LinearDecayWithWarmup(lr, max_steps, warmup_steps)
 
@@ -143,7 +143,7 @@ class ConstScheduleWithWarmup(LambdaDecay):
 
         .. code-block:: python
 
-            from paddlenlp.transformers import ConstScheduleWithWarmup
+            from paddleformers.transformers import ConstScheduleWithWarmup
             lr, warmup_steps = 0.1, 100
             lr_scheduler = ConstScheduleWithWarmup(lr, warmup_steps)
 
@@ -202,7 +202,7 @@ class CosineDecayWithWarmup(LambdaDecay):
 
         .. code-block:: python
 
-            from paddlenlp.transformers import CosineDecayWithWarmup
+            from paddleformers.transformers import CosineDecayWithWarmup
             lr, warmup_steps, max_steps = 0.1, 100, 1000
             lr_scheduler = CosineDecayWithWarmup(lr, max_steps, warmup_steps)
 
@@ -276,7 +276,7 @@ class PolyDecayWithWarmup(LambdaDecay):
 
         .. code-block:: python
 
-            from paddlenlp.transformers import PolyDecayWithWarmup
+            from paddleformers.transformers import PolyDecayWithWarmup
             lr, lr_end, warmup_steps, max_steps = 0.1, 1e-6, 100, 1000
             lr_scheduler = PolyDecayWithWarmup(lr, max_steps, warmup_steps, lr_end)
 

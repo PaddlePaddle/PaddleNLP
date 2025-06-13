@@ -29,9 +29,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ContextManager, List, Optional, Type, Union
 
 from filelock import FileLock
+from paddleformers import __version__
 
-from paddlenlp import __version__
-from paddlenlp.utils.downloader import (
+from ..utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     download_check,
     get_path_from_url_with_filelock,
@@ -40,7 +40,7 @@ from paddlenlp.utils.downloader import (
 )
 
 if TYPE_CHECKING:
-    from paddlenlp.transformers import PretrainedModel
+    from paddleformers.transformers import PretrainedModel
 
 import numpy as np
 import paddle
@@ -51,11 +51,10 @@ from paddle.common_ops_import import convert_dtype
 from paddle.nn import Layer
 from requests.exceptions import HTTPError
 
-from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
-from paddlenlp.utils.import_utils import import_module
-from paddlenlp.utils.log import logger
-
 from ..utils.download import resolve_file_path
+from ..utils.env import HF_CACHE_HOME, MODEL_HOME
+from ..utils.import_utils import import_module
+from ..utils.log import logger
 from .aistudio_utils import aistudio_download
 
 HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
@@ -202,7 +201,7 @@ def adapt_stale_fwd_patch(self, name, value):
         ]
 
         if new_args:
-            if self.__module__.startswith("paddlenlp"):
+            if self.__module__.startswith("paddleformers"):
                 warnings.warn(
                     f"The `forward` method of {self.__class__ if isinstance(self, Layer) else self} is patched and the patch "
                     "might be based on an old version which missing some "
@@ -214,7 +213,7 @@ def adapt_stale_fwd_patch(self, name, value):
                 warnings.warn(
                     f"The `forward` method of {self.__class__ if isinstance(self, Layer) else self} "
                     "is patched and the patch might be conflict with patches made "
-                    f"by paddlenlp which seems have more arguments such as {new_args}. "
+                    f"by paddleformers which seems have more arguments such as {new_args}. "
                     "We automatically add compatibility on the patch for "
                     "these arguments, and maybe the patch should be updated."
                 )
@@ -349,7 +348,7 @@ def find_transformer_model_type(model_class: Type) -> str:
     Returns:
         str: the type string
     """
-    from paddlenlp.transformers import PretrainedModel
+    from paddleformers.transformers import PretrainedModel
 
     default_model_type = ""
 
@@ -357,7 +356,7 @@ def find_transformer_model_type(model_class: Type) -> str:
         return default_model_type
 
     module_name: str = model_class.__module__
-    if not module_name.startswith("paddlenlp.transformers."):
+    if not module_name.startswith("paddleformers.transformers."):
         return default_model_type
 
     tokens = module_name.split(".")
@@ -376,7 +375,7 @@ def find_transformer_model_class_by_name(model_name: str) -> Optional[Type[Pretr
     Returns:
         Optional[Type[PretrainedModel]]: optional pretrained-model class
     """
-    transformer_module = import_module("paddlenlp.transformers")
+    transformer_module = import_module("paddleformers.transformers")
 
     for obj_name in dir(transformer_module):
         if obj_name.startswith("_"):
@@ -426,7 +425,7 @@ def convert_file_size_to_int(size: Union[int, str]):
     raise ValueError("`size` is not in a valid format. Use an integer followed by the unit, e.g., '5GB'.")
 
 
-def paddlenlp_hub_download(
+def paddleformers_hub_download(
     repo_id: str,
     filename: str,
     *,
@@ -455,7 +454,7 @@ def paddlenlp_hub_download(
             logger.info(f"Downloading {repo_id}")
             weight_file_path = get_path_from_url_with_filelock(repo_id, cache_dir)
             # # check the downloaded weight file and registered weight file name
-            download_check(repo_id, "paddlenlp_hub_download")
+            download_check(repo_id, "paddleformers_hub_download")
 
             # make sure that model states names: model_states.pdparams
             new_weight_file_path = os.path.join(os.path.split(weight_file_path)[0], filename)
@@ -488,7 +487,7 @@ def paddlenlp_hub_download(
         logger.info(f"Downloading {community_model_file_path}")
         weight_file_path = get_path_from_url_with_filelock(community_model_file_path, cache_dir)
         # # check the downloaded weight file and registered weight file name
-        download_check(community_model_file_path, "paddlenlp_hub_download")
+        download_check(community_model_file_path, "paddleformers_hub_download")
         return weight_file_path
 
     return None
@@ -565,7 +564,7 @@ def cached_file(
         #     cache_dir = os.path.join(MODEL_HOME, ".cache")
         try:
             # Load from URL or cache if already cached
-            resolved_file = paddlenlp_hub_download(
+            resolved_file = paddleformers_hub_download(
                 path_or_repo_id,
                 filename,
                 subfolder=None if len(subfolder) == 0 else subfolder,
@@ -745,7 +744,7 @@ def device_guard(device="cpu", dev_id=0):
         paddle.set_device(origin_device)
 
 
-def paddlenlp_load(path, map_location="cpu"):
+def paddleformers_load(path, map_location="cpu"):
     assert map_location in ["cpu", "gpu", "xpu", "npu", "numpy", "np"]
     if map_location in ["numpy", "np"]:
         return paddle.load(path, return_numpy=True)

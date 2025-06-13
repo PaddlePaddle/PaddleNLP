@@ -21,7 +21,7 @@ except:
 import paddle.distributed as dist
 from paddle.autograd import PyLayer
 
-from paddlenlp.utils.tools import get_env_device
+from ..utils.tools import get_env_device
 
 
 def parallel_matmul(lm_output, logit_weights, tensor_parallel_output=True, training=True):

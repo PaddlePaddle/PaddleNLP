@@ -36,8 +36,8 @@ from jinja2.exceptions import TemplateError, TemplateSyntaxError
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 from paddle.utils import try_import
 
-from paddlenlp.utils.env import CHAT_TEMPLATE_CONFIG_NAME
-from paddlenlp.utils.log import logger
+from ..utils.env import CHAT_TEMPLATE_CONFIG_NAME
+from ..utils.log import logger
 
 try:
     from functools import lru_cache
