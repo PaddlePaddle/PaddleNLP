@@ -244,7 +244,8 @@ __global__ void SwigluProbsGradKernelVec4(
 std::vector<paddle::Tensor> SwigluProbsGradCUDABackward(
     const paddle::Tensor& o1,
     const paddle::Tensor& do2_s,
-    const paddle::Tensor& unzipped_probs) {
+    const paddle::Tensor& unzipped_probs,
+    bool inplace) {
   auto o1_dims = o1.dims();
   int o1_outer_dim = 1;
   for(int i = 0; i < o1_dims.size() - 1; i++){
@@ -254,10 +255,10 @@ std::vector<paddle::Tensor> SwigluProbsGradCUDABackward(
   const int moe_intermediate_size_2 = o1_dims[o1_dims.size() - 1];
   const int moe_intermediate_size = moe_intermediate_size_2 / 2;
 
-  auto do1 = paddle::empty_like(o1);
+  auto do1 = inplace ? o1 : paddle::empty_like(o1);
   auto probs_grad = paddle::empty(
       {o1_outer_dim}, paddle::DataType::FLOAT32, o1.place());
-  auto o2_s = paddle::empty_like(do2_s);
+  auto o2_s = inplace ? do2_s : paddle::empty_like(do2_s);
 
   const BFloat16* o1_ptr =
       reinterpret_cast<const BFloat16*>(o1.data<phi::bfloat16>());
@@ -295,5 +296,6 @@ std::vector<paddle::Tensor> SwigluProbsGradCUDABackward(
 
 PD_BUILD_OP(fused_swiglu_probs_bwd)
     .Inputs({"o1", "do2_s", "unzipped_probs"})
+    .Attrs({"inplace : bool"})
     .Outputs({"do1", "probs_grad", "o2_s"})
     .SetKernelFn(PD_KERNEL(SwigluProbsGradCUDABackward));
