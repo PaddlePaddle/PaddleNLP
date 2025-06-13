@@ -30,6 +30,7 @@ from tqdm.auto import tqdm
 from paddlenlp.trainer import Trainer
 
 from ..transformers.model_utils import unwrap_model
+from ..transformers.segment_parallel_utils import split_dist_inputs_sequence_dim
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
     PREFIX_CHECKPOINT_DIR,
@@ -506,6 +507,9 @@ class AutoTrainer(Trainer):
 
             # read global-batch from dist_loader
             for step, inputs in enumerate(train_dataloader):
+                if self.args.sep_parallel_degree > 1:
+                    inputs = split_dist_inputs_sequence_dim(inputs)
+
                 self.timers and self.timers("read-data").stop()
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
