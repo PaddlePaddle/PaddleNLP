@@ -25,6 +25,7 @@ from .modeling_auto import (
     GPTDecoderLayerAuto,
     GPTEmbeddingsAuto,
     GPTLayerNorm,
+    GPTLMHeadAuto,
     GPTPretrainedModelAuto,
     MultiHeadAttentionAuto,
     seed_guard_context,
@@ -96,32 +97,20 @@ class GPTEmbeddingAutoPP(nn.Layer):
 
 
 class GPTLMHeadAutoPP(nn.Layer):
-    def __init__(self, config, ipp=None):
+    def __init__(self, config, embedding_weights=None, ipp=None):
         super(GPTLMHeadAutoPP, self).__init__()
         self.config = config
-        self.transpose_y = True
-        self.ipp = ipp
-        self.weight = self.create_parameter(
-            shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype()
-        )
-        self.weight = dist.shard_tensor(self.weight, get_mesh(ipp), [dist.Replicate(), dist.Shard(0)])
+        self.lm_head = GPTLMHeadAuto(config, embedding_weights=embedding_weights, ipp=ipp)
 
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
-
-        # if self.config.sequence_parallel:
-        #     hidden_states = dist.reshard(hidden_states, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()])
-        #     hidden_states = paddle.reshape(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
-
-        y = dist.reshard(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)])
-        logits = paddle.matmul(hidden_states, y, transpose_y=self.transpose_y)
-
+        logits = self.lm_head(hidden_states)
         return return_args(logits, attention_mask, position_ids)
 
 
-class GPTDecoderLayerAutoPP(nn.Layer):
+class GPTDecoderLayerAutoPP(GPTPretrainedModelAuto):
     def __init__(self, config, layer_idx, ipp=None):
-        super(GPTDecoderLayerAutoPP, self).__init__()
+        super(GPTDecoderLayerAutoPP, self).__init__(config)
         self.config = config
         self.layer_idx = layer_idx
         self.embeddings = None
@@ -132,6 +121,7 @@ class GPTDecoderLayerAutoPP(nn.Layer):
 
         self.layer = GPTDecoderLayerAuto(config, ipp)
         self.ipp = ipp
+
         self.enable_recompute = False
         self.bias = paddle.tril(
             paddle.ones([1, 1, config.max_position_embeddings, config.max_position_embeddings], dtype="int64")
@@ -139,51 +129,85 @@ class GPTDecoderLayerAutoPP(nn.Layer):
         self.bias = dist.shard_tensor(self.bias, get_mesh(), [dist.Replicate(), dist.Replicate()])
 
         if layer_idx == config.num_hidden_layers - 1:
+            # self.embeddings = GPTEmbeddingAutoPP(config)
             self.norm = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
-            self.lm_head = GPTLMHeadAutoPP(config, ipp)
+            self.lm_head = GPTLMHeadAutoPP(config, ipp=ipp)
 
     def forward(self, args):
-        if self.embeddings is not None:
+        output_attentions = self.config.output_attentions
+        use_cache = self.config.use_cache
+        past_key_values = None
+        output_hidden_states = self.config.output_hidden_states
+        return_dict = self.config.return_dict
+        if self.layer_idx == 0:
             input_ids, attention_mask, position_ids = parse_args(args)
-            input_shape = input_ids.shape
-            input_ids = input_ids.reshape((-1, input_shape[-1]))
+            if self.config.sequence_parallel and use_cache:
+                raise ValueError("We currently only support sequence parallel without cache.")
+            if input_ids is not None:
+                input_shape = input_ids.shape
+                input_ids = input_ids.reshape((-1, input_shape[-1]))
+            else:
+                raise ValueError("You have to specify either input_ids or inputs_embeds")
+
+            # past_key_values is None
             if position_ids is None:
                 past_length = 0
-                # if past_key_values[0] is not None:
-                #     # bs, seq_len, num_head, head_dim
-                #     past_length = past_key_values[0][0].shape[1]
                 position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype="int64")
                 position_ids = position_ids.unsqueeze(0)
                 position_ids = paddle.expand(position_ids, input_shape)
             args = return_args(input_ids, attention_mask, position_ids)
             args = self.embeddings(args)
+            hidden_states, attention_mask, position_ids = parse_args(args)
+
             length = input_shape[-1]
+            cache_length = 0
+            causal_mask = self.bias[:, :, cache_length:length, :length]
+            if attention_mask is not None:
+                if attention_mask.dtype != paddle.int64:
+                    attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
+                if len(attention_mask.shape) == 2:
+                    attention_mask = attention_mask[:, None, None, :]
+                attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
+            else:
+                attention_mask = (1.0 - causal_mask) * -1e4
+            # The tensor returned by triu not in static graph.
+            attention_mask.stop_gradient = True
+            args = return_args(hidden_states, attention_mask, position_ids)
 
         hidden_states, attention_mask, position_ids = parse_args(args)
 
-        output_attentions = self.config.output_attentions
-        use_cache = self.config.use_cache
-
-        past_key_values = None
-        inputs_embeds = None
-
-        # cache_length = 0
-        # causal_mask = self.bias[:, :, cache_length:length, :length]
-        # attention_mask = (1.0 - causal_mask) * -1e4
-        # attention_mask.stop_gradient = True
-        attention_mask = None
-        output_hidden_states = False
-        return_dict = False
         all_self_attentions = () if output_attentions else None
         all_hidden_states = () if output_hidden_states else None
         next_decoder_cache = () if use_cache else None
-        outputs = self.layer(
-            hidden_states,
-            attention_mask,
-            use_cache,
-            past_key_values,
-            output_attentions,
-        )
+        has_gradient = not hidden_states.stop_gradient
+        pre_ipp = None
+        # if self.layer.ipp is not None and pre_ipp != self.ipp:
+        #     hidden_states = dist.reshard(hidden_states, get_mesh(self.layer.ipp), [dist.Shard(0), dist.Replicate()])
+        #     attention_mask = dist.reshard(
+        #         attention_mask, get_mesh(self.layer.ipp), [dist.Replicate(), dist.Replicate()]
+        #     )
+
+        attention_mask = None
+        if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full":
+            outputs = self.recompute_training(
+                layer_module=self.layer,
+                hidden_states=hidden_states,
+                attention_mask=attention_mask,
+                use_cache=use_cache,
+                past_key_value=None,
+                output_attentions=output_attentions,
+            )
+        else:
+            outputs = self.layer(
+                hidden_states,
+                attention_mask=attention_mask,
+                use_cache=use_cache,
+                past_key_value=past_key_values,
+                output_attentions=output_attentions,
+            )
+
+        # outputs = hidden_states if both use_cache and output_attentions are False
+        # Otherwise, outputs = (hidden_states, attention if output_attentions, cache if use_cache)
         output = outputs[0] if (use_cache or output_attentions) else outputs
         all_self_attentions = all_self_attentions + (outputs[1],) if output_attentions else None
         all_hidden_states = all_hidden_states + (output,) if output_hidden_states else None
@@ -194,9 +218,29 @@ class GPTDecoderLayerAutoPP(nn.Layer):
             position_ids,
         )
         if self.norm is not None:
-            ret_args = self.norm(output)
-        if self.lm_head is not None:
-            ret_args = self.lm_head(ret_args)
+            output = self.norm(output)
+            next_cache = next_decoder_cache if use_cache else None
+            if not return_dict:
+                temp_list = [output, next_cache, all_hidden_states, all_self_attentions]
+
+                if not (use_cache or output_attentions or output_hidden_states):
+                    outputs = output
+                else:
+                    outputs = tuple(v for v in temp_list if v is not None)
+
+            if output_hidden_states:
+                if return_dict:
+                    outputs.hidden_states = (embedding_output,) + outputs.hidden_states
+                else:  # outputs is a tuple
+                    idx = 2 if use_cache else 1
+                    all_hidden_states = (embedding_output,) + outputs[idx]
+                    outputs[idx] = all_hidden_states
+
+            if self.lm_head is not None:
+                ret_args = self.lm_head(outputs)
+            else:
+                raise ValueError("ERR")
+
         return ret_args
 
 
