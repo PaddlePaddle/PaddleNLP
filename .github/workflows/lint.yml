@@ -1,4 +1,4 @@
-name: Lint
+name: PaddleNLP Codestyle Check
 
 on: [push, pull_request]
 
