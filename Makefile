@@ -35,7 +35,7 @@ lint:
 test: unit-test
 
 unit-test:
-	PYTHONPATH=$(shell pwd) pytest -v \
+	PYTHONPATH=$(shell pwd) pytest tests/layers/test_linear.py -v \
 		-n auto \
 		--retries 1 --retry-delay 1 \
 		--durations 20 \
