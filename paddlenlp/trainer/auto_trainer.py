@@ -29,7 +29,7 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
 
-from ..transformers.model_utils import unwrap_model
+from ..transformers.model_utils import clean_model_class_name, unwrap_model
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
     PREFIX_CHECKPOINT_DIR,
@@ -910,7 +910,7 @@ class AutoTrainer(Trainer):
             config_to_save = copy.deepcopy(model_to_save.config)
             config_to_save.mp_degree = getattr(config_to_save, "config_to_save", 1)
             # Attach architecture to the config
-            config_to_save.architectures = [model_to_save.__class__.__name__]
+            config_to_save.architectures = [clean_model_class_name(model_to_save.__class__.__name__)]
 
             config_to_save.save_pretrained(output_dir)
             if self.model.can_generate():

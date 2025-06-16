@@ -2825,7 +2825,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     variant = weight_name_suffix() if variant is None else variant
 
         # Attach architecture to the config
-        config_to_save.architectures = [model_to_save.__class__.__name__]
+        config_to_save.architectures = [clean_model_class_name(model_to_save.__class__.__name__)]
+
         # Save the config
         if is_main_process:
             config_to_save.save_pretrained(save_directory)
@@ -3282,3 +3283,29 @@ def load_tp_checkpoint(folder, cls, config, return_numpy=False):
                 )
                 state_dict.update(shard_state_dict)
     return state_dict
+
+
+def clean_model_class_name(class_name, suffixes_to_strip: Union[str, List[str]] = "Pipe"):
+    """
+    Returns the class name of the given model with specified suffixes removed.
+
+    This is typically used to clean up the model name before saving it to
+    config.architectures, removing implementation-specific suffixes like "Pipe".
+
+    Args:
+        class_name: The __class__.__name__ attribute.
+        suffixes_to_strip (str or list of str, optional): One or more suffix strings to remove
+            from the class name (e.g., 'Pipe' or ['Pipe', 'Wrapper']). If None or empty,
+            no stripping is applied.
+
+    Returns:
+        str: The cleaned model class name with specified suffix removed (if present).
+    """
+    if not suffixes_to_strip:
+        return class_name
+
+    if isinstance(suffixes_to_strip, str):
+        suffixes_to_strip = [suffixes_to_strip]
+
+    pattern = f"({'|'.join(map(re.escape, suffixes_to_strip))})$"
+    return re.sub(pattern, "", class_name)
