@@ -428,7 +428,10 @@ def _load_part_state_dict(
                 part_state_dict.update(quant_state_dict)
             else:
                 if key in tensor_parallel_split_mapping:
-                    weight = tensor_parallel_split_mapping[key](py_safe_slice_.get())
+                    if len(py_safe_slice_.shape) == 0:
+                        weight = tensor_parallel_split_mapping[key](py_safe_slice_.get())
+                    else:
+                        weight = tensor_parallel_split_mapping[key](py_safe_slice_)
                 else:
                     if len(py_safe_slice_.shape) == 0:
                         weight = py_safe_slice_.get()
