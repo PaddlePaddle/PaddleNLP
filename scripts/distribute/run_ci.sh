@@ -295,6 +295,7 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh
         bash  $cmd prepare_case llama_case_list_auto $FLAGS_install_deps $FLAGS_download_data
         execute_func_list $cmd llama_auto
+        export FLAGS_install_deps=1
         export FLAGS_download_data="llama ""$FLAGS_download_data"
         let case_num++
         clean_file $nlp_dir/llm/auto_parallel/llama
