@@ -46,34 +46,23 @@ __global__ void tokens_unzip_stable_kernel(
     const int num_experts,
     const int topk) {
   const int block_row_base = blockIdx.x * CUMSUM_BLOCK_SIZE;
-  int cumsum_offset[MAX_NUM_EXPERTS];
+  int cumsum_offset = (blockIdx.x != 0) * CUMSUM_INVALID_TAG;// 除了第0个block，其他的都以非法值初始化,因为atomic忙等要用
   int local_expert_offsets[MAX_NUM_EXPERTS];
-  int local_cumsum[MAX_NUM_EXPERTS];
-#pragma unroll
-  for (int i = 0; i < num_experts; i++) {
-    cumsum_offset[i] =
-        (blockIdx.x == 0)
-            ? 0
-            : CUMSUM_INVALID_TAG;  // 除了第0个block，其他的都以非法值初始化,因为atomic忙等要用
-    local_expert_offsets[i] = expert_base_offset.data[i];
-    local_cumsum[i] = 0;
-  }
-  const int base_row_idx = blockIdx.x * CUMSUM_BLOCK_SIZE;
+  int local_cumsum = 0;
   __shared__ int shared_expert_rowmap[CUMSUM_BLOCK_SIZE][MAX_NUM_EXPERTS];
   __shared__ probs_T shared_expert_probmap[CUMSUM_BLOCK_SIZE][MAX_NUM_EXPERTS];
+  for(int i = 0; i<num_experts; i++){
+    local_expert_offsets[i] = expert_base_offset.data[i];
+  }
 
   // --------------------- thread0 单线程任务传递 -------------------------
-  if (threadIdx.x == 0) [[unlikely]] {
-    int local_expert_rowmap[CUMSUM_BLOCK_SIZE][MAX_NUM_EXPERTS];
-    probs_T local_expert_probs[CUMSUM_BLOCK_SIZE][MAX_NUM_EXPERTS];
+  if (threadIdx.x < MAX_NUM_EXPERTS) [[unlikely]] {
+    int local_expert_rowmap[CUMSUM_BLOCK_SIZE];
+    probs_T local_expert_probs[CUMSUM_BLOCK_SIZE];
 #pragma unroll
     for (int i = 0; i < CUMSUM_BLOCK_SIZE; i++) {
-#pragma unroll
-      for (int j = 0; j < num_experts; j++) {
-        local_expert_rowmap[i][j] =
-            -1;  // 以非法值初始化，方便后续shared mem写入
-        local_expert_probs[i][j] = (probs_T)0;
-      }
+      local_expert_rowmap[i] = -1;  // 以非法值初始化，方便后续shared mem写入
+      local_expert_probs[i] = (probs_T)0;
     }
     // 将乱序访存限制在寄存器级别，后续shared_mem规整写入
     for (int row = block_row_base; row < block_row_base + CUMSUM_BLOCK_SIZE;
@@ -84,39 +73,36 @@ __global__ void tokens_unzip_stable_kernel(
       for (int k = 0; k < topk; k++) {
         const int expert = routemap_topk[row * topk + k];
         if (expert == -1) continue;
-        local_expert_rowmap[internal_row][expert] =
-            local_cumsum[expert] + local_expert_offsets[expert];
-        local_expert_probs[internal_row][expert] = probs_topk[row * topk + k];
-        local_cumsum[expert] += 1;
+        if(threadIdx.x==expert){
+          local_expert_rowmap[internal_row] =
+              local_cumsum + local_expert_offsets;
+          local_expert_probs[internal_row] = probs_topk[row * topk + k];
+          local_cumsum += 1;
+        }
       }
     }
 // -------------------------- 块间通信逻辑 -----------------------------
-#pragma unroll
-    for (int i = 0; i < num_experts; i++) {
-      if (blockIdx.x != 0) [[likely]] {
-        while (cumsum_offset[i] == CUMSUM_INVALID_TAG) [[likely]] {
-          cumsum_offset[i] = atomicExch(
-              &global_expertwise_block_cumsum[blockIdx.x * num_experts + i],
-              CUMSUM_INVALID_TAG);
-        }
+    if (blockIdx.x != 0) [[likely]] {
+      while (cumsum_offset == CUMSUM_INVALID_TAG){
+        cumsum_offset = atomicExch(
+            &global_expertwise_block_cumsum[blockIdx.x * num_experts + threadIdx.x],
+            CUMSUM_INVALID_TAG);
       }
-      const int proposed_offset = cumsum_offset[i] + local_cumsum[i];
-      global_expertwise_block_cumsum[(blockIdx.x + 1) * num_experts + i] =
-          proposed_offset;
-    }  // 至此，给下一个block的cumsum已经更新完毕，下一个block可以开始cumsum的计算了
+    }
+    const int proposed_offset = cumsum_offset + local_cumsum;
+    global_expertwise_block_cumsum[(blockIdx.x + 1) * num_experts + threadIdx.x] =
+        proposed_offset;
+  // 至此，给下一个block的cumsum已经更新完毕，下一个block可以开始cumsum的计算了
 
 // -------------------------- 块内通信逻辑 -----------------------------
 #pragma unroll
     for (int i = 0; i < CUMSUM_BLOCK_SIZE; i++) {
-#pragma unroll
-      for (int j = 0; j < num_experts; j++) {
-        const int proposed_row =
-            (local_expert_rowmap[i][j] == -1)
-                ? -1
-                : (local_expert_rowmap[i][j] + cumsum_offset[j]);
-        shared_expert_rowmap[i][j] = proposed_row;
-        shared_expert_probmap[i][j] = local_expert_probs[i][j];
-      }
+      const int proposed_row =
+          (local_expert_rowmap[i] == -1)
+              ? -1
+              : (local_expert_rowmap[i] + cumsum_offset);
+      shared_expert_rowmap[i][threadIdx.x] = proposed_row;
+      shared_expert_probmap[i][threadIdx.x] = local_expert_probs[i];
     }
   }  // 至此，本线程块内的shared_mem已经规整完毕，接下来是向量化的数据搬运
   __syncthreads();  // 其余线程等到了thread0，工作安排在shared_mem上
@@ -276,7 +262,6 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
   } else {  // 让输出时不报错，但实际不会用到
     XScale_unzipped = paddle::empty({0}, paddle::DataType::FLOAT32, X.place());
   }
-
   X_unzipped = paddle::empty({output_rows, cols}, X.dtype(), X.place());
   zipped_expertwise_rowmap =
       paddle::empty({rows, num_experts}, paddle::DataType::INT32, X.place());
@@ -287,40 +272,60 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
   if (X.dtype() == paddle::DataType::BFLOAT16) {
     auto X_unzipped_ptr =
         reinterpret_cast<void *>(X_unzipped.data<phi::bfloat16>());
-    cudaMemsetAsync(X_unzipped_ptr,
-                    0,
-                    sizeof(phi::bfloat16) * output_rows * cols,
-                    X.stream());
+    for(int i = 0; i<num_experts; i++){
+      int next_expert_offset = i<num_experts-1 ? expert_offset.data[i+1] : output_rows;
+      int invaild_rows = next_expert_offset - expert_offset.data[i] - tokens_per_expert[i];
+      cudaMemsetAsync(X_unzipped_ptr+tokens_per_expert[i]*sizeof(phi::bfloat16),
+                      0,
+                      sizeof(phi::bfloat16) * invaild_rows * cols,
+                      X.stream());
+    }
   } else if (X.dtype() == paddle::DataType::FLOAT8_E4M3FN) {
     auto X_unzipped_ptr =
         reinterpret_cast<void *>(X_unzipped.data<phi::float8_e4m3fn>());
-    cudaMemsetAsync(X_unzipped_ptr,
-                    0,
-                    sizeof(phi::float8_e4m3fn) * output_rows * cols,
-                    X.stream());
+    for(int i = 0; i<num_experts; i++){
+      int next_expert_offset = i<num_experts-1 ? expert_offset.data[i+1] : output_rows;
+      int invaild_rows = next_expert_offset - expert_offset.data[i] - tokens_per_expert[i];
+      cudaMemsetAsync(X_unzipped_ptr+tokens_per_expert[i]*sizeof(phi::float8_e4m3fn),
+                      0,
+                      sizeof(phi::float8_e4m3fn) * invaild_rows * cols,
+                      X.stream());
+    }
   }
   if (XScale) {
     auto XScale_unzipped_ptr =
         reinterpret_cast<void *>(XScale_unzipped.data<float>());
-    cudaMemsetAsync(XScale_unzipped_ptr,
-                    0,
-                    sizeof(float) * output_rows * quanted_cols,
-                    XScale_unzipped.stream());
+    for(int i = 0; i<num_experts; i++){
+      int next_expert_offset = i<num_experts-1 ? expert_offset.data[i+1] : output_rows;
+      int invaild_rows = next_expert_offset - expert_offset.data[i] - tokens_per_expert[i];
+      cudaMemsetAsync(XScale_unzipped_ptr+tokens_per_expert[i]*sizeof(float),
+                      0,
+                      sizeof(float) * invaild_rows * quanted_cols,
+                      XScale_unzipped.stream());
+    }
   }
   if (expert_prob_topk.dtype() == paddle::DataType::BFLOAT16) {
     auto token_prob_unzipped_ptr =
         reinterpret_cast<void *>(token_prob_unzipped.data<phi::bfloat16>());
-    cudaMemsetAsync(token_prob_unzipped_ptr,
-                    0,
-                    sizeof(phi::bfloat16) * output_rows,
-                    token_prob_unzipped.stream());
+    for(int i = 0; i<num_experts; i++){
+      int next_expert_offset = i<num_experts-1 ? expert_offset.data[i+1] : output_rows;
+      int invaild_rows = next_expert_offset - expert_offset.data[i] - tokens_per_expert[i];
+      cudaMemsetAsync(token_prob_unzipped_ptr+tokens_per_expert[i]*sizeof(phi::bfloat16),
+                      0,
+                      sizeof(phi::bfloat16) * invaild_rows,
+                      token_prob_unzipped.stream());
+    }
   } else if (expert_prob_topk.dtype() == paddle::DataType::FLOAT32) {
     auto token_prob_unzipped_ptr =
         reinterpret_cast<void *>(token_prob_unzipped.data<float>());
-    cudaMemsetAsync(token_prob_unzipped_ptr,
-                    0,
-                    sizeof(float) * output_rows,
-                    token_prob_unzipped.stream());
+    for(int i = 0; i<num_experts; i++){
+      int next_expert_offset = i<num_experts-1 ? expert_offset.data[i+1] : output_rows;
+      int invaild_rows = next_expert_offset - expert_offset.data[i] - tokens_per_expert[i];
+      cudaMemsetAsync(token_prob_unzipped_ptr+tokens_per_expert[i]*sizeof(float),
+                      0,
+                      sizeof(float) * invaild_rows,
+                      token_prob_unzipped.stream());
+    }
   }
   // ------------ 前缀和辅助数组相关逻辑，“推”式block通信 -------------------
   const int cumsum_blocknum =
