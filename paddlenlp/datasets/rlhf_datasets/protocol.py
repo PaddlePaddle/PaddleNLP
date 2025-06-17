@@ -24,14 +24,12 @@ from typing import Dict, List, Sequence, Union
 
 import numpy as np
 import paddle
-import paddle.distributed as dist
 import pandas as pd
 from paddle.io import DataLoader
 
 from ...utils import logger
 from ...utils.nested import flatten_list
 
-original_concat = paddle.concat
 __all__ = [
     "DataProto",
     "union_tensor_dict",
@@ -73,6 +71,14 @@ class TensorDict:
         return key in self._tensors
 
     def update(self, other):
+        """Updates the tensor dictionary of the current object.
+
+        Args:
+            other (TensorDict or dict): A TensorDict or a dictionary containing tensors to update with.
+
+        Returns:
+            None
+        """
         if isinstance(other, TensorDict):
             other = other._tensors
         for key, value in other.items():
@@ -91,6 +97,18 @@ class TensorDict:
         return self
 
     def pop(self, key: str, default=None):
+        """Removes the value associated with the specified key from the TensorDict and returns it.
+
+        Args:
+            key (str): The key to remove from the TensorDict.
+            default (Optional[Any]): The default value to return if the key is not found. Defaults to None.
+
+        Returns:
+            Any: The value corresponding to the key if it exists; otherwise, returns the default value if provided.
+
+        Raises:
+            KeyError: If the key does not exist and no default value is provided.
+        """
         if key in self._tensors:
             value = self._tensors.pop(key)
             return value
@@ -100,6 +118,18 @@ class TensorDict:
             raise KeyError(f"Key '{key}' not found in TensorDict and no default value provided.")
 
     def select(self, *keys, default=None):
+        """Selects tensors by the given keys and returns a new TensorDict object.
+
+        Args:
+            *keys (tuple): One or more keys to select.
+            default (Any, optional): The default value to return if a key does not exist. Defaults to None.
+
+        Returns:
+            TensorDict: A new TensorDict containing the selected tensors.
+
+        Raises:
+            KeyError: If a key does not exist and no default value is provided.
+        """
         selected_tensors = {}
         for key in keys:
             if key in self._tensors:
@@ -117,6 +147,21 @@ class TensorDict:
         return TensorDict(selected_tensors, batch_size=batch_size, num_batch_dims=self.num_batch_dims)
 
     def rename_key_(self, old_keys, new_keys):
+        """Renames keys in the TensorDict for use with the `rename` method of DataProto.
+        The naming convention is directly adopted from the official PyTorch implementation.
+
+        Args:
+            old_keys (str or List[str]): The key or list of keys to be renamed.
+            new_keys (str or List[str]): The new key or list of new keys.
+
+        Returns:
+            self: The updated TensorDict instance with renamed keys.
+
+        Raises:
+            ValueError: If the lengths of `old_keys` and `new_keys` do not match.
+            KeyError: If any key in `old_keys` does not exist in the TensorDict,
+                        or if any key in `new_keys` already exists in the TensorDict.
+        """
         if isinstance(old_keys, (str,)):
             old_keys = [old_keys]
         if isinstance(new_keys, (str,)):
@@ -134,6 +179,20 @@ class TensorDict:
 
     @classmethod
     def concat(cls, tensordict_list, axis=0):
+        """Concatenate multiple TensorDict objects along a specified axis.
+
+        Args:
+            cls (class): The TensorDict class.
+            tensordict_list (list of TensorDict): The list of TensorDict objects to concatenate.
+            axis (int, optional): The axis to concatenate along, default is 0.
+
+        Returns:
+            TensorDict: The concatenated TensorDict object.
+
+        Raises:
+            ValueError: If tensordict_list is empty, or the keys of TensorDict objects are different,
+                        or the dimensions other than the concatenation axis do not match, a ValueError will be raised.
+        """
         if not tensordict_list:
             raise ValueError("tensordict_list must not be empty")
 
@@ -164,11 +223,24 @@ class TensorDict:
         return self._tensors.get(key, default)
 
 
-def tensordict_concat(
+def tensor_or_tensordict_concat(
     x: Union[Sequence[paddle.Tensor], Sequence[TensorDict]],
     axis: int | paddle.Tensor = 0,
     name: str | None = None,
 ):
+    """Concatenates multiple tensors or TensorDicts along the specified axis.
+
+    Args:
+        x (Union[Sequence[paddle.Tensor], Sequence[TensorDict]]): A sequence of tensors or TensorDicts to concatenate.
+        axis (int or paddle.Tensor, optional): The axis along which to concatenate. Defaults to 0.
+            If `x` is a sequence of tensors, `axis` should be an integer;
+            if `x` is a sequence of TensorDicts, `axis` should be a paddle.Tensor. Defaults to 0.
+        name (str, optional): The name of the operation (optional). Defaults to None.
+
+    Returns:
+        Union[paddle.Tensor, TensorDict]: The concatenated tensor or TensorDict.
+    """
+
     def is_tensor_sequence():
         if isinstance(x[0], paddle.Tensor):
             return True
@@ -178,21 +250,64 @@ def tensordict_concat(
     if not is_tensor_sequence() and paddle.in_dynamic_mode():
         return TensorDict.concat(x)
     else:
-        return original_concat(x, axis, name)
+        return paddle.concat(x, axis, name)
 
 
-paddle.concat = tensordict_concat
+def union_tensor_dict(tensor_dict1: TensorDict, tensor_dict2: TensorDict) -> TensorDict:
+    """Union two tensordicts."""
+    assert (
+        tensor_dict1.batch_size == tensor_dict2.batch_size
+    ), f"Two tensor dict must have identical batch size. Got {tensor_dict1.batch_size} and {tensor_dict2.batch_size}"
+    for key in tensor_dict2.keys():
+        if key not in tensor_dict1.keys():
+            tensor_dict1[key] = tensor_dict2[key]
+        else:
+            assert tensor_dict1[key].equal(
+                tensor_dict2[key]
+            ), f"{key} in tensor_dict1 and tensor_dict2 are not the same object"
+
+    return tensor_dict1
+
+
+def union_numpy_dict(tensor_dict1: dict[np.ndarray], tensor_dict2: dict[np.ndarray]) -> dict[np.ndarray]:
+    """Merges two dictionaries containing NumPy arrays.
+
+    Args:
+        tensor_dict1 (dict[np.ndarray]): The first dictionary containing NumPy arrays.
+        tensor_dict2 (dict[np.ndarray]): The second dictionary containing NumPy arrays.
+
+    Returns:
+        dict[np.ndarray]: The merged dictionary.
+
+    Raises:
+        AssertionError: If the values corresponding to the same key in both dictionaries are not NumPy arrays,
+                        or if the arrays are not equal (considering NaNs and object types).
+    """
+    for key, val in tensor_dict2.items():
+        if key in tensor_dict1:
+            assert isinstance(tensor_dict2[key], np.ndarray)
+            assert isinstance(tensor_dict1[key], np.ndarray)
+            # to properly deal with nan and object type
+            assert pd.DataFrame(tensor_dict2[key]).equals(
+                pd.DataFrame(tensor_dict1[key])
+            ), f"{key} in tensor_dict1 and tensor_dict2 are not the same object"
+        tensor_dict1[key] = val
+
+    return tensor_dict1
 
 
 def union_two_dict(dict1: Dict, dict2: Dict):
-    """Union two dict. Will throw an error if there is an item not the same object with the same key.
+    """Merges two dictionaries. Raises an error if the same key exists in both dictionaries but maps to different objects.
 
     Args:
-        dict1:
-        dict2:
+        dict1 (Dict): The first dictionary.
+        dict2 (Dict): The second dictionary.
 
     Returns:
+        Dict: The merged dictionary.
 
+    Raises:
+        AssertionError: If the same key exists in both dictionaries with different values.
     """
     for key, val in dict2.items():
         if key in dict1:
@@ -229,42 +344,39 @@ def pad_dataproto_to_divisor(data: "DataProto", size_divisor: int):
 
 
 def unpad_dataproto(data: "DataProto", pad_size):
+    """Removes the padded parts from the given DataProto object.
+
+    Args:
+        data (DataProto): The DataProto object containing the data.
+        pad_size (int): The size of the padding to remove.
+
+    Returns:
+        DataProto: The DataProto object with the padding removed.
+    """
     if pad_size != 0:
         data = data[:-pad_size]
     return data
 
 
-def union_tensor_dict(tensor_dict1: TensorDict, tensor_dict2: TensorDict) -> TensorDict:
-    """Union two tensordicts."""
-    assert (
-        tensor_dict1.batch_size == tensor_dict2.batch_size
-    ), f"Two tensor dict must have identical batch size. Got {tensor_dict1.batch_size} and {tensor_dict2.batch_size}"
-    for key in tensor_dict2.keys():
-        if key not in tensor_dict1.keys():
-            tensor_dict1[key] = tensor_dict2[key]
-        else:
-            assert tensor_dict1[key].equal(
-                tensor_dict2[key]
-            ), f"{key} in tensor_dict1 and tensor_dict2 are not the same object"
-
-    return tensor_dict1
-
-
-def union_numpy_dict(tensor_dict1: dict[np.ndarray], tensor_dict2: dict[np.ndarray]) -> dict[np.ndarray]:
-    for key, val in tensor_dict2.items():
-        if key in tensor_dict1:
-            assert isinstance(tensor_dict2[key], np.ndarray)
-            assert isinstance(tensor_dict1[key], np.ndarray)
-            # to properly deal with nan and object type
-            assert pd.DataFrame(tensor_dict2[key]).equals(
-                pd.DataFrame(tensor_dict1[key])
-            ), f"{key} in tensor_dict1 and tensor_dict2 are not the same object"
-        tensor_dict1[key] = val
-
-    return tensor_dict1
-
-
 def list_of_dict_to_dict_of_list(list_of_dict: list[dict]):
+    """Converts a list of dictionaries into a dictionary of lists.
+
+    Args:
+        list_of_dict (list[dict]): A list containing dictionaries.
+
+    Returns:
+        dict: A dictionary where each key maps to a list of values collected from the input dictionaries.
+
+    Raises:
+        AssertionError: Raised if any key in the dictionaries is not present in the final output dictionary during iteration.
+
+    Examples:
+        >>> list_of_dict = [{'name': 'Alice', 'age': 25}, {'name': 'Bob', 'age': 30}]
+        >>> result = list_of_dict_to_dict_of_list(list_of_dict)
+        >>> print(result)
+        {'name': ['Alice', 'Bob'], 'age': [25, 30]}
+    """
+
     if len(list_of_dict) == 0:
         return {}
     keys = list_of_dict[0].keys()
@@ -316,6 +428,15 @@ def unfold_batch_dim(data: "DataProto", batch_dims=2):
 
 
 def collate_fn(x: list["DataProtoItem"]):
+    """Combines a list of DataProtoItem objects into a single batch.
+
+    Args:
+        x (list["DataProtoItem"]): A list of DataProtoItem objects.
+
+    Returns:
+        DataProto: A DataProto object containing the combined batch data and non-tensor batch data.
+    """
+
     batch = []
     non_tensor_batch = []
     for data in x:
@@ -415,6 +536,14 @@ class DataProto:
             raise TypeError(f"Indexing with {type(item)} is not supported")
 
     def print_size(self, prefix=""):
+        """Prints the sizes of `tensordict` and `non_tensor_batch`.
+
+        Args:
+            prefix (str, optional): A prefix string to identify the log message. Defaults to an empty string.
+
+        Returns:
+            None
+        """
         size_of_tensordict = 0
         for key, tensor in self.batch.items():
             size_of_tensordict += tensor.element_size() * tensor.numel()
@@ -457,6 +586,19 @@ class DataProto:
 
     @classmethod
     def from_single_dict(cls, data: Dict[str, Union[paddle.Tensor, np.ndarray]], meta_info=None):
+        """Converts a dictionary containing Paddle tensors and NumPy arrays into a DataProto object.
+
+        Args:
+            cls (class): The class invoking this method.
+            data (Dict[str, Union[paddle.Tensor, np.ndarray]]): A dictionary containing Paddle tensors and NumPy arrays.
+            meta_info (Any, optional): Optional metadata. Defaults to None.
+
+        Returns:
+            DataProto: A DataProto object containing `tensors` and `non_tensors`.
+
+        Raises:
+            ValueError: If the input `data` contains unsupported data types.
+        """
         tensors = {}
         non_tensors = {}
 
@@ -508,59 +650,12 @@ class DataProto:
         return cls(batch=tensor_dict, non_tensor_batch=non_tensors, meta_info=meta_info)
 
     @staticmethod
-    def gather_tensor(tensor, dp_group=None, sd_group=None):
-        """Gather tensor from all devices."""
-
-        if not isinstance(tensor, list):
-            tensor = [tensor]
-
-        if isinstance(tensor[0], paddle.Tensor):
-            type = "tensor"
-        elif isinstance(tensor[0], np.ndarray):
-            type = "numpy"
-        else:
-            raise TypeError(f"{type(tensor[0])} is not supported for gather and pad")
-
-        dtype = tensor[0].dtype
-
-        if (dp_group is None and sd_group is None) or (dp_group.nranks == 1 and sd_group.nranks == 1):
-            return tensor
-
-        def map_func(weight):
-            if isinstance(weight, paddle.Tensor):
-                weight = weight.numpy()
-            return weight
-
-        tensor = [map_func(i) for i in tensor]
-
-        sd_gathered_tensor = []
-        if sd_group.nranks > 1:
-            dist.all_gather_object(sd_gathered_tensor, tensor, group=sd_group)
-
-        dp_gathered_tensor = []
-        if dp_group.nranks > 1:
-            if len(sd_gathered_tensor) > 0:
-                tensor = sd_gathered_tensor
-            dist.all_gather_object(dp_gathered_tensor, tensor, group=dp_group)
-
-        if len(dp_gathered_tensor) > 0:
-            gathered_tensor = dp_gathered_tensor
-        else:
-            gathered_tensor = sd_gathered_tensor
-
-        if type == "tensor":
-            gathered_tensor = [paddle.to_tensor(i, dtype=dtype) for i in flatten_list(gathered_tensor)]
-
-        return gathered_tensor
-
-    @staticmethod
     def concatenate_tensors(
         gathered_list: List[Union[paddle.Tensor, np.ndarray, List]],
         data_parallel_group=None,
         sharding_parallel_group=None,
     ) -> Union[paddle.Tensor, np.ndarray]:
-        """
-        Concatenates a list of tensors/arrays that have been gathered from
+        """Concatenates a list of tensors/arrays that have been gathered from
         different distributed ranks. Handles both Paddle Tensors and NumPy arrays,
         and accounts for nested lists from `all_gather_object` with multiple ranks.
 
@@ -589,6 +684,20 @@ class DataProto:
 
     @staticmethod
     def pad_tensor(tensor_list, pad_index, dtype, padding_side):
+        """Pads a list of tensors or numpy arrays to the same size.
+
+        Args:
+            tensor_list (list): A list of tensors or numpy arrays. All elements must have the same first dimension (shape[0]).
+            pad_index (int): The value used for padding.
+            dtype (paddle.DataType): The data type of the resulting padded tensor.
+            padding_side (str): The padding direction. Use 'right' to pad on the right, or 'left' to pad on the left.
+
+        Returns:
+            Tensor or ndarray: The padded tensor or numpy array with shape (data_num, max_size).
+
+        Raises:
+            ValueError: If `padding_side` is not 'right' or 'left'.
+        """
         max_size = max([i.shape[-1] for i in tensor_list])
         data_num = sum([i.shape[0] for i in tensor_list])
         if isinstance(tensor_list[0], paddle.Tensor):
@@ -612,6 +721,16 @@ class DataProto:
 
     @staticmethod
     def pad_or_concat_tensor_list(tensor_list, pad_index, key):
+        """Pads or concatenates a given list of tensors.
+
+        Args:
+            tensor_list (list): The list of tensors to be processed.
+            pad_index (int): The value used for padding.
+            key (str): The key identifying the tensor list.
+
+        Returns:
+            Union[np.ndarray, torch.Tensor]: The processed tensor or list of tensors.
+        """
         left_padding_key = ("prompt", "label_ids")
         pad = False if len(flatten_list(tensor_list)[0].shape) == 1 else True
         padding_side = "left" if (key in left_padding_key) else "right"
@@ -623,7 +742,15 @@ class DataProto:
 
     @staticmethod
     def pad_batch_data(tensor_list: List[paddle.Tensor] = None, pad_token_id=None) -> List[paddle.Tensor]:
+        """Pads a batch of tensors.
 
+        Args:
+            tensor_list (List[paddle.Tensor], optional): A list of tensors to be padded. Defaults to None.
+            pad_token_id (int, optional): The token ID used for padding. Defaults to None.
+
+        Returns:
+            List[paddle.Tensor]: The list of padded tensors.
+        """
         tensor_list = [paddle.unsqueeze(v, axis=0) if v.ndim == 1 else v for v in tensor_list]
         padded_tensors = DataProto.pad_tensor(
             tensor_list,
@@ -796,8 +923,21 @@ class DataProto:
         return DataProto.from_dict(tensors=tensors, non_tensors=non_tensors, meta_info=meta_info)
 
     def rename(self, old_keys=None, new_keys=None) -> "DataProto":
-        """
-        Note that this function only rename the key in the batch
+        """Rename the keys in the batch.
+
+        Args:
+            old_keys (Optional[Union[str, List[str]]]): The old keys to be renamed.
+            new_keys (Optional[Union[str, List[str]]]): The new keys after renaming.
+
+        Returns:
+            DataProto: Returns the instance itself.
+
+        Raises:
+            TypeError: If old_keys or new_keys is not a string or a list.
+            ValueError: If the lengths of old_keys and new_keys are not the same.
+
+        Note:
+            This function only renames the keys in the batch.
         """
 
         def validate_input(keys):
@@ -923,7 +1063,7 @@ class DataProto:
         for batch in data:
             batch_lst.append(batch.batch)
         if batch_lst[0] is not None:
-            new_batch = paddle.concat(batch_lst, axis=0)
+            new_batch = tensor_or_tensordict_concat(batch_lst, axis=0)
         else:
             new_batch = None
 
@@ -1010,14 +1150,7 @@ class DataProto:
         for i in range(num_micro_batches):
             micro_batch = {}
             for key, data in self.batch.items():
-                if isinstance(data, paddle.Tensor):
-                    micro_batch[key] = data[i * batch_size : (i + 1) * batch_size]
-                elif isinstance(data, np.ndarray):
-                    micro_batch[key] = data[i * batch_size : (i + 1) * batch_size]
-                elif isinstance(data, list):
-                    micro_batch[key] = data[i * batch_size : (i + 1) * batch_size]
-                else:
-                    raise TypeError(f"Unsupported data type for key {key}: {type(data)}")
+                micro_batch[key] = data[i * batch_size : (i + 1) * batch_size]
 
             # if os.getenv("PROCESS_PROMPT_AND_RESPONSE", "1").lower() in ["1", "t", "true", "yes", "y"]:
             #     micro_batch = process_prompt_and_response(micro_batch=micro_batch, pad_token_id=pad_token_id)
