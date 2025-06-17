@@ -1520,12 +1520,6 @@ class TrainingArguments:
                         assert (
                             "split_param" in sharding_parallel_config
                         ), "split_param should be set when enable_stage1_allgather_overlap."
-                        use_casual_mask = os.getenv("USE_CASUAL_MASK", "False")
-                        assert use_casual_mask, "enable_stage1_allgather_overlap requires USE_CASUAL_MASK=True."
-                        assert self.logging_steps > 1, (
-                            "The logging_steps should be greater than 1 for enable_stage1_allgather_overlap, "
-                            f"but got logging_steps={self.logging_steps}."
-                        )
 
                     if "split_param" in sharding_parallel_config:
                         if ShardingOption.SHARD_OP not in self.sharding:
