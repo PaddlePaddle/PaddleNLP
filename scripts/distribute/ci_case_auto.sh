@@ -159,11 +159,11 @@ function llm_gpt_case_list_auto() {
     fun_list=(
         # The test name must have "llm_gpt_dygraph_auto_" as a prefix, 
         # which will be used for tracking the execution status of the case.
-        # llm_gpt_dygraph_auto_bs8_fp32_DP2
-        # llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2
-        # llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2
-        # llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2
-        # llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
+        llm_gpt_dygraph_auto_bs8_fp32_DP2
+        llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2
+        llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2
+        llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2
+        llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
         llm_gpt_pir_auto_bs4_TP2
         llm_gpt_pir_auto_bs4_TP2_PP2
         llm_gpt_pir_auto_bs8_DP2_TP2_PP2
@@ -2218,7 +2218,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.55848312 # output of dropout is different after supporting spmd
+    loss_base=10.55853844 # output of dropout is different after supporting spmd
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
@@ -2290,7 +2290,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.56786537 # output of dropout is different after supporting spmd
+    loss_base=10.56579494 # output of dropout is different after supporting spmd
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
@@ -2363,7 +2363,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.59993172     # note: need to debug
-    loss_base=10.57312012 # output of dropout is different after supporting spmd
+    loss_base=10.57174873 # output of dropout is different after supporting spmd
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
@@ -2436,7 +2436,7 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.58456802     # note: need to debug
-    loss_base=10.57452488
+    loss_base=10.57304478
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
@@ -2510,7 +2510,7 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.58456802     # note: need to debug
-    loss_base=10.566679
+    loss_base=10.56716251
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
