@@ -58,7 +58,6 @@ __global__ void tokens_unzip_stable_kernel(
     local_expert_offsets[i] = expert_base_offset.data[i];
     local_cumsum[i] = 0;
   }
-  const int base_row_idx = blockIdx.x * CUMSUM_BLOCK_SIZE;
   __shared__ int shared_expert_rowmap[CUMSUM_BLOCK_SIZE][MAX_NUM_EXPERTS];
   __shared__ probs_T shared_expert_probmap[CUMSUM_BLOCK_SIZE][MAX_NUM_EXPERTS];
 
@@ -287,40 +286,60 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
   if (X.dtype() == paddle::DataType::BFLOAT16) {
     auto X_unzipped_ptr =
         reinterpret_cast<void *>(X_unzipped.data<phi::bfloat16>());
-    cudaMemsetAsync(X_unzipped_ptr,
-                    0,
-                    sizeof(phi::bfloat16) * output_rows * cols,
-                    X.stream());
+    for(int i = 0; i<num_experts; i++){
+      int next_expert_offset = i<num_experts-1 ? expert_offset.data[i+1] : output_rows;
+      int invaild_rows = next_expert_offset - expert_offset.data[i] - tokens_per_expert[i];
+      cudaMemsetAsync(X_unzipped_ptr+tokens_per_expert[i]*sizeof(phi::bfloat16),
+                      0,
+                      sizeof(phi::bfloat16) * invaild_rows * cols,
+                      X.stream());
+    }
   } else if (X.dtype() == paddle::DataType::FLOAT8_E4M3FN) {
     auto X_unzipped_ptr =
         reinterpret_cast<void *>(X_unzipped.data<phi::float8_e4m3fn>());
-    cudaMemsetAsync(X_unzipped_ptr,
-                    0,
-                    sizeof(phi::float8_e4m3fn) * output_rows * cols,
-                    X.stream());
+    for(int i = 0; i<num_experts; i++){
+      int next_expert_offset = i<num_experts-1 ? expert_offset.data[i+1] : output_rows;
+      int invaild_rows = next_expert_offset - expert_offset.data[i] - tokens_per_expert[i];
+      cudaMemsetAsync(X_unzipped_ptr+tokens_per_expert[i]*sizeof(phi::float8_e4m3fn),
+                      0,
+                      sizeof(phi::float8_e4m3fn) * invaild_rows * cols,
+                      X.stream());
+    }
   }
   if (XScale) {
     auto XScale_unzipped_ptr =
         reinterpret_cast<void *>(XScale_unzipped.data<float>());
-    cudaMemsetAsync(XScale_unzipped_ptr,
-                    0,
-                    sizeof(float) * output_rows * quanted_cols,
-                    XScale_unzipped.stream());
+    for(int i = 0; i<num_experts; i++){
+      int next_expert_offset = i<num_experts-1 ? expert_offset.data[i+1] : output_rows;
+      int invaild_rows = next_expert_offset - expert_offset.data[i] - tokens_per_expert[i];
+      cudaMemsetAsync(XScale_unzipped_ptr+tokens_per_expert[i]*sizeof(float),
+                      0,
+                      sizeof(float) * invaild_rows * quanted_cols,
+                      XScale_unzipped.stream());
+    }
   }
   if (expert_prob_topk.dtype() == paddle::DataType::BFLOAT16) {
     auto token_prob_unzipped_ptr =
         reinterpret_cast<void *>(token_prob_unzipped.data<phi::bfloat16>());
-    cudaMemsetAsync(token_prob_unzipped_ptr,
-                    0,
-                    sizeof(phi::bfloat16) * output_rows,
-                    token_prob_unzipped.stream());
+    for(int i = 0; i<num_experts; i++){
+      int next_expert_offset = i<num_experts-1 ? expert_offset.data[i+1] : output_rows;
+      int invaild_rows = next_expert_offset - expert_offset.data[i] - tokens_per_expert[i];
+      cudaMemsetAsync(token_prob_unzipped_ptr+tokens_per_expert[i]*sizeof(phi::bfloat16),
+                      0,
+                      sizeof(phi::bfloat16) * invaild_rows,
+                      token_prob_unzipped.stream());
+    }
   } else if (expert_prob_topk.dtype() == paddle::DataType::FLOAT32) {
     auto token_prob_unzipped_ptr =
         reinterpret_cast<void *>(token_prob_unzipped.data<float>());
-    cudaMemsetAsync(token_prob_unzipped_ptr,
-                    0,
-                    sizeof(float) * output_rows,
-                    token_prob_unzipped.stream());
+    for(int i = 0; i<num_experts; i++){
+      int next_expert_offset = i<num_experts-1 ? expert_offset.data[i+1] : output_rows;
+      int invaild_rows = next_expert_offset - expert_offset.data[i] - tokens_per_expert[i];
+      cudaMemsetAsync(token_prob_unzipped_ptr+tokens_per_expert[i]*sizeof(float),
+                      0,
+                      sizeof(float) * invaild_rows,
+                      token_prob_unzipped.stream());
+    }
   }
   // ------------ 前缀和辅助数组相关逻辑，“推”式block通信 -------------------
   const int cumsum_blocknum =
