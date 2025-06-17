@@ -434,7 +434,7 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     if training_args.enable_linear_fused_grad_add:
-        from fused_layers import mock_layers
+        from llm.utils.fused_layers import mock_layers
 
         mock_layers()
 
