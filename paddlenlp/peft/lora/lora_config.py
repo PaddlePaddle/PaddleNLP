@@ -77,6 +77,8 @@ class LoRAConfig:
     rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
     pissa: bool = field(default=False, metadata={"help": "Whether to use Pissa: https://arxiv.org/pdf/2404.02948.pdf"})
     loraga: bool = field(default=False, metadata={"help": "Whether to LoRA-GA"})
+    nola: bool = field(default=False, metadata={"help": "Whether to use Nola: https://arxiv.org/pdf/2310.02556"})
+    nola_basis_num: int = field(default=1, metadata={"help": "When use nola, the number of basis"})
     use_mora: bool = field(
         default=False, metadata={"help": "Whether to use MoRA: https://arxiv.org/pdf/2405.12130.pdf"}
     )

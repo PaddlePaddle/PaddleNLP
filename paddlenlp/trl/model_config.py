@@ -64,6 +64,8 @@ class ModelConfig:
     lora_use_mixer: bool = field(
         default=False, metadata={"help": "Whether to use MosLoRA: https://arxiv.org/pdf/2406.11909"}
     )
+    nola: bool = field(default=False, metadata={"help": "Whether to use Nola: https://arxiv.org/pdf/2310.02556"})
+    nola_basis_num: int = field(default=1, metadata={"help": "When use nola, the number of basis"})
     use_mora: bool = field(
         default=False, metadata={"help": "Whether to use MoRA: https://arxiv.org/pdf/2405.12130.pdf"}
     )
