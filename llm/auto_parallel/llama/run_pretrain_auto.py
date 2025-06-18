@@ -41,14 +41,16 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     LlamaConfig,
     LlamaForCausalLM3DAuto,
+    LlamaForCausalLM3DAutoPP,
     LlamaForCausalLMNet,
     LlamaPretrainingCriterion3DAuto,
     LlamaPretrainingCriterionNet,
 )
 from paddlenlp.utils.log import logger
+from paddle.distributed.auto_parallel.pipelining.schedules import ScheduleGPipe
 
 MODEL_CLASSES = {
-    "llama": (LlamaConfig, LlamaForCausalLM3DAuto, LlamaPretrainingCriterion3DAuto),
+    "llama": (LlamaConfig, LlamaForCausalLM3DAutoPP, LlamaPretrainingCriterion3DAuto),
     "llama_network": (LlamaConfig, LlamaForCausalLMNet, LlamaPretrainingCriterionNet),
 }
 
@@ -94,7 +96,10 @@ class PreTrainingArguments(AutoTrainingArguments):
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
     )
-
+    n_microbatches: int = field(
+        default=1,
+        metadata={"help": "Control the num of microbatches in one pp step."},
+    )
     def __post_init__(self):
         super().__post_init__()
         assert self.enable_auto_parallel

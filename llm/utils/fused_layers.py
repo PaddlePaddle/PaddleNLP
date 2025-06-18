@@ -30,6 +30,7 @@ else:
 
 
 class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
+
     @staticmethod
     def forward(ctx, x, weight, bias=None, name=None):
         y = origin_linear(x, weight, bias)
@@ -44,32 +45,33 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
         # _C_ops.fused_linear_param_grad_add(x, y_grad, dw, db, multi precision, has bias)
         if bias is None:
             if hasattr(weight, "main_grad"):
-                weight.main_grad, _ = _C_ops.fused_linear_param_grad_add(
-                    x, y_grad, weight.main_grad, None, True, False
-                )
+                with paddle.amp.auto_cast(False):
+                    weight.main_grad, _ = _C_ops.fused_linear_param_grad_add(
+                        x, y_grad, weight.main_grad, None, True, False)
                 return x_grad, None
             else:
                 if weight.grad is not None:
-                    weight.grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, weight.grad, None, False, False)
+                    weight.grad, _ = _C_ops.fused_linear_param_grad_add(
+                        x, y_grad, weight.grad, None, False, False)
                     return x_grad, None
                 else:
-                    weight_grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False, False)
+                    weight_grad, _ = _C_ops.fused_linear_param_grad_add(
+                        x, y_grad, None, None, False, False)
                     return x_grad, weight_grad
 
         if hasattr(weight, "main_grad") and hasattr(bias, "main_grad"):
             weight.main_grad, bias.main_grad = _C_ops.fused_linear_param_grad_add(
-                x, y_grad, weight.main_grad, bias.main_grad, True, True
-            )
+                x, y_grad, weight.main_grad, bias.main_grad, True, True)
             return x_grad, None, None
         else:
             if weight.grad is not None:
                 assert bias.grad is not None
                 weight.grad, bias.grad = _C_ops.fused_linear_param_grad_add(
-                    x, y_grad, weight.grad, bias.grad, False, True
-                )
+                    x, y_grad, weight.grad, bias.grad, False, True)
                 return x_grad, None, None
             else:
-                weight_grad, bias_grad = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False, True)
+                weight_grad, bias_grad = _C_ops.fused_linear_param_grad_add(
+                    x, y_grad, None, None, False, True)
                 return x_grad, weight_grad, bias_grad
 
 
