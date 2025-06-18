@@ -28,7 +28,7 @@ from .testing_utils import LLMTest
 @parameterized_class(
     ["model_dir"],
     [
-        # ["llama"],
+        ["llama"],
         # ["chatglm"], @skip("Skip and wait to fix.")
         # ["chatglm2"], @skip("Skip and wait to fix.")
         # ["bloom"], @skip("Skip and wait to fix.")
