@@ -140,7 +140,7 @@ def sep_reshard_layer(input, split_axis, concat_axis):
     input_placements = input.placements
     if input_placements[sep_axis] != dist.Shard(concat_axis):
         raise ValueError(
-            f"Input placements for 'sep' axis should be Shard({split_axis}), but got {input_placements[sep_axis]}"
+            f"Input placements for 'sep' axis should be Shard({concat_axis}), but got {input_placements[sep_axis]}"
         )
 
     input_placements[sep_axis] = dist.Shard(split_axis)
@@ -1001,8 +1001,12 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             self.hidden_size,
         )
 
-        if config.tensor_parallel_degree > 1:
-            embedding_placements = [dist.Replicate(), dist.Shard(1)]
+        embedding_placements = (
+            [dist.Replicate(), dist.Shard(1)]
+            if self.config.tensor_parallel_degree > 1
+            else [dist.Replicate(), dist.Replicate()]
+        )
+
         if config.sep_parallel_degree > 1:
             embedding_placements = [dist.Replicate(), dist.Replicate(), dist.Replicate()]
 
@@ -1178,8 +1182,9 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                 global_mesh,
                 [dist.Replicate() for _ in range(len(global_mesh._shape))],
             )
+
         hidden_states = inputs_embeds
-        hidden_states = dist.reshard(hidden_states, get_mesh(), self.placements)
+        hidden_states = dist.reshard(hidden_states, get_mesh(self.ipp), self.placements)
 
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
