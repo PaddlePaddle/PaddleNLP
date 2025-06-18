@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import re
-import warnings
 
 import paddle
 from paddle import _C_ops, pir
@@ -24,6 +23,8 @@ from paddle.base.libpaddle import DataType
 from paddle.distributed import fleet
 from paddle.optimizer.adamw import AdamW
 from paddle.pir import Value
+
+from paddlenlp.utils.log import logger
 
 try:
     from .adamw_triton import adamw_triton
@@ -411,29 +412,29 @@ class AdamWMini(AdamW):
             if any(mlp_name in name for mlp_name in self.mlp_names):
                 counts["mlp"] += 1
 
-        print("\nAdam-mini found blocks:")
-        print(f"- {counts['embedding']} embedding layers")
-        print(f"- {counts['output']} output layers")
-        print(f"- {counts['query/key']} Query and Key layers")
-        print(f"- {counts['value']} Value layers")
-        print(f"- {counts['attention_proj']} Attention projection layers")
-        print(f"- {counts['mlp']} MLP layers\n")
+        logger.info("\nAdam-mini found blocks:")
+        logger.info(f"- {counts['embedding']} embedding layers")
+        logger.info(f"- {counts['output']} output layers")
+        logger.info(f"- {counts['query/key']} Query and Key layers")
+        logger.info(f"- {counts['value']} Value layers")
+        logger.info(f"- {counts['attention_proj']} Attention projection layers")
+        logger.info(f"- {counts['mlp']} MLP layers\n")
 
         # Print warnings for missing blocks
         if counts["embedding"] == 0:
-            print("Warning: No embedding layers found")
+            logger.warning("Warning: No embedding layers found")
         if counts["output"] == 0:
-            print("Warning: No output layers found (ignore if using weight tying)")
+            logger.warning("Warning: No output layers found (ignore if using weight tying)")
         if counts["query/key"] == 0:
-            print("Warning: No Query/Key layers found")
+            logger.warning("Warning: No Query/Key layers found")
         if counts["value"] == 0:
-            print("Warning: No Value layers found")
+            logger.warning("Warning: No Value layers found")
         if counts["attention_proj"] == 0:
-            print("Warning: No attention projection layers found")
+            logger.warning("Warning: No attention projection layers found")
         if counts["mlp"] == 0:
-            print("Warning: No MLP layers found")
+            logger.warning("Warning: No MLP layers found")
         if sum(counts.values()) == 0:
-            print("Warning: No Transformer blocks found")
+            logger.warning("Warning: No Transformer blocks found")
 
     def _create_accumulators(self, block, parameters):
         """Create accumulators for parameters."""
@@ -450,7 +451,7 @@ class AdamWMini(AdamW):
                 self._already_create_accumulator.add(p.name)
                 continue
             if self._is_dtype_fp16_or_bf16(p.dtype) and not self._multi_precision:
-                warnings.warn(
+                logger.warning(
                     "Accumulating with FP16 or BF16 in optimizer can lead to poor accuracy or slow convergence."
                     "Consider using multi_precision=True option of the Adam optimizer."
                 )
