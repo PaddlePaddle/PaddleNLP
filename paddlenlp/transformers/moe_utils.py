@@ -123,7 +123,7 @@ class UnZipNode:
                 dispatched_probs,
                 num_experts=num_experts,
                 tokens_per_expert=tokens_per_expert,
-                padding_multiplex=128,
+                padding_alignment=128,
             )
         self.unzipped_probs = unzipped_probs
         self.zipped_expertwise_rowmap = zipped_expertwise_rowmap
@@ -181,7 +181,7 @@ class ZipNode:
                 dispatched_probs,
                 num_experts,
                 tokens_per_expert,
-                padding_multiplex=128,
+                padding_alignment=128,
             )
 
         return unzipped_grad
