@@ -15,20 +15,21 @@
 """Paddle Llama model"""
 from __future__ import annotations
 
-import math
 import os
-import warnings
-from functools import partial
-from typing import Optional, Tuple
+from typing import Optional
 
 import paddle
 import paddle.distributed as dist
 import paddle.nn.functional as F
 from paddle import nn
 from paddle.distributed import fleet
-from paddle.distributed.fleet.utils import recompute
-from paddle.distributed.auto_parallel.pipelining.schedules import ScheduleGPipe, Schedule1F1B, ScheduleInterleaved1F1B
+from paddle.distributed.auto_parallel.pipelining.schedules import (
+    Schedule1F1B,
+    ScheduleFThenB,
+    ScheduleVPP,
+)
 from paddle.distributed.auto_parallel.pipelining.stage import PipelineStage
+from paddle.distributed.fleet.utils import recompute
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -45,44 +46,12 @@ except ImportError:
         return F.silu(x) * y
 
 
-from paddlenlp.transformers.conversion_utils import (
-    StateDictNameMapping,
-    init_name_mappings,
-)
-from paddlenlp.transformers.model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
-    CausalLMOutputWithCrossAttentions,
-)
-from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 from paddlenlp.utils.tools import get_env_device
 
 from . import fusion_ops
-from .configuration import (
-    LLAMA_PRETRAINED_INIT_CONFIGURATION,
-    LLAMA_PRETRAINED_RESOURCE_FILES_MAP,
-    LlamaConfig,
-)
-from .modeling import (
-    LlamaDynamicNTKScalingRotaryEmbedding,
-    LlamaLinearScalingRotaryEmbedding,
-    LlamaNTKScalingRotaryEmbedding,
-    LlamaRotaryEmbedding,
-    _expand_2d_mask,
-    _make_causal_mask,
-    apply_rotary_pos_emb,
-    build_alibi_tensor,
-    get_triangle_upper_mask,
-    repeat_kv,
-)
-
-from .modeling_auto import (
-    LlamaMLPAuto, 
-    LlamaAttentionAuto, 
-    LlamaPretrainedModelAuto, 
-    LlamaDecoderLayerAuto, 
-    LlamaModelAuto,
-    LlamaForCausalLM3DAuto,
-)
+from .configuration import LlamaConfig
+from .modeling import _expand_2d_mask, _make_causal_mask, build_alibi_tensor
+from .modeling_auto import LlamaDecoderLayerAuto, LlamaPretrainedModelAuto
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
@@ -125,6 +94,14 @@ def global_mesh_starts_with_pp():
     else:
         return mesh
 
+
+def get_attr(layer, name):
+    if getattr(layer, name, None) is not None:
+        return getattr(layer, name, None)
+    else:
+        return get_attr(layer._layer, name)
+
+
 def parse_args(args):
     attention_mask, position_ids, alibi = None, None, None
     if isinstance(args, tuple):
@@ -132,15 +109,15 @@ def parse_args(args):
             hidden_states, attention_mask, position_ids, alibi = args
         if len(args) == 3:
             hidden_states, attention_mask, position_ids = args
-            
+
         elif len(args) == 2:
             hidden_states, attention_mask = args
-          
+
         if len(args) == 1:
             hidden_states = args[0]
     else:
         hidden_states = args
-   
+
     if position_ids is not None:
         position_ids.stop_gradient = True
 
@@ -150,12 +127,10 @@ def parse_args(args):
     if alibi is not None:
         alibi.stop_gradient = True
 
-    return  hidden_states, attention_mask, position_ids, alibi
+    return hidden_states, attention_mask, position_ids, alibi
 
 
-def return_args(
-    hidden_states, attention_mask = None, position_ids = None, alibi=None
-):
+def return_args(hidden_states, attention_mask=None, position_ids=None, alibi=None):
     ret = (hidden_states,)
 
     if attention_mask is not None:
@@ -169,15 +144,31 @@ def return_args(
 
     return ret
 
-class _Pipeline_model_chunk(nn.Layer):
-    def __init__(self, layers):
-        super(_Pipeline_model_chunk, self).__init__()
+
+class LlamaChunk(nn.Layer):
+    def __init__(self, layers=None, is_first=False):
+        super(LlamaChunk, self).__init__()
         self.layers = layers
+        self.is_first = is_first
+
     def forward(self, *args, **kwargs):
-        for layer in self.layers:
-            x = layer(kwargs["input_ids"])
-        return x
-    
+        if self.is_first:
+            input_ids = kwargs.get("input_ids")
+            attention_mask = kwargs.get("attention_mask")
+            position_ids = kwargs.get("position_ids")
+            outputs = tuple([input_ids, attention_mask, position_ids])
+            # decoder layers
+            for idx, (decoder_layer) in enumerate(self.layers):
+                outputs = decoder_layer(outputs)
+            return outputs
+        else:
+            outputs = args
+            # decoder layers
+            for idx, (decoder_layer) in enumerate(self.layers):
+                outputs = decoder_layer(outputs)
+        return outputs
+
+
 def manual_model_split(model, stage_idx, group, mode, pp_degree):
 
     num_hidden_layers = model.config.num_hidden_layers
@@ -187,62 +178,32 @@ def manual_model_split(model, stage_idx, group, mode, pp_degree):
     layer_lists = None
 
     layer_lists = model.layers
-    # 构建stages
+
     def _build_stage(model, stage_idx, group):
         new_model = None
-        local_chunk_id = stage_idx // pp_degree
-        if stage_idx == 0: # 第一个model_chunk输入特殊处理
-            new_model = _Pipeline_model_chunk(layer_lists[:chunk_size])
-            def forward_in_first_stage(
-                self,
-                input_ids=None,
-                labels=None,
-                position_ids=None,
-                attention_mask=None,
-                inputs_embeds=None,
-                use_cache=False,
-                past_key_values=None,
-                output_attentions=None,
-                output_hidden_states=None,
-                return_dict=None,
-            ):
-                outputs = tuple([input_ids, attention_mask, position_ids])
-                # decoder layers
-                for idx, (decoder_layer) in enumerate(self.layers):
-                    outputs = decoder_layer(outputs)
-                return outputs
-            new_model.forward = forward_in_first_stage.__get__(new_model)
+        if stage_idx == 0:  # 第一个model_chunk输入特殊处理
+            new_model = LlamaChunk(layer_lists[:chunk_size], is_first=True)
         else:
-            new_model = _Pipeline_model_chunk(layer_lists[stage_idx * chunk_size : (stage_idx + 1) * chunk_size])
-            def forward_in_middle_stages(self, *args, **kwargs):
-                outputs = args
-                # decoder layers
-                for idx, (decoder_layer) in enumerate(self.layers):
-                    outputs = decoder_layer(outputs)
-                return outputs
-            new_model.forward = forward_in_middle_stages.__get__(new_model)
-        stage = PipelineStage(
-            new_model,
-            stage_idx,
-            chunk_num,
-            group=group
-        )
+            new_model = LlamaChunk(layer_lists[stage_idx * chunk_size : (stage_idx + 1) * chunk_size], is_first=False)
+        stage = PipelineStage(new_model, stage_idx, chunk_num, group=group)
         return stage
+
     stages = []
-    for i in range(virtual_pp_degree):  
-        stage = _build_stage(model, stage_idx+i*pp_degree, group)
+    for i in range(virtual_pp_degree):
+        stage = _build_stage(model, stage_idx + i * pp_degree, group)
         stages.append(stage)
     return stages
 
+
 def get_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group):
-    assert mode in ["VPP", "1F1B", "GPipe"]
+    assert mode in ["VPP", "1F1B", "FThenB"]
     stages = manual_model_split(model, group.rank, group, mode, pp_degree)
     if mode == "VPP":
-        schedule = ScheduleInterleaved1F1B(stages, n_microbatches = n_microbatches, loss_fn = loss_fn)
+        schedule = ScheduleVPP(stages, n_microbatches=n_microbatches, loss_fn=loss_fn)
     elif mode == "1F1B":
-        schedule = Schedule1F1B(stages[0], n_microbatches = n_microbatches, loss_fn = loss_fn)
+        schedule = Schedule1F1B(stages[0], n_microbatches=n_microbatches, loss_fn=loss_fn)
     else:
-        schedule = ScheduleGPipe(stages[0], n_microbatches = n_microbatches, loss_fn = loss_fn)
+        schedule = ScheduleFThenB(stages[0], n_microbatches=n_microbatches, loss_fn=loss_fn)
     return schedule
 
 
@@ -271,11 +232,10 @@ class LlamaRMSNormAutoPP(nn.Layer):
     def forward(self, args):
         hidden_states, attention_mask, position_ids, alibi = parse_args(args)
         if self.config.use_fused_rms_norm:
-            hidden_states =  fusion_ops.fusion_rms_norm(
+            hidden_states = fusion_ops.fusion_rms_norm(
                 hidden_states, self.weight, self.variance_epsilon, self.config.use_fast_layer_norm
             )
             return return_args(hidden_states, attention_mask, position_ids, alibi)
-
 
         with paddle.amp.auto_cast(False):
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
@@ -284,8 +244,8 @@ class LlamaRMSNormAutoPP(nn.Layer):
         if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
             hidden_states = paddle.cast(hidden_states, self.weight.dtype)
 
-
         return return_args(hidden_states * self.weight, attention_mask, position_ids, alibi)
+
 
 class LlamaEmbeddingAutoPP(nn.Layer):
     """Extends LlamaEmbeddings to forward attention_mask through the pipeline."""
@@ -306,7 +266,7 @@ class LlamaEmbeddingAutoPP(nn.Layer):
             if self.config.tensor_parallel_degree > 1
             else [dist.Replicate(), dist.Replicate()]
         )
-        
+
         self.embed_tokens.weight = dist.shard_tensor(
             self.embed_tokens.weight,
             get_mesh(),
@@ -361,31 +321,29 @@ class LlamaEmbeddingAutoPP(nn.Layer):
 
     def forward(self, args):
         input_ids, attention_mask, position_ids, alibi = parse_args(args)
-        
+
         input_ids.stop_gradient = True
-        
-        
+
         # output_hidden_states = (
         #     output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         # )
         # return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-        output_attentions = self.config.output_attentions
+        # output_attentions = self.config.output_attentions
 
-        use_cache = self.config.use_cache
+        # use_cache = self.config.use_cache
 
         # retrieve input_ids
-       
+
         if input_ids is not None:
             batch_size, seq_length = input_ids.shape
         else:
             raise ValueError("You have to specify either decoder_input_ids")
 
-        
-        past_key_values = tuple([None] * self.config.num_hidden_layers)
+        # past_key_values = tuple([None] * self.config.num_hidden_layers)
 
         seq_length_with_past = seq_length
         cache_length = 0
-        
+
         with paddle.amp.auto_cast(False):
             inputs_embeds = self.embed_tokens(input_ids)
 
@@ -432,9 +390,8 @@ class LlamaEmbeddingAutoPP(nn.Layer):
 
         hidden_states = dist.reshard(hidden_states, get_mesh(), self.placements)
 
-        return return_args(
-            hidden_states, attention_mask, position_ids, alibi
-        )
+        return return_args(hidden_states, attention_mask, position_ids, alibi)
+
 
 class LlamaDecoderLayerAutoPP(nn.Layer):
     def __init__(self, config, idx, layerwise_recompute: bool = False, ipp: Optional[int] = None):
@@ -452,7 +409,7 @@ class LlamaDecoderLayerAutoPP(nn.Layer):
         self.enable_recompute = False
         self.recompute_granularity = config.recompute_granularity
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
-        
+
         if self.layer_id == self.config.num_hidden_layers - 1:
             self.norm = LlamaRMSNormAutoPP(config, ipp)
             self.lm_head = LlamaLMHeadAutoPP(config)
@@ -463,11 +420,11 @@ class LlamaDecoderLayerAutoPP(nn.Layer):
         hidden_states, attention_mask, position_ids, alibi = parse_args(args)
         output_attentions = self.config.output_attentions
         use_cache = self.config.use_cache
-        
+
         past_key_value = None
 
         has_gradient = not hidden_states.stop_gradient
-   
+
         if position_ids is not None:
             position_ids_input = dist.reshard(
                 position_ids,
@@ -525,16 +482,20 @@ class LlamaDecoderLayerAutoPP(nn.Layer):
             hidden_states = layer_outputs[0]
         else:
             hidden_states = layer_outputs
-            
+
         ret_args = return_args(
-            hidden_states, attention_mask, position_ids, alibi,
+            hidden_states,
+            attention_mask,
+            position_ids,
+            alibi,
         )
         if self.norm is not None:
-           ret_args = self.norm(ret_args)
+            ret_args = self.norm(ret_args)
 
         if self.lm_head is not None:
             ret_args = self.lm_head(ret_args)
         return ret_args
+
 
 class LlamaLMHeadAutoPP(nn.Layer):
     def __init__(self, config: LlamaConfig):
@@ -554,7 +515,7 @@ class LlamaLMHeadAutoPP(nn.Layer):
 
     def forward(self, args):
         hidden_states, attention_mask, position_ids, alibi = parse_args(args)
-        
+
         if self.config.sequence_parallel:
             hidden_states = dist.reshard(
                 hidden_states,
@@ -567,19 +528,20 @@ class LlamaLMHeadAutoPP(nn.Layer):
 
 
 class LlamaForCausalLM3DAutoPP(LlamaPretrainedModelAuto):
-
     def __init__(self, config: LlamaConfig):
         super().__init__(config)
         self.config = config
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
 
         decoder_layers = []
+
         def get_pp_stage_id(layer_id):
             pp_degree = global_mesh_starts_with_pp().shape[0]
             chunk_size = self.config.num_hidden_layers // (pp_degree * self.config.virtual_pp_degree)
             chunk_id = layer_id // chunk_size
             pp_stage_id = chunk_id % pp_degree
             return pp_stage_id
+
         for i in range(config.num_hidden_layers):
             pp_stage_id = get_pp_stage_id(i)
             decoder_layers.append(LlamaDecoderLayerAutoPP(config, i, i not in self.no_recompute_layers, pp_stage_id))
@@ -598,7 +560,7 @@ class LlamaForCausalLM3DAutoPP(LlamaPretrainedModelAuto):
         output_hidden_states=None,
         return_dict=None,
     ):
-        
+
         outputs = return_args(input_ids, attention_mask, position_ids)
 
         # decoder layers
