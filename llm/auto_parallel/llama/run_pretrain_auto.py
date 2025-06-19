@@ -643,6 +643,7 @@ def main():
     )
     trainer = PretrainingTrainer(
         model=model,
+        model_type=model_args.model_type,
         criterion=criterion,
         args=training_args,
         data_collator=data_collator,

@@ -1253,3 +1253,8 @@ def download_recovery_ckpt_from_pdc(recovery_checkpoint_path, timeout):
         raise RuntimeError(
             f"{PDC_DOWNLOAD_ERROR}; Error occurred when trying to download checkpoint from PDC, recovery_checkpoint_path: {recovery_checkpoint_path}, timeout: {timeout}; error details: {PDCErrorMessageMap[result]}"
         )
+
+
+def check_auto_parallel_pipeline_support(model_type=None):
+    support_types = ["llama_hybrid_pp"]
+    return model_type in support_types
