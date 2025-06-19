@@ -1,4 +1,4 @@
-name: PaddleNLP Unit GPU CI
+name: Unittest GPU CI
 
 on:
   push:
@@ -32,11 +32,11 @@ defaults:
     shell: bash
 
 jobs:
-  unit-gpu-ci:
-    name: unit-gpu-test
+  unittest-gpu-ci:
+    name: unittest-gpu-ci
     runs-on: [self-hosted, 4gpu]
     steps:
-      - name: Download PaddleNLP
+      - name: Download Code
         env:
           work_dir: ${{ github.workspace }}
         run: |
@@ -62,7 +62,7 @@ jobs:
           git diff --numstat ${BRANCH} |awk '{print $NF}'
           git log --pretty=oneline -10
       
-      - name: Parse GPU ID from runner label
+      - name: Parse GPU ID From Runner Label
         id: parse-gpu
         run: |
           echo "Runner labels: $MACHINE_TAG"
@@ -75,7 +75,7 @@ jobs:
             echo "cudaid=0,1,2,3" >> ${{ github.env }}
           fi
       
-      - name: Check docker image and run container
+      - name: Check Docker Image And Run Container
         env:
           CACHE_DIR: /home/data/cfs/.cache
           FLAGS_dynamic_static_unified_comm: "True"
@@ -128,7 +128,7 @@ jobs:
           timeout 50m bash scripts/unit_test/ci_unit.sh ${paddle_whl}
           '
 
-      - name: Upload allure-reports & logs
+      - name: Upload Allure-reports & Logs
         if: always()
         env:
           home_path: ${{ github.workspace }}/..
@@ -158,24 +158,24 @@ jobs:
           echo "products: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit-gpu/${PR_ID}/${COMMIT_ID}/logs/products.tar.gz"
           '
 
-      - name: Terminate and delete the container
+      - name: Terminate And Delete the Container
         if: always()
         run: |
           docker rm -f ${{ env.container_name }}
 
   upload-products:
     name: upload-products
-    needs: [unit-gpu-ci]
+    needs: [unittest-gpu-ci]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: wget files
+      - name: Wget Files
         if: always()
         run: |
           wget -q --no-proxy  https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/unit-gpu/${PR_ID}/${COMMIT_ID}/logs/products.tar.gz --no-check-certificate
           tar -xzf products.tar.gz
 
-      - name: Upload Allure report
+      - name: Upload Allure Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -183,11 +183,11 @@ jobs:
           path: report
           if-no-files-found: ignore
 
-      - name: Upload logs
+      - name: Upload Logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: unit-gpu-log
+          name: unittest-gpu-ci-log
           path: |
             unittest_logs
           if-no-files-found: ignore

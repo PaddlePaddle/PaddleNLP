@@ -30,44 +30,44 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
-          JOB_NAME: 'PaddleNLP LLM CI / llm-test'
+          JOB_NAME: 'LLM CI / llm-ci'
 
-      - name: Rerun Unit GPU
-        if: ${{ contains(github.event.comment.body, 'Unit GPU') }}
+      - name: Unittest GPU
+        if: ${{ contains(github.event.comment.body, 'Unittest GPU') }}
         uses: ./.github/actions/rerun-workflow
         with:
           PR_ID: ${{ github.event.issue.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
-          JOB_NAME: 'PaddleNLP Unit GPU CI / unit-gpu-test'
+          JOB_NAME: 'Unittest GPU CI / unittest-gpu-ci'
         
-      - name: Rerun Unit CPU
-        if: ${{ contains(github.event.comment.body, 'Unit CPU') }}
+      - name: Rerun Unittest CPU
+        if: ${{ contains(github.event.comment.body, 'Unittest CPU') }}
         uses: ./.github/actions/rerun-workflow
         with:
           PR_ID: ${{ github.event.issue.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
-          JOB_NAME: 'PaddleNLP Unit CPU CI / unit-cpu-test'
+          JOB_NAME: 'Unittest CPU CI / unit-cpu-ci'
 
-      - name: Rerun Distribute
-        if: ${{ contains(github.event.comment.body, 'Distribute') }}
+      - name: Rerun Distribute (V100)
+        if: ${{ contains(github.event.comment.body, 'Distribute (V100)') }}
         uses: ./.github/actions/rerun-workflow
         with:
           PR_ID: ${{ github.event.issue.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
-          JOB_NAME: 'PaddleNLP Distribute CI / distribute-test'
+          JOB_NAME: 'Distribute CI (V100)/ distribute-v100-ci'
 
-      - name: Rerun Codestyle
-        if: ${{ contains(github.event.comment.body, 'Codestyle') }}
+      - name: Rerun Codestyle Check
+        if: ${{ contains(github.event.comment.body, 'Codestyle Check') }}
         uses: ./.github/actions/rerun-workflow
         with:
           PR_ID: ${{ github.event.issue.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
-          JOB_NAME: 'PaddleNLP Codestyle Check / Lint'
+          JOB_NAME: 'Codestyle Check / Lint'
