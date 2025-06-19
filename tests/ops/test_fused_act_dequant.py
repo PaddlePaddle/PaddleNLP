@@ -83,9 +83,33 @@ def verify_act_dequant():
             print(np_results[0])
             print("------------")
             print( np_results[1])
+def verify_3d():
+    x= paddle.clip(paddle.randn([8,8192, 8192]).astype("bfloat16"), min=-50, max=50)
+    shape = x.shape
+    x_fp8, scale = FQO.fused_act_quant(x.reshape([-1, x.shape[-1]]), transpose_output=False, padding_last_dim_to_8x=False, using_pow2_scaling=False)
+    x_fp8.reshape(shape)
+    scale.reshape([x.shape[0],-1, scale.shape[-1]])
+    dequant_result= FQO.fused_act_dequant(x_fp8,scale)
+    np_results=[]
+    golden_res = x
+    np_results.append(golden_res.astype("float").numpy())
+    np_results.append(dequant_result.astype("float").numpy())
+    nan_cnt_golden, nan_cnt_fused= np.sum(np.isnan(np_results[0])), np.sum(np.isnan(np_results[1]))
+    print(f"Nan count of Golden result: {nan_cnt_golden}; Nan count of Fused result: {nan_cnt_fused}")
+    try:
+        np.testing.assert_allclose(np_results[0], np_results[1], rtol=0.01, atol=1) #存在截断误差，atol=1，通常在1e-6
+        print("+++++++ Passed ++++++++")
+    except AssertionError as err:
+        print(err)
+        compare_tensors(np_results[0], np_results[1])
+    print(np_results[0])
+    print("------------")
+    print( np_results[1]) 
+
             
 def run():
-    verify_act_dequant()
+    #verify_act_dequant()
+    verify_3d()
 
 if __name__ == "__main__":
     run()

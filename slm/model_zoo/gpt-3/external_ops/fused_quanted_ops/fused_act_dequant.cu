@@ -7,6 +7,18 @@ struct alignas(16) VectorType {
   T data[N];
 };
 
+static void GetRowsCols(const std::vector<int64_t> &shape,
+                        int *p_rows,
+                        int *p_cols) {
+  int rows = 1;
+  for (int i = 0; i + 1 < shape.size(); ++i) {
+    rows *= shape[i];
+  }
+  int cols = shape[shape.size() - 1];
+  *p_rows = rows;
+  *p_cols = cols;
+}
+
 __global__ void FusedActDequant(
     const phi::float8_e4m3fn*__restrict__ Xin,
     const float *__restrict__ Xscale,
@@ -97,8 +109,7 @@ std::vector<paddle::Tensor> fused_act_dequant(
   PD_CHECK(X.dtype() == paddle::DataType::FLOAT8_E4M3FN);
   PD_CHECK(Xscale.dtype() == paddle::DataType::FLOAT32);
   int rows, cols;
-  rows = X.shape()[0];
-  cols = X.shape()[1];
+  GetRowsCols(X.shape(), &rows, &cols);
   paddle::Tensor out;
   
   out = paddle::empty({rows, cols}, paddle::DataType::BFLOAT16, X.place());
