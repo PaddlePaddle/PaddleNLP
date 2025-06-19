@@ -513,7 +513,7 @@ class FP8GroupGemmMlpFunctionNode:
                 o1, unzipped_probs, using_pow2_scaling=True
             )
         o2_scale = paddle.transpose(paddle.transpose(o2_scale, [1, 0]).contiguous(), [1, 0])
-        self.unzipped_probs = unzipped_probs
+        self.unzipped_probs = unzipped_probs.unsqueeze(-1)
 
         # compute gemm
         o3 = paddle.zeros([o2_fp8.shape[0], w2_quant.shape[1]], dtype=o1.dtype)
@@ -545,7 +545,10 @@ class FP8GroupGemmMlpFunctionNode:
                 (unzipped_grad_fp8, unzipped_grad_scale), (bw_w2_quant, bw_w2_scale), do2_s, m_indices=self.m_indices
             )
 
-        do1, probs_grad, o2_s = paddle.incubate.nn.functional.fused_swiglu_weighted_bwd(o1, do2_s, self.unzipped_probs)
+        with paddle.amp.auto_cast(False):
+            do1, probs_grad, o2_s = paddle.incubate.nn.functional.fused_swiglu_weighted_bwd(
+                o1, do2_s, self.unzipped_probs
+            )
 
         return do1, o2_s, probs_grad
 
