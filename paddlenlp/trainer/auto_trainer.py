@@ -79,7 +79,7 @@ class AutoTrainer(Trainer):
                 kwargs.update({"criterion": loss_func})
         self.auto_dist_config = kwargs.pop("auto_dist_config", None)
         model = kwargs.get("model", None)
-        self.model_type = kwargs.get("model_type", None)
+        self.model_type = kwargs.pop("model_type", None)
         assert model is not None
         if kwargs.get("args", None) is not None and kwargs["args"].use_intermediate_api:
             if not parallelize.has_parallelized_model:
