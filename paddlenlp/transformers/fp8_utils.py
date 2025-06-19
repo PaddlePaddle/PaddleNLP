@@ -508,9 +508,10 @@ class FP8GroupGemmMlpFunctionNode:
         w2_sacle = w2_sacle.reshape([num_expert, -1, w2_sacle.shape[-1]])
 
         # quant o2
-        o2_fp8, o2_scale = paddle.incubate.nn.functional.fused_weighted_swiglu_act_quant(
-            o1, unzipped_probs, using_pow2_scaling=True
-        )
+        with paddle.amp.auto_cast(False):
+            o2_fp8, o2_scale = paddle.incubate.nn.functional.fused_weighted_swiglu_act_quant(
+                o1, unzipped_probs, using_pow2_scaling=True
+            )
         o2_scale = paddle.transpose(paddle.transpose(o2_scale, [1, 0]).contiguous(), [1, 0])
         self.unzipped_probs = unzipped_probs
 
