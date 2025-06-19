@@ -456,8 +456,14 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    if training_args.enable_linear_fused_grad_add:
-        from fused_layers import mock_layers
+    do_enable_sp_async_reduce_scatter = (
+        training_args.enable_auto_parallel
+        and training_args.tensor_parallel_degree > 1
+        and training_args.sequence_parallel
+        and "enable_sp_async_reduce_scatter" in training_args.tensor_parallel_config
+    )
+    if training_args.enable_linear_fused_grad_add and not do_enable_sp_async_reduce_scatter:
+        from llm.utils.fused_layers import mock_layers
 
         mock_layers()
 
@@ -592,6 +598,13 @@ def main():
                 layer.enable_recompute = True
 
         model.apply(fn)
+
+    if do_enable_sp_async_reduce_scatter:
+        from llm.utils.sp_async_reduce_scatter import (
+            mock_layers_sp_async_reduce_scatter,
+        )
+
+        mock_layers_sp_async_reduce_scatter(model)
 
     # Create the learning_rate scheduler and optimizer
     if training_args.decay_steps is None:
