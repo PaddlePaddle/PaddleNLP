@@ -3,7 +3,7 @@ name: Distribute CI (V100)
 on:
   # push:
   #   branches: [develop, release/*]
-  pull_request:
+  # pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
