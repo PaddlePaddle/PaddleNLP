@@ -29,8 +29,8 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
 
-from ..transformers.model_utils import clean_model_class_name, unwrap_model
 from ..transformers import get_pp_schedule
+from ..transformers.model_utils import clean_model_class_name, unwrap_model
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
     PREFIX_CHECKPOINT_DIR,
@@ -100,7 +100,14 @@ class AutoTrainer(Trainer):
         self.global_mesh = fleet.auto.get_mesh()
         self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
         if self.args.pipeline_parallel_degree > 1:
-            self.pp_schedule = get_pp_schedule(model, self.args.n_microbatches, self.criterion, self.args.pipeline_schedule_mode, self.args.pipeline_parallel_degree, self.comm_group_in_pp)
+            self.pp_schedule = get_pp_schedule(
+                model,
+                self.args.n_microbatches,
+                self.criterion,
+                self.args.pipeline_schedule_mode,
+                self.args.pipeline_parallel_degree,
+                self.comm_group_in_pp,
+            )
         self._in_pir_mode = paddle.base.framework.get_flags("FLAGS_enable_pir_api")["FLAGS_enable_pir_api"]
 
     @classmethod
@@ -727,20 +734,22 @@ class AutoTrainer(Trainer):
 
         pp_rank = self.comm_group_in_pp.rank
         losses = []
-        if pp_rank == 0:        # 第一个pp_stage，参数传入数据流
-            self.pp_schedule.step(**inputs) # 最后的pp_stage，参数传入label, 并输出loss
+        if pp_rank == 0:  # 第一个pp_stage，参数传入数据流
+            self.pp_schedule.step(**inputs)  # 最后的pp_stage，参数传入label, 并输出loss
         elif pp_rank == self.args.pipeline_parallel_degree - 1:
-            self.pp_schedule.step(target=labels, losses = losses)
+            self.pp_schedule.step(target=labels, losses=losses)
         else:
             self.pp_schedule.step()
 
         final_loss = None
         if len(losses) != 0:
             final_loss = paddle.stack(losses).mean()
-            
+
         return final_loss
 
-    def dynamic_pipeline_training(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
+    def dynamic_pipeline_training(
+        self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]
+    ) -> paddle.Tensor:
         assert self.args.pipeline_parallel_degree > 1, "pipeline_parallel_degree must be greater than 1."
         with self.autocast_smart_context_manager():
             loss = self.compute_pipeline_loss(model, inputs)
@@ -749,7 +758,7 @@ class AutoTrainer(Trainer):
 
     def dynamic_training(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         if self.args.pipeline_parallel_degree > 1:
-            return self.dynamic_pipeline_training(model, inputs)  
+            return self.dynamic_pipeline_training(model, inputs)
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
 
