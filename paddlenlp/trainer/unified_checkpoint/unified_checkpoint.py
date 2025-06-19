@@ -648,7 +648,7 @@ def unified_optimizer_into_shards(
             tp_actions = model._get_tensor_parallel_convert_actions(model_keys, is_split=False, ignore_error=True)
         else:
             tp_actions = model.get_tensor_parallel_convert_actions(
-                model.config, model_keys, is_split=False, ignore_error=True
+                model.config, model_keys, is_split=False, ignore_error=True, is_optim=True
             )
         logger.info("Unified optimizer tensor parallel in shards")
         optim_state_dict = merge_tensor_parallel_for_optimizer(

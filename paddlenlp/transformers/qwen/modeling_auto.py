@@ -675,6 +675,7 @@ class QWenModelAuto(QWenPretrainedModelAuto):
                 inputs_embeds = self.wte(input_ids)
 
         hidden_states = inputs_embeds
+        hidden_states = dist.reshard(hidden_states, get_mesh(), [dist.Shard(0), dist.Replicate()])
 
         use_casual_mask = get_use_casual_mask()
         if use_casual_mask:

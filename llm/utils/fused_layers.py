@@ -50,7 +50,9 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
                 return x_grad, None
             else:
                 if weight.grad is not None:
-                    weight.grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, weight.grad, None, False, False)
+                    weight.grad, _ = _C_ops.fused_linear_param_grad_add(
+                        x, y_grad, weight.grad, None, False if weight.grad.dtype != paddle.float32 else True, False
+                    )
                     return x_grad, None
                 else:
                     weight_grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False, False)
@@ -65,7 +67,7 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
             if weight.grad is not None:
                 assert bias.grad is not None
                 weight.grad, bias.grad = _C_ops.fused_linear_param_grad_add(
-                    x, y_grad, weight.grad, bias.grad, False, True
+                    x, y_grad, weight.grad, bias.grad, False if weight.grad.dtype != paddle.float32 else True, True
                 )
                 return x_grad, None, None
             else:
