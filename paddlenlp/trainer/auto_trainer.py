@@ -29,7 +29,6 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
 
-from ..transformers import get_pp_schedule
 from ..transformers.model_utils import clean_model_class_name, unwrap_model
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
@@ -49,6 +48,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     _exec_mode_guard,
     check_auto_parallel_pipeline_support,
     get_last_checkpoint,
+    get_pp_schedule,
     has_length,
     speed_metrics,
 )
@@ -104,6 +104,7 @@ class AutoTrainer(Trainer):
         if self.args.pipeline_parallel_degree > 1 and check_auto_parallel_pipeline_support(self.model_type):
             self.pp_schedule = get_pp_schedule(
                 model,
+                self.model_type,
                 self.args.n_microbatches,
                 self.criterion,
                 self.args.pipeline_schedule_mode,

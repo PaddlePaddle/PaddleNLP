@@ -59,7 +59,7 @@ except:
     flash_attention = None
 
 __all__ = [
-    "get_pp_schedule",
+    "get_llama_pp_schedule",
     "LlamaForCausalLM3DAutoPP",
 ]
 
@@ -210,7 +210,7 @@ def manual_model_split(model, stage_idx, group, mode, pp_degree):
     return stages
 
 
-def get_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group):
+def get_llama_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group):
     assert mode in ["VPP", "1F1B", "FThenB"]
     stages = manual_model_split(model, group.rank, group, mode, pp_degree)
     if mode == "VPP":
