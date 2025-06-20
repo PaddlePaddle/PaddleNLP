@@ -153,6 +153,11 @@ class LlamaChunk(nn.Layer):
         self.is_first = is_first
         self.is_last = is_last
 
+    def __init__(self, layers=None, is_first=False):
+        super(LlamaChunk, self).__init__()
+        self.layers = layers
+        self.is_first = is_first
+
     def forward(self, *args, **kwargs):
         if self.is_first:
             input_ids = kwargs.get("input_ids")
