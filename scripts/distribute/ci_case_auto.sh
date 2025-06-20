@@ -712,7 +712,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
         rm -rf $case_log_dir
 
         python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
-            --model_type "llama_hybrid_pp" \
+            --model_type "llama_pp" \
             --model_name_or_path "facebook/llama-7b" \
             --tokenizer_name_or_path "facebook/llama-7b" \
             --input_dir "./data" \

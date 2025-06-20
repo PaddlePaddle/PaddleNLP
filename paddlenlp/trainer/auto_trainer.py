@@ -29,7 +29,6 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
 
-from ..transformers import get_pp_schedule
 from ..transformers.model_utils import clean_model_class_name, unwrap_model
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
