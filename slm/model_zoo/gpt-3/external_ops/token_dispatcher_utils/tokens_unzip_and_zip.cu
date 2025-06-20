@@ -747,6 +747,7 @@ std::vector<paddle::Tensor> tokens_zip(
            unzipped_tokens.dtype() == paddle::DataType::FLOAT32);
   const int rows = unzipped_tokens.shape()[0];       // seqlen
   const int cols = unzipped_tokens.shape()[1];       // 一般为7168
+  if(rows==0)return;
   const int topk = expert_routemap_topk.shape()[1];  // 一般为8
 
 

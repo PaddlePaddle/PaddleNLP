@@ -246,6 +246,7 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
   }
   const int rows = X.shape()[0];  // 一般为seqlen
   const int cols = X.shape()[1];  // 一般为7168
+  if(rows==0)return;
   const int quanted_cols = (XScale) ? XScale->shape()[1] : 0;
   /*
   const int max_tokens_per_expert =
