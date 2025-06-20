@@ -28,7 +28,7 @@ defaults:
 jobs:
   distribute-v100-ci:
     name: distribute-v100-ci
-    runs-on: [self-hosted, distribute]
+    runs-on: [self-hosted, distribute-v100]
     steps:
       - name: Download PaddleNLP
         env:
