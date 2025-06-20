@@ -19,6 +19,14 @@ import paddle.distributed as dist
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.distributed import fleet
+from .configuration import GPTConfig
+from paddle.distributed.auto_parallel.pipelining.stage import PipelineStage
+
+from paddle.distributed.auto_parallel.pipelining.schedules import (
+    Schedule1F1B,
+    ScheduleFThenB,
+    ScheduleVPP,
+)
 
 from ..model_outputs import BaseModelOutputWithPastAndCrossAttentions
 from .modeling_auto import (
@@ -27,8 +35,6 @@ from .modeling_auto import (
     GPTLayerNorm,
     GPTPretrainedModelAuto,
     GPTLMHeadAuto,
-    MultiHeadAttentionAuto,
-    seed_guard_context,
 )
 
 __all__ = [
@@ -84,14 +90,37 @@ def get_mesh(pp_idx=0):
         mesh = mesh.get_mesh_with_dim("pp")[pp_idx]
     return mesh
 
-class _Pipeline_model_chunk(nn.Layer):
-    def __init__(self, layers):
-        super(_Pipeline_model_chunk, self).__init__()
+class GPTChunk(nn.Layer):
+    def __init__(self, layers=None, is_first=False, is_last=False):
+        super(GPTChunk, self).__init__()
+        assert not (is_first and is_last)
         self.layers = layers
+        self.is_first = is_first
+        self.is_last = is_last
+
     def forward(self, *args, **kwargs):
-        for layer in self.layers:
-            x = layer(kwargs["input_ids"])
-        return x
+        if self.is_first:
+            input_ids = kwargs.get("input_ids")
+            attention_mask = kwargs.get("attention_mask")
+            position_ids = kwargs.get("position_ids")
+            outputs = tuple([input_ids, attention_mask, position_ids])
+            # decoder layers
+            for idx, (decoder_layer) in enumerate(self.layers):
+                outputs = decoder_layer(outputs)
+            return outputs
+        elif self.is_last:
+            outputs = args
+            # decoder layers
+            for idx, (decoder_layer) in enumerate(self.layers):
+                outputs = decoder_layer(outputs)
+            if isinstance(outputs, tuple):
+                outputs = outputs[0]
+        else:
+            outputs = args
+            # decoder layers
+            for idx, (decoder_layer) in enumerate(self.layers):
+                outputs = decoder_layer(outputs)
+        return outputs
     
 def manual_model_split(model, stage_idx, group, mode, pp_degree):
 
@@ -102,91 +131,55 @@ def manual_model_split(model, stage_idx, group, mode, pp_degree):
     layer_lists = None
 
     layer_lists = model.layers
+
     def _build_stage(model, stage_idx, group):
         new_model = None
-        local_chunk_id = stage_idx // pp_degree
-        if stage_idx == 0:
-            new_model = _Pipeline_model_chunk(layer_lists[:chunk_size])
-            def forward_in_first_stage(
-                self,
-                input_ids=None,
-                labels=None,
-                position_ids=None,
-                attention_mask=None,
-                inputs_embeds=None,
-                use_cache=False,
-                past_key_values=None,
-                output_attentions=None,
-                output_hidden_states=None,
-                return_dict=None,
-            ):
-                outputs = tuple([input_ids, attention_mask, position_ids])
-                # decoder layers
-                for idx, (decoder_layer) in enumerate(self.layers):
-                    outputs = decoder_layer(outputs)
-                return outputs
-            new_model.forward = forward_in_first_stage.__get__(new_model)
+        if stage_idx == 0: # 第一个model_chunk输入特殊处理
+            new_model = GPTChunk(layer_lists[:chunk_size], is_first=True, is_last=False)
+        elif stage_idx == chunk_num - 1:  # 最后一个一个model_chunk输出特殊处理
+            new_model = GPTChunk(
+                layer_lists[stage_idx * chunk_size : (stage_idx + 1) * chunk_size], is_first=False, is_last=True
+            )
         else:
-            new_model = _Pipeline_model_chunk(layer_lists[stage_idx * chunk_size : (stage_idx + 1) * chunk_size])
-            def forward_in_middle_stages(self, *args, **kwargs):
-                outputs = args
-                # decoder layers
-                for idx, (decoder_layer) in enumerate(self.layers):
-                    outputs = decoder_layer(outputs)
-                return outputs
-            new_model.forward = forward_in_middle_stages.__get__(new_model)
-        stage = PipelineStage(
-            new_model,
-            stage_idx,
-            chunk_num,
-            group=group
-        )
+            new_model = GPTChunk(
+                layer_lists[stage_idx * chunk_size : (stage_idx + 1) * chunk_size], is_first=False, is_last=False
+            )
+        stage = PipelineStage(new_model, stage_idx, chunk_num, group=group)
         return stage
+
     stages = []
-    for i in range(virtual_pp_degree):  
-        stage = _build_stage(model, stage_idx+i*pp_degree, group)
+    for i in range(virtual_pp_degree):
+        stage = _build_stage(model, stage_idx + i * pp_degree, group)
         stages.append(stage)
     return stages
 
 def get_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group):
-    assert mode in ["VPP", "1F1B", "GPipe"]
+    assert mode in ["VPP", "1F1B", "FThenB"]
     stages = manual_model_split(model, group.rank, group, mode, pp_degree)
     if mode == "VPP":
-        schedule = ScheduleInterleaved1F1B(stages, n_microbatches = n_microbatches, loss_fn = loss_fn)
+        schedule = ScheduleVPP(stages, n_microbatches=n_microbatches, loss_fn=loss_fn)
     elif mode == "1F1B":
-        schedule = Schedule1F1B(stages[0], n_microbatches = n_microbatches, loss_fn = loss_fn)
+        schedule = Schedule1F1B(stages[0], n_microbatches=n_microbatches, loss_fn=loss_fn)
     else:
-        schedule = ScheduleGPipe(stages[0], n_microbatches = n_microbatches, loss_fn = loss_fn)
+        schedule = ScheduleFThenB(stages[0], n_microbatches=n_microbatches, loss_fn=loss_fn)
     return schedule
 
 
-class GPTEmbeddingAutoPP(nn.Layer):
-    def __init__(self, config):
-        super().__init__()
-        self.config = config
-        self.embeddings = GPTEmbeddingsAuto(config)
-
-    def forward(self, args):
-        input_ids, position_ids, _ = parse_args(args)
-        embedding_output = self.embeddings(input_ids=input_ids, position_ids=position_ids, inputs_embeddings=None)
-        return return_args(embedding_output, None, position_ids)
-
-
-class GPTDecoderLayerAutoPP(GPTPretrainedModelAuto):
-    def __init__(self, config, layer_idx, ipp=None):
-        super(GPTDecoderLayerAutoPP, self).__init__(config)
+class GPTDecoderLayerAutoPP(nn.Layer):
+    def __init__(self, config, layer_idx, ipp = None):
+        super(GPTDecoderLayerAutoPP, self).__init__()
         self.config = config
         self.layer_idx = layer_idx
         self.embeddings = None
-        self.lm_head = None
         self.norm = None
+        self.lm_head = None
         if layer_idx == 0:
-            self.embeddings = GPTEmbeddingAutoPP(config)
+            self.embeddings = GPTEmbeddingsAuto(config)
 
         self.layer = GPTDecoderLayerAuto(config, ipp)
         self.ipp = ipp
-
         self.enable_recompute = False
+
         self.bias = paddle.tril(
             paddle.ones([1, 1, config.max_position_embeddings, config.max_position_embeddings], dtype="int64")
         )
@@ -194,9 +187,7 @@ class GPTDecoderLayerAutoPP(GPTPretrainedModelAuto):
 
         if layer_idx == config.num_hidden_layers - 1:
             self.norm = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
-            self.lm_head = GPTLMHeadAuto(
-                config, embedding_weights=None, ipp=ipp
-            )
+            self.lm_head = GPTLMHeadAuto(config, embedding_weights=None, ipp=ipp)
 
     def forward(self, args):
         output_attentions = self.config.output_attentions
@@ -204,6 +195,7 @@ class GPTDecoderLayerAutoPP(GPTPretrainedModelAuto):
         past_key_values = None
         output_hidden_states = self.config.output_hidden_states
         return_dict = self.config.return_dict
+        print("self.layer_idx:",self.layer_idx)
         if self.layer_idx == 0:
             input_ids, attention_mask, position_ids = parse_args(args)
             if self.config.sequence_parallel and use_cache:
@@ -221,8 +213,11 @@ class GPTDecoderLayerAutoPP(GPTPretrainedModelAuto):
                 position_ids = position_ids.unsqueeze(0)
                 position_ids = paddle.expand(position_ids, input_shape)
             args = return_args(input_ids, attention_mask, position_ids)
-            args = self.embeddings(args)
-            hidden_states, attention_mask, position_ids = parse_args(args)
+            hidden_states = self.embeddings(
+                input_ids=input_ids, position_ids=position_ids, inputs_embeddings=None
+            )
+            # args = self.embeddings(args)
+            # hidden_states, attention_mask, position_ids = parse_args(args)
             length = input_shape[-1]
             cache_length = 0
             causal_mask = self.bias[:, :, cache_length:length, :length]
@@ -236,7 +231,8 @@ class GPTDecoderLayerAutoPP(GPTPretrainedModelAuto):
                 else:
                     attention_mask = (1.0 - causal_mask) * -1e4
             # The tensor returned by triu not in static graph.
-            attention_mask.stop_gradient = True
+            if attention_mask is not None:
+                attention_mask.stop_gradient = True
             args = return_args(hidden_states, attention_mask, position_ids)
         
         hidden_states, attention_mask, position_ids = parse_args(args)
@@ -262,6 +258,7 @@ class GPTDecoderLayerAutoPP(GPTPretrainedModelAuto):
                 past_key_value=past_key_values,
                 output_attentions=output_attentions,
             )
+        
 
         # outputs = hidden_states if both use_cache and output_attentions are False
         # Otherwise, outputs = (hidden_states, attention if output_attentions, cache if use_cache)
@@ -285,13 +282,13 @@ class GPTDecoderLayerAutoPP(GPTPretrainedModelAuto):
                 else:
                     outputs = tuple(v for v in temp_list if v is not None)
             
-            if output_hidden_states:
-                if return_dict:
-                    outputs.hidden_states = (embedding_output,) + outputs.hidden_states
-                else:  # outputs is a tuple
-                    idx = 2 if use_cache else 1
-                    all_hidden_states = (embedding_output,) + outputs[idx]
-                    outputs[idx] = all_hidden_states
+            # if output_hidden_states:
+            #     if return_dict:
+            #         outputs.hidden_states = (embedding_output,) + outputs.hidden_states
+            #     else:  # outputs is a tuple
+            #         idx = 2 if use_cache else 1
+            #         all_hidden_states = (embedding_output,) + outputs[idx]
+            #         outputs[idx] = all_hidden_states
 
             if self.lm_head is not None:
                 logits = self.lm_head(outputs)
@@ -301,7 +298,7 @@ class GPTDecoderLayerAutoPP(GPTPretrainedModelAuto):
 
 
 class GPTForCausalLMAutoPP(GPTPretrainedModelAuto):
-    def __init__(self, config):
+    def __init__(self, config: GPTConfig):
         super().__init__(config)
         self.config = config
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
@@ -335,6 +332,7 @@ class GPTForCausalLMAutoPP(GPTPretrainedModelAuto):
     ):
         outputs = return_args(input_ids, attention_mask, position_ids)
 
+        # decoder layers
         for layer in self.layers:
             outputs = layer(outputs)
 
