@@ -1,9 +1,9 @@
 name: Distribute CI (V100)
 
 on:
-  # push:
-  #   branches: [develop, release/*]
-  # pull_request:
+  push:
+    branches: [develop, release/*]
+  pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -28,7 +28,7 @@ defaults:
 jobs:
   distribute-v100-ci:
     name: distribute-v100-ci
-    runs-on: [self-hosted, Auto-Parallel]
+    runs-on: [self-hosted, distribute]
     steps:
       - name: Download PaddleNLP
         env:
