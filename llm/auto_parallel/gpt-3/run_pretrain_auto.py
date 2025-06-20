@@ -74,6 +74,12 @@ class PreTrainingArguments(AutoTrainingArguments):
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
         },
     )
+    enable_linear_fused_grad_add: bool = field(
+        default=False,
+        metadata={
+            "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
+        },
+    )
     job_schedule_profiler_start: int = field(
         default=-1,
         metadata={"help": "The step to start job_schedule_profiler."},
@@ -95,16 +101,16 @@ class PreTrainingArguments(AutoTrainingArguments):
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
     )
+    n_microbatches: int = field(
+        default=1,
+        metadata={"help": "Control the num of microbatches in one pp step."},
+    )
     pre_alloc_memory: float = field(
         default=0.0,
         metadata={
             "help": "Pre-allocate one specific-capacity empty tensor "
             "and release it for avoiding memory fragmentation"
         },
-    )
-    n_microbatches: int = field(
-        default=1,
-        metadata={"help": "Control the num of microbatches in one pp step."},
     )
 
     def __post_init__(self):
@@ -438,6 +444,11 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+    if training_args.enable_linear_fused_grad_add:
+        from llm.utils.fused_layers import mock_layers
+
+        mock_layers()
+
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
 
@@ -596,6 +607,7 @@ def main():
 
     trainer = PretrainingTrainer(
         model=model,
+        model_type=model_args.model_type,
         criterion=criterion,
         args=training_args,
         data_collator=data_collator,
