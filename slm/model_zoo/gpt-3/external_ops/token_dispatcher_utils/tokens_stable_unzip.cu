@@ -13,22 +13,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 */
+#include "paddle/common/array.h"
+#include "paddle/phi/kernels/funcs/aligned_vector.h"
 #include "utils.h"
 
-#define CUMSUM_BLOCK_SIZE 48   // cumsum开销和并行度之间的tradeoff的结果，勿动
+#define CUMSUM_BLOCK_SIZE 48  // cumsum开销和并行度之间的tradeoff的结果，勿动
 #define CUMSUM_INVALID_TAG -1  // 用于标记无效的cumsum，尝试过-114514但失败了
 #ifndef MAX_NUM_EXPERTS
 #define MAX_NUM_EXPERTS 8
 #endif
 
-typedef struct __align__(16){
+typedef struct __align__(16) {
   int data[MAX_NUM_EXPERTS];
-}expert_base_offset;
+}
+expert_base_offset;
 
 // 多阶段算法，控制每block处理的行数来权衡额外开销
 //  首先解析routemap来更新专家当前所收到的token数，然后check前一个block给的前缀和并更新给下一个block
 //  随后，目的行号的信息已获取，立即开始搬运工作，直至任务完全完成
-template <typename X_T, typename routemap_T, typename probs_T, bool has_scale>
+template <typename X_T,
+          typename routemap_T,
+          typename probs_T,
+          bool has_scale,
+          bool fill_x>
 __global__ void tokens_unzip_stable_kernel(
     const X_T *__restrict__ X,
     const routemap_T *__restrict__ routemap_topk,
@@ -95,10 +102,10 @@ __global__ void tokens_unzip_stable_kernel(
     for (int i = 0; i < num_experts; i++) {
       if (blockIdx.x != 0) [[likely]] {
         while (cumsum_offset[i] == CUMSUM_INVALID_TAG) [[likely]] {
-          cumsum_offset[i] = atomicExch(
-              &global_expertwise_block_cumsum[blockIdx.x * num_experts + i],
-              CUMSUM_INVALID_TAG);
-        }
+            cumsum_offset[i] = atomicExch(
+                &global_expertwise_block_cumsum[blockIdx.x * num_experts + i],
+                CUMSUM_INVALID_TAG);
+          }
       }
       const int proposed_offset = cumsum_offset[i] + local_cumsum[i];
       global_expertwise_block_cumsum[(blockIdx.x + 1) * num_experts + i] =
@@ -137,14 +144,18 @@ __global__ void tokens_unzip_stable_kernel(
         probs_unzipped[unzipped_row_idx] =
             shared_expert_probmap[internal_row][expert];
       }
-      if constexpr (has_scale) {
-        vectorized_memcpy(&XScale[(int64_t)row * (int64_t)scale_length],
-                          &XScale_unzipped[(int64_t)unzipped_row_idx * (int64_t)scale_length],
-                          scale_length);
+      if (fill_x) {
+        if constexpr (has_scale) {
+          vectorized_memcpy(&XScale[(int64_t)row * (int64_t)scale_length],
+                            &XScale_unzipped[(int64_t)unzipped_row_idx *
+                                             (int64_t)scale_length],
+                            scale_length);
+        }
+        vectorized_memcpy(
+            &X[(int64_t)row * (int64_t)token_length],
+            &X_unzipped[(int64_t)unzipped_row_idx * (int64_t)token_length],
+            token_length);
       }
-      vectorized_memcpy(&X[(int64_t)row * (int64_t)token_length],
-                        &X_unzipped[(int64_t)unzipped_row_idx * (int64_t)token_length],
-                        token_length);
     }
   }
 }
@@ -162,59 +173,78 @@ void dispatch_tokens_unzip_stable(
     paddle::Tensor &global_expertwise_block_cumsum,
     const int total_zipped_tokens_num,
     const int token_length,
-    const int topk, // deprecated
+    const int topk,  // deprecated
     const int num_experts,
-    const int scale_length) {
+    const int scale_length,
+    const bool fill_x) {
   dim3 grid, block;
   grid.x =
       (total_zipped_tokens_num + CUMSUM_BLOCK_SIZE - 1) / CUMSUM_BLOCK_SIZE;
   block.x = 256;
+
+  if (grid.x <= 0) return;
 
 // 定义类型获取宏
 #define DTYPE_CASE(dtype, type) dtype == paddle::DataType::type
 #define GET_DATA(tensor, type) tensor.data<type>()
 
 // 分发处理不同的类型组合
-#define DISPATCH_CASE(TOKEN_T, PROB_T, INT_T, HAS_SCALE)                       \
-  auto kernel = tokens_unzip_stable_kernel<TOKEN_T, INT_T, PROB_T, HAS_SCALE>; \
-  kernel<<<grid, block, 0, X.stream()>>>(                                      \
-      GET_DATA(X, TOKEN_T),                                                    \
-      GET_DATA(expert_routemap_topk, INT_T),                                   \
-      GET_DATA(expert_prob_topk, PROB_T),                                      \
-      XScale ? XScale->data<float>() : nullptr,                                \
-      expert_offsets, \
-      GET_DATA(X_unzipped, TOKEN_T),                                           \
-      GET_DATA(zipped_expertwise_rowmap, INT_T),                               \
-      GET_DATA(token_prob_unzipped, PROB_T),                                   \
-      XScale_unzipped.data<float>(),                                           \
-      global_expertwise_block_cumsum.data<int>(),                              \
-      total_zipped_tokens_num,                                                 \
-      token_length,                                                            \
-      scale_length,                                                            \
-      num_experts,                                                             \
-      topk);
+#define DISPATCH_CASE_IMPL(TOKEN_T, PROB_T, INT_T, HAS_SCALE, FILL_X)          \
+  do {                                                                         \
+    auto kernel =                                                              \
+        tokens_unzip_stable_kernel<TOKEN_T, INT_T, PROB_T, HAS_SCALE, FILL_X>; \
+    kernel<<<grid, block, 0, X.stream()>>>(                                    \
+        GET_DATA(X, TOKEN_T),                                                  \
+        GET_DATA(expert_routemap_topk, INT_T),                                 \
+        GET_DATA(expert_prob_topk, PROB_T),                                    \
+        XScale ? XScale->data<float>() : nullptr,                              \
+        expert_offsets,                                                        \
+        GET_DATA(X_unzipped, TOKEN_T),                                         \
+        GET_DATA(zipped_expertwise_rowmap, INT_T),                             \
+        GET_DATA(token_prob_unzipped, PROB_T),                                 \
+        XScale_unzipped.data<float>(),                                         \
+        global_expertwise_block_cumsum.data<int>(),                            \
+        total_zipped_tokens_num,                                               \
+        token_length,                                                          \
+        scale_length,                                                          \
+        num_experts,                                                           \
+        topk);                                                                 \
+  } while (0)
+
+#define DISPATCH_CASE(TOKEN_T, PROB_T, INT_T, HAS_SCALE)            \
+  do {                                                              \
+    if (fill_x) {                                                   \
+      DISPATCH_CASE_IMPL(TOKEN_T, PROB_T, INT_T, HAS_SCALE, true);  \
+    } else {                                                        \
+      DISPATCH_CASE_IMPL(TOKEN_T, PROB_T, INT_T, HAS_SCALE, false); \
+    }                                                               \
+  } while (0)
 
 // 可扩展：处理特定的topk和num_experts组合,可根据之后需求进行扩展
 #define HANDLE_EXPERT_CASE(TOKEN_T, PROB_T, INT_T, HAS_SCALE) \
-  DISPATCH_CASE(TOKEN_T, PROB_T, INT_T, HAS_SCALE)
+  DISPATCH_CASE(TOKEN_T, PROB_T, INT_T, HAS_SCALE);
 
-#define HANDLE_TOKEN_TYPE(PROB_T, INT_T)                        \
-  if (DTYPE_CASE(X.dtype(), BFLOAT16)) {                        \
-    HANDLE_EXPERT_CASE(phi::bfloat16, PROB_T, INT_T, false)     \
-  } else if (DTYPE_CASE(X.dtype(), FLOAT8_E4M3FN)) {            \
-    HANDLE_EXPERT_CASE(phi::float8_e4m3fn, PROB_T, INT_T, true) \
-  }
+#define HANDLE_TOKEN_TYPE(PROB_T, INT_T)                           \
+  do {                                                             \
+    if (DTYPE_CASE(X.dtype(), BFLOAT16)) {                         \
+      HANDLE_EXPERT_CASE(phi::bfloat16, PROB_T, INT_T, false);     \
+    } else if (DTYPE_CASE(X.dtype(), FLOAT8_E4M3FN)) {             \
+      HANDLE_EXPERT_CASE(phi::float8_e4m3fn, PROB_T, INT_T, true); \
+    }                                                              \
+  } while (0)
 
-#define HANDLE_PROB_TYPE(INT_T)                               \
-  if (DTYPE_CASE(expert_prob_topk.dtype(), BFLOAT16)) {       \
-    HANDLE_TOKEN_TYPE(phi::bfloat16, INT_T)                   \
-  } else if (DTYPE_CASE(expert_prob_topk.dtype(), FLOAT32)) { \
-    HANDLE_TOKEN_TYPE(float, INT_T)                           \
-  }
+#define HANDLE_PROB_TYPE(INT_T)                                 \
+  do {                                                          \
+    if (DTYPE_CASE(expert_prob_topk.dtype(), BFLOAT16)) {       \
+      HANDLE_TOKEN_TYPE(phi::bfloat16, INT_T);                  \
+    } else if (DTYPE_CASE(expert_prob_topk.dtype(), FLOAT32)) { \
+      HANDLE_TOKEN_TYPE(float, INT_T);                          \
+    }                                                           \
+  } while (0)
 
   // 可扩展：根据整型类型控制派发，未来可支持int8，但int64不行，因为下标开销太重了，建议在外面直接cast到int32
   if (DTYPE_CASE(zipped_expertwise_rowmap.dtype(), INT32)) {
-    HANDLE_PROB_TYPE(int)
+    HANDLE_PROB_TYPE(int);
   }
 
 #undef DTYPE_CASE
@@ -234,7 +264,8 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
     const int &topk,
     const int &num_experts,
     const std::vector<int> &tokens_per_expert,
-    const int padding_multiplex) {
+    const int padding_multiplex,
+    const bool fill_x) {
   // --------------------- 输入检查与解析 --------------------
   PD_CHECK(X.dtype() == paddle::DataType::BFLOAT16 ||
            X.dtype() == paddle::DataType::FLOAT8_E4M3FN);
@@ -246,7 +277,6 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
   }
   const int rows = X.shape()[0];  // 一般为seqlen
   const int cols = X.shape()[1];  // 一般为7168
-  if(rows==0)return;
   const int quanted_cols = (XScale) ? XScale->shape()[1] : 0;
   /*
   const int max_tokens_per_expert =
@@ -255,11 +285,13 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
   */
   expert_base_offset expert_offset;
   int tokens_cumulated = 0;
-  for(int i = 0; i < MAX_NUM_EXPERTS; i++){
-    if(i < num_experts){
+  for (int i = 0; i < MAX_NUM_EXPERTS; i++) {
+    if (i < num_experts) {
       expert_offset.data[i] = tokens_cumulated;
-      tokens_cumulated += ((tokens_per_expert[i] + padding_multiplex - 1) / padding_multiplex) * padding_multiplex;
-    }else{
+      tokens_cumulated +=
+          ((tokens_per_expert[i] + padding_multiplex - 1) / padding_multiplex) *
+          padding_multiplex;
+    } else {
       expert_offset.data[i] = 0;
     }
   }
@@ -271,42 +303,48 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
       token_prob_unzipped;
 
   // FP8 scale unziped缓冲区分配
-  if (XScale) {
+  if (XScale && fill_x) {
     XScale_unzipped = paddle::empty(
         {output_rows, quanted_cols}, XScale->dtype(), XScale->place());
   } else {  // 让输出时不报错，但实际不会用到
     XScale_unzipped = paddle::empty({0}, paddle::DataType::FLOAT32, X.place());
   }
 
-  X_unzipped = paddle::empty({output_rows, cols}, X.dtype(), X.place());
+  if (fill_x) {
+    X_unzipped = paddle::empty({output_rows, cols}, X.dtype(), X.place());
+  } else {
+    X_unzipped = paddle::empty({0, cols}, X.dtype(), X.place());
+  }
   zipped_expertwise_rowmap =
       paddle::empty({rows, num_experts}, paddle::DataType::INT32, X.place());
   token_prob_unzipped = paddle::empty(
       {output_rows}, expert_prob_topk.dtype(), expert_prob_topk.place());
 
   // ------------------------ 缓冲区初始化（适配padding）----------------
-  if (X.dtype() == paddle::DataType::BFLOAT16) {
-    auto X_unzipped_ptr =
-        reinterpret_cast<void *>(X_unzipped.data<phi::bfloat16>());
-    cudaMemsetAsync(X_unzipped_ptr,
-                    0,
-                    sizeof(phi::bfloat16) * output_rows * cols,
-                    X.stream());
-  } else if (X.dtype() == paddle::DataType::FLOAT8_E4M3FN) {
-    auto X_unzipped_ptr =
-        reinterpret_cast<void *>(X_unzipped.data<phi::float8_e4m3fn>());
-    cudaMemsetAsync(X_unzipped_ptr,
-                    0,
-                    sizeof(phi::float8_e4m3fn) * output_rows * cols,
-                    X.stream());
-  }
-  if (XScale) {
-    auto XScale_unzipped_ptr =
-        reinterpret_cast<void *>(XScale_unzipped.data<float>());
-    cudaMemsetAsync(XScale_unzipped_ptr,
-                    0,
-                    sizeof(float) * output_rows * quanted_cols,
-                    XScale_unzipped.stream());
+  if (fill_x) {
+    if (X.dtype() == paddle::DataType::BFLOAT16) {
+      auto X_unzipped_ptr =
+          reinterpret_cast<void *>(X_unzipped.data<phi::bfloat16>());
+      cudaMemsetAsync(X_unzipped_ptr,
+                      0,
+                      sizeof(phi::bfloat16) * output_rows * cols,
+                      X.stream());
+    } else if (X.dtype() == paddle::DataType::FLOAT8_E4M3FN) {
+      auto X_unzipped_ptr =
+          reinterpret_cast<void *>(X_unzipped.data<phi::float8_e4m3fn>());
+      cudaMemsetAsync(X_unzipped_ptr,
+                      0,
+                      sizeof(phi::float8_e4m3fn) * output_rows * cols,
+                      X.stream());
+    }
+    if (XScale) {
+      auto XScale_unzipped_ptr =
+          reinterpret_cast<void *>(XScale_unzipped.data<float>());
+      cudaMemsetAsync(XScale_unzipped_ptr,
+                      0,
+                      sizeof(float) * output_rows * quanted_cols,
+                      XScale_unzipped.stream());
+    }
   }
   if (expert_prob_topk.dtype() == paddle::DataType::BFLOAT16) {
     auto token_prob_unzipped_ptr =
@@ -349,7 +387,8 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
                                cols,
                                topk_calculated,
                                num_experts,
-                               quanted_cols);
+                               quanted_cols,
+                               fill_x);
   return {X_unzipped,
           zipped_expertwise_rowmap,
           token_prob_unzipped,
@@ -365,9 +404,368 @@ PD_BUILD_OP(tokens_unzip_stable)
               "zipped_expertwise_rowmap",
               "token_prob_unzipped",
               paddle::Optional("XScale_unzipped")})
-    .Attrs({"topk: int", "num_experts: int","tokens_per_expert: std::vector<int>","padding_multiplex: int"})
+    .Attrs({"topk: int",
+            "num_experts: int",
+            "tokens_per_expert: std::vector<int>",
+            "padding_multiplex: int",
+            "fill_output: bool"})
     .SetKernelFn(PD_KERNEL(tokens_unzip_stable));
 
 
 #undef CUMSUM_BLOCK_SIZE
-#undef MAX_NUM_EXPERTS 
+
+
+static int LimitGridDim(int64_t n) {
+  return static_cast<int>(std::min<int64_t>(n, 1024 * 1024));
+}
+
+
+template <typename T, bool has_scale>
+__global__ void tokens_unzip_gather_kernel(
+    const T *__restrict__ x,
+    const float *__restrict__ x_scale,
+    const int *__restrict__ zipped_expertwise_rowmap,
+    T *__restrict__ x_unzipped,
+    float *__restrict__ x_scale_unzipped,
+    int64_t *__restrict__ index_unzipped,
+    int64_t unzipped_rows,
+    int64_t zipped_rows,
+    int token_length,
+    int scale_length,
+    int num_experts,
+    int expert_id,
+    int64_t offset) {
+  for (int64_t row = blockIdx.x; row < zipped_rows; row += gridDim.x) {
+    int64_t unzipped_row_idx =
+        zipped_expertwise_rowmap[row * num_experts + expert_id];
+    if (unzipped_row_idx < 0) continue;
+
+    unzipped_row_idx -= offset;
+    index_unzipped[unzipped_row_idx] = row;
+    if constexpr (has_scale) {
+      vectorized_memcpy(x_scale + row * scale_length,
+                        x_scale_unzipped + unzipped_row_idx * scale_length,
+                        scale_length);
+    }
+    vectorized_memcpy(x + row * token_length,
+                      x_unzipped + unzipped_row_idx * token_length,
+                      token_length);
+  }
+}
+
+std::vector<paddle::Tensor> tokens_unzip_gather(
+    const paddle::Tensor &x,
+    const paddle::optional<paddle::Tensor> &x_scale,
+    const paddle::Tensor &zipped_expertwise_rowmap,
+    const int expert_id,
+    const std::vector<int64_t> &tokens_per_expert,
+    const int padding_multiplex) {
+  int num_experts = tokens_per_expert.size();
+  PD_CHECK(expert_id >= 0 && expert_id < num_experts);
+  std::vector<int64_t> cumsum_tokens(num_experts + 1);
+  cumsum_tokens[0] = 0;
+  for (int i = 0; i < num_experts; ++i) {
+    auto padded = (tokens_per_expert[i] + padding_multiplex - 1) /
+                  padding_multiplex * padding_multiplex;
+    cumsum_tokens[i + 1] = cumsum_tokens[i] + padded;
+  }
+
+  int64_t padded_num_tokens =
+      cumsum_tokens[expert_id + 1] - cumsum_tokens[expert_id];
+  int64_t offset = cumsum_tokens[expert_id];
+
+  auto dtype = x.dtype();
+  auto place = x.place();
+  auto stream = x.stream();
+  auto x_shape = x.shape();
+  PD_CHECK(x_shape.size() == 2);
+  int64_t zipped_rows = x_shape[0];
+  int hidden_size = x_shape[1];
+
+  std::vector<int64_t> x_scale_shape;
+  int quanted_hidden_size = 0;
+  bool has_scale = (x_scale.get_ptr() != nullptr);
+  if (has_scale) {
+    x_scale_shape = x_scale.get().shape();
+    PD_CHECK(x_scale_shape.size() == 2);
+    PD_CHECK(x_scale_shape[0] == x_shape[0]);
+    quanted_hidden_size = x_scale_shape[1];
+  }
+
+  auto x_unzipped =
+      paddle::zeros({padded_num_tokens, hidden_size}, dtype, place);
+  paddle::Tensor x_scale_unzipped;
+  if (has_scale) {
+    x_scale_unzipped = paddle::zeros(
+        {padded_num_tokens, quanted_hidden_size}, x_scale.get().dtype(), place);
+  } else {
+    PD_CHECK(hidden_size % 128 == 0);
+    quanted_hidden_size = hidden_size / 128;
+    x_scale_unzipped = paddle::empty(
+        {0, quanted_hidden_size}, paddle::DataType::FLOAT32, place);
+  }
+
+  auto index_unzipped = paddle::empty(
+      {tokens_per_expert[expert_id]}, paddle::DataType::INT64, place);
+
+  int block = 1024;
+  int grid = LimitGridDim(zipped_rows);
+
+#define LAUNCH_TOKENS_UNZIP_GATHER_KERNEL_IMPL(__cpp_dtype, __has_scale) \
+  do {                                                                   \
+    tokens_unzip_gather_kernel<__cpp_dtype, __has_scale>                 \
+        <<<grid, block, 0, stream>>>(                                    \
+            x.data<__cpp_dtype>(),                                       \
+            __has_scale ? x_scale.get().data<float>() : nullptr,         \
+            zipped_expertwise_rowmap.data<int>(),                        \
+            x_unzipped.data<__cpp_dtype>(),                              \
+            __has_scale ? x_scale_unzipped.data<float>() : nullptr,      \
+            index_unzipped.data<int64_t>(),                              \
+            tokens_per_expert[expert_id],                                \
+            zipped_rows,                                                 \
+            hidden_size,                                                 \
+            quanted_hidden_size,                                         \
+            num_experts,                                                 \
+            expert_id,                                                   \
+            offset);                                                     \
+  } while (0)
+
+#define LAUNCH_TOKENS_UNZIP_GATHER_KERNEL(__cpp_dtype)            \
+  do {                                                            \
+    if (has_scale) {                                              \
+      LAUNCH_TOKENS_UNZIP_GATHER_KERNEL_IMPL(__cpp_dtype, true);  \
+    } else {                                                      \
+      LAUNCH_TOKENS_UNZIP_GATHER_KERNEL_IMPL(__cpp_dtype, false); \
+    }                                                             \
+  } while (0)
+
+  if (grid > 0) {
+    if (has_scale) {
+      LAUNCH_TOKENS_UNZIP_GATHER_KERNEL(phi::float8_e4m3fn);
+    } else {
+      LAUNCH_TOKENS_UNZIP_GATHER_KERNEL(phi::bfloat16);
+    }
+  }
+  return {x_unzipped, x_scale_unzipped, index_unzipped};
+}
+
+template <typename ZipT, typename UnzipT, int VecSize>
+__global__ void tokens_zip_unique_add_kernel(
+    ZipT *__restrict__ zipped,
+    const UnzipT *__restrict__ unzipped,
+    const int64_t *__restrict__ index_unzipped,
+    const int64_t unzipped_rows,
+    const int hidden_size) {
+  for (int64_t unzipped_row = blockIdx.x; unzipped_row < unzipped_rows;
+       unzipped_row += gridDim.x) {
+    auto *zipped_ptr = zipped + index_unzipped[unzipped_row] * hidden_size;
+    const auto *unzipped_ptr = unzipped + unzipped_row * hidden_size;
+    for (int i = threadIdx.x * VecSize; i < hidden_size;
+         i += blockDim.x * VecSize) {
+      phi::AlignedVector<ZipT, VecSize> zipped_tmp;
+      phi::AlignedVector<UnzipT, VecSize> unzipped_tmp;
+      phi::Load(zipped_ptr + i, &zipped_tmp);
+      phi::Load(unzipped_ptr + i, &unzipped_tmp);
+#pragma unroll
+      for (int j = 0; j < VecSize; ++j) {
+        zipped_tmp[j] += static_cast<ZipT>(unzipped_tmp[j]);
+      }
+      phi::Store(zipped_tmp, zipped_ptr + i);
+    }
+  }
+}
+
+std::vector<paddle::Tensor> tokens_zip_unique_add(
+    const paddle::Tensor &zipped_origin,
+    const paddle::Tensor &unzipped,
+    const paddle::Tensor &index_unzipped,
+    int64_t zipped_rows) {
+  auto zipped_shape = zipped_origin.shape();
+  auto unzipped_shape = unzipped.shape();
+  PD_CHECK(zipped_shape.size() == 2);
+  PD_CHECK(unzipped_shape.size() == 2);
+  PD_CHECK(zipped_shape[1] == unzipped_shape[1]);
+
+  auto hidden_size = zipped_shape[1];
+
+  auto out_dtype = zipped_origin.dtype();
+  auto in_dtype = unzipped.dtype();
+  auto place = zipped_origin.place();
+
+  paddle::Tensor zipped;
+  if (zipped_shape[0] == 0) {
+    zipped = paddle::zeros({zipped_rows, hidden_size}, out_dtype, place);
+  } else {
+    PD_CHECK(zipped_shape[0] == zipped_rows);
+    zipped = zipped_origin;
+  }
+
+  auto index_shape = index_unzipped.shape();
+  PD_CHECK(index_shape.size() == 1);
+  auto unzipped_rows = index_shape[0];
+  PD_CHECK(unzipped_rows <= zipped_rows);
+  PD_CHECK(unzipped_rows <= unzipped_shape[0]);
+
+  constexpr int kVecSize = 4;
+  PD_CHECK(hidden_size % kVecSize == 0);
+
+  int block = 1024;
+  int grid = LimitGridDim(unzipped_rows);
+
+#define LAUNCH_TOKENS_ZIP_UNIQUE_ADD(__ZipT, __UnzipT)       \
+  do {                                                       \
+    tokens_zip_unique_add_kernel<__ZipT, __UnzipT, kVecSize> \
+        <<<grid, block, 0, unzipped.stream()>>>(             \
+            zipped.data<__ZipT>(),                           \
+            unzipped.data<__UnzipT>(),                       \
+            index_unzipped.data<int64_t>(),                  \
+            unzipped_rows,                                   \
+            hidden_size);                                    \
+  } while (0)
+
+  if (grid > 0) {
+    if (out_dtype == paddle::DataType::FLOAT32 &&
+        in_dtype == paddle::DataType::BFLOAT16) {
+      LAUNCH_TOKENS_ZIP_UNIQUE_ADD(float, phi::bfloat16);
+    } else if (out_dtype == paddle::DataType::BFLOAT16 &&
+               in_dtype == out_dtype) {
+      LAUNCH_TOKENS_ZIP_UNIQUE_ADD(phi::bfloat16, phi::bfloat16);
+    } else if (out_dtype == paddle::DataType::FLOAT32 &&
+               in_dtype == out_dtype) {
+      LAUNCH_TOKENS_ZIP_UNIQUE_ADD(float, float);
+    } else {
+      PD_THROW("Unsupported data type");
+    }
+  }
+
+  return {zipped};
+}
+
+
+template <typename T>
+struct UnzippedProbInfo {
+  const T *__restrict__ data;
+  int64_t offset;
+};
+
+template <typename T>
+__global__ void tokens_zip_prob_kernel(
+    phi::Array<UnzippedProbInfo<T>, MAX_NUM_EXPERTS> unzipped_probs,
+    const int *__restrict__ zipped_expertwise_rowmap,
+    const int *__restrict__ dispatched_indices,
+    T *zipped_probs,
+    int64_t zipped_rows,
+    int topk,
+    int num_expert) {
+  int64_t idx = threadIdx.x + static_cast<int64_t>(blockDim.x) * blockIdx.x;
+  int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+  int64_t limit = zipped_rows * topk;
+  while (idx < limit) {
+    auto zipped_row = idx / topk;
+    auto topk_idx = idx % topk;
+    auto expert_id = dispatched_indices[idx];
+    T value = static_cast<T>(0);
+    if (expert_id >= 0) {
+      auto unzipped_row =
+          zipped_expertwise_rowmap[zipped_row * num_expert + expert_id];
+      if (unzipped_row >= 0) {
+        unzipped_row -= unzipped_probs[expert_id].offset;
+        value = unzipped_probs[expert_id].data[unzipped_row];
+      }
+    }
+    zipped_probs[idx] = value;
+    idx += stride;
+  }
+}
+
+template <typename T>
+std::vector<paddle::Tensor> tokens_zip_prob_impl(
+    const std::vector<paddle::Tensor> &unzipped_probs,
+    const paddle::Tensor &zipped_expertwise_rowmap,
+    const paddle::Tensor &dispatched_indices,
+    paddle::DataType dtype) {
+  auto zipped_expertwise_rowmap_shape = zipped_expertwise_rowmap.shape();
+  auto dispatched_indices_shape = dispatched_indices.shape();
+  PD_CHECK(zipped_expertwise_rowmap_shape.size() == 2);
+  PD_CHECK(dispatched_indices_shape.size() == 2);
+  PD_CHECK(zipped_expertwise_rowmap_shape[0] == dispatched_indices_shape[0]);
+
+  int64_t zipped_rows = zipped_expertwise_rowmap_shape[0];
+  int num_expert = zipped_expertwise_rowmap_shape[1];
+  int topk = dispatched_indices_shape[1];
+  PD_CHECK(unzipped_probs.size() == num_expert);
+  PD_CHECK(num_expert <= MAX_NUM_EXPERTS);
+
+  auto zipped_probs =
+      paddle::empty({zipped_rows, topk}, dtype, unzipped_probs[0].place());
+  phi::Array<UnzippedProbInfo<T>, MAX_NUM_EXPERTS> unzipped_probs_info;
+  int64_t offset = 0;
+  for (int i = 0; i < num_expert; ++i) {
+    auto shape = unzipped_probs[i].shape();
+    PD_CHECK(shape.size() == 1);
+    unzipped_probs_info[i].data = unzipped_probs[i].data<T>();
+    unzipped_probs_info[i].offset = offset;
+    offset += shape[0];
+  }
+
+  int thread = 1024;
+  int grid = LimitGridDim((zipped_rows * topk + thread - 1) / thread);
+
+  if (grid > 0) {
+    tokens_zip_prob_kernel<T><<<grid, thread, 0, zipped_probs.stream()>>>(
+        unzipped_probs_info,
+        zipped_expertwise_rowmap.data<int>(),
+        dispatched_indices.data<int>(),
+        zipped_probs.data<T>(),
+        zipped_rows,
+        topk,
+        num_expert);
+  }
+  return {zipped_probs};
+}
+
+
+std::vector<paddle::Tensor> tokens_zip_prob(
+    const std::vector<paddle::Tensor> &unzipped_probs,
+    const paddle::Tensor &zipped_expertwise_rowmap,
+    const paddle::Tensor &dispatched_indices) {
+  PD_CHECK(zipped_expertwise_rowmap.dtype() == paddle::DataType::INT32);
+  PD_CHECK(dispatched_indices.dtype() == paddle::DataType::INT32);
+
+  auto dtype = unzipped_probs[0].dtype();
+  if (dtype == paddle::DataType::FLOAT32) {
+    return tokens_zip_prob_impl<float>(
+        unzipped_probs, zipped_expertwise_rowmap, dispatched_indices, dtype);
+  } else if (dtype == paddle::DataType::BFLOAT16) {
+    return tokens_zip_prob_impl<phi::bfloat16>(
+        unzipped_probs, zipped_expertwise_rowmap, dispatched_indices, dtype);
+  } else {
+    PD_THROW("Unsupported data type: %s", dtype);
+  }
+}
+
+
+PD_BUILD_OP(tokens_unzip_gather)
+    .Inputs({"x", paddle::Optional("x_scale"), "zipped_expertwise_rowmap"})
+    .Outputs({"x_unzipped",
+              paddle::Optional("x_scale_unzipped"),
+              "idx_unzipped"})
+    .Attrs({"expert_id: int",
+            "tokens_per_expert: std::vector<int64_t>",
+            "padding_multiplex: int"})
+    .SetKernelFn(PD_KERNEL(tokens_unzip_gather));
+
+
+PD_BUILD_OP(tokens_zip_unique_add)
+    .Inputs({"x_zipped", "x_unzipped", "idx_unzipped"})
+    .Outputs({"y_zipped"})
+    .Attrs({"zipped_rows: int64_t"})
+    .SetKernelFn(PD_KERNEL(tokens_zip_unique_add));
+
+
+PD_BUILD_OP(tokens_zip_prob)
+    .Inputs({paddle::Vec("unzipped_prob"),
+             "zipped_expertwise_rowmap",
+             "dispatched_indices"})
+    .Outputs({"zipped_prob"})
+    .SetKernelFn(PD_KERNEL(tokens_zip_prob));

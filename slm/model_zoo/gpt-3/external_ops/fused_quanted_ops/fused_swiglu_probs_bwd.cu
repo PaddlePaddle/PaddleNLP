@@ -1,3 +1,17 @@
+// Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // swiglu_probs_grad_op.cu
 #include <cuda_bf16.h>
 #include <cuda_runtime.h>
@@ -184,8 +198,9 @@ __global__ void SwigluProbsGradKernelVec4(
   const bfloat16x4_t* do2_s_row_vec4 =
       reinterpret_cast<const bfloat16x4_t*>(do2_s_row);
   const bfloat16x4_t* o1_row_right_half_vec4 =
-      reinterpret_cast<const bfloat16x4_t*>(o1_row + (int64_t)moe_intermediate_size);
-  BFloat16* do1_row = do1 + row_idx *(int64_t) moe_intermediate_size * 2;
+      reinterpret_cast<const bfloat16x4_t*>(o1_row +
+                                            (int64_t)moe_intermediate_size);
+  BFloat16* do1_row = do1 + row_idx * (int64_t)moe_intermediate_size * 2;
   BFloat16* o2s_row = o2_s + row_idx * (int64_t)moe_intermediate_size;
   bfloat16x4_t* do1_row_vec4 = reinterpret_cast<bfloat16x4_t*>(do1_row);
   bfloat16x4_t* o2s_row_vec4 = reinterpret_cast<bfloat16x4_t*>(o2s_row);
@@ -244,20 +259,21 @@ __global__ void SwigluProbsGradKernelVec4(
 std::vector<paddle::Tensor> SwigluProbsGradCUDABackward(
     const paddle::Tensor& o1,
     const paddle::Tensor& do2_s,
-    const paddle::Tensor& unzipped_probs) {
+    const paddle::Tensor& unzipped_probs,
+    bool inplace) {
   auto o1_dims = o1.dims();
   int o1_outer_dim = 1;
-  for(int i = 0; i < o1_dims.size() - 1; i++){
+  for (int i = 0; i < o1_dims.size() - 1; i++) {
     o1_outer_dim *= o1_dims[i];
   }
 
   const int moe_intermediate_size_2 = o1_dims[o1_dims.size() - 1];
   const int moe_intermediate_size = moe_intermediate_size_2 / 2;
 
-  auto do1 = paddle::empty_like(o1);
-  auto probs_grad = paddle::empty(
-      {o1_outer_dim}, paddle::DataType::FLOAT32, o1.place());
-  auto o2_s = paddle::empty_like(do2_s);
+  auto do1 = inplace ? o1 : paddle::empty_like(o1);
+  auto probs_grad =
+      paddle::empty({o1_outer_dim}, paddle::DataType::FLOAT32, o1.place());
+  auto o2_s = inplace ? do2_s : paddle::empty_like(do2_s);
 
   const BFloat16* o1_ptr =
       reinterpret_cast<const BFloat16*>(o1.data<phi::bfloat16>());
@@ -296,4 +312,5 @@ std::vector<paddle::Tensor> SwigluProbsGradCUDABackward(
 PD_BUILD_OP(fused_swiglu_probs_bwd)
     .Inputs({"o1", "do2_s", "unzipped_probs"})
     .Outputs({"do1", "probs_grad", "o2_s"})
+    .Attrs({"inplace : bool"})
     .SetKernelFn(PD_KERNEL(SwigluProbsGradCUDABackward));
