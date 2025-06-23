@@ -21,6 +21,7 @@ import paddle.nn.functional as F
 from paddle.distributed import fleet
 from .configuration import GPTConfig
 from paddle.distributed.auto_parallel.pipelining.stage import PipelineStage
+from paddle.distributed.fleet.utils import recompute
 
 from paddle.distributed.auto_parallel.pipelining.schedules import (
     Schedule1F1B,
@@ -37,8 +38,15 @@ from .modeling_auto import (
     GPTLMHeadAuto,
 )
 
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        mark_as_sequence_parallel_parameter,
+    )
+except:
+    pass
+
 __all__ = [
-    "get_pp_schedule",
+    "get_gpt_pp_schedule",
     "GPTForCausalLMAutoPP",
 ]
 
@@ -134,9 +142,9 @@ def manual_model_split(model, stage_idx, group, mode, pp_degree):
 
     def _build_stage(model, stage_idx, group):
         new_model = None
-        if stage_idx == 0: # 第一个model_chunk输入特殊处理
+        if stage_idx == 0:
             new_model = GPTChunk(layer_lists[:chunk_size], is_first=True, is_last=False)
-        elif stage_idx == chunk_num - 1:  # 最后一个一个model_chunk输出特殊处理
+        elif stage_idx == chunk_num - 1:
             new_model = GPTChunk(
                 layer_lists[stage_idx * chunk_size : (stage_idx + 1) * chunk_size], is_first=False, is_last=True
             )
@@ -153,7 +161,7 @@ def manual_model_split(model, stage_idx, group, mode, pp_degree):
         stages.append(stage)
     return stages
 
-def get_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group):
+def get_gpt_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group):
     assert mode in ["VPP", "1F1B", "FThenB"]
     stages = manual_model_split(model, group.rank, group, mode, pp_degree)
     if mode == "VPP":
@@ -187,15 +195,46 @@ class GPTDecoderLayerAutoPP(nn.Layer):
 
         if layer_idx == config.num_hidden_layers - 1:
             self.norm = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
+            if config.sequence_parallel:
+                mark_as_sequence_parallel_parameter(self.norm.weight)
+                mark_as_sequence_parallel_parameter(self.norm.bias)
             self.lm_head = GPTLMHeadAuto(config, embedding_weights=None, ipp=ipp)
+
+    @paddle.jit.not_to_static
+    def recompute_training(
+        self,
+        layer_module: nn.Layer,
+        hidden_states: paddle.Tensor,
+        past_key_value: paddle.Tensor,
+        attention_mask: paddle.Tensor,
+        use_cache: bool,
+        output_attentions: paddle.Tensor,
+    ):
+        def create_custom_forward(module):
+            def custom_forward(*inputs):
+                return module(*inputs, output_attentions)
+
+            return custom_forward
+
+        hidden_states = recompute(
+            create_custom_forward(layer_module),
+            hidden_states,
+            attention_mask,
+            use_cache,
+            past_key_value,
+            use_reentrant=self.config.recompute_use_reentrant,
+        )
+        return hidden_states
 
     def forward(self, args):
         output_attentions = self.config.output_attentions
         use_cache = self.config.use_cache
+        if self.config.sequence_parallel and use_cache:
+            raise ValueError("We currently only support sequence parallel without cache.")
+
         past_key_values = None
         output_hidden_states = self.config.output_hidden_states
         return_dict = self.config.return_dict
-        print("self.layer_idx:",self.layer_idx)
         if self.layer_idx == 0:
             input_ids, attention_mask, position_ids = parse_args(args)
             if self.config.sequence_parallel and use_cache:
@@ -206,7 +245,6 @@ class GPTDecoderLayerAutoPP(nn.Layer):
             else:
                 raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-            # past_key_values is None
             if position_ids is None:
                 past_length = 0
                 position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype="int64")
@@ -216,8 +254,6 @@ class GPTDecoderLayerAutoPP(nn.Layer):
             hidden_states = self.embeddings(
                 input_ids=input_ids, position_ids=position_ids, inputs_embeddings=None
             )
-            # args = self.embeddings(args)
-            # hidden_states, attention_mask, position_ids = parse_args(args)
             length = input_shape[-1]
             cache_length = 0
             causal_mask = self.bias[:, :, cache_length:length, :length]
@@ -282,14 +318,6 @@ class GPTDecoderLayerAutoPP(nn.Layer):
                 else:
                     outputs = tuple(v for v in temp_list if v is not None)
             
-            # if output_hidden_states:
-            #     if return_dict:
-            #         outputs.hidden_states = (embedding_output,) + outputs.hidden_states
-            #     else:  # outputs is a tuple
-            #         idx = 2 if use_cache else 1
-            #         all_hidden_states = (embedding_output,) + outputs[idx]
-            #         outputs[idx] = all_hidden_states
-
             if self.lm_head is not None:
                 logits = self.lm_head(outputs)
                 ret_args = return_args(logits,)
