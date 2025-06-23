@@ -173,10 +173,11 @@ class ZeroCostCheckpointEMAProcessor:
         self.ema_buffer_modele_params = None
 
     @imperative_base.no_grad()
-    def ema_accumulate(self):
+    def ema_accumulate(self, global_step, loss, zcc_ema_loss_threshold):
         """
         perform ema update : ` \alpha * EMA + (1-\alpha) + model`
-        build `self.ema_buffer` if necessary
+        buid `self.ema_buffer` if necessary
+        when loss < threshold, do ema update
         """
         # logger.info(f'[ZCC EMA] wait all done, doing EMA w/ coef: {self.ema_coef}, status:{self.status()}')
         # do update: ema = alpha * ema + (1-alpha) * model
@@ -185,14 +186,19 @@ class ZeroCostCheckpointEMAProcessor:
             cpu_master_weights = self.optimizer_fusion_storage_helper.cpu_buffer._slice(
                 self.master_min_offset, self.master_max_offset
             ).cpu()
-            self.ema_buffer = self.ema_coef * self.ema_buffer + (1 - self.ema_coef) * cpu_master_weights
-            # logger.info(f'[ZCC EMA2] wait all done, doing EMA w/ coef: {self.ema_coef}, status:{self.status()}')
-            for index, ema_buf in self.ema_buffer_model_params.items():
-                _, cpu_buf = self.param_fusion_storage_helper.inited_buffers[index]
-                updated_ema = self.ema_coef * ema_buf + (1 - self.ema_coef) * cpu_buf
-                self.ema_buffer_model_params[index] = updated_ema
-
-        logger.info(f"[ZCC EMA] accumulating, buffer type:{self.ema_buffer.place} {self.ema_buffer.dtype}, done")
+            if zcc_ema_loss_threshold is None or loss < zcc_ema_loss_threshold:
+                self.ema_buffer = self.ema_coef * self.ema_buffer + (1 - self.ema_coef) * cpu_master_weights
+                for index, ema_buf in self.ema_buffer_model_params.items():
+                    _, cpu_buf = self.param_fusion_storage_helper.inited_buffers[index]
+                    updated_ema = self.ema_coef * ema_buf + (1 - self.ema_coef) * cpu_buf
+                    self.ema_buffer_model_params[index] = updated_ema
+                logger.info(
+                    f"[ZCC EMA] accmulating, buffer type:{self.ema_buffer.place} {self.ema_buffer.dtype}, done"
+                )
+            else:
+                logger.info(
+                    f"[ZCC EMA] accmulating SKIP for global_step:{global_step}, because loss:{loss} > threshold:{zcc_ema_loss_threshold}"
+                )
 
     @imperative_base.no_grad()
     def ema_state_dict(self):
@@ -790,7 +796,11 @@ class ZeroCostCheckpointWorker:
             self.global_step.value = global_step
 
             if self.ema_coef is not None:
-                self.zcc_ema_processor.ema_accumulate()
+                self.zcc_ema_processor.ema_accumulate(
+                    self.trainer_state.global_step,
+                    self.trainer_state.loss,
+                    self.training_args_content.zcc_ema_loss_threshold,
+                )
 
         # continue to process dumping task at the last chunk
         if self.offloaded_numels == self.all_numel:

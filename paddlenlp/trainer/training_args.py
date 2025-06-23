@@ -1050,6 +1050,10 @@ class TrainingArguments:
         default=1,
         metadata={"help": "Interval between updating EMA parameters."},
     )
+    zcc_ema_loss_threshold: Optional[float] = field(
+        default=None,
+        metadata={"help": "If set not None, only do EMA when the training loss is smaller than the threshold value"},
+    )
     save_tokenizer: Optional[bool] = field(
         default=True,
         metadata={"help": "Save tokenizer to output_dir."},

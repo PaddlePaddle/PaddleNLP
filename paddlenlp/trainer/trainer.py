@@ -1384,6 +1384,16 @@ class Trainer:
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
+
+                    # For ZCC EMA
+                    if self.args.enable_zero_cost_checkpoint:
+                        tr_loss_for_zcc = tr_loss.clone()
+                        dist.all_reduce(
+                            tr_loss_for_zcc, dist.ReduceOp.SUM
+                        )  # 3级并行时，每个pp下的loss会广播，全局reduce-mean的时候，分子分母都会乘以pp_world_size，结果会被约掉
+                        tr_loss_for_zcc_scalar = tr_loss_for_zcc.item() / dist.get_world_size()
+                        self.state.loss = tr_loss_for_zcc_scalar
+
                     self.state.consumed_samples = (
                         self.state.global_step
                         * args.per_device_train_batch_size
