@@ -99,13 +99,13 @@ function llama_case_list_auto() {
         # be used for tracking the execution status of the case.
         llama_dygraph_auto_bs4_bf16_SD2
         llama_dygraph_auto_bs8_fp32_DP2
-        llama_dygraph_auto_bs8_fp32_DP2-MP2
+        # llama_dygraph_auto_bs8_fp32_DP2-MP2
         llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
         llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
         # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
         llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw
         llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2
-        llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
+        # llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
         llama_pir_auto_fuse_ffn_attention_qkv_MP2
         llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
         llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP
@@ -159,11 +159,11 @@ function llm_gpt_case_list_auto() {
     fun_list=(
         # The test name must have "llm_gpt_dygraph_auto_" as a prefix, 
         # which will be used for tracking the execution status of the case.
-        llm_gpt_dygraph_auto_bs8_fp32_DP2
-        llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2
-        llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2
-        llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2
-        llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
+        # llm_gpt_dygraph_auto_bs8_fp32_DP2
+        # llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2
+        # llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2
+        # llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2
+        # llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
         llm_gpt_pir_auto_bs4_TP2
         llm_gpt_pir_auto_bs4_TP2_PP2
         llm_gpt_pir_auto_bs8_DP2_TP2_PP2

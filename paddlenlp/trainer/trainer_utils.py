@@ -1256,7 +1256,7 @@ def download_recovery_ckpt_from_pdc(recovery_checkpoint_path, timeout):
         )
 
 def check_auto_parallel_pipeline_support(model_type=None):
-    support_types = ["gpt_pp"]
+    support_types = ["llama_pp", "gpt_pp"]
     return model_type in support_types
 
 

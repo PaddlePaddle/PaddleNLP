@@ -28,11 +28,11 @@ from paddle import nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import PipelineLayer
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
-from paddle.utils import map_structure
 from rich.console import Console
 from rich.table import Table
 
 from ...data import DataCollator
+from ...datasets.rlhf_datasets.protocol import DataProto, TensorDict
 from ...generation import GenerationConfig
 from ...trainer.trainer import (
     EvalLoopOutput,
@@ -67,17 +67,14 @@ from ..models.ppo_model_utils import make_position_ids_from_input_ids
 from ..utils.comm_utils import (
     ActorStages,
     RolloutStages,
-    combine_micro_batches_into_batch,
     data_group_merge,
     data_group_split,
     filter_valid_reward_groups,
-    gather_and_pad,
+    gather_and_pad_dataproto,
+    gather_tensor_list,
     get_timer_label,
-    make_eos_mask,
     new_timer_log,
-    pad_tensor,
     split_batch_by_rank,
-    split_batch_into_micro_batches,
 )
 from ..utils.infer_utils import infer_guard
 from ..utils.offload_utils import reload_and_offload_scope, reload_tensor_to_gpu
@@ -166,15 +163,21 @@ class PPOMetric:
                 self.metrics[i] = paddle.zeros([freq], dtype=paddle.float32)
 
     @paddle.no_grad()
-    def update(self, metrics: Dict[str, paddle.Tensor]) -> Union[None, Dict[str, float]]:
+    def update(self, metrics: DataProto) -> Union[None, DataProto]:
         """
         If has updated for`freq` times then return metrics (results reduced from
         all worker) and reset metric states, otherwise return `None`.
         """
+        # PipelineParallel broadcast loss with shape [1]
+        metrics = TensorDict(
+            {
+                k: (v.squeeze() if isinstance(v, paddle.Tensor) and v.shape == [1] else v)
+                for k, v in metrics.meta_info["metrics"].items()
+            }
+        )
         for name in self.metric_names:
-            # PipelineParallel broadcast loss with shape [1]
-            if len(metrics[name].shape) != 0:
-                metrics[name] = metrics[name].squeeze()
+            # if len(metrics[name].shape) != 0:
+            #     metrics[name] = metrics[name].squeeze()
             if metrics[name].dtype != paddle.float32:
                 metrics[name] = metrics[name].cast(paddle.float32)
         if self.use_stack:
@@ -207,7 +210,7 @@ class PPOMetric:
             else:
                 for i, name in enumerate(self.metric_names):
                     self.metrics[i].fill_(0.0)
-            return out_metrics
+            return DataProto(meta_info={"metrics": out_metrics})
 
 
 class PPOTrainer(RLTrainerBase):
@@ -688,11 +691,15 @@ class PPOTrainer(RLTrainerBase):
         inputs = data_group_split(inputs, group=data_trans_group)
         with reload_and_offload_scope(self, self.actor_model, self.reference_model, self.actor_trainer):
             with infer_guard(self.actor_trainer):
-                prompt_only_batch = {
-                    "input_ids": inputs["input_ids"],
-                    **({"label_ids": inputs["label_ids"]} if self.args.use_rm_server else {}),
-                }
-                generated_seq = self.actor_trainer.generate_sequences(prompt_only_batch, do_eval=True)[0]["input_ids"]
+                prompt_only_batch = DataProto.from_single_dict(
+                    {
+                        "input_ids": inputs["input_ids"],
+                        **({"label_ids": inputs["label_ids"]} if self.args.use_rm_server else {}),
+                    }
+                )
+                generated_seq = self.actor_trainer.generate_sequences(prompt_only_batch, do_eval=True)[0].batch[
+                    "input_ids"
+                ]
 
             if self.reshard_controller is not None:
                 self.reshard_controller.set_train_env("[after prediction_step]")
@@ -734,7 +741,7 @@ class PPOTrainer(RLTrainerBase):
                 )[1]
             else:
                 prompt_len = inputs["input_ids"].shape[-1]
-                if "label_ids" not in inputs:
+                if "label_ids" not in inputs.keys():
                     raise ValueError("Rule-based reward needs labels.")
                 src = self.tokenizer.batch_decode(inputs["input_ids"], skip_special_tokens=False)
                 tgt = self.tokenizer.batch_decode(inputs["label_ids"], skip_special_tokens=False)
@@ -1091,7 +1098,7 @@ class PPOTrainer(RLTrainerBase):
             rl_loss.update(value_loss)
         return rl_loss
 
-    def remove_pad_tokens_after_generate(self, generated_batches):
+    def remove_pad_tokens_after_generate(self, generated_batches: List[DataProto]):
         cleanup_batches, indices, label_ids_batches = [], [], []
 
         for batch in generated_batches:
@@ -1103,7 +1110,7 @@ class PPOTrainer(RLTrainerBase):
                         remove_side="right",
                         eos_token_id=self.tokenizer.eos_token_id,
                     )
-                    for row in batch["input_ids"]
+                    for row in batch.batch["input_ids"]
                 ]
             )
             if self.args.use_rm_server:
@@ -1115,10 +1122,10 @@ class PPOTrainer(RLTrainerBase):
                             remove_side="left",
                             eos_token_id=self.tokenizer.eos_token_id,
                         )
-                        for row in batch["label_ids"]
+                        for row in batch.batch["label_ids"]
                     ]
                 )
-            indices.append(batch["index"])
+            indices.append(batch.non_tensor_batch["index"])
 
         return cleanup_batches, indices, label_ids_batches
 
@@ -1131,99 +1138,39 @@ class PPOTrainer(RLTrainerBase):
             )[0]
         return batch
 
-    def pad_batch_data(
-        self,
-        input_ids: List[paddle.Tensor],
-        label_ids: List[paddle.Tensor] = None,
-        padding_strategy="longest",
-        padding_max_len=None,
-        pad_to_multiple_of=None,
-    ):
-        input_ids = self.tokenizer.pad(
-            {"input_ids": input_ids},
-            padding=padding_strategy,
-            padding_side="right",
-            max_length=padding_max_len,
-            return_attention_mask=False,
-            pad_to_multiple_of=pad_to_multiple_of,
-        )["input_ids"]
-
-        label_ids = [paddle.unsqueeze(v, axis=0) if v.ndim == 1 else v for v in label_ids]
-        label_ids = pad_tensor(
-            label_ids,
-            pad_index=self.tokenizer.pad_token_id,
-            dtype=label_ids[0].dtype,
-            padding_side="right",
-        )
-        position_ids = make_position_ids_from_input_ids(input_ids, pad_token_id=self.tokenizer.pad_token_id)
-        return input_ids, label_ids, position_ids
-
-    def distribute_gather_and_pad_data(self, batch):
-        # group index for grpo
-        eos_mask = make_eos_mask(
-            batch["input_ids"][:, batch["prompt"].shape[-1] :],
-            eos_token_ids=llm_utils.get_eos_token_id(self.tokenizer, self.generation_config),
-        ).to(
-            batch["log_probs"].dtype  # fix dtype
-        )
-        try:
-            hcg = fleet.get_hybrid_communicate_group()
-            sd_group = hcg.get_sharding_parallel_group()
-            dp_group = hcg.get_data_parallel_group()
-        except AttributeError:
-            sd_group = None
-            dp_group = None
-
-        new_batch = {
-            "index": gather_and_pad(batch["index"], dp_group, sd_group, pad=False),
-            "rewards": gather_and_pad(batch["rewards"], dp_group, sd_group, pad=False),
-            "eos_mask": gather_and_pad(eos_mask, dp_group, sd_group),
-        }
-        if "log_probs" in batch:
-            new_batch["log_probs"] = gather_and_pad(batch["log_probs"], dp_group, sd_group)
-        if "ref_log_probs" in batch:
-            new_batch["ref_log_probs"] = gather_and_pad(batch["ref_log_probs"], dp_group, sd_group)
-
-        return new_batch
-
     def get_rank_data(self, tensor):
         return tensor.split(self.args.dataset_world_size)[self.args.dataset_rank]
 
-    def distribute_get_rank_data(self, local_batch, global_batch):
+    def distribute_get_rank_data(self, local_batch: DataProto, global_batch: DataProto):
         local_data = {
-            "reward_advantages": self.get_rank_data(global_batch["reward_advantages"]),
-            "rewards": self.get_rank_data(global_batch["rewards"]),
-            "ori_rewards": self.get_rank_data(global_batch["ori_rewards"]),
-            "eos_mask": self.get_rank_data(global_batch["eos_mask"]),
+            "reward_advantages": self.get_rank_data(global_batch.batch["reward_advantages"]),
+            "rewards": self.get_rank_data(global_batch.batch["rewards"]),
+            "ori_rewards": self.get_rank_data(global_batch.batch["ori_rewards"]),
+            "eos_mask": self.get_rank_data(global_batch.batch["eos_mask"]),
         }
         if self.args.rl_algorithm == "reinforce_plus_plus":
-            local_data["reward_returns"] = self.get_rank_data(global_batch["reward_returns"])
-            local_data["kl_rewards"] = self.get_rank_data(global_batch["kl_rewards"])
-            local_data["rewards_with_kl"] = self.get_rank_data(global_batch["rewards_with_kl"])
+            local_data["reward_returns"] = self.get_rank_data(global_batch.batch["reward_returns"])
+            local_data["kl_rewards"] = self.get_rank_data(global_batch.batch["kl_rewards"])
+            local_data["rewards_with_kl"] = self.get_rank_data(global_batch.batch["rewards_with_kl"])
 
-        shape = local_batch["log_probs"].shape
-        for k, v in local_data.items():
-            if local_data[k].ndim <= 1:
-                local_batch.update({k: local_data[k][: shape[-1]]})
-            else:
-                local_batch.update({k: local_data[k][:, : shape[-1]]})
+        # shape = local_batch.batch["log_probs"].shape
+        # for k, v in local_data.items():
+        #     if local_data[k].ndim <= 1:
+        #         local_batch.batch.update({k: local_data[k][: shape[-1]]})
+        #     else:
+        #         local_batch.batch.update({k: local_data[k][:, : shape[-1]]})
 
         # TODO(downfish19): test following code instead of above without any error
-        # for k, v in local_data.items():
-        #     local_batch.update({k: local_data[k]})
+        for k, v in local_data.items():
+            local_batch.batch.update({k: local_data[k]})
         return local_batch
 
-    def _balance_batch(self, micro_batches):
+    def _balance_batch(self, local_batch: DataProto):
         """Reorder the data such that each dp/sharding rank gets similar total tokens"""
-        if isinstance(micro_batches, list):
-            need_combine_and_split = True
-        else:
-            need_combine_and_split = False
-
         dp_degree, sharding_degree = max(self.args.data_parallel_degree, 1), max(self.args.sharding_parallel_degree, 1)
         # dp or sharding degree = 1, no need to balance batch
         if dp_degree * sharding_degree == 1:
-            return micro_batches
+            return local_batch
 
         # otherwise, need to balance batch across DP and Sharding groups
         try:
@@ -1234,49 +1181,33 @@ class PPOTrainer(RLTrainerBase):
             sharding_parallel_group = None
             data_parallel_group = None
 
-        total_unbalance_batch = defaultdict(list)
-        if need_combine_and_split:
-            unbalance_micro_batch = combine_micro_batches_into_batch(micro_batches, pad_token_id=self.tokenizer.pad_token_id)  # fmt:skip
-        else:
-            unbalance_micro_batch = micro_batches
-        for key in unbalance_micro_batch:
-            total_unbalance_batch[key].append(unbalance_micro_batch[key])
+        tensors_to_gather_per_key = defaultdict(list)
+        for key in local_batch.batch.keys():
+            tensors_to_gather_per_key[key].append(local_batch.batch[key])
+        for key in local_batch.non_tensor_batch.keys():
+            tensors_to_gather_per_key[key].append(local_batch.non_tensor_batch[key])
 
+        global_balanced_batch_dict = {}
         # Collect and pad tensors from all workers (across DP and Sharding groups)
-        for key in total_unbalance_batch.keys():
-            tensor_list = total_unbalance_batch[key]
-            # Do not need to pad 1-D Tensors
-            pad = False if len(tensor_list[0].shape) == 1 else True
-            pad_index = self.tokenizer.pad_token_id
-            padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
-            total_unbalance_batch[key] = gather_and_pad(
-                tensor_list,
-                data_parallel_group,
-                sharding_parallel_group,
-                pad_index=pad_index,
-                pad=pad,
-                padding_side=padding_side,
-            )
+        for key in tensors_to_gather_per_key.keys():
+            tensor_list_from_local_batch = tensors_to_gather_per_key[key]
+
+            global_balanced_batch_dict[key] = gather_tensor_list(data_parallel_group, sharding_parallel_group)(
+                DataProto.pad_or_concat_tensor_list
+            )(tensor_list_from_local_batch, self.tokenizer.pad_token_id, key)
+
         # Truncate total_batch to match expected total batch size
         # Split total_batch evenly across all DP × Sharding ranks
-        combined_balance_batch = split_batch_by_rank(
-            total_batch=total_unbalance_batch,
+        balanced_slice_for_current_rank = split_batch_by_rank(
+            total_batch=global_balanced_batch_dict,
             dp_rank=hcg.get_data_parallel_rank(),
             sharding_rank=hcg.get_sharding_parallel_rank(),
             dp_degree=dp_degree,
             sharding_degree=sharding_degree,
             balance_batch_across_dp_group=True,
         )
-        # split into micro-batches
-        if need_combine_and_split:
-            micro_batches = split_batch_into_micro_batches(
-                total_batch=combined_balance_batch,
-                batch_size=self.args.per_device_train_batch_size,
-                pad_token_id=self.tokenizer.pad_token_id,
-            )
-        else:
-            micro_batches = combined_balance_batch
-        return micro_batches
+
+        return DataProto.from_single_dict(balanced_slice_for_current_rank)
 
     def train(
         self,
@@ -1380,6 +1311,16 @@ class PPOTrainer(RLTrainerBase):
             total_valid_prompt = 0
             total_batch = defaultdict(list)
 
+        is_fleet_init = True
+        try:
+            hcg = fleet.get_hybrid_communicate_group()
+            sharding_parallel_group = hcg.get_sharding_parallel_group()
+            data_parallel_group = hcg.get_data_parallel_group()
+        except:
+            is_fleet_init = False
+            sharding_parallel_group = None
+            data_parallel_group = None
+
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
                 train_dataloader.batch_sampler, DistributedBatchSampler
@@ -1390,32 +1331,33 @@ class PPOTrainer(RLTrainerBase):
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             step = -1
-            for prompt_only_batch in self.prompt_only_dataloader:
+            for prompt_only_batch_dict in self.prompt_only_dataloader:
+                prompt_only_batch: DataProto = DataProto.from_single_dict(prompt_only_batch_dict)
                 self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
                 # step 1-1: rollout data with actor model (eval) and reward model
                 self.set_eval()
                 data_trans_group = getattr(self.actor_trainer, "_data_trans_group", None)
                 prompt_only_batch = data_group_split(prompt_only_batch, group=data_trans_group)
+                eos_token_ids = llm_utils.get_eos_token_id(self.tokenizer, self.generation_config)
+                pad_token_id = self.tokenizer.pad_token_id
+                prompt_only_batch.meta_info = {
+                    "eos_token_ids": eos_token_ids,
+                    "pad_token_id": pad_token_id,
+                }
 
-                cleanup_batches, indices, label_ids_batches = [], [], []
-                total_batch_size = prompt_only_batch["input_ids"].shape[0]
                 # expand input_ids and raw_prompt_len for all sequences
-                prompt_only_batch["raw_prompt_len_expand"] = paddle.repeat_interleave(
-                    prompt_only_batch["raw_prompt_len"], repeats=self.args.rollout_n, axis=0
+                batch_keys_to_pop = ["raw_label_ids_len", "raw_prompt_len", "input_ids"]
+                prompt_only_batch_expand = prompt_only_batch.select(
+                    batch_keys=batch_keys_to_pop,
                 )
-                if self.args.use_rm_server:
-                    prompt_only_batch["raw_label_ids_len"] = paddle.repeat_interleave(
-                        prompt_only_batch["raw_label_ids_len"], repeats=self.args.rollout_n, axis=0
-                    )
+                prompt_only_batch_expand = prompt_only_batch_expand.repeat(
+                    repeat_times=self.args.rollout_n, interleave=True
+                )
+                prompt_only_batch_expand.rename("raw_prompt_len", "raw_prompt_len_expand")
 
+                expand_prompt = prompt_only_batch_expand.batch["input_ids"]
                 per_device_rollout_batch_size = self.args.per_device_rollout_batch_size
-                if self.args.rollout_n > 1:
-                    expand_prompt = prompt_only_batch["input_ids"].repeat_interleave(
-                        self.args.rollout_n,
-                        axis=0,
-                    )
-                else:
-                    expand_prompt = prompt_only_batch["input_ids"]
+                cleanup_batches, indices, label_ids_batches = [], [], []
 
                 timer_scope_actor_model = TimerScope(
                     self.timers,
@@ -1428,14 +1370,14 @@ class PPOTrainer(RLTrainerBase):
                     timer_scope_rollout = TimerScope(self.timers, RolloutStages.GENERATE)
                     timer_scope_rollout.start()
                     with infer_guard(self.actor_trainer):
-                        for i in range(0, total_batch_size, per_device_rollout_batch_size):
-                            micro_batch = map_structure(
-                                lambda tensor: tensor[i : i + per_device_rollout_batch_size],
-                                prompt_only_batch,
-                            )
+                        total_batch_size = prompt_only_batch.batch["input_ids"].shape[0]
 
+                        for i in range(0, total_batch_size, per_device_rollout_batch_size):
+                            micro_prompt_batch = prompt_only_batch[i : i + per_device_rollout_batch_size]
                             # generate for multi batches and then disable FuseMT model
-                            generated_batches = self.actor_trainer.generate_sequences(micro_batch)
+                            generated_batches: List[DataProto] = self.actor_trainer.generate_sequences(
+                                micro_prompt_batch
+                            )
                             # NOTE(drownfish19): do process for each micro_batch, prepare for split mode
                             micro_ret = self.remove_pad_tokens_after_generate(generated_batches)
                             micro_cleanup_batches, micro_indices, micro_label_ids_batches = micro_ret
@@ -1458,26 +1400,38 @@ class PPOTrainer(RLTrainerBase):
 
                 # padding data
                 pad_to_multiple_of = self.args.tensor_parallel_degree if self._model_config.sequence_parallel else None
-                input_ids, label_ids, position_ids = self.pad_batch_data(truncate_input_ids, label_ids_batches, pad_to_multiple_of=pad_to_multiple_of)  # fmt: skip
+                input_ids = self.tokenizer.pad(
+                    {"input_ids": truncate_input_ids},
+                    padding="longest",
+                    padding_side="right",
+                    max_length=None,
+                    return_attention_mask=False,
+                    pad_to_multiple_of=pad_to_multiple_of,
+                )["input_ids"]
+                label_ids = DataProto.pad_batch_data(label_ids_batches, pad_token_id=pad_token_id)
+                position_ids = make_position_ids_from_input_ids(input_ids, pad_token_id=pad_token_id)
+
                 prompt_len = paddle.full(shape=[expand_prompt.shape[0]], fill_value=expand_prompt.shape[1], dtype=expand_prompt.dtype)  # fmt: skip
-                prompt_len_without_pad = prompt_only_batch["raw_prompt_len_expand"]
+                prompt_len_without_pad = prompt_only_batch_expand.batch["raw_prompt_len_expand"]
                 response_len_without_pad = input_ids_len - prompt_len
 
-                batch = {
-                    "prompt": expand_prompt,
-                    "input_ids": input_ids,
-                    "position_ids": position_ids,
-                    "prompt_len": prompt_len,
-                    "prompt_len_without_pad": prompt_len_without_pad,
-                    "response_len_without_pad": response_len_without_pad,
-                    "index": indices,
-                    **({"label_ids": label_ids} if self.args.use_rm_server else {}),
-                    **(
-                        {"raw_label_ids_len": prompt_only_batch["raw_label_ids_len"]}
-                        if self.args.use_rm_server
-                        else {}
-                    ),
-                }
+                batch = DataProto.from_single_dict(
+                    {
+                        "prompt": expand_prompt,
+                        "input_ids": input_ids,
+                        "position_ids": position_ids,
+                        "prompt_len": prompt_len,
+                        "prompt_len_without_pad": prompt_len_without_pad,
+                        "response_len_without_pad": response_len_without_pad,
+                        "index": indices,
+                        **({"label_ids": label_ids} if self.args.use_rm_server else {}),
+                        **(
+                            {"raw_label_ids_len": prompt_only_batch_expand.batch["raw_label_ids_len"]}
+                            if self.args.use_rm_server
+                            else {}
+                        ),
+                    }
+                )
 
                 batch = data_group_merge(batch, group=data_trans_group)
 
@@ -1490,12 +1444,13 @@ class PPOTrainer(RLTrainerBase):
                     with TimerScope(self.timers, RolloutStages.ROLLOUT_LOGPROB):
                         with reload_and_offload_scope(self, self.reference_model):
                             with TimerScope(self.timers, RolloutStages.ROLLOUT_REF_LOGPROB):
-                                batch["ref_log_probs"] = self.reference_trainer.compute_logprob(**batch)
+                                ref_log_probs = self.reference_trainer.compute_logprob(batch, key="ref_log_probs")
+                                batch = batch.union(ref_log_probs)
 
                         with reload_and_offload_scope(self, self.actor_model):
                             with TimerScope(self.timers, RolloutStages.ROLLOUT_OLD_LOGPROB):
-                                self.actor_trainer.model.eval()
-                                batch["log_probs"] = self.actor_trainer.compute_logprob(**batch)
+                                log_probs = self.actor_trainer.compute_logprob(batch, key="log_probs")
+                                batch = batch.union(log_probs)
 
                 # step 2-2: compute reward for rollout data
                 with TimerScope(
@@ -1509,27 +1464,28 @@ class PPOTrainer(RLTrainerBase):
                         self.reward_model if not self.args.use_rm_server else None,
                     ):
                         with TimerScope(self.timers, RolloutStages.ROLLOUT_REWARD_VALUE):
-                            batch["rewards"] = self.reward_trainer.compute_reward(
+                            reward_tensor = self.reward_trainer.compute_reward(
+                                batch,
                                 input_ids_tokenizer=self.tokenizer,
-                                **batch,
                             )
+                            batch.batch["rewards"] = reward_tensor
                             if self.args.enable_overlong_reward_buffer:
                                 overlong_penalty = apply_overlong_penalty(
-                                    response_length=batch["response_len_without_pad"],
+                                    response_length=batch.batch["response_len_without_pad"],
                                     max_dec_len=self.args.max_dec_len,
                                     overlong_buffer_len=self.args.overlong_reward_buffer,
                                     penalty_factor=self.args.overlong_penalty_factor,
                                 )
-                                batch["rewards_before_length_penalty"] = batch["rewards"].clone()
-                                batch["rewards"] = batch["rewards"] + overlong_penalty
+                                batch.batch["rewards_before_length_penalty"] = reward_tensor.clone()
+                                batch.batch["rewards"] = reward_tensor + overlong_penalty
 
                             if self.args.rl_algorithm == "ppo":
-                                batch["reward_values"] = self.critic_trainer.compute_value(**batch)
+                                reward_values = self.critic_trainer.compute_value(batch)
+                                batch.union(reward_values)
 
                 # dynamic sampling: filter generated samples by rewards, keep generating until valid samples are enough
                 if self.args.dynamic_sampling:
                     local_valid_prompt = 0
-                    # combined_batch = combine_micro_batches_into_batch(micro_batches, pad_token_id=self.tokenizer.pad_token_id)
                     combined_batch = batch
                     total_batch, local_valid_prompt = filter_valid_reward_groups(
                         combined_batch=combined_batch,
@@ -1537,16 +1493,6 @@ class PPOTrainer(RLTrainerBase):
                         rollout_n=self.args.rollout_n,
                         variance_threshold=1e-6,
                     )
-
-                    is_fleet_init = True
-                    try:
-                        hcg = fleet.get_hybrid_communicate_group()
-                        sharding_parallel_group = hcg.get_sharding_parallel_group()
-                        data_parallel_group = hcg.get_data_parallel_group()
-                    except:
-                        is_fleet_init = False
-                        sharding_parallel_group = None
-                        data_parallel_group = None
 
                     dp_degree, sharding_degree = (
                         max(self.args.data_parallel_degree, 1),
@@ -1567,18 +1513,12 @@ class PPOTrainer(RLTrainerBase):
                         # Collect and pad tensors from all workers (across DP and Sharding groups)
                         for key in total_batch.keys():
                             tensor_list = total_batch[key]
-                            # Do not need to pad 1-D Tensors
-                            pad = False if len(tensor_list[0].shape) == 1 else True
-                            pad_index = self.tokenizer.pad_token_id
-                            padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
-                            total_batch[key] = gather_and_pad(
-                                tensor_list,
-                                data_parallel_group,
-                                sharding_parallel_group,
-                                pad_index=pad_index,
-                                pad=pad,
-                                padding_side=padding_side,
-                            )
+
+                            gathered_and_padded_tensor = gather_tensor_list(
+                                data_parallel_group, sharding_parallel_group
+                            )(DataProto.pad_or_concat_tensor_list)(tensor_list, pad_token_id, key)
+
+                            total_batch[key] = gathered_and_padded_tensor
 
                         # Truncate total_batch to match expected total batch size
                         for key in total_batch.keys():
@@ -1595,7 +1535,7 @@ class PPOTrainer(RLTrainerBase):
                                 balance_batch_across_dp_group=False,
                             )
 
-                        batch = total_batch
+                        batch = DataProto.from_single_dict(dict(total_batch))
 
                         # Reset for next accumulation
                         total_batch = defaultdict(list)
@@ -1616,14 +1556,16 @@ class PPOTrainer(RLTrainerBase):
                 # prepare data for reinforce_plus_plus & grpo
                 if self.args.rl_algorithm in ["reinforce_plus_plus", "grpo"]:
                     local_batch = copy.deepcopy(batch)
-                    batch = self.distribute_gather_and_pad_data(batch)
+                    select_keys = ["index", "rewards", "eos_mask", "log_probs", "ref_log_probs"]
+                    batch = gather_and_pad_dataproto(
+                        batch, data_parallel_group, sharding_parallel_group, eos_token_ids, pad_token_id, select_keys
+                    )
                 else:
                     local_batch = batch
                     batch = batch
 
                 # step 2-3: compute reward normalization
-
-                batch["ori_rewards"] = batch["rewards"].clone()
+                batch.batch["ori_rewards"] = batch.batch["rewards"].clone()
 
                 if self.args.normalize_reward:
                     batch = self.compute_reward_normalization(batch)
@@ -1648,8 +1590,7 @@ class PPOTrainer(RLTrainerBase):
                     with reload_and_offload_scope(self, self.actor_model, self.actor_trainer.optimizer):
                         with TimerScope(self.timers, ActorStages.RL_STEP):
                             # timer_info = {} # prepare for each micro_step
-                            micro_batches = split_batch_into_micro_batches(
-                                total_batch=batch,
+                            micro_batches = batch.split_batch_into_micro_batches(
                                 batch_size=self.args.per_device_train_batch_size,
                                 pad_token_id=self.tokenizer.pad_token_id,
                             )
@@ -1664,13 +1605,14 @@ class PPOTrainer(RLTrainerBase):
                                 paddle.device.cuda.empty_cache()
 
                                 if self.args.rl_algorithm == "ppo":
-                                    rl_info["train_value_loss"] = self.critic_trainer.update_critic(micro_batch)
+                                    train_value_loss = self.critic_trainer.update_critic(micro_batch)
+                                    rl_info.union(train_value_loss)
                                 if self.is_step_end():
                                     self.state.global_step += 1
                                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
-                                    rl_info.update(self.get_step_loss(loss_prefix="train_"))
+                                    rl_info.meta_info["metrics"].update(self.get_step_loss(loss_prefix="train_"))
                                     rl_info = metric.update(rl_info)
-                                    self.timers and rl_info.update(
+                                    self.timers and rl_info.meta_info["metrics"].update(
                                         self.timers.info(self.timers.timers.keys(), reset=False)
                                     )
                                     # on_step_end
@@ -1766,7 +1708,7 @@ class PPOTrainer(RLTrainerBase):
                     "on multiple nodes, you should activate `--save_on_each_node`."
                 )
 
-    def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
+    def _maybe_log_save_evaluate(self, tr_loss: DataProto, model, epoch, ignore_keys_for_eval, **kwargs):
         """
         Log, save, and evaluate if needed.
 
@@ -1792,7 +1734,7 @@ class PPOTrainer(RLTrainerBase):
             # use_ptx would double the gradient_accumulation_steps which causes
             # policy_loss and ptx_loss reduced by half. Moreover, ptx_loss should
             # be divided by ptx_coeff for logging.
-            logs.update(tr_loss)
+            logs.update(tr_loss.meta_info["metrics"])
             logs["global_step"] = int(self.state.global_step)
             logs["train_actor_lr"] = float(f"{self.actor_trainer._get_learning_rate():.3e}")
             if self.args.rl_algorithm == "ppo":
@@ -1818,7 +1760,7 @@ class PPOTrainer(RLTrainerBase):
 
         # To trigger evaluation and save but avoid log again
         with guard_set_args(self.control, {"should_log": False}):
-            super()._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval)
+            super()._maybe_log_save_evaluate(tr_loss.meta_info["metrics"], model, epoch, ignore_keys_for_eval)
 
     def get_advantages_and_returns(
         self,
@@ -1915,24 +1857,24 @@ class PPOTrainer(RLTrainerBase):
         return batch
 
     @paddle.no_grad()
-    def compute_advantage(self, batch, use_tgt_len_value):
-        if "log_probs" in batch:
-            old_log_probs = batch["log_probs"]  # length: src + tgt -1
-        if "ref_log_probs" in batch:
-            ref_log_probs = batch["ref_log_probs"]  # length: src + tgt -1
-        rewards = batch["rewards"]  # length: 1
+    def compute_advantage(self, batch: DataProto, use_tgt_len_value) -> DataProto:
+        if "log_probs" in batch.batch:
+            old_log_probs = batch.batch["log_probs"]  # length: src + tgt -1
+        if "ref_log_probs" in batch.batch:
+            ref_log_probs = batch.batch["ref_log_probs"]  # length: src + tgt -1
+        rewards = batch.batch["rewards"]  # length: 1
         if self.args.rl_algorithm == "ppo":
-            old_reward_values = batch["reward_values"]  # length: src + tgt -1
+            old_reward_values = batch.batch["reward_values"]  # length: src + tgt -1
 
         if self.args.rl_algorithm == "grpo":
-            eos_mask = batch["eos_mask"]
+            eos_mask = batch.batch["eos_mask"]
             start = 0
             reward_advantages = compute_grpo_advantages(
-                rewards, batch["index"], eos_mask[:, start:], eos_mask.shape[-1]
+                rewards, batch.non_tensor_batch["index"], eos_mask[:, start:], eos_mask.shape[-1]
             )
         elif self.args.rl_algorithm == "ppo":
-            start = batch["prompt"].shape[-1] - 1
-            eos_mask = (batch["input_ids"] != self.tokenizer.pad_token_id)[:, 1:].to(old_log_probs.dtype)
+            start = batch.batch["prompt"].shape[-1] - 1
+            eos_mask = (batch.batch["input_ids"] != self.tokenizer.pad_token_id)[:, 1:].to(old_log_probs.dtype)
             rewards_with_kl, kl_rewards = add_kl_divergence_regularization(
                 None,  # prompt,
                 old_log_probs,
@@ -1953,7 +1895,7 @@ class PPOTrainer(RLTrainerBase):
             )  # length: tgt if use_tgt_len_value src + tgt -1
         elif self.args.rl_algorithm == "reinforce_plus_plus":
             start = 0
-            eos_mask = batch["eos_mask"]
+            eos_mask = batch.batch["eos_mask"]
             rewards_with_kl, kl_rewards = add_kl_divergence_regularization(
                 None,  # prompt,
                 old_log_probs,
@@ -1971,7 +1913,7 @@ class PPOTrainer(RLTrainerBase):
         else:
             raise ValueError(f"Unknown rl_algorithm: {self.args.rl_algorithm}")
 
-        batch.update(
+        batch.batch.update(
             {
                 # "log_probs": old_log_probs,
                 "reward_advantages": reward_advantages,
@@ -1983,9 +1925,9 @@ class PPOTrainer(RLTrainerBase):
         )
         if self.args.rl_algorithm in ["reinforce_plus_plus", "ppo"]:
             if self.args.rl_algorithm == "ppo":
-                batch.update({"reward_values": old_reward_values})
+                batch.batch.update({"reward_values": old_reward_values})
 
-            batch.update(
+            batch.batch.update(
                 {
                     "reward_returns": reward_returns,
                     "kl_rewards": kl_rewards,
@@ -1999,8 +1941,8 @@ class PPOTrainer(RLTrainerBase):
         return batch
 
     @paddle.no_grad()
-    def compute_advantage_normalization(self, batch):
-        all_advantages = batch["reward_advantages_clean"].cast(paddle.float32)
+    def compute_advantage_normalization(self, batch: DataProto):
+        all_advantages = batch.batch["reward_advantages_clean"].cast(paddle.float32)
 
         try:
             hcg = fleet.get_hybrid_communicate_group()
@@ -2021,7 +1963,9 @@ class PPOTrainer(RLTrainerBase):
             pass
         all_advantages_mean = all_advantages.mean().cast(paddle.bfloat16)
         all_advantages_std = all_advantages.std().cast(paddle.bfloat16)
-        batch["reward_advantages"] = (batch["reward_advantages"] - all_advantages_mean) / (all_advantages_std + 1e-8)
-        batch["reward_advantages"] = batch["reward_advantages"] * batch["eos_mask"]
+        batch.batch["reward_advantages"] = (batch.batch["reward_advantages"] - all_advantages_mean) / (
+            all_advantages_std + 1e-8
+        )
+        batch.batch["reward_advantages"] = batch.batch["reward_advantages"] * batch.batch["eos_mask"]
 
         return batch

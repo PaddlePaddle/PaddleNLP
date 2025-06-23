@@ -14,7 +14,8 @@
 
 from typing import Optional
 
-from aistudio_sdk.hub import download
+from aistudio_sdk.file_download import model_file_download as download
+from requests import HTTPError
 
 
 class UnauthorizedError(Exception):
@@ -46,22 +47,24 @@ def aistudio_download(
     if revision is not None:
         download_kwargs["revision"] = revision
     if cache_dir is not None:
-        download_kwargs["cache_dir"] = cache_dir
-    res = download(
-        repo_id=repo_id,
-        filename=filename,
-        **download_kwargs,
-    )
-    if "path" in res:
-        return res["path"]
-    else:
-        if res["error_code"] == 10001:
-            raise ValueError("Illegal argument error")
-        elif res["error_code"] == 10002:
-            raise UnauthorizedError(
-                "Unauthorized Access. Please ensure that you have provided the AIStudio Access Token and you have access to the requested asset"
-            )
-        elif res["error_code"] == 12001:
-            raise EntryNotFoundError(f"Cannot find the requested file '{filename}' in repo '{repo_id}'")
-        else:
-            raise Exception(f"Unknown error: {res}")
+        download_kwargs["local_dir"] = cache_dir
+
+    try:
+        return download(
+            repo_id=repo_id,
+            file_path=filename,
+            **download_kwargs,
+        )
+    except ValueError:
+        raise EnvironmentError(
+            f"Cannot find {filename} in the cached files and it looks like {repo_id} is not the path to a directory containing the {filename} or"
+            " \nCheckout your internet connection or see how to run the library in offline mode."
+        )
+    except EntryNotFoundError:
+        raise EnvironmentError(
+            f"Cannot find the requested file {filename} in {repo_id}, please make sure the {filename} under the repo {repo_id}"
+        )
+    except HTTPError as err:
+        raise EnvironmentError(f"There was a specific connection error when trying to load {repo_id}:\n{err}")
+    except Exception:
+        raise EnvironmentError(f"Please make sure the {filename} under the repo {repo_id}")
