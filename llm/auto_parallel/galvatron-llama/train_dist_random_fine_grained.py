@@ -435,7 +435,7 @@ def main():
     # one demo
     if pp == 2 and tp == 2 and dp == 2:
         meshs[2] = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", "mp"])
-        meshs[6] = dist.ProcessMesh([[4], [5], [6], [7]], dim_names=["dp", "mp"])
+        # meshs[6] = dist.ProcessMesh([[4], [5], [6], [7]], dim_names=["dp", "mp"])
     elif pp == 2 and tp == 1 and dp == 4:
         meshs[2] = dist.ProcessMesh([[0, 1, 2, 3]], dim_names=['dp', 'mp'])
     elif pp == 2 and tp == 4 and dp == 1:

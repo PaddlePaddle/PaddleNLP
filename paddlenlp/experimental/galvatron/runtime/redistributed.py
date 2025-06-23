@@ -138,3 +138,17 @@ class GatherBatchFwdSplitBatchBwd(PyLayer):
         origin_mesh = ProcessMesh(process_list, dim_names=['dp', 'tp'])
         out = split_batch_with_sequence_parallel(grad_output, origin_mesh)
         return out
+    
+class DummyRedistributed(PyLayer):
+    @staticmethod
+    def forward(ctx, dtensor: Tensor, mesh: ProcessMesh):
+        origin_mesh = dtensor.process_mesh
+        origin_dtensor_shape = dtensor.shape
+        dummy_tensor = paddle.randn((origin_dtensor_shape), dtype=dtensor.dtype)
+        dummy_dtensor = dist.shard_tensor(dummy_tensor, mesh, [dist.Shard(1), dist.Shard(0)])
+        # print(f"DummyRedistributed forward, dtensor shape: {dtensor.shape}, mesh: {mesh}, dummy_dtensor shape: {dummy_dtensor.shape}")
+        print(f'DummyRedistributed forward, dummy_dtensor: {dummy_dtensor}')
+        return dummy_dtensor
+    
+    def backward(ctx, grad_output: Tensor):
+        return grad_output

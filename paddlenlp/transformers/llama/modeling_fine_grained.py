@@ -1029,35 +1029,6 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
         next_decoder_cache = () if use_cache else None
         for idx, (decoder_layer) in enumerate(self.layers):
             rank = dist.get_rank()
-            # if idx == 0 or idx == 1 or idx == 2:
-            #     if rank not in [0, 1, 2, 3]:
-            #         print(f'[linguangming] [modeling_fine_grained.py], skip decoder_layer {idx} because rank {rank} is not in [0, 1, 2, 3]')
-            #         continue
-            print(f'[linguangming] [modeling_fine_grained.py], rank {rank} start to call decoder_layer {idx}')
-            # print(f'[linguangming] [modeling_fine_grained.py], hidden_states: {hidden_states}')
-            # 此处增添逻辑，如果hidden_states的mesh和现在的mesh不一致的话，就做数据重分布
-            # print(f'[linguangming] [modeling_fine_grained.py], hidden_states mesh: {hidden_states.process_mesh}, decoder_layer mesh: {decoder_layer.mesh}')
-            hidden_states_mesh = hidden_states.process_mesh
-            if hidden_states_mesh.shape[0] != decoder_layer.mesh.shape[0]:
-                print(f'should call redistributed')
-                from paddlenlp.experimental.galvatron.runtime.redistributed import SpiltBatchFwdGatherBatchBwd, GatherBatchFwdSplitBatchBwd
-                if hidden_states_mesh.shape[0] < decoder_layer.mesh.shape[0]: # dp degree increase
-                    hidden_states = SpiltBatchFwdGatherBatchBwd.apply(hidden_states, decoder_layer.mesh)
-                elif hidden_states_mesh.shape[0] > decoder_layer.mesh.shape[0]: # dp degree decrease
-                    hidden_states = GatherBatchFwdSplitBatchBwd.apply(hidden_states, decoder_layer.mesh)
-                # if dist.get_rank() not in hidden_states.process_mesh.process_ids:
-                #     if dist.get_rank() in [0, 1, 2, 3]:
-                #         print(f'[linguangming] [modeling_fine_grained.py], rank {rank} is not in hidden_states mesh {hidden_states.process_mesh}, skip decoder_layer {idx}')
-                #         comm_activate_tensor = paddle.zeros((1,), dtype=hidden_states.dtype)
-                #         comm_activate_mesh = dist.ProcessMesh([[0, 1, 2, 3]], dim_names=["dp", 'tp'])
-                #         comm_activate_dtensor = dist.shard_tensor(comm_activate_tensor, comm_activate_mesh, [dist.Replicate(), dist.Replicate()])
-                #         comm_activate_tensor.stop_gradient = True
-                #     else:
-                #         print(f'[linguangming] [modeling_fine_grained.py], rank {rank} is not in hidden_states mesh {hidden_states.process_mesh}, skip decoder_layer {idx}')
-                #         comm_activate_tensor = paddle.zeros((1,), dtype=hidden_states.dtype)
-                #         comm_activate_mesh = dist.ProcessMesh([[4, 5, 6, 7]], dim_names=["dp", 'tp'])
-                #         comm_activate_dtensor = dist.shard_tensor(comm_activate_tensor, comm_activate_mesh, [dist.Replicate(), dist.Replicate()])
-                #         comm_activate_tensor.stop_gradient = True
                 
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
@@ -1148,6 +1119,38 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
+                
+            if idx != len(self.layers) - 1 and hidden_states.process_mesh.shape[0] != self.layers[idx + 1].mesh.shape[0] and dist.get_rank() in hidden_states.process_mesh.process_ids:
+                print(f'[linguangming] [modeling_fine_grained.py], layer{idx} -> layer{idx + 1} should call redistributed')
+                from paddlenlp.experimental.galvatron.runtime.redistributed import SpiltBatchFwdGatherBatchBwd, GatherBatchFwdSplitBatchBwd
+                if hidden_states.process_mesh.shape[0] < self.layers[idx + 1].mesh.shape[0]: # dp degree increase
+                    hidden_states = SpiltBatchFwdGatherBatchBwd.apply(hidden_states, self.layers[idx + 1].mesh)
+                elif hidden_states.process_mesh.shape[0] > self.layers[idx + 1].mesh.shape[0]: # dp degree decrease
+                    hidden_states = GatherBatchFwdSplitBatchBwd.apply(hidden_states, self.layers[idx + 1].mesh)
+                    
+            if idx != len(self.layers) - 1 and hidden_states.process_mesh.shape[0] != self.layers[idx + 1].mesh.shape[0] and dist.get_rank() not in hidden_states.process_mesh.process_ids:
+                from paddlenlp.experimental.galvatron.runtime.redistributed import DummyRedistributed
+                if dist.get_rank() in [0, 1, 2, 3]:
+                    print(f'[linguangming] [modeling_fine_grained.py], rank {rank} is not in hidden_states mesh {hidden_states.process_mesh}, skip decoder_layer {idx}')
+                    comm_activate_tensor = paddle.zeros((1,), dtype=hidden_states.dtype)
+                    comm_activate_mesh = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", 'tp'])
+                    comm_activate_dtensor = dist.shard_tensor(comm_activate_tensor, comm_activate_mesh, [dist.Replicate(), dist.Replicate()])
+                    comm_activate_tensor.stop_gradient = True
+                else:
+                    print(f'[linguangming] [modeling_fine_grained.py], rank {rank} is not in hidden_states mesh {hidden_states.process_mesh}, skip decoder_layer {idx}')
+                    # hidden_states = DummyRedistributed.apply(hidden_states, self.layers[idx + 1].mesh)
+                    comm_activate_tensor = paddle.zeros((1,), dtype=hidden_states.dtype)
+                    comm_activate_mesh = dist.ProcessMesh([[1], [2], [3], [4]], dim_names=["dp", 'tp'])
+                    comm_activate_dtensor = dist.shard_tensor(comm_activate_tensor, comm_activate_mesh, [dist.Replicate(), dist.Replicate()])
+                    # comm_activate_tensor.stop_gradient = True
+                    
+                    # rubbish_leaner = nn.Linear(4, 4, bias_attr=False)
+                    # rubbish_leaner.weight = dist.shard_tensor(
+                    #     rubbish_leaner.weight,
+                    #     comm_activate_mesh,
+                    #     [dist.Shard(1), dist.Shard(0)],
+                    # )
+
 
         # norm layer
         hidden_states = self.norm(hidden_states)
