@@ -59,7 +59,7 @@ except:
     flash_attention = None
 
 __all__ = [
-    "get_pp_schedule",
+    "get_llama_pp_schedule",
     "LlamaForCausalLM3DAutoPP",
 ]
 
@@ -146,10 +146,12 @@ def return_args(hidden_states, attention_mask=None, position_ids=None, alibi=Non
 
 
 class LlamaChunk(nn.Layer):
-    def __init__(self, layers=None, is_first=False):
+    def __init__(self, layers=None, is_first=False, is_last=False):
         super(LlamaChunk, self).__init__()
+        assert not (is_first and is_last)
         self.layers = layers
         self.is_first = is_first
+        self.is_last = is_last
 
     def forward(self, *args, **kwargs):
         if self.is_first:
@@ -161,6 +163,13 @@ class LlamaChunk(nn.Layer):
             for idx, (decoder_layer) in enumerate(self.layers):
                 outputs = decoder_layer(outputs)
             return outputs
+        elif self.is_last:
+            outputs = args
+            # decoder layers
+            for idx, (decoder_layer) in enumerate(self.layers):
+                outputs = decoder_layer(outputs)
+            if isinstance(outputs, tuple):
+                outputs = outputs[0]
         else:
             outputs = args
             # decoder layers
@@ -182,9 +191,15 @@ def manual_model_split(model, stage_idx, group, mode, pp_degree):
     def _build_stage(model, stage_idx, group):
         new_model = None
         if stage_idx == 0:  # 第一个model_chunk输入特殊处理
-            new_model = LlamaChunk(layer_lists[:chunk_size], is_first=True)
+            new_model = LlamaChunk(layer_lists[:chunk_size], is_first=True, is_last=False)
+        elif stage_idx == chunk_num - 1:  # 最后一个一个model_chunk输出特殊处理
+            new_model = LlamaChunk(
+                layer_lists[stage_idx * chunk_size : (stage_idx + 1) * chunk_size], is_first=False, is_last=True
+            )
         else:
-            new_model = LlamaChunk(layer_lists[stage_idx * chunk_size : (stage_idx + 1) * chunk_size], is_first=False)
+            new_model = LlamaChunk(
+                layer_lists[stage_idx * chunk_size : (stage_idx + 1) * chunk_size], is_first=False, is_last=False
+            )
         stage = PipelineStage(new_model, stage_idx, chunk_num, group=group)
         return stage
 
@@ -195,7 +210,7 @@ def manual_model_split(model, stage_idx, group, mode, pp_degree):
     return stages
 
 
-def get_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group):
+def get_llama_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group):
     assert mode in ["VPP", "1F1B", "FThenB"]
     stages = manual_model_split(model, group.rank, group, mode, pp_degree)
     if mode == "VPP":
