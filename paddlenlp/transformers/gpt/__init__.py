@@ -15,7 +15,12 @@
 from .configuration import *
 from .modeling import *
 from .modeling_auto import *
-from .modeling_auto_pp import *
+
+try:
+    from .modeling_auto_pp import *
+except (ImportError, ModuleNotFoundError):
+    # Temporarily adapt to the release version of Paddle, which can be removed later.
+    pass
 from .modeling_network import *
 from .modeling_pp import *
 from .tokenizer import *

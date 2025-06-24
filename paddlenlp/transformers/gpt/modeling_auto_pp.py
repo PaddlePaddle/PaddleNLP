@@ -19,23 +19,22 @@ import paddle.distributed as dist
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.distributed import fleet
-from .configuration import GPTConfig
-from paddle.distributed.auto_parallel.pipelining.stage import PipelineStage
-from paddle.distributed.fleet.utils import recompute
-
 from paddle.distributed.auto_parallel.pipelining.schedules import (
     Schedule1F1B,
     ScheduleFThenB,
     ScheduleVPP,
 )
+from paddle.distributed.auto_parallel.pipelining.stage import PipelineStage
+from paddle.distributed.fleet.utils import recompute
 
 from ..model_outputs import BaseModelOutputWithPastAndCrossAttentions
+from .configuration import GPTConfig
 from .modeling_auto import (
     GPTDecoderLayerAuto,
     GPTEmbeddingsAuto,
     GPTLayerNorm,
-    GPTPretrainedModelAuto,
     GPTLMHeadAuto,
+    GPTPretrainedModelAuto,
 )
 
 try:
@@ -98,6 +97,7 @@ def get_mesh(pp_idx=0):
         mesh = mesh.get_mesh_with_dim("pp")[pp_idx]
     return mesh
 
+
 class GPTChunk(nn.Layer):
     def __init__(self, layers=None, is_first=False, is_last=False):
         super(GPTChunk, self).__init__()
@@ -129,7 +129,8 @@ class GPTChunk(nn.Layer):
             for idx, (decoder_layer) in enumerate(self.layers):
                 outputs = decoder_layer(outputs)
         return outputs
-    
+
+
 def manual_model_split(model, stage_idx, group, mode, pp_degree):
 
     num_hidden_layers = model.config.num_hidden_layers
@@ -161,6 +162,7 @@ def manual_model_split(model, stage_idx, group, mode, pp_degree):
         stages.append(stage)
     return stages
 
+
 def get_gpt_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group):
     assert mode in ["VPP", "1F1B", "FThenB"]
     stages = manual_model_split(model, group.rank, group, mode, pp_degree)
@@ -174,7 +176,7 @@ def get_gpt_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group):
 
 
 class GPTDecoderLayerAutoPP(nn.Layer):
-    def __init__(self, config, layer_idx, ipp = None):
+    def __init__(self, config, layer_idx, ipp=None):
         super(GPTDecoderLayerAutoPP, self).__init__()
         self.config = config
         self.layer_idx = layer_idx
@@ -251,9 +253,7 @@ class GPTDecoderLayerAutoPP(nn.Layer):
                 position_ids = position_ids.unsqueeze(0)
                 position_ids = paddle.expand(position_ids, input_shape)
             args = return_args(input_ids, attention_mask, position_ids)
-            hidden_states = self.embeddings(
-                input_ids=input_ids, position_ids=position_ids, inputs_embeddings=None
-            )
+            hidden_states = self.embeddings(input_ids=input_ids, position_ids=position_ids, inputs_embeddings=None)
             length = input_shape[-1]
             cache_length = 0
             causal_mask = self.bias[:, :, cache_length:length, :length]
@@ -270,7 +270,7 @@ class GPTDecoderLayerAutoPP(nn.Layer):
             if attention_mask is not None:
                 attention_mask.stop_gradient = True
             args = return_args(hidden_states, attention_mask, position_ids)
-        
+
         hidden_states, attention_mask, position_ids = parse_args(args)
         all_self_attentions = () if output_attentions else None
         all_hidden_states = () if output_hidden_states else None
@@ -294,7 +294,6 @@ class GPTDecoderLayerAutoPP(nn.Layer):
                 past_key_value=past_key_values,
                 output_attentions=output_attentions,
             )
-        
 
         # outputs = hidden_states if both use_cache and output_attentions are False
         # Otherwise, outputs = (hidden_states, attention if output_attentions, cache if use_cache)
@@ -312,16 +311,18 @@ class GPTDecoderLayerAutoPP(nn.Layer):
             next_cache = next_decoder_cache if use_cache else None
             if not return_dict:
                 temp_list = [output, next_cache, all_hidden_states, all_self_attentions]
-                
+
                 if not (use_cache or output_attentions or output_hidden_states):
                     outputs = output
                 else:
                     outputs = tuple(v for v in temp_list if v is not None)
-            
+
             if self.lm_head is not None:
                 logits = self.lm_head(outputs)
-                ret_args = return_args(logits,)
-                
+                ret_args = return_args(
+                    logits,
+                )
+
         return ret_args
 
 
