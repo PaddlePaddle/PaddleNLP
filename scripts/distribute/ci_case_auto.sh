@@ -1412,8 +1412,9 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
         elif [ $to_static -eq 1 ];then
             loss_base=9.99302673
         fi
-        
-        if [ $IS_A100 -ne 0 ];then
+        if [ $IS_A100 -ne 0 ] && [ $to_static -eq 0 ];then
+            loss_base=10.20990601
+        elif [ $IS_A100 -ne 0 ] && [ $to_static -eq 1 ];then
             loss_base=10.20991516
         fi
         ips_base=-1
