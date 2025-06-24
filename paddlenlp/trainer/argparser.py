@@ -157,7 +157,9 @@ class PdArgumentParser(ArgumentParser):
             elif field.default is dataclasses.MISSING:
                 kwargs["required"] = True
         else:
-            kwargs["type"] = json.loads if field.type is dict else field.type
+            from typing import get_origin
+
+            kwargs["type"] = json.loads if field.type is dict or get_origin(field.type) is dict else field.type
             if field.default is not dataclasses.MISSING:
                 kwargs["default"] = field.default
             elif field.default_factory is not dataclasses.MISSING:
