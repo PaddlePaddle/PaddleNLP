@@ -2112,9 +2112,8 @@ class TrainingArguments:
             self.use_hybrid_parallel = False
 
     def add_moe_comm_group(self):
-        import paddle.base.core as core
-        from fleet.base.topology import message_to_dict
         from paddle.distributed import fleet
+        from paddle.distributed.fleet.base.topology import message2nccl_config
 
         hybrid_configs = fleet.fleet._user_defined_strategy.hybrid_configs
         hcg = fleet.get_hybrid_communicate_group()
@@ -2129,10 +2128,7 @@ class TrainingArguments:
                 rank_indices = list(range(i * self.expert_parallel_degree, (i + 1) * self.expert_parallel_degree))
                 ranks = [ranks_in_current_sharding_group[i] for i in rank_indices]
                 group = dist.new_group(
-                    ranks=ranks,
-                    nccl_config=core.NCCLConfig.create(
-                        **message_to_dict(hybrid_configs["ep_configs"].nccl_config, "ep")
-                    ),
+                    ranks=ranks, nccl_config=message2nccl_config(hybrid_configs["ep_configs"].nccl_config, "ep")
                 )
                 if dist.get_rank() in ranks:
                     assert not hasattr(hcg, "expert_parallel_group"), "expert_parallel_group can not be set repeate"
@@ -2144,9 +2140,7 @@ class TrainingArguments:
                 ranks = [ranks_in_current_sharding_group[i] for i in rank_indices]
                 group = dist.new_group(
                     ranks=ranks,
-                    nccl_config=core.NCCLConfig.create(
-                        **message_to_dict(hybrid_configs["ep_configs"].grad_nccl_config, "ep_grad")
-                    ),
+                    nccl_config=message2nccl_config(hybrid_configs["ep_configs"].grad_nccl_config, "ep_grad"),
                 )
                 if dist.get_rank() in ranks:
                     assert not hasattr(hcg, "expert_grad_comm_group"), "expert_grad_comm_group can not be set repeate"
