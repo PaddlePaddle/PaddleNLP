@@ -17,7 +17,6 @@
 import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
-import paddle.nn.functional as F
 from paddle.distributed import fleet
 from paddle.distributed.auto_parallel.pipelining.schedules import (
     Schedule1F1B,
@@ -27,7 +26,6 @@ from paddle.distributed.auto_parallel.pipelining.schedules import (
 from paddle.distributed.auto_parallel.pipelining.stage import PipelineStage
 from paddle.distributed.fleet.utils import recompute
 
-from ..model_outputs import BaseModelOutputWithPastAndCrossAttentions
 from .configuration import GPTConfig
 from .modeling_auto import (
     GPTDecoderLayerAuto,
