@@ -301,9 +301,9 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
                 echo "result: loss=$loss ips=$ips mem=$mem"
                 
                 if [ -z "$flag" ]; then
-                    loss_base=9.23502579
+                    loss_base=123
                 elif [ "$flag" = "FLAGS_fuse_allreduce_in_opt" ]; then
-                    loss_base=9.23502579
+                    loss_base=123
                 elif [ "$flag" = "FLAGS_fuse_reducescatter_in_opt" ]; then
                     loss_base=9.23504105
                 elif [ "$flag" = "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap" ]; then
