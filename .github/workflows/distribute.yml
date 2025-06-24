@@ -30,7 +30,7 @@ jobs:
     name: distribute-v100-ci
     runs-on: [self-hosted, distribute-v100]
     steps:
-      - name: Download PaddleNLP
+      - name: Download Code
         env:
           work_dir: ${{ github.workspace }}
         run: |
@@ -39,9 +39,6 @@ jobs:
           wget -q --no-proxy  https://paddle-qa.bj.bcebos.com/CodeSync/develop/PaddleNLP.tar --no-check-certificate
           echo "Extracting PaddleNLP.tar.gz"
           tar xf PaddleNLP.tar && rm -rf PaddleNLP.tar
-          # wget -q --no-proxy https://paddle-qa.bj.bcebos.com/paddlenlp/Bos.zip --no-check-certificate
-          # unzip -P "$(cat ${{ github.workspace }}/../../../bos_key)" Bos.zip
-          # mkdir paddlenlp && mv Bos/* ./paddlenlp/
           source ${{ github.workspace }}/../../../proxy
           cd PaddleNLP
           git config --global user.name "PaddleCI"
@@ -95,7 +92,6 @@ jobs:
           ldconfig
           pip config set global.cache-dir "/home/.cache/pip"
           ln -sf $(which python${python_version}) /usr/bin/python
-          python -m pip install bce-python-sdk==0.8.74
           '
           docker exec -t ${{ env.container_name }} /bin/bash -c '
           ldconfig
