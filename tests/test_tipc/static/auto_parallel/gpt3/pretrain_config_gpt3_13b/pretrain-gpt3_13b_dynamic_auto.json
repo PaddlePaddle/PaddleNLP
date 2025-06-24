@@ -37,7 +37,7 @@
     "fuse_attention_ffn": true,
     "fuse_attention_qkv": true,
     "fused_linear_param_grad_add": true,
-    "enable_linear_fused_grad_add": false,
+    "enable_linear_fused_grad_add": true,
     "use_fused_rope": true,
     "use_fused_rms_norm": true,
     "recompute": false,
