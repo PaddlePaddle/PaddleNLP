@@ -704,6 +704,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
         export PYTHONPATH=$root_path/:$PYTHONPATH
         export FLAGS_call_stack_level=3
         export NVIDIA_TF32_OVERRIDE=0
+        export FLAGS_enable_auto_parallel_pipeline_mode=True
 
         task_name="llama_auto_bs8_fp16_dp2mp2pp2_hybrid_pp"
         case_out_dir="output/$task_name"
