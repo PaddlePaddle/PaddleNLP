@@ -79,7 +79,8 @@ class AutoTrainer(Trainer):
                 kwargs.update({"criterion": loss_func})
         self.auto_dist_config = kwargs.pop("auto_dist_config", None)
         model = kwargs.get("model", None)
-        self.model_type = kwargs.pop("model_type", None)
+        if kwargs.get("args", None) is not None and kwargs["args"].model_type:
+            self.model_type = kwargs["args"].model_type
         assert model is not None
         if kwargs.get("args", None) is not None and kwargs["args"].use_intermediate_api:
             if not parallelize.has_parallelized_model:
@@ -102,6 +103,8 @@ class AutoTrainer(Trainer):
         self.global_mesh = fleet.auto.get_mesh()
         self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
         if self.args.pipeline_parallel_degree > 1 and check_auto_parallel_pipeline_support(self.model_type):
+            if self.criterion is None:
+                self.criterion = self.model.criterion
             self.pp_schedule = get_pp_schedule(
                 model,
                 self.model_type,
@@ -722,7 +725,12 @@ class AutoTrainer(Trainer):
         """
         if self.criterion is not None:
             if "labels" in inputs:
-                labels = inputs.pop("labels")
+                # hack fix for ernie
+                input_ids = inputs["input_ids"]
+                if len(input_ids) == 4:
+                    input_ids, labels, data_ids, src_ids = input_ids
+                else:
+                    labels = inputs.pop("labels")
             elif "start_positions" in inputs and "end_positions" in inputs:
                 labels = (inputs.pop("start_positions"), inputs.pop("end_positions"))
             elif self.args.label_names is not None:
@@ -746,6 +754,7 @@ class AutoTrainer(Trainer):
 
         final_loss = None
         if len(losses) != 0:
+            losses = [loss[0] for loss in losses]
             final_loss = paddle.stack(losses).mean()
 
         return final_loss
