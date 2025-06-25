@@ -11,6 +11,7 @@
     "pipeline_schedule_mode": "VPP",
     "pipeline_parallel_degree": 4,
     "virtual_pp_degree": 5,
+    "model_type": "llama_pp",
     "sharding": "stage1",
     "data_parallel_config": "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate",
     "sharding_parallel_config": "enable_overlap enable_tensor_fusion",
