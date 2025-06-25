@@ -2088,7 +2088,9 @@ class TrainingArguments:
             for i in range(self.expert_parallel_degree):
                 rank_indices = list(range(i, self.sharding_parallel_degree, self.expert_parallel_degree))
                 ranks = [ranks_in_current_sharding_group[i] for i in rank_indices]
-                group = dist.new_group(ranks=ranks)
+                group = dist.new_group(
+                    ranks=ranks, nccl_config=message2nccl_config(hybrid_configs["ep_configs"].nccl_config, "ep_grad")
+                )
                 if dist.get_rank() in ranks:
                     assert not hasattr(hcg, "expert_grad_comm_group"), "expert_grad_comm_group can not be set repeate"
                     setattr(hcg, "expert_grad_comm_group", group)
