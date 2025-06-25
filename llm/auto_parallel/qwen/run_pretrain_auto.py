@@ -436,7 +436,9 @@ def main():
     if training_args.enable_linear_fused_grad_add:
         from llm.utils.fused_layers import mock_layers
 
-        mock_layers()
+        mock_layers(
+            mp_async_allreduce=True if "enable_mp_async_allreduce" in training_args.tensor_parallel_config else False
+        )
 
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
