@@ -43,6 +43,7 @@ from paddlenlp.transformers.refined_recompute import (
     get_skip_recompute_ops,
 )
 from paddlenlp.transformers.refined_recompute import recompute as rr_recompute
+from paddlenlp.utils.chunk import subbatch
 from paddlenlp.utils.tools import get_env_device
 
 from .. import linear_utils
@@ -1408,11 +1409,18 @@ class Qwen2PretrainingCriterion(nn.Layer):
         self.ignore_index = getattr(config, "ignore_index", -100)
         self.config = config
         self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
+        self.loss_subbatch_seqlen = self.config.get("loss_subbatch_seqlen", 32768)
 
         if self.enable_parallel_cross_entropy:  # and False: # and lm_head is distributed
             self.loss_func = mpu.ParallelCrossEntropy(ignore_index=self.ignore_index)
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
+
+    def loss_impl(self, prediction_scores, masked_lm_labels):
+        """extract loss impl for subbatch"""
+        prediction_scores = prediction_scores.cast("float32")
+        masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(-1))
+        return masked_lm_loss
 
     def forward(self, prediction_scores, masked_lm_labels):
         if self.enable_parallel_cross_entropy:
@@ -1423,7 +1431,15 @@ class Qwen2PretrainingCriterion(nn.Layer):
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
         with paddle.amp.auto_cast(False):
-            masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
+            prediction_scores_dims = len(prediction_scores.shape)
+            if prediction_scores_dims == 2 and prediction_scores.shape[0] > self.loss_subbatch_seqlen:
+                sb_loss_func = subbatch(self.loss_impl, [0, 1], [0, 0], self.loss_subbatch_seqlen, 0)
+                masked_lm_loss = sb_loss_func(prediction_scores, masked_lm_labels)
+            elif prediction_scores_dims == 3 and prediction_scores.shape[1] > self.loss_subbatch_seqlen:
+                sb_loss_func = subbatch(self.loss_impl, [0, 1], [1, 1], self.loss_subbatch_seqlen, 1)
+                masked_lm_loss = sb_loss_func(prediction_scores, masked_lm_labels)
+            else:
+                masked_lm_loss = self.loss_impl(prediction_scores, masked_lm_labels)
 
             # skip ignore_index which loss == 0
             # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
