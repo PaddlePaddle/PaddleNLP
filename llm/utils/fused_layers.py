@@ -73,15 +73,14 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
 
         task = None
         if _mp_async_allreduce and x_grad.process_mesh is not None:
-            if int(os.getenv("CUDA_DEVICE_MAX_CONNECTIONS", "0")) != 1:
-                if _raise_cuda_env_unset_warning:
-                    logger.warning(
-                        "You set mp_async_allreduce=True, but you forget to set environment "
-                        "variable CUDA_DEVICE_MAX_CONNECTIONS=1, which may leads to performance "
-                        "loss. Try to export CUDA_DEVICE_MAX_CONNECTIONS=1 for better performance."
-                    )
-            global _raise_cuda_env_unset_warning
-            _raise_cuda_env_unset_warning = False
+            if _raise_cuda_env_unset_warning and int(os.getenv("CUDA_DEVICE_MAX_CONNECTIONS", "0")) != 1:
+                logger.warning(
+                    "You set mp_async_allreduce=True, but you forget to set environment "
+                    "variable CUDA_DEVICE_MAX_CONNECTIONS=1, which may leads to performance "
+                    "loss. Try to export CUDA_DEVICE_MAX_CONNECTIONS=1 for better performance."
+                )
+                global _raise_cuda_env_unset_warning
+                _raise_cuda_env_unset_warning = False
             mp_placement_index = x_grad.process_mesh.dim_names.index("mp")
             if mp_placement_index != -1 and x_grad.placements[mp_placement_index].is_partial():
                 hcg = fleet.get_hybrid_communicate_group()
