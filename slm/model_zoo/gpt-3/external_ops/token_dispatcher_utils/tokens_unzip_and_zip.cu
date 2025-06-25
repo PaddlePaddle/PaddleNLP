@@ -747,7 +747,6 @@ std::vector<paddle::Tensor> tokens_zip(
            unzipped_tokens.dtype() == paddle::DataType::FLOAT32);
   const int rows = unzipped_tokens.shape()[0];       // seqlen
   const int cols = unzipped_tokens.shape()[1];       // 一般为7168
-  if(rows==0)return;
   const int topk = expert_routemap_topk.shape()[1];  // 一般为8
 
 
@@ -775,16 +774,18 @@ std::vector<paddle::Tensor> tokens_zip(
                     unzipped_token_probs.stream());
   }
 
-  dispatch_tokens_zip(unzipped_tokens,
-                      zipped_expertwise_rowmap,
-                      expert_routemap_topk,
-                      unzipped_token_probs,
-                      zipped_tokens,
-                      zipped_probs_topk,
-                      total_zipped_tokens_num,
-                      num_experts,
-                      cols,
-                      topk);
+  if(rows != 0){
+    dispatch_tokens_zip(unzipped_tokens,
+                        zipped_expertwise_rowmap,
+                        expert_routemap_topk,
+                        unzipped_token_probs,
+                        zipped_tokens,
+                        zipped_probs_topk,
+                        total_zipped_tokens_num,
+                        num_experts,
+                        cols,
+                        topk);
+  }
   return {zipped_tokens, zipped_probs_topk};
 }
 

@@ -246,7 +246,6 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
   }
   const int rows = X.shape()[0];  // 一般为seqlen
   const int cols = X.shape()[1];  // 一般为7168
-  if(rows==0)return;
   const int quanted_cols = (XScale) ? XScale->shape()[1] : 0;
   /*
   const int max_tokens_per_expert =
@@ -335,21 +334,23 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
                   CUMSUM_INVALID_TAG,
                   sizeof(int) * (cumsum_blocknum + 1) * num_experts,
                   global_expertwise_block_cumsum.stream());
-  dispatch_tokens_unzip_stable(X,
-                               expert_routemap_topk,
-                               expert_prob_topk,
-                               XScale,
-                               expert_offset,
-                               X_unzipped,
-                               zipped_expertwise_rowmap,
-                               token_prob_unzipped,
-                               XScale_unzipped,
-                               global_expertwise_block_cumsum,
-                               rows,
-                               cols,
-                               topk_calculated,
-                               num_experts,
-                               quanted_cols);
+  if(rows != 0){
+    dispatch_tokens_unzip_stable(X,
+                                expert_routemap_topk,
+                                expert_prob_topk,
+                                XScale,
+                                expert_offset,
+                                X_unzipped,
+                                zipped_expertwise_rowmap,
+                                token_prob_unzipped,
+                                XScale_unzipped,
+                                global_expertwise_block_cumsum,
+                                rows,
+                                cols,
+                                topk_calculated,
+                                num_experts,
+                                quanted_cols);
+  }
   return {X_unzipped,
           zipped_expertwise_rowmap,
           token_prob_unzipped,
