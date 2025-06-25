@@ -1277,7 +1277,7 @@ def parse_nccl_config_file(config_dir):
         def get_full_config_from_dict(comm_config):
             assert type(comm_config) is dict
             final_config = {}
-            final_config["commName"] = comm_config.get("commName", "default_name")
+            final_config["commName"] = comm_config.get("name", "default_name")
             final_config["buffsize_align"] = comm_config.get("buffsize_align", 1024)
             final_config["algoStr"] = comm_config.get("algo", "")
             final_config["protoStr"] = comm_config.get("proto", "")
