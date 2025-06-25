@@ -36,6 +36,7 @@ target_lists_for_llm=(
     "paddlenlp/trl"
     "llm"
     "tests/llm"
+    "tests/utils/test_optimizers"
     "csrc"
     "scripts/regression"
 )
