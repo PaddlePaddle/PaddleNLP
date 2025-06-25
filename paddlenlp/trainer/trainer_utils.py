@@ -30,6 +30,7 @@ import threading
 import time
 from contextlib import contextmanager
 from enum import Enum
+from pathlib import Path
 from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
@@ -1265,3 +1266,35 @@ def get_pp_schedule(model, model_type, n_microbatches, loss_fn, mode, pp_degree,
     assert check_auto_parallel_pipeline_support(model_type)
     if model_type == "llama_pp":
         return get_llama_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group)
+
+
+def parse_nccl_config_file(config_dir):
+    json_file = Path(config_dir)
+    if json_file.exists():
+        with open(json_file, "r") as file:
+            data = json.load(file)
+
+        def get_full_config_from_dict(comm_config):
+            assert type(comm_config) is dict
+            final_config = {}
+            final_config["commName"] = comm_config.get("commName", "default_name")
+            final_config["buffsize_align"] = comm_config.get("buffsize_align", 1024)
+            final_config["algoStr"] = comm_config.get("algo", "")
+            final_config["protoStr"] = comm_config.get("proto", "")
+            final_config["nchannels"] = comm_config.get("n_channels", -1)
+            final_config["ll_buffsize"] = comm_config.get("ll_buffsize", -1)
+            final_config["ll128_buffsize"] = comm_config.get("ll128_buffsize", -1)
+            final_config["simple_buffsize"] = comm_config.get("simple_buffsize", -1)
+            if final_config["protoStr"] != "":
+                protos = split_parallel_config(final_config["protoStr"].lower())
+                for proto in ["ll", "ll128", "simple"]:
+                    if proto not in protos:
+                        final_config[(proto + "_buffsize")] = 0
+            return final_config
+
+        for key in data.keys():
+            data[key] = get_full_config_from_dict(data[key])
+
+        return data
+    else:
+        raise FileNotFoundError(f"The argument file {json_file} does not exist.")

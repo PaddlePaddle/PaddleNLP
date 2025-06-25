@@ -39,6 +39,7 @@ from .trainer_utils import (
     OptimizerNames,
     SchedulerType,
     ShardingOption,
+    parse_nccl_config_file,
     split_parallel_config,
 )
 
@@ -1072,6 +1073,9 @@ class TrainingArguments:
         metadata={"help": "是否开启单路sharding时global norm通信拆分全局通信组为pp通信和mp通信分别做"},
     )
 
+    enable_nccl_comm_group_config: Optional[bool] = field(default=False, metadata={"help": "是否启用NCCL中通信组的细粒度控制"})
+    nccl_comm_group_config: Optional[str] = field(default=None, metadata={"help": "NCCL中通信组的细粒度控制的配置文件路径"})
+
     def __post_init__(self):
         world_size = paddle.distributed.get_world_size()
         if in_auto_parallel_align_mode():
@@ -1528,6 +1532,41 @@ class TrainingArguments:
                             self.amp_master_grad
                         ), "If `split_param` in sharding_parallel_config, `amp_master_grad` must be True."
 
+                if self.enable_nccl_comm_group_config:
+                    nccl_config = parse_nccl_config_file(self.nccl_comm_group_config)
+
+                    def set_comm_config(configs, attr, dict_obj):
+                        if strategy.hybrid_configs.get(configs, None) is None or dict_obj is None:
+                            return
+                        if not hasattr(strategy.hybrid_configs[configs], attr):
+                            return
+                        attr_obj = getattr(strategy.hybrid_configs[configs], attr)
+                        for key, value in dict_obj.items():
+                            if hasattr(attr_obj, key):
+                                setattr(attr_obj, key, value)
+
+                    set_comm_config("pp_configs", "coll_nccl_config", nccl_config.get("pp_comm_config", None))
+                    set_comm_config("pp_configs", "p2p_nccl_config", nccl_config.get("pp_p2p_comm_config", None))
+                    set_comm_config("pp_configs", "shared_nccl_config", nccl_config.get("pp_shared_comm_config", None))
+                    set_comm_config("mp_configs", "nccl_config", nccl_config.get("tp_comm_config", None))
+                    set_comm_config("sharding_configs", "nccl_config", nccl_config.get("sharding_comm_config", None))
+                    set_comm_config(
+                        "sharding_configs", "check_nccl_config", nccl_config.get("sharding_check_comm_config", None)
+                    )
+                    set_comm_config("dp_configs", "nccl_config", nccl_config.get("dp_comm_config", None))
+                    set_comm_config(
+                        "dp_configs", "check_nccl_config", nccl_config.get("dp_checking_comm_config", None)
+                    )
+                    set_comm_config("sep_configs", "nccl_config", nccl_config.get("sep_comm_config", None))
+                    set_comm_config("dp_sep_configs", "nccl_config", nccl_config.get("dp_sep_comm_config", None))
+                    set_comm_config("pp_tp_configs", "nccl_config", nccl_config.get("pp_tp_comm_config", None))
+                    set_comm_config("ep_configs", "nccl_config", nccl_config.get("ep_comm_config", None))
+                    set_comm_config(
+                        "moe_sharding_configs", "nccl_config", nccl_config.get("moe_sharding_comm_config", None)
+                    )
+                    set_comm_config(
+                        "default_comm_group_configs", "nccl_config", nccl_config.get("default_comm_config", None)
+                    )
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
 
