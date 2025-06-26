@@ -34,11 +34,7 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
 )
 from paddlenlp.trainer.auto_trainer import AutoTrainer
-from paddlenlp.trainer.trainer_utils import (
-    IntervalStrategy,
-    _get_distributed_seeds,
-    enable_auto_parallel_pipeline,
-)
+from paddlenlp.trainer.trainer_utils import IntervalStrategy, _get_distributed_seeds
 from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
@@ -100,10 +96,6 @@ class PreTrainingArguments(AutoTrainingArguments):
     autotuner_benchmark: bool = field(
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
-    )
-    n_microbatches: int = field(
-        default=1,
-        metadata={"help": "Control the num of microbatches in one pp step."},
     )
 
     def __post_init__(self):
@@ -639,6 +631,23 @@ def main():
         )
 
     data_file = get_train_data_file(data_args)
+    pp_schedule = None
+    if training_args.pipeline_parallel_degree > 1:
+        comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
+        pp_schedule = get_llama_pp_schedule(
+            model,
+            training_args.gradient_accumulation_steps,
+            criterion,
+            training_args.pipeline_schedule_mode,
+            training_args.pipeline_parallel_degree,
+            comm_group_in_pp,
+        )
+        # 自动并行pp，在内部进行编排和acc_step累积
+        training_args.per_device_train_batch_size = (
+            training_args.gradient_accumulation_steps * training_args.gradient_accumulation_steps
+        )
+        training_args.gradient_accumulation_steps = 1
+
     train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
         data_args,
         training_args,
@@ -646,17 +655,6 @@ def main():
         tokenizer,
         need_data=training_args.should_load_dataset,
     )
-    pp_schedule = None
-    if training_args.pipeline_parallel_degree > 1 and enable_auto_parallel_pipeline():
-        comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
-        pp_schedule = get_llama_pp_schedule(
-            model,
-            training_args.n_microbatches,
-            criterion,
-            training_args.pipeline_schedule_mode,
-            training_args.pipeline_parallel_degree,
-            comm_group_in_pp,
-        )
     trainer = PretrainingTrainer(
         model=model,
         pp_schedule=pp_schedule,

@@ -46,7 +46,6 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     ShardingOption,
     TrainOutput,
     _exec_mode_guard,
-    enable_auto_parallel_pipeline,
     get_last_checkpoint,
     has_length,
     speed_metrics,
@@ -100,8 +99,10 @@ class AutoTrainer(Trainer):
 
         self.global_mesh = fleet.auto.get_mesh()
         self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
-        if self.args.pipeline_parallel_degree > 1 and enable_auto_parallel_pipeline():
-            assert self.pp_schedule is not None
+        if not self.args.to_static and self.args.pipeline_parallel_degree > 1 and self.pp_schedule is None:
+            logger.warning(
+                "The training process will use a naive pipeline parallel model. Please check if it meets expectations"
+            )
         self._in_pir_mode = paddle.base.framework.get_flags("FLAGS_enable_pir_api")["FLAGS_enable_pir_api"]
 
     @classmethod
@@ -745,14 +746,14 @@ class AutoTrainer(Trainer):
         self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]
     ) -> paddle.Tensor:
         assert self.args.pipeline_parallel_degree > 1, "pipeline_parallel_degree must be greater than 1."
-        assert enable_auto_parallel_pipeline(), "dynamic auto_parallel pipeline only supports special models"
+        assert self.pp_schedule is not None, "In dynamic auto_parallel pipeline, pp_schedule must not be None"
         with self.autocast_smart_context_manager():
             loss = self.compute_pipeline_loss(model, inputs)
 
         return loss
 
     def dynamic_training(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
-        if self.args.pipeline_parallel_degree > 1 and enable_auto_parallel_pipeline():
+        if self.args.pipeline_parallel_degree > 1 and self.pp_schedule is not None:
             return self.dynamic_auto_parallel_pipeline_training(model, inputs)
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)

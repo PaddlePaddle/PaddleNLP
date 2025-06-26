@@ -704,7 +704,6 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
         export PYTHONPATH=$root_path/:$PYTHONPATH
         export FLAGS_call_stack_level=3
         export NVIDIA_TF32_OVERRIDE=0
-        export FLAGS_enable_auto_parallel_pipeline_mode=True
 
         task_name="llama_auto_bs8_fp16_dp2mp2pp2_hybrid_pp"
         case_out_dir="output/$task_name"
@@ -724,10 +723,9 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
             --intermediate_size 3072 \
             --num_hidden_layers 8 \
             --num_attention_heads 32 \
-            --per_device_train_batch_size 4 \
+            --per_device_train_batch_size 1 \
             --per_device_eval_batch_size 4 \
-            --n_microbatch 4 \
-            --gradient_accumulation_steps 1 \
+            --gradient_accumulation_steps 4 \
             --use_flash_attention 1 \
             --use_fused_rms_norm 0 \
             --fp16 1 \

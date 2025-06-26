@@ -1253,7 +1253,3 @@ def download_recovery_ckpt_from_pdc(recovery_checkpoint_path, timeout):
         raise RuntimeError(
             f"{PDC_DOWNLOAD_ERROR}; Error occurred when trying to download checkpoint from PDC, recovery_checkpoint_path: {recovery_checkpoint_path}, timeout: {timeout}; error details: {PDCErrorMessageMap[result]}"
         )
-
-
-def enable_auto_parallel_pipeline():
-    return strtobool(os.getenv("FLAGS_enable_auto_parallel_pipeline_mode", "False"))
