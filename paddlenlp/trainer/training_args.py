@@ -30,7 +30,11 @@ from typing import Any, Dict, List, Optional
 import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
-from paddle.distributed.fleet.base.topology import message2nccl_config
+
+try:
+    from paddle.distributed.fleet.base.topology import create_nccl_config
+except ImportError:
+    create_nccl_config = None
 
 from ..utils.env import PREFIX_CHECKPOINT_DIR
 from ..utils.log import logger
@@ -2077,9 +2081,12 @@ class TrainingArguments:
             for i in range(experts_replicas):
                 rank_indices = list(range(i * self.expert_parallel_degree, (i + 1) * self.expert_parallel_degree))
                 ranks = [ranks_in_current_sharding_group[i] for i in rank_indices]
-                group = dist.new_group(
-                    ranks=ranks, nccl_config=message2nccl_config(hybrid_configs["ep_configs"].nccl_config, "ep")
-                )
+                if create_nccl_config is not None and hybrid_configs.get("ep_configs", None) is not None:
+                    group = dist.new_group(
+                        ranks=ranks, nccl_config=create_nccl_config(hybrid_configs["ep_configs"].nccl_config, "ep")
+                    )
+                else:
+                    group = dist.new_group(ranks=ranks)
                 if dist.get_rank() in ranks:
                     assert not hasattr(hcg, "expert_parallel_group"), "expert_parallel_group can not be set repeate"
                     setattr(hcg, "expert_parallel_group", group)
@@ -2088,9 +2095,13 @@ class TrainingArguments:
             for i in range(self.expert_parallel_degree):
                 rank_indices = list(range(i, self.sharding_parallel_degree, self.expert_parallel_degree))
                 ranks = [ranks_in_current_sharding_group[i] for i in rank_indices]
-                group = dist.new_group(
-                    ranks=ranks, nccl_config=message2nccl_config(hybrid_configs["ep_configs"].nccl_config, "ep_grad")
-                )
+                if create_nccl_config is not None and hybrid_configs.get("ep_configs", None) is not None:
+                    group = dist.new_group(
+                        ranks=ranks,
+                        nccl_config=create_nccl_config(hybrid_configs["ep_configs"].nccl_config, "ep_grad"),
+                    )
+                else:
+                    group = dist.new_group(ranks=ranks)
                 if dist.get_rank() in ranks:
                     assert not hasattr(hcg, "expert_grad_comm_group"), "expert_grad_comm_group can not be set repeate"
                     setattr(hcg, "expert_grad_comm_group", group)
