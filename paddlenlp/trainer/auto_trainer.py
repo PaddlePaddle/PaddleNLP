@@ -729,8 +729,7 @@ class AutoTrainer(Trainer):
                 # hack fix for ernie
                 labels = inputs.pop("labels")
                 if len(input_ids) == 4:
-                    input_ids = inputs["input_ids"]
-                    input_ids, labels, _, _ = input_ids
+                    input_ids, labels, _, _ = inputs["input_ids"]
             elif "start_positions" in inputs and "end_positions" in inputs:
                 labels = (inputs.pop("start_positions"), inputs.pop("end_positions"))
             elif self.args.label_names is not None:
