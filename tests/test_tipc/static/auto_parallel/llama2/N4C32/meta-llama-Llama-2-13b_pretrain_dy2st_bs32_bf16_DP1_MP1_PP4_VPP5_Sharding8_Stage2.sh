@@ -18,7 +18,6 @@ param+="device_num=N4C32 "
 param+="global_batch_size=32 "
 param+="nnodes=4 "
 param+="model_type=llama2_13b "
-export FLAGS_enable_auto_parallel_pipeline_mode=True
 
 cd ./tests
 bash ./test_tipc/static/auto_parallel/llama2/benchmark_common/prepare.sh
