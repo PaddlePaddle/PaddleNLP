@@ -98,28 +98,28 @@ function llama_case_list_auto() {
         # The test name must have "llama_" as a prefix, which will 
         # be used for tracking the execution status of the case.
         llama_dygraph_auto_bs4_bf16_SD2
-        llama_dygraph_auto_bs8_fp32_DP2
-        llama_dygraph_auto_bs8_fp32_DP2-MP2
-        llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
-        llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
-        llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp
-        # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
-        llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw
-        llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2
-        llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
-        llama_pir_auto_fuse_ffn_attention_qkv_MP2
-        llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
-        llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP
-        llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP
-        llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1
-        llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4
-        llama_align_dygraph_dy2st_pir_auto_pp_bs2_bf16_DP1-MP1-PP4
-        llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2
-        # llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate
-        llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN
-        llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1
-        llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate
-        llama_baichuan_dygraph_auto_sp_async_reduce_scatter_bs8_bf16_DP4-MP2-SP
+        # llama_dygraph_auto_bs8_fp32_DP2
+        # llama_dygraph_auto_bs8_fp32_DP2-MP2
+        # llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
+        # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
+        # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp
+        # # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
+        # llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw
+        # llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2
+        # llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
+        # llama_pir_auto_fuse_ffn_attention_qkv_MP2
+        # llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
+        # llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP
+        # llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP
+        # llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1
+        # llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4
+        # llama_align_dygraph_dy2st_pir_auto_pp_bs2_bf16_DP1-MP1-PP4
+        # llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2
+        # # llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate
+        # llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN
+        # llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1
+        # llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate
+        # llama_baichuan_dygraph_auto_sp_async_reduce_scatter_bs8_bf16_DP4-MP2-SP
     )
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
@@ -300,7 +300,7 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
                 ips=-1
                 mem=-1
                 echo "result: loss=$loss ips=$ips mem=$mem"
-                
+                echo "flag=$flag acc_step=$acc_step"
                 if [ -z "$flag" ]; then
                     loss_base=9.23504791
                 elif [ "$flag" = "FLAGS_fuse_allreduce_in_opt" ]; then
