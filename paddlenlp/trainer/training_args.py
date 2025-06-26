@@ -32,9 +32,9 @@ import paddle.distributed as dist
 from paddle.distributed import fleet
 
 try:
-    from paddle.distributed.fleet.base.topology import create_nccl_config
+    from paddle.distributed.fleet.base.topology import message2nccl_config
 except ImportError:
-    create_nccl_config = None
+    message2nccl_config = None
 
 from ..utils.env import PREFIX_CHECKPOINT_DIR
 from ..utils.log import logger
@@ -1550,28 +1550,24 @@ class TrainingArguments:
                             if hasattr(attr_obj, key):
                                 setattr(attr_obj, key, value)
 
-                    set_comm_config("pp_configs", "coll_nccl_config", nccl_config.get("pp_comm_config", None))
-                    set_comm_config("pp_configs", "p2p_nccl_config", nccl_config.get("pp_p2p_comm_config", None))
-                    set_comm_config("pp_configs", "shared_nccl_config", nccl_config.get("pp_shared_comm_config", None))
-                    set_comm_config("mp_configs", "nccl_config", nccl_config.get("tp_comm_config", None))
-                    set_comm_config("sharding_configs", "nccl_config", nccl_config.get("sharding_comm_config", None))
+                    set_comm_config("pp_configs", "coll_nccl_config", nccl_config.get("pp", None))
+                    set_comm_config("pp_configs", "p2p_nccl_config", nccl_config.get("pp_p2p", None))
+                    set_comm_config("pp_configs", "shared_nccl_config", nccl_config.get("pp_shared", None))
+                    set_comm_config("mp_configs", "nccl_config", nccl_config.get("tp", None))
+                    set_comm_config("sharding_configs", "nccl_config", nccl_config.get("sharding", None))
+                    set_comm_config("sharding_configs", "check_nccl_config", nccl_config.get("sharding_check", None))
+                    set_comm_config("dp_configs", "nccl_config", nccl_config.get("dp", None))
+                    set_comm_config("dp_configs", "check_nccl_config", nccl_config.get("dp_check", None))
+                    set_comm_config("sep_configs", "nccl_config", nccl_config.get("sep", None))
+                    set_comm_config("dp_sep_configs", "nccl_config", nccl_config.get("dp_sep", None))
+                    set_comm_config("pp_tp_configs", "nccl_config", nccl_config.get("pp_tp", None))
+                    set_comm_config("ep_configs", "nccl_config", nccl_config.get("ep", None))
+                    set_comm_config("ep_configs", "grad_nccl_config", nccl_config.get("ep_grad", None))
+                    set_comm_config("moe_sharding_configs", "nccl_config", nccl_config.get("moe_sharding", None))
                     set_comm_config(
-                        "sharding_configs", "check_nccl_config", nccl_config.get("sharding_check_comm_config", None)
+                        "moe_sharding_configs", "check_nccl_config", nccl_config.get("moe_sharding_check", None)
                     )
-                    set_comm_config("dp_configs", "nccl_config", nccl_config.get("dp_comm_config", None))
-                    set_comm_config(
-                        "dp_configs", "check_nccl_config", nccl_config.get("dp_checking_comm_config", None)
-                    )
-                    set_comm_config("sep_configs", "nccl_config", nccl_config.get("sep_comm_config", None))
-                    set_comm_config("dp_sep_configs", "nccl_config", nccl_config.get("dp_sep_comm_config", None))
-                    set_comm_config("pp_tp_configs", "nccl_config", nccl_config.get("pp_tp_comm_config", None))
-                    set_comm_config("ep_configs", "nccl_config", nccl_config.get("ep_comm_config", None))
-                    set_comm_config(
-                        "moe_sharding_configs", "nccl_config", nccl_config.get("moe_sharding_comm_config", None)
-                    )
-                    set_comm_config(
-                        "default_comm_group_configs", "nccl_config", nccl_config.get("default_comm_config", None)
-                    )
+                    set_comm_config("default_comm_group_configs", "nccl_config", nccl_config.get("default", None))
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
 
@@ -2081,9 +2077,9 @@ class TrainingArguments:
             for i in range(experts_replicas):
                 rank_indices = list(range(i * self.expert_parallel_degree, (i + 1) * self.expert_parallel_degree))
                 ranks = [ranks_in_current_sharding_group[i] for i in rank_indices]
-                if create_nccl_config is not None and hybrid_configs.get("ep_configs", None) is not None:
+                if message2nccl_config is not None and hybrid_configs.get("ep_configs", None) is not None:
                     group = dist.new_group(
-                        ranks=ranks, nccl_config=create_nccl_config(hybrid_configs["ep_configs"].nccl_config, "ep")
+                        ranks=ranks, nccl_config=message2nccl_config(hybrid_configs["ep_configs"].nccl_config, "ep")
                     )
                 else:
                     group = dist.new_group(ranks=ranks)
@@ -2095,10 +2091,10 @@ class TrainingArguments:
             for i in range(self.expert_parallel_degree):
                 rank_indices = list(range(i, self.sharding_parallel_degree, self.expert_parallel_degree))
                 ranks = [ranks_in_current_sharding_group[i] for i in rank_indices]
-                if create_nccl_config is not None and hybrid_configs.get("ep_configs", None) is not None:
+                if message2nccl_config is not None and hybrid_configs.get("ep_configs", None) is not None:
                     group = dist.new_group(
                         ranks=ranks,
-                        nccl_config=create_nccl_config(hybrid_configs["ep_configs"].nccl_config, "ep_grad"),
+                        nccl_config=message2nccl_config(hybrid_configs["ep_configs"].grad_nccl_config, "ep_grad"),
                     )
                 else:
                     group = dist.new_group(ranks=ranks)

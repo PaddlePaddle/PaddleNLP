@@ -1269,6 +1269,7 @@ def get_pp_schedule(model, model_type, n_microbatches, loss_fn, mode, pp_degree,
     elif model_type == "gpt_pp":
         return get_gpt_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group)
 
+
 def parse_nccl_config_file(config_dir):
     json_file = Path(config_dir)
     if json_file.exists():
@@ -1277,20 +1278,30 @@ def parse_nccl_config_file(config_dir):
 
         def get_full_config_from_dict(comm_config):
             assert type(comm_config) is dict
+            min_val = {
+                "ll_buffsize": 2**15,  # 32KB
+                "ll128_buffsize": 2**17,  # 128KB
+                "simple_buffsize": 2**17,  # 128KB
+            }
             final_config = {}
-            final_config["commName"] = comm_config.get("name", "default_name")
+
+            # if user does not set group name, use the default name set by Paddle
+            if comm_config.get("name", None) is not None:
+                final_config["commName"] = comm_config.get["name"]
             final_config["buffsize_align"] = comm_config.get("buffsize_align", 1024)
             final_config["algoStr"] = comm_config.get("algo", "")
             final_config["protoStr"] = comm_config.get("proto", "")
             final_config["nchannels"] = comm_config.get("n_channels", -1)
-            final_config["ll_buffsize"] = comm_config.get("ll_buffsize", -1)
-            final_config["ll128_buffsize"] = comm_config.get("ll128_buffsize", -1)
-            final_config["simple_buffsize"] = comm_config.get("simple_buffsize", -1)
+            final_config["ll_buffsize"] = min(comm_config.get("ll_buffsize", -1), min_val["ll_buffsize"])
+            final_config["ll128_buffsize"] = min(comm_config.get("ll128_buffsize", -1), min_val["ll128_buffsize"])
+            final_config["simple_buffsize"] = min(comm_config.get("simple_buffsize", -1), min_val["simple_buffsize"])
+            # set the buffer size of unused protocols to the minimum value
             if final_config["protoStr"] != "":
                 protos = split_parallel_config(final_config["protoStr"].lower())
                 for proto in ["ll", "ll128", "simple"]:
                     if proto not in protos:
-                        final_config[(proto + "_buffsize")] = 0
+                        final_config[(proto + "_buffsize")] = min_val[(proto + "_buffsize")]
+
             return final_config
 
         for key in data.keys():
@@ -1299,4 +1310,3 @@ def parse_nccl_config_file(config_dir):
         return data
     else:
         raise FileNotFoundError(f"The argument file {json_file} does not exist.")
-
