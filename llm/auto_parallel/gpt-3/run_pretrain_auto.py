@@ -38,6 +38,7 @@ from paddlenlp.transformers import (
     CosineAnnealingWithWarmupDecay,
     GPTConfig,
     GPTForCausalLMAuto,
+    GPTForCausalLMAutoPP,
     GPTForCausalLMNet,
     GPTPretrainingCriterionAuto,
     GPTPretrainingCriterionNet,
@@ -48,6 +49,7 @@ from paddlenlp.utils.tools import get_env_device
 
 MODEL_CLASSES = {
     "gpt": (GPTConfig, GPTForCausalLMAuto, GPTPretrainingCriterionAuto),
+    "gpt_pp": (GPTConfig, GPTForCausalLMAutoPP, GPTPretrainingCriterionAuto),
     "gpt_network": (GPTConfig, GPTForCausalLMNet, GPTPretrainingCriterionNet),
 }
 
@@ -98,6 +100,10 @@ class PreTrainingArguments(AutoTrainingArguments):
     autotuner_benchmark: bool = field(
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
+    )
+    n_microbatches: int = field(
+        default=1,
+        metadata={"help": "Control the num of microbatches in one pp step."},
     )
     pre_alloc_memory: float = field(
         default=0.0,
@@ -601,6 +607,7 @@ def main():
 
     trainer = PretrainingTrainer(
         model=model,
+        model_type=model_args.model_type,
         criterion=criterion,
         args=training_args,
         data_collator=data_collator,

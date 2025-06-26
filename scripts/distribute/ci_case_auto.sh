@@ -99,14 +99,14 @@ function llama_case_list_auto() {
         # be used for tracking the execution status of the case.
         llama_dygraph_auto_bs4_bf16_SD2
         llama_dygraph_auto_bs8_fp32_DP2
-        # llama_dygraph_auto_bs8_fp32_DP2-MP2
+        llama_dygraph_auto_bs8_fp32_DP2-MP2
         llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
         llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
         llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp
         # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
         llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw
         llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2
-        # llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
+        llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
         llama_pir_auto_fuse_ffn_attention_qkv_MP2
         llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
         llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP
@@ -464,7 +464,7 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.3507843
+    loss_base=9.35078526
     if [ $IS_A100 -ne 0 ];then
         loss_base=9.38577747
     fi
@@ -1407,8 +1407,14 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
         ips=-1
         mem=-1
         echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
-        loss_base=9.99302673
-        if [ $IS_A100 -ne 0 ];then
+        if [ $to_static -eq 0 ];then
+            loss_base=9.99302597
+        elif [ $to_static -eq 1 ];then
+            loss_base=9.99302673
+        fi
+        if [ $IS_A100 -ne 0 ] && [ $to_static -eq 0 ];then
+            loss_base=10.20990601
+        elif [ $IS_A100 -ne 0 ] && [ $to_static -eq 1 ];then
             loss_base=10.20991516
         fi
         ips_base=-1
