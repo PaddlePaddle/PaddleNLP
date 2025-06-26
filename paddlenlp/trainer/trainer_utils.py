@@ -1257,11 +1257,7 @@ def download_recovery_ckpt_from_pdc(recovery_checkpoint_path, timeout):
 
 
 def check_auto_parallel_pipeline_support(model_type=None):
-<<<<<<< ernie_pp
-    support_types = ["llama_pp","ernie_pp"]
-=======
-    support_types = ["llama_pp", "gpt_pp"]
->>>>>>> develop
+    support_types = ["llama_pp", "gpt_pp","ernie_pp"]
     return model_type in support_types
 
 
@@ -1269,11 +1265,8 @@ def get_pp_schedule(model, model_type, n_microbatches, loss_fn, mode, pp_degree,
     assert check_auto_parallel_pipeline_support(model_type)
     if model_type == "llama_pp":
         return get_llama_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group)
-<<<<<<< ernie_pp
-    if model_type == "ernie_pp":
-        # PaddleNLP cannot import ernie model, instead use llama_schedule
-        return get_llama_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group)
-=======
     elif model_type == "gpt_pp":
         return get_gpt_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group)
->>>>>>> develop
+    elif model_type == "ernie_pp":
+        # PaddleNLP cannot import ernie model, instead use llama_schedule
+        return get_llama_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group)
