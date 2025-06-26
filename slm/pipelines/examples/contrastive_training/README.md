@@ -261,6 +261,28 @@ MTEB-Retrieval 数据集, NDCG@10分数：
 | LLARA-passage               |  52.48   |  47.51  |    26.13     |        37.26         |  44.12  | 81.09  |  43.98   |  69.17   |  45.49  |  37.07   | 61.76  |     82.29      |  17.30  |  76.07  |   36.73    |   81.30   |
 
 
+## 模型剪枝
+
+模型剪枝脚本 `shortgpt_prune.py`，用于评估并移除大语言模型中重要性较低的层，以生成一个更小、更高效的模型。该脚本采用“块影响”度量来计算层的重要性，并直接在内存中完成剪枝和保存，流程高效。
+
+### 使用方法
+
+通过以下命令执行剪枝脚本。可指定原始模型、输出路径、要剪枝的层数以及模型中transformer层的路径。
+
+```bash
+python shortgpt_prune.py \
+    --model_name_or_path meta-llama/Llama-2-7b \
+    --output_model_path ./pruned-Llama-2-7b \
+    --n_prune_layers 9 \
+    --layers_path "model.layers"
+```
+
+### 主要参数说明
+
+  - `--model_name_or_path`: 原始模型的名称或本地路径。
+  - `--output_model_path`: 剪枝后模型的保存路径。
+  - `--n_prune_layers`: 希望移除的层数。脚本会自动找出最不重要的N层。
+  - `--layers_path`: 模型对象中指向transformer层列表的点分隔路径（例如Llama为`"model.layers"`）。
 
 ## Reference
 
