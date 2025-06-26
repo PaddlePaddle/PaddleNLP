@@ -1,9 +1,9 @@
 name: LLM CI
 
 on:
-  push:
-    branches: [develop, release/*]
   pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [develop]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
