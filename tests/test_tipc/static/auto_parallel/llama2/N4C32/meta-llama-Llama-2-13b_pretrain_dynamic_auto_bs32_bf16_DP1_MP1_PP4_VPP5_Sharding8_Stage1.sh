@@ -26,6 +26,7 @@ export FLAGS_fuse_reducescatter_in_opt=1
 # Enable tensor fusion and sharding overlap optimization
 export FLAGS_enable_tensor_fusion=1
 export FLAGS_enable_sharding_overlap=1
+export FLAGS_enable_auto_parallel_pipeline_mode=True
 
 cd ./tests
 bash ./test_tipc/static/auto_parallel/llama2/benchmark_common/prepare.sh
