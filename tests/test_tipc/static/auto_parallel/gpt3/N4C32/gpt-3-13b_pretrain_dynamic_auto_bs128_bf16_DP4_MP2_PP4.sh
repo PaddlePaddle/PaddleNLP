@@ -19,7 +19,6 @@ param+="global_batch_size=128 "
 param+="nnodes=4 "
 param+="model_type=gpt3_13b "
 param+='dynamic_auto=_dynamic_auto '
-export FLAGS_enable_auto_parallel_pipeline_mode=True
 
 cd ./tests
 bash ./test_tipc/static/auto_parallel/gpt3/benchmark_common/prepare.sh

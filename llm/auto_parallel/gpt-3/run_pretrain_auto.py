@@ -595,7 +595,7 @@ def main():
         )
 
     pp_schedule = None
-    if training_args.pipeline_parallel_degree > 1:
+    if training_args.pipeline_parallel_degree > 1 and model_args.model_type == "gpt_pp":
         comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
         pp_schedule = get_gpt_pp_schedule(
             model,

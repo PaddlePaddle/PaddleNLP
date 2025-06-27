@@ -632,7 +632,7 @@ def main():
 
     data_file = get_train_data_file(data_args)
     pp_schedule = None
-    if training_args.pipeline_parallel_degree > 1:
+    if training_args.pipeline_parallel_degree > 1 and model_args.model_type == "llama_pp":
         comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
         pp_schedule = get_llama_pp_schedule(
             model,
