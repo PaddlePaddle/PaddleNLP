@@ -1078,8 +1078,9 @@ class TrainingArguments:
         metadata={"help": "是否开启单路sharding时global norm通信拆分全局通信组为pp通信和mp通信分别做"},
     )
 
-    enable_nccl_comm_group_config: Optional[bool] = field(default=False, metadata={"help": "是否启用NCCL中通信组的细粒度控制"})
-    nccl_comm_group_config: Optional[str] = field(default=None, metadata={"help": "NCCL中通信组的细粒度控制的配置文件路径"})
+    nccl_comm_group_config: Optional[str] = field(
+        default=None, metadata={"help": "NCCL中通信组的细粒度控制的配置文件路径, 默认值为None, 代表不启用此项配置"}
+    )
 
     def __post_init__(self):
         world_size = paddle.distributed.get_world_size()
@@ -1537,7 +1538,7 @@ class TrainingArguments:
                             self.amp_master_grad
                         ), "If `split_param` in sharding_parallel_config, `amp_master_grad` must be True."
 
-                if self.enable_nccl_comm_group_config:
+                if self.nccl_comm_group_config is not None:
                     nccl_config = parse_nccl_config_file(self.nccl_comm_group_config)
 
                     def set_comm_config(configs, attr, dict_obj):

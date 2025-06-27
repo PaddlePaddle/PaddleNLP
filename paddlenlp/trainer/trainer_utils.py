@@ -1292,9 +1292,24 @@ def parse_nccl_config_file(config_dir):
             final_config["algoStr"] = comm_config.get("algo", "")
             final_config["protoStr"] = comm_config.get("proto", "")
             final_config["nchannels"] = comm_config.get("n_channels", -1)
-            final_config["ll_buffsize"] = min(comm_config.get("ll_buffsize", -1), min_val["ll_buffsize"])
-            final_config["ll128_buffsize"] = min(comm_config.get("ll128_buffsize", -1), min_val["ll128_buffsize"])
-            final_config["simple_buffsize"] = min(comm_config.get("simple_buffsize", -1), min_val["simple_buffsize"])
+
+            # ll part
+            # -1 means using the default value
+            final_config["ll_buffsize"] = comm_config.get("ll_buffsize", -1)
+            # keep the buffsize > the min value
+            if final_config["ll_buffsize"] != -1:
+                final_config["ll_buffsize"] = max(final_config["ll_buffsize"], min_val["ll_buffsize"])
+
+            # ll128 part
+            final_config["ll128_buffsize"] = comm_config.get("ll128_buffsize", -1)
+            if final_config["ll128_buffsize"] != -1:
+                final_config["ll128_buffsize"] = max(final_config["ll128_buffsize"], min_val["ll128_buffsize"])
+
+            # simple part
+            final_config["simple_buffsize"] = comm_config.get("simple_buffsize", -1)
+            if final_config["simple_buffsize"] != -1:
+                final_config["simple_buffsize"] = max(final_config["simple_buffsize"], min_val["simple_buffsize"])
+
             # set the buffer size of unused protocols to the minimum value
             if final_config["protoStr"] != "":
                 protos = split_parallel_config(final_config["protoStr"].lower())
