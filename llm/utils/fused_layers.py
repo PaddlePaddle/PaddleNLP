@@ -38,7 +38,6 @@ else:
 
 
 def sync_allreduce(task, dist_tensor, mp_placement_index):
-    # set dist_tensor's mp placment to replicate
     new_placments = list()
     for idx, placment in enumerate(dist_tensor.placements):
         if idx == mp_placement_index:
