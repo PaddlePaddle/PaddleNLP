@@ -25,7 +25,7 @@ import types
 import warnings
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import paddle
 import paddle.distributed as dist
@@ -1071,6 +1071,66 @@ class TrainingArguments:
         default=False,
         metadata={"help": "是否开启单路sharding时global norm通信拆分全局通信组为pp通信和mp通信分别做"},
     )
+    pipeline_parallel_nccl_config: Optional[Dict[str, Dict[str, Union[int, str]]]] = field(
+        default=None,
+        metadata={
+            "help": "nccl config of pipeline paralle",
+        },
+    )
+    tensor_parallel_nccl_config: Optional[Dict[str, Dict[str, Union[int, str]]]] = field(
+        default=None,
+        metadata={
+            "help": "nccl config of tensor parallel",
+        },
+    )
+    sharding_parallel_nccl_config: Optional[Dict[str, Dict[str, Union[int, str]]]] = field(
+        default=None,
+        metadata={
+            "help": "nccl config of sharding parallel",
+        },
+    )
+    sequence_parallel_nccl_config: Optional[Dict[str, Dict[str, Union[int, str]]]] = field(
+        default=None,
+        metadata={
+            "help": "nccl config of sequence parallel",
+        },
+    )
+    data_parallel_nccl_config: Optional[Dict[str, Dict[str, Union[int, str]]]] = field(
+        default=None,
+        metadata={
+            "help": "nccl config of data parallel",
+        },
+    )
+    data_sequence_parallel_nccl_config: Optional[Dict[str, Dict[str, Union[int, str]]]] = field(
+        default=None,
+        metadata={
+            "help": "nccl config of data sequence parallel",
+        },
+    )
+    pipeline_tensor_parallel_nccl_config: Optional[Dict[str, Dict[str, Union[int, str]]]] = field(
+        default=None,
+        metadata={
+            "help": "nccl config of pipeline tensor parallel",
+        },
+    )
+    expert_parallel_nccl_config: Optional[Dict[str, Dict[str, Union[int, str]]]] = field(
+        default=None,
+        metadata={
+            "help": "nccl config of expert parallel",
+        },
+    )
+    moe_sharding_parallel_nccl_config: Optional[Dict[str, Dict[str, Union[int, str]]]] = field(
+        default=None,
+        metadata={
+            "help": "nccl config of moe sharding parallel",
+        },
+    )
+    default_comm_group_nccl_config: Optional[Dict[str, Dict[str, Union[int, str]]]] = field(
+        default=None,
+        metadata={
+            "help": "nccl config of the first comm group",
+        },
+    )
 
     def __post_init__(self):
         world_size = paddle.distributed.get_world_size()
@@ -1527,6 +1587,33 @@ class TrainingArguments:
                         assert (
                             self.amp_master_grad
                         ), "If `split_param` in sharding_parallel_config, `amp_master_grad` must be True."
+
+                def set_protobuf_from_dict(meg, dict_obj):
+                    if dict_obj is not None:
+                        for key, value in dict_obj.items():
+                            if hasattr(meg, key):
+                                for k, v in value.items():
+                                    if hasattr(getattr(meg, key), k):
+                                        setattr(getattr(meg, key), k, v)
+
+                set_protobuf_from_dict(strategy.hybrid_configs["pp_configs"], self.pipeline_parallel_nccl_config)
+                set_protobuf_from_dict(strategy.hybrid_configs["mp_configs"], self.tensor_parallel_nccl_config)
+                set_protobuf_from_dict(strategy.hybrid_configs["sharding_configs"], self.sharding_parallel_nccl_config)
+                set_protobuf_from_dict(strategy.hybrid_configs["dp_configs"], self.data_parallel_nccl_config)
+                set_protobuf_from_dict(strategy.hybrid_configs["sep_configs"], self.sequence_parallel_nccl_config)
+                set_protobuf_from_dict(
+                    strategy.hybrid_configs["dp_sep_configs"], self.data_sequence_parallel_nccl_config
+                )
+                set_protobuf_from_dict(
+                    strategy.hybrid_configs["pp_tp_configs"], self.pipeline_tensor_parallel_nccl_config
+                )
+                set_protobuf_from_dict(strategy.hybrid_configs["ep_configs"], self.expert_parallel_nccl_config)
+                set_protobuf_from_dict(
+                    strategy.hybrid_configs["moe_sharding_configs"], self.moe_sharding_parallel_nccl_config
+                )
+                set_protobuf_from_dict(
+                    strategy.hybrid_configs["default_comm_group_configs"], self.default_comm_group_nccl_config
+                )
 
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
@@ -2025,6 +2112,10 @@ class TrainingArguments:
             self.use_hybrid_parallel = False
 
     def add_moe_comm_group(self):
+        from paddle.distributed import fleet
+        from paddle.distributed.fleet.base.topology import message2nccl_config
+
+        hybrid_configs = fleet.fleet._user_defined_strategy.hybrid_configs
         hcg = fleet.get_hybrid_communicate_group()
         topo = hcg._topo
         sharding_parallel_groups = topo.get_comm_list("sharding")
@@ -2036,7 +2127,9 @@ class TrainingArguments:
             for i in range(experts_replicas):
                 rank_indices = list(range(i * self.expert_parallel_degree, (i + 1) * self.expert_parallel_degree))
                 ranks = [ranks_in_current_sharding_group[i] for i in rank_indices]
-                group = dist.new_group(ranks=ranks)
+                group = dist.new_group(
+                    ranks=ranks, nccl_config=message2nccl_config(hybrid_configs["ep_configs"].nccl_config, "ep")
+                )
                 if dist.get_rank() in ranks:
                     assert not hasattr(hcg, "expert_parallel_group"), "expert_parallel_group can not be set repeate"
                     setattr(hcg, "expert_parallel_group", group)
@@ -2045,7 +2138,10 @@ class TrainingArguments:
             for i in range(self.expert_parallel_degree):
                 rank_indices = list(range(i, self.sharding_parallel_degree, self.expert_parallel_degree))
                 ranks = [ranks_in_current_sharding_group[i] for i in rank_indices]
-                group = dist.new_group(ranks=ranks)
+                group = dist.new_group(
+                    ranks=ranks,
+                    nccl_config=message2nccl_config(hybrid_configs["ep_configs"].grad_nccl_config, "ep_grad"),
+                )
                 if dist.get_rank() in ranks:
                     assert not hasattr(hcg, "expert_grad_comm_group"), "expert_grad_comm_group can not be set repeate"
                     setattr(hcg, "expert_grad_comm_group", group)
