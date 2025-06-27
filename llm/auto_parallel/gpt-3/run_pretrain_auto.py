@@ -607,7 +607,7 @@ def main():
         )
         # 自动并行pp，在内部进行编排和acc_step累积
         training_args.per_device_train_batch_size = (
-            training_args.gradient_accumulation_steps * training_args.gradient_accumulation_steps
+            training_args.per_device_train_batch_size * training_args.gradient_accumulation_steps
         )
         training_args.gradient_accumulation_steps = 1
 
