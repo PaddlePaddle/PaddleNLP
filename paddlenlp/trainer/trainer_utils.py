@@ -1287,7 +1287,7 @@ def parse_nccl_config_file(config_dir):
 
             # if user does not set group name, use the default name set by Paddle
             if comm_config.get("name", None) is not None:
-                final_config["commName"] = comm_config.get["name"]
+                final_config["commName"] = comm_config["name"]
             final_config["buffsize_align"] = comm_config.get("buffsize_align", 1024)
             final_config["algoStr"] = comm_config.get("algo", "")
             final_config["protoStr"] = comm_config.get("proto", "")
