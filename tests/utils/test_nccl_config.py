@@ -19,6 +19,11 @@ from paddle.distributed import fleet
 
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 
+try:
+    from paddle.distributed import create_nccl_config
+except ImportError:
+    create_nccl_config = None
+
 nccl_config = """
 {
     "default": {
@@ -44,6 +49,9 @@ class TestNcclConfig(unittest.TestCase):
         Path("/tmp/config.json").write_text(nccl_config)
 
     def test_nccl_config(self):
+        # paddle version does not match
+        if create_nccl_config is None:
+            return
         args_dict = {"output_dir": self.output_path, "nccl_comm_group_config": self.nccl_config_path}
 
         parser = PdArgumentParser((TrainingArguments,))
