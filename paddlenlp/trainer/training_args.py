@@ -44,7 +44,7 @@ from .trainer_utils import (
     OptimizerNames,
     SchedulerType,
     ShardingOption,
-    parse_nccl_config_file,
+    init_nccl_config,
     split_parallel_config,
 )
 
@@ -1539,7 +1539,7 @@ class TrainingArguments:
                         ), "If `split_param` in sharding_parallel_config, `amp_master_grad` must be True."
 
                 if self.nccl_comm_group_config is not None:
-                    strategy = self._init_nccl_config(strategy)
+                    strategy = init_nccl_config(self.nccl_comm_group_config, strategy)
 
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
@@ -2079,37 +2079,6 @@ class TrainingArguments:
         logger.info(
             f"experts groups are created, expert_parallel_group: {hcg.expert_parallel_group}, expert_grad_comm_group: {hcg.expert_grad_comm_group}"
         )
-
-    def _init_nccl_config(self, strategy):
-        nccl_config = parse_nccl_config_file(self.nccl_comm_group_config)
-
-        def set_comm_config(configs, attr, dict_obj):
-            if strategy.hybrid_configs.get(configs, None) is None or dict_obj is None:
-                return
-            if not hasattr(strategy.hybrid_configs[configs], attr):
-                return
-            attr_obj = getattr(strategy.hybrid_configs[configs], attr)
-            for key, value in dict_obj.items():
-                if hasattr(attr_obj, key):
-                    setattr(attr_obj, key, value)
-
-        set_comm_config("pp_configs", "coll_nccl_config", nccl_config.get("pp", None))
-        set_comm_config("pp_configs", "p2p_nccl_config", nccl_config.get("pp_p2p", None))
-        set_comm_config("pp_configs", "shared_nccl_config", nccl_config.get("pp_shared", None))
-        set_comm_config("mp_configs", "nccl_config", nccl_config.get("tp", None))
-        set_comm_config("sharding_configs", "nccl_config", nccl_config.get("sharding", None))
-        set_comm_config("sharding_configs", "check_nccl_config", nccl_config.get("sharding_check", None))
-        set_comm_config("dp_configs", "nccl_config", nccl_config.get("dp", None))
-        set_comm_config("dp_configs", "check_nccl_config", nccl_config.get("dp_check", None))
-        set_comm_config("sep_configs", "nccl_config", nccl_config.get("sep", None))
-        set_comm_config("dp_sep_configs", "nccl_config", nccl_config.get("dp_sep", None))
-        set_comm_config("pp_tp_configs", "nccl_config", nccl_config.get("pp_tp", None))
-        set_comm_config("ep_configs", "nccl_config", nccl_config.get("ep", None))
-        set_comm_config("ep_configs", "grad_nccl_config", nccl_config.get("ep_grad", None))
-        set_comm_config("moe_sharding_configs", "nccl_config", nccl_config.get("moe_sharding", None))
-        set_comm_config("moe_sharding_configs", "check_nccl_config", nccl_config.get("moe_sharding_check", None))
-        set_comm_config("default_comm_group_configs", "nccl_config", nccl_config.get("default", None))
-        return strategy
 
     def __str__(self):
         self_as_dict = asdict(self)

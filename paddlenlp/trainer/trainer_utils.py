@@ -1325,3 +1325,35 @@ def parse_nccl_config_file(config_dir):
         return data
     else:
         raise FileNotFoundError(f"The argument file {json_file} does not exist.")
+
+
+def init_nccl_config(nccl_comm_group_config, strategy):
+    nccl_config = parse_nccl_config_file(nccl_comm_group_config)
+
+    def set_comm_config(configs, attr, dict_obj):
+        if strategy.hybrid_configs.get(configs, None) is None or dict_obj is None:
+            return
+        if not hasattr(strategy.hybrid_configs[configs], attr):
+            return
+        attr_obj = getattr(strategy.hybrid_configs[configs], attr)
+        for key, value in dict_obj.items():
+            if hasattr(attr_obj, key):
+                setattr(attr_obj, key, value)
+
+    set_comm_config("pp_configs", "coll_nccl_config", nccl_config.get("pp", None))
+    set_comm_config("pp_configs", "p2p_nccl_config", nccl_config.get("pp_p2p", None))
+    set_comm_config("pp_configs", "shared_nccl_config", nccl_config.get("pp_shared", None))
+    set_comm_config("mp_configs", "nccl_config", nccl_config.get("tp", None))
+    set_comm_config("sharding_configs", "nccl_config", nccl_config.get("sharding", None))
+    set_comm_config("sharding_configs", "check_nccl_config", nccl_config.get("sharding_check", None))
+    set_comm_config("dp_configs", "nccl_config", nccl_config.get("dp", None))
+    set_comm_config("dp_configs", "check_nccl_config", nccl_config.get("dp_check", None))
+    set_comm_config("sep_configs", "nccl_config", nccl_config.get("sep", None))
+    set_comm_config("dp_sep_configs", "nccl_config", nccl_config.get("dp_sep", None))
+    set_comm_config("pp_tp_configs", "nccl_config", nccl_config.get("pp_tp", None))
+    set_comm_config("ep_configs", "nccl_config", nccl_config.get("ep", None))
+    set_comm_config("ep_configs", "grad_nccl_config", nccl_config.get("ep_grad", None))
+    set_comm_config("moe_sharding_configs", "nccl_config", nccl_config.get("moe_sharding", None))
+    set_comm_config("moe_sharding_configs", "check_nccl_config", nccl_config.get("moe_sharding_check", None))
+    set_comm_config("default_comm_group_configs", "nccl_config", nccl_config.get("default", None))
+    return strategy
