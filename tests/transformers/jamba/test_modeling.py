@@ -36,7 +36,7 @@ from paddlenlp.transformers.jamba.modeling import (
     repeat_kv,
 )
 
-from ...testing_utils import slow
+from ...testing_utils import skip_for_none_ce_case, slow
 
 # from ..generation import GenerationTesterMixin
 from ..test_configuration_common import ConfigTester
@@ -589,6 +589,7 @@ class JambaModelTest(ModelTesterMixin, unittest.TestCase):
             and down_weight.grad.sum() == 0
         )
 
+    @skip_for_none_ce_case
     def test_from_hf_hub(self):
         model_id = "ai21labs/Jamba-tiny-random"
         model = JambaForCausalLM.from_pretrained(model_id, dtype="bfloat16", from_hf_hub=True, convert_from_torch=True)

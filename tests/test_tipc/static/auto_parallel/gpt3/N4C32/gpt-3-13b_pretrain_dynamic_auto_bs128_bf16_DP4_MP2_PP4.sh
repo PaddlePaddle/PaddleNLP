@@ -1,4 +1,4 @@
-# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-param="model_item=intermediate_api_meta-llama-Llama-2-7b_pretrain_dy2st "
-param+="run_mode=Sharding32_Stage2 "
+param="model_item=gpt-3-13b_pretrain_dynamic_auto "
+param+="run_mode=DP4_MP2_PP4 "
 param+="device_num=N4C32 "
-param+="global_batch_size=32 "
+param+="global_batch_size=128 "
 param+="nnodes=4 "
-param+="model_type=llama2_7b "
-param+='intermediate_api=intermediate_api_ '
-export FLAGS_use_cinn=0
+param+="model_type=gpt3_13b "
+param+='dynamic_auto=_dynamic_auto '
 
 cd ./tests
-bash ./test_tipc/static/auto_parallel/llama2/benchmark_common/prepare.sh
+bash ./test_tipc/static/auto_parallel/gpt3/benchmark_common/prepare.sh
 
-bash -c "${param} bash ./test_tipc/static/auto_parallel/llama2/benchmark_common/run_benchmark.sh"
+bash -c "${param} bash ./test_tipc/static/auto_parallel/gpt3/benchmark_common/run_benchmark.sh"

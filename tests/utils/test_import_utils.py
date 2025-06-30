@@ -16,8 +16,11 @@ import unittest
 
 from paddlenlp.utils import install_package, uninstall_package
 
+from ..testing_utils import skip_for_none_ce_case
+
 
 class ImportUntilsTest(unittest.TestCase):
+    @skip_for_none_ce_case
     def test_install_specific_package(self):
         install_package("loguru", "0.6.0")
         from loguru import __version__

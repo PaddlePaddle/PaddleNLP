@@ -868,6 +868,10 @@ class TrainingArguments:
         default="adamw",
         metadata={"help": "The optimizer to use."},
     )
+    use_lowprecision_moment: bool = field(
+        default=False,
+        metadata={"help": "AdamW use 16bit moment as model parameter."},
+    )
     report_to: Optional[List[str]] = field(
         default=None, metadata={"help": "The list of integrations to report the results and logs to."}
     )
@@ -995,6 +999,16 @@ class TrainingArguments:
     offload_optim: Optional[bool] = field(
         default=False,
         metadata={"help": "Offload optimizer after optimizer.step()"},
+    )
+    tensorwise_offload_optimizer: Optional[bool] = field(
+        default=False,
+        metadata={
+            "help": (
+                "Offload all optimizer states to CPU memory. "
+                "The corresponding parameters will only be loaded to GPU during optimizer step, "
+                "which reduces GPU memory usage but may increase step time."
+            )
+        },
     )
     save_sharding_stage1_model_include_freeze_params: Optional[bool] = field(
         default=False, metadata={"help": "Save Sharding Stage1 Model Exclude Freeze Params"}
@@ -1506,12 +1520,6 @@ class TrainingArguments:
                         assert (
                             "split_param" in sharding_parallel_config
                         ), "split_param should be set when enable_stage1_allgather_overlap."
-                        use_casual_mask = os.getenv("USE_CASUAL_MASK", "False")
-                        assert use_casual_mask, "enable_stage1_allgather_overlap requires USE_CASUAL_MASK=True."
-                        assert self.logging_steps > 1, (
-                            "The logging_steps should be greater than 1 for enable_stage1_allgather_overlap, "
-                            f"but got logging_steps={self.logging_steps}."
-                        )
 
                     if "split_param" in sharding_parallel_config:
                         if ShardingOption.SHARD_OP not in self.sharding:

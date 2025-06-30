@@ -153,6 +153,8 @@ for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`
             fi
         elif [[ ${dir1} =~ "csrc" ]];then # 推理改动
             Build_list[${dir1}]="paddlenlp_ops" # 影响推理编包
+        elif [[ ${dir1} =~ "requirements" ]];then # 依赖改动
+            Build_list[${dir1}]="paddlenlp" # 影响paddlenlp编包
         else
             continue
         fi
