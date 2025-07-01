@@ -675,6 +675,21 @@ class ShardingIO:
             moe_sharding_degree = parallel_config.get("moe_sharding_degree", 1)
             assert tp_degree * sharding_degree == ep_degree * moe_sharding_degree, "mismatch parallel degree settings"
 
+    def check_same_strategy(self, resume_from_checkpoint=None):
+        if resume_from_checkpoint:
+            cur_config = self._get_distributed_strategy()
+            old_config = self._load_model_meta_impl(resume_from_checkpoint)["parallel_config"]
+            keys = list(old_config.keys())
+            for key in keys:
+                if key not in cur_config:
+                    return False, f"missing {key}"
+                else:
+                    old_value = old_config[key]
+                    cur_value = cur_config[key]
+                    if old_value != cur_value:
+                        return False, f"{key} not match: {old_value} vs {cur_value}"
+        return True, None
+
     def _get_distributed_strategy(self):
         pp_degree = 1
         mp_degree = 1
