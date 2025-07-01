@@ -29,6 +29,9 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
 
+from ..transformers.segment_parallel_utils import split_inputs_sequence_dim
+from ..transformers.context_parallel_utils import split_sequence_dim_load_balance
+
 from ..transformers.model_utils import unwrap_model
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
@@ -129,6 +132,7 @@ class AutoTrainer(Trainer):
             "data_sharding_parallel": training_args.dataset_world_size > 1,
             "sharding": training_args.sharding,
             "sharding_mesh_dim": training_args.sharding_parallel_mesh_dimension,
+            "context_parallel": training_args.context_parallel_degree > 1 or training_args.sep_parallel_degree > 1,
         }
         auto_dist_config = model._generate_auto_dist_config(auto_dist_degree)
         model = parallelize.parallelize_model(
@@ -544,8 +548,17 @@ class AutoTrainer(Trainer):
                 for inputs in inputs_list:
                     if step_control % args.gradient_accumulation_steps == 0:
                         self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
-                        self.timers and self.timers("forward-backward").start()
-
+                        self.timers and self.timers("forward-backward").start()                    
+                    if (
+                        self.args.sep_parallel_degree > 1
+                        and self.args.split_inputs_sequence_dim
+                    ):
+                        inputs = split_inputs_sequence_dim(inputs)
+                    if (
+                        self.args.context_parallel_degree > 1
+                        and self.args.split_inputs_sequence_dim
+                    ):
+                        inputs = split_sequence_dim_load_balance(inputs)
                     tr_loss_step = self.training_step(model, inputs)
 
                     with _exec_mode_guard("dynamic"):
@@ -714,6 +727,14 @@ class AutoTrainer(Trainer):
             self.scaler.scale(loss).backward()
         else:
             loss.backward()
+        # print(f'222 dynamic_training')
+        # for name, param in model.named_parameters():
+        #     if hasattr(param, "main_grad") and param.main_grad is not None:
+        #         grad_value = param.main_grad.numpy()
+        #         print(f"{name}: shape={grad_value.shape}, sample_values={grad_value.flatten()[:10]}")
+        #     elif hasattr(param, "grad") and param.grad is not None:
+        #         grad_value = param.grad.numpy()
+        #         print(f"{name}: 22shape={grad_value.shape}, sample_values={grad_value.flatten()[:10]}")
 
         return loss
 

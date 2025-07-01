@@ -27,6 +27,9 @@
 
 import paddle
 from paddle.distributed.fleet import fleet
+from paddle.distributed.auto_parallel.ring_attention import (
+    shard_seq_load_balance,
+)
 
 
 def split_inputs_sequence_dim_load_balance(inputs, rank=None, degree=None):
@@ -67,26 +70,17 @@ def split_sequence_dim_load_balance(inputs):
     '''
     for auto_parallel mode
     '''
-    if inputs is None:
-        return inputs
-    placements = inputs.placements
-    process_mesh = inputs.process_mesh
-    cp_index = process_mesh.dim_names.index('sep')  # get the axis for the split
-    cp_degree = process_mesh.shape[cp_index]
-    if cp_degree > 1:
-        # split
-        sliced_datas = paddle.split(
-            inputs, num_or_sections=cp_degree * 2, axis=-1
-        )
-        # resort [q0,q1,q2,q3] -> [q0,q3,q1,q2]
-        indices = []
-        for i in range(cp_degree):
-            indices.append(i)
-            indices.append(cp_degree * 2 - 1 - i)
-        reorder_indices = indices
-        reordered = [sliced_datas[i] for i in reorder_indices]
-        reordered_tensor = paddle.concat(reordered, axis=-1)
-        # reshard q/k/v -> Shard(seq_dim)
-        placements[cp_index] = paddle.distributed.Shard(1)  # seq_dim:1
-        inputs = paddle.distributed.reshard(reordered_tensor, process_mesh, placements)
-    return inputs
+    if isinstance(inputs, paddle.Tensor):
+        return shard_seq_load_balance(inputs,1)
+    elif isinstance(inputs, dict):
+        res = {}
+        for k, tensor in inputs.items():
+            res[k] = shard_seq_load_balance(tensor, 1)
+    elif isinstance(inputs, list):
+        res = []
+        for tensor in inputs:
+            res.append(shard_seq_load_balance(tensor, 1))
+    else:
+        raise ValueError(f"the inputs should be a list or a dict, but is type: {type(inputs)}")
+    return res
+

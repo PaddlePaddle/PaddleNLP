@@ -15,6 +15,7 @@
 """Paddle Llama model"""
 from __future__ import annotations
 
+import numpy as np
 import math
 import os
 import warnings
@@ -54,8 +55,6 @@ from paddlenlp.transformers.model_outputs import (
 )
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 from paddlenlp.utils.tools import get_env_device
-from paddlenlp.transformers.segment_parallel_utils import split_sequence_dim
-from paddlenlp.transformers.context_parallel_utils import split_sequence_dim_load_balance
 
 from . import fusion_ops
 from .configuration import (
@@ -203,9 +202,14 @@ def scaled_dot_product_attention(
         return (attn_output, attn_weights) if output_attentions else attn_output
 
 
-colwise_placements = [dist.Replicate(), dist.Replicate(), dist.Shard(1)] #dp,sep,mp
-rowise_placement = [dist.Replicate(), dist.Replicate(), dist.Shard(0)]
+def get_colwise_placement(has_seq_mesh):
+    return [dist.Replicate(), dist.Replicate(), dist.Shard(1)] if has_seq_mesh else [dist.Replicate(), dist.Shard(1)]
 
+def get_rowwise_placement(has_seq_mesh):
+    return [dist.Replicate(), dist.Replicate(), dist.Shard(0)] if has_seq_mesh else [dist.Replicate(), dist.Shard(0)]
+
+def get_replicate_placement(has_seq_mesh):
+    return [dist.Replicate(), dist.Replicate(), dist.Replicate()] if has_seq_mesh else [dist.Replicate(), dist.Replicate()]
 
 class LlamaRMSNormAuto(nn.Layer):
     def __init__(self, config, ipp):
@@ -217,13 +221,15 @@ class LlamaRMSNormAuto(nn.Layer):
             default_initializer=nn.initializer.Constant(1.0),
         )
         self.ipp = ipp
+        self.config = config
+        has_seq_mesh = self.config.context_parallel_degree > 1 or self.config.sep_parallel_degree > 1
         self.weight = dist.shard_tensor(
             self.weight,
             get_mesh(self.ipp),
-            [dist.Replicate(), dist.Replicate(), dist.Replicate()],
+            get_replicate_placement(has_seq_mesh),
         )
         self.variance_epsilon = config.rms_norm_eps
-        self.config = config
+        
 
     def forward(self, hidden_states):
         if self.config.use_fused_rms_norm:
@@ -249,34 +255,35 @@ class LlamaMLPAuto(nn.Layer):
         self.fuse_attention_ffn = config.fuse_attention_ffn
         self.ipp = ipp
         self.config = config
+        has_seq_mesh = self.config.context_parallel_degree > 1 or self.config.sep_parallel_degree > 1
 
         if config.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass():
             self.gate_up_fused_proj = nn.Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
             self.gate_up_fused_proj.weight = dist.shard_tensor(
                 self.gate_up_fused_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                get_colwise_placement(has_seq_mesh),
             )
         else:
             self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.gate_proj.weight = dist.shard_tensor(
                 self.gate_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                get_colwise_placement(has_seq_mesh),
             )
 
             self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.up_proj.weight = dist.shard_tensor(
                 self.up_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                get_colwise_placement(has_seq_mesh),
             )
 
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
         self.down_proj.weight = dist.shard_tensor(
             self.down_proj.weight,
             get_mesh(self.ipp),
-            rowise_placement,
+            get_rowwise_placement(has_seq_mesh),,
         )
 
     def forward(self, x):
@@ -317,6 +324,7 @@ class LlamaAttentionAuto(nn.Layer):
         self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
         self.ipp = ipp
+        self.has_seq_mesh = self.config.context_parallel_degree > 1 or self.config.sep_parallel_degree > 1
 
         self.use_fused_rope = config.use_fused_rope
         if self.use_fused_rope and get_env_device() not in ["npu", "mlu", "xpu", "gcu", "intel_hpu"]:
@@ -336,7 +344,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.qkv_proj.weight = dist.shard_tensor(
                 self.qkv_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                get_colwise_placement(self.has_seq_mesh),
             )
 
         else:
@@ -348,7 +356,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.q_proj.weight = dist.shard_tensor(
                 self.q_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                get_colwise_placement(self.has_seq_mesh),
             )
 
             self.k_proj = nn.Linear(
@@ -359,7 +367,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.k_proj.weight = dist.shard_tensor(
                 self.k_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                get_colwise_placement(self.has_seq_mesh),
             )
 
             self.v_proj = nn.Linear(
@@ -370,7 +378,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.v_proj.weight = dist.shard_tensor(
                 self.v_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                get_colwise_placement(self.has_seq_mesh),
             )
 
         self.o_proj = nn.Linear(
@@ -381,7 +389,7 @@ class LlamaAttentionAuto(nn.Layer):
         self.o_proj.weight = dist.shard_tensor(
             self.o_proj.weight,
             get_mesh(self.ipp),
-            rowise_placement,
+            get_rowwise_placement(self.has_seq_mesh),
         )
 
         if config.rope:
@@ -433,12 +441,13 @@ class LlamaAttentionAuto(nn.Layer):
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] or [seq_len / n, bs, num_head * head_dim] (if sequence_parallel)
         # enter tp region
+        # print(f'hidden_states1111:{hidden_states}')
         if self.config.sequence_parallel:
             # [seq_len / n, bs, num_head * head_dim] -> [seq_len, bs, num_head * head_dim] (if sequence_parallel)
             hidden_states = dist.reshard(
                 hidden_states,
                 get_mesh(self.ipp),
-                [dist.Shard(1), dist.Replicate(), dist.Replicate()],
+                [dist.Shard(1), dist.Replicate(), dist.Replicate()] if self.has_seq_mesh else [dist.Shard(1), dist.Replicate()],
             )
 
         if self.fuse_attention_qkv and not enable_fuse_ffn_qkv_pass():
@@ -471,10 +480,7 @@ class LlamaAttentionAuto(nn.Layer):
 
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-3]
-        # logger.info(f'query_states:{query_states}')
-        logger.info(f'self.config.rope:{self.config.rope}')
         if self.config.rope:
-            logger.info(f'position_ids:{position_ids}')
             if self.config.context_parallel_degree > 1:
                 mesh = dist.auto_parallel.get_mesh()
                 group = mesh._get_group("sep")
@@ -487,61 +493,47 @@ class LlamaAttentionAuto(nn.Layer):
                     (chunk_num - rank - 1) * chunk_size, (chunk_num - rank) * chunk_size, dtype="int64"
                 )
                 position_ids = paddle.concat([first_chunk_ids, second_chunk_ids]).expand((batch_size, seq_length))
-                
+                position_ids = dist.auto_parallel.api.dtensor_from_local(
+                    position_ids, query_states.process_mesh, query_states.placements
+                )
+                # print(f'after position_ids:{position_ids}, position_ids local:{position_ids._local_value()}')
             if self.use_fused_rope:
-                # TODO: check if position_ids should change
-                assert past_key_value is None, "fuse rotary not support cache kv for now"
-                batch_size, seq_length, num_heads, head_dim = query_states._local_shape
-                _, kv_seq_len, num_key_value_heads, _ = key_states._local_shape
-                if self.config.context_parallel_degree > 1:
-                    kv_seq_len *= self.config.context_parallel_degree
-                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-                # logger.info(f'kv_seq_len:{kv_seq_len}, seq_length:{seq_length},cos :{cos}, sin:{sin}')
-
-                paddle_version = float(paddle.__version__[:3])
-                if ((paddle_version != 0.0) and (paddle_version <= 2.6)) and (num_heads != num_key_value_heads):
-                    query_states, _, _ = fused_rotary_position_embedding(
+                # print(f'past_key_value:{past_key_value},query_states._local_value:{query_states._local_value().shape}')
+                # base_query_states = paddle.load(f'{paddle.distributed.get_rank()}_query_states.pdparams')
+                # base_value_states = paddle.load(f'{paddle.distributed.get_rank()}_value_states.pdparams')
+                # base_key_states = paddle.load(f'{paddle.distributed.get_rank()}_key_states.pdparams')
+                # base_query_states = dist.auto_parallel.api.dtensor_from_local(
+                #     base_query_states, query_states.process_mesh, query_states.placements
+                # )
+                # base_value_states = dist.auto_parallel.api.dtensor_from_local(
+                #     base_value_states, value_states.process_mesh, value_states.placements
+                # )
+                # base_key_states = dist.auto_parallel.api.dtensor_from_local(
+                #     base_key_states, key_states.process_mesh, key_states.placements
+                # )
+                # print(f'key_value:{key_states},query_states._local_value:{query_states._local_value().shape}')
+                query_states, key_states = fusion_ops.fusion_rope(
+                    query_states,
+                    key_states,
+                    value_states,
+                    hidden_states,
+                    position_ids,
+                    past_key_value,
+                    self.rotary_emb,
+                    self.config.context_parallel_degree,
+                )
+                # logger.info(f'222new_query_states:{query_states._local_value()}, new_key_states:{key_states._local_value()}')
+                if self.has_seq_mesh:
+                    query_states = dist.reshard(
                         query_states,
-                        None,
-                        None,
-                        sin=sin,
-                        cos=cos,
-                        position_ids=position_ids,
-                        use_neox_rotary_style=False,
+                        get_mesh(self.ipp),
+                        [dist.Shard(0),  dist.Shard(1), dist.Shard(2)],
                     )
-                    key_states, _, _ = fused_rotary_position_embedding(
+                    key_states = dist.reshard(
                         key_states,
-                        None,
-                        None,
-                        sin=sin,
-                        cos=cos,
-                        position_ids=position_ids,
-                        use_neox_rotary_style=False,
+                        get_mesh(self.ipp),
+                        [dist.Shard(0),  dist.Shard(1), dist.Shard(2)],
                     )
-                else:
-                    # local_query_states = dist.auto_parallel.api.dtensor_to_local(
-                    #     query_states, mesh, query_states.placements
-                    # )
-                    # local_key_states = dist.auto_parallel.api.dtensor_to_local(
-                    #     key_states, mesh, key_states.placements
-                    # )
-                    new_query_states, new_key_states, _ = fused_rotary_position_embedding(
-                        query_states._local_value(),
-                        key_states._local_value(),
-                        v=None,
-                        sin=sin,
-                        cos=cos,
-                        position_ids=position_ids,
-                        use_neox_rotary_style=False,
-                    )
-                    query_states = dist.auto_parallel.api.dtensor_from_local(
-                        new_query_states, query_states.process_mesh, query_states.placements
-                    )
-                    key_states = dist.auto_parallel.api.dtensor_from_local(
-                        new_key_states, key_states.process_mesh, query_states.placements
-                    )
-                    query_states.stop_gradient = False
-                    key_states.stop_gradient = False
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 # hack here, because elementwise infer spmd not support broadcast now
@@ -568,11 +560,12 @@ class LlamaAttentionAuto(nn.Layer):
             value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         attention_mask = (
-            dist.reshard(attention_mask, get_mesh(self.ipp), [dist.Shard(0), dist.Replicate(), dist.Replicate()])
+            dist.reshard(attention_mask, get_mesh(self.ipp), [dist.Shard(0), dist.Replicate(), dist.Replicate()] if self.has_seq_mesh else [dist.Shard(0), dist.Replicate()])
             if attention_mask is not None
             else None
         )
-        alibi = dist.reshard(alibi, get_mesh(self.ipp), [dist.Shard(0), dist.Replicate(), dist.Shard(1)]) if alibi is not None else None
+        alibi_placement = [dist.Shard(0), dist.Replicate(), dist.Shard(1)]) if self.has_seq_mesh else [dist.Shard(0), dist.Shard(1)]
+        alibi = dist.reshard(alibi, get_mesh(self.ipp), alibi_placement) if alibi is not None else None
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
             self.enable_recompute
@@ -618,7 +611,7 @@ class LlamaAttentionAuto(nn.Layer):
             attn_output = dist.reshard(
                 attn_output,
                 get_mesh(self.ipp),
-                [dist.Shard(1), dist.Replicate(), dist.Shard(0)],
+                [dist.Shard(1), dist.Replicate(), dist.Shard(0)] if self.has_seq_mesh else [dist.Shard(1), dist.Shard(0)],
             )
         if not output_attentions:
             attn_weights = None
@@ -729,11 +722,12 @@ class LlamaDecoderLayerAuto(nn.Layer):
         hidden_states = self.post_attention_layernorm(hidden_states)
 
         # enter tp region
+        has_seq_mesh = self.config.context_parallel_degree > 1 or self.sep_parallel_degree > 1
         if self.config.sequence_parallel:
             hidden_states = dist.reshard(
                 hidden_states,
                 get_mesh(self.ipp),
-                [dist.Shard(1), dist.Replicate(), dist.Replicate()],
+                [dist.Shard(1), dist.Replicate(), dist.Replicate()] if has_seq_mesh else [dist.Shard(1), dist.Replicate()],
             )
 
         hidden_states = self.mlp(hidden_states)
@@ -743,7 +737,7 @@ class LlamaDecoderLayerAuto(nn.Layer):
             hidden_states = dist.reshard(
                 hidden_states,
                 get_mesh(self.ipp),
-                [dist.Shard(1), dist.Replicate(), dist.Shard(0)],
+                [dist.Shard(1), dist.Replicate(), dist.Shard(0)] if has_seq_mesh else [dist.Shard(1), dist.Shard(0)],
             )
 
         hidden_states = residual + hidden_states
@@ -909,21 +903,6 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
-        self.embed_tokens = nn.Embedding(
-            self.vocab_size,
-            self.hidden_size,
-        )
-
-        embedding_placements = (
-            [dist.Replicate(), dist.Replicate(), dist.Shard(1)]
-            if self.config.tensor_parallel_degree > 1
-            else [dist.Replicate(), dist.Replicate(), dist.Replicate()]
-        )
-        self.embed_tokens.weight = dist.shard_tensor(
-            self.embed_tokens.weight,
-            get_mesh(),
-            embedding_placements,
-        )
 
         def get_layer_pp_info(layer_index):
             mesh = fleet.auto.get_mesh()
@@ -948,6 +927,10 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
         self.gradient_checkpointing = False
 
+        self.embed_tokens = nn.Embedding(
+            self.vocab_size,
+            self.hidden_size,
+        )
         self.placements = None
         if (
             self.config.context_parallel_degree > 1
@@ -959,11 +942,25 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                 if self.config.sequence_parallel
                 else [dist.Shard(0), dist.Shard(1), dist.Replicate()]
             )
+            embedding_placements = (
+                [dist.Replicate(), dist.Replicate(), dist.Shard(1)]
+                if self.config.tensor_parallel_degree > 1
+                else [dist.Replicate(), dist.Replicate(), dist.Replicate()]
+            )
         else:
             self.placements = (
                 [dist.Shard(1), dist.Replicate(), dist.Shard(0)] if self.config.sequence_parallel else [dist.Shard(0), dist.Replicate(), dist.Replicate()]
             )
-        
+            embedding_placements = (
+                [dist.Replicate(), dist.Shard(1)]
+                if self.config.tensor_parallel_degree > 1
+                else [dist.Replicate(), dist.Replicate()]
+            )
+        self.embed_tokens.weight = dist.shard_tensor(
+            self.embed_tokens.weight,
+            get_mesh(),
+            embedding_placements,
+        )
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1127,7 +1124,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                     dist.reshard(
                         attention_mask,
                         get_mesh(ipp),
-                        [dist.Replicate(), dist.Replicate(), dist.Replicate()],
+                        [dist.Replicate() for _ in range(len(get_mesh(ipp)._shape))],
                     )
                     if attention_mask is not None
                     else None
@@ -1136,7 +1133,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                     dist.reshard(
                         alibi,
                         get_mesh(ipp),
-                        [dist.Replicate(), dist.Replicate(), dist.Replicate()],
+                        [dist.Replicate() for _ in range(len(get_mesh(ipp)._shape))],
                     )
                     if alibi is not None
                     else None
@@ -1204,6 +1201,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             cross_attentions=None,
         )
 
+
 class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
     """
     Criterion for Llama.
@@ -1219,10 +1217,6 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
         self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
     def forward(self, prediction_scores, masked_lm_labels):
-        if self.config.sep_parallel_degree > 1:
-            masked_lm_labels = split_sequence_dim(masked_lm_labels)
-        if self.config.context_parallel_degree > 1:
-            masked_lm_labels = split_sequence_dim_load_balance(masked_lm_labels)
         if self.enable_parallel_cross_entropy:
             if prediction_scores.shape[-1] == self.config.vocab_size:
                 warnings.warn(
@@ -1243,14 +1237,6 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                     prediction_scores.astype("float32"),
                     masked_lm_labels.unsqueeze(2),
                 )
-            if self.config.sep_parallel_degree > 1 or self.config.context_parallel_degree > 1:
-                # logger.info(f'LlamaPretrainingCriterion3DAuto get_mesh(-1):{get_mesh(-1)}')
-                # logger.info(f'masked_lm_loss:{masked_lm_loss}')
-                masked_lm_loss = dist.reshard(
-                    masked_lm_loss,
-                    get_mesh(-1),
-                    [dist.Replicate(), dist.Replicate(), dist.Replicate()],
-                )
 
             # XPU dose not support allgather mask with bool dtype, so we use local_map here.
             if get_env_device() == "xpu":
@@ -1260,6 +1246,7 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                     loss = paddle.mean(masked_lm_loss).unsqueeze(0)
                     return loss.unsqueeze(0)
 
+                dp_placement = [dist.Shard(0), dist.Replicate(), dist.Replicate()] if self.config.context_parallel_degree > 1 or self.config.sep_parallel_degree > 1 else [dist.Shard(0), dist.Replicate()]
                 out_dist_attrs = [
                     [dist.Shard(0), dist.Replicate()],
                 ]
@@ -1284,6 +1271,7 @@ class LlamaLMHeadAuto(nn.Layer):
     def __init__(self, config: LlamaConfig):
         super(LlamaLMHeadAuto, self).__init__()
         self.config = config
+        has_seq_mesh = self.config.context_parallel_degree > 1 or self.config.sep_parallel_degree > 1
 
         vocab_size = config.vocab_size
         self.weight = self.create_parameter(
@@ -1293,12 +1281,11 @@ class LlamaLMHeadAuto(nn.Layer):
         self.weight = dist.shard_tensor(
             self.weight,
             get_mesh(-1),
-            colwise_placements,
+            get_colwise_placement(has_seq_mesh),
         )
 
     def forward(self, hidden_states, tensor_parallel_output=None):
         # todo:check placement 
-        #logger.info(f'LlamaLMHeadAuto hidden_states:{hidden_states}') #[Shard(dim=0), Replicate(), Replicate()]
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
         logits = paddle.matmul(hidden_states, self.weight, transpose_y=False)
@@ -1401,12 +1388,7 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
         output_hidden_states=None,
         return_dict=None,
     ):
-        logger.info(f'into LlamaForCausalLM3DAuto forward')
         input_ids.stop_gradient = True
-        if self.config.sep_parallel_degree > 1:
-            input_ids = split_sequence_dim(input_ids)
-        if self.config.context_parallel_degree > 1:
-            input_ids = split_sequence_dim_load_balance(input_ids)
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -1430,7 +1412,7 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
             hidden_states = dist.reshard(
                 hidden_states,
                 get_mesh(-1),
-                [dist.Shard(1), dist.Replicate(), dist.Replicate()],
+                [dist.Shard(1), dist.Replicate(), dist.Replicate()] if self.config.context_parallel_degree > 1 or self.config.sep_parallel_degree > 1 else [dist.Shard(1), dist.Replicate()],
             )
             hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
 

@@ -394,7 +394,6 @@ def print_config(args, key=""):
 
 def init_seed(seed: int = 1234, args=None):
     if args is None:
-        logger.info(f'init_seed {seed}')
         random.seed(seed)
         np.random.seed(seed)
         paddle.seed(seed)
@@ -411,7 +410,6 @@ def init_seed(seed: int = 1234, args=None):
                 sep_degree = args.sep_parallel_degree
             else:
                 sep_degree = 1
-            print(f'sep_degree:{sep_degree}')
             sep_degree=args.sep_parallel_degree if args.sep_parallel_degree > 1 else args.context_parallel_degree
             topo = Topology(
                 dist.get_rank(),
@@ -507,7 +505,6 @@ def main():
             )
 
     config_class, model_class, criterion_class = MODEL_CLASSES[model_args.model_type]
-    print(f'config_class:{config_class}, model_class:{model_class}, criterion_class:{criterion_class}')
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
 
