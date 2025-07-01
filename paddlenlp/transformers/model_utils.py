@@ -3011,7 +3011,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             merged_config["sp_config"] is not None
             final_config["mp_config"] = merged_config["sp_config"]
 
-        print(f'auto_dist_degree:{auto_dist_degree}')
         if "context_parallel" in auto_dist_degree and auto_dist_degree["context_parallel"]:
             merged_config["cp_config"] is not None
             if final_config["mp_config"] is not None:

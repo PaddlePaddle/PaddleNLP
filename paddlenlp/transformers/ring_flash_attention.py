@@ -232,6 +232,7 @@ def balanced_ring_flash_attention_bwd_func(
             "the paddlenlp_ops by following the instructions "
             "provided at https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
         )
+
     for step in range(cp_size):
         block_k, block_v = kv_comm_buffer.get_buffers()
 
@@ -343,6 +344,7 @@ class RingFlashAttention(PyLayer):
 
         if fixed_seed_offset is None:
             fixed_seed_offset = paddle.to_tensor([0, 0], place=paddle.CPUPlace(), dtype=paddle.int64)
+
         query_grad, key_grad, value_grad = balanced_ring_flash_attention_bwd_func(
             group, out_grad, query, key, value, out, lse, fixed_seed_offset, attn_mask, dropout, is_causal
         )
