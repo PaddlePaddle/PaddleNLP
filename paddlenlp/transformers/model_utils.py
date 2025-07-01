@@ -428,7 +428,10 @@ def _load_part_state_dict(
                 part_state_dict.update(quant_state_dict)
             else:
                 if key in tensor_parallel_split_mapping:
-                    weight = tensor_parallel_split_mapping[key](py_safe_slice_.get())
+                    if len(py_safe_slice_.shape) == 0:
+                        weight = tensor_parallel_split_mapping[key](py_safe_slice_.get())
+                    else:
+                        weight = tensor_parallel_split_mapping[key](py_safe_slice_)
                 else:
                     if len(py_safe_slice_.shape) == 0:
                         weight = py_safe_slice_.get()
@@ -912,8 +915,11 @@ def faster_set_state_dict(model, state_dict, model_state_dict=None, strict_dtype
     return error_msgs
 
 
-def _load_state_dict_into_model(model_to_load, state_dict, start_prefix, model_to_load_state_dict):
+def _load_state_dict_into_model(model_to_load, state_dict, start_prefix, model_to_load_state_dict=None):
     # torch will cast dtype in load_state_dict, but paddle strictly check dtype
+    if model_to_load_state_dict is None:
+        model_to_load_state_dict = model_to_load.state_dict()
+
     if len(start_prefix) > 0:
         for key in list(state_dict.keys()):
             if key.startswith(start_prefix):
@@ -2822,7 +2828,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     variant = weight_name_suffix() if variant is None else variant
 
         # Attach architecture to the config
-        config_to_save.architectures = [model_to_save.__class__.__name__]
+        config_to_save.architectures = [clean_model_class_name(model_to_save.__class__.__name__)]
+
         # Save the config
         if is_main_process:
             config_to_save.save_pretrained(save_directory)
@@ -3300,3 +3307,29 @@ def load_tp_checkpoint(folder, cls, config, return_numpy=False):
                 )
                 state_dict.update(shard_state_dict)
     return state_dict
+
+
+def clean_model_class_name(class_name, suffixes_to_strip: Union[str, List[str]] = "Pipe"):
+    """
+    Returns the class name of the given model with specified suffixes removed.
+
+    This is typically used to clean up the model name before saving it to
+    config.architectures, removing implementation-specific suffixes like "Pipe".
+
+    Args:
+        class_name: The __class__.__name__ attribute.
+        suffixes_to_strip (str or list of str, optional): One or more suffix strings to remove
+            from the class name (e.g., 'Pipe' or ['Pipe', 'Wrapper']). If None or empty,
+            no stripping is applied.
+
+    Returns:
+        str: The cleaned model class name with specified suffix removed (if present).
+    """
+    if not suffixes_to_strip:
+        return class_name
+
+    if isinstance(suffixes_to_strip, str):
+        suffixes_to_strip = [suffixes_to_strip]
+
+    pattern = f"({'|'.join(map(re.escape, suffixes_to_strip))})$"
+    return re.sub(pattern, "", class_name)

@@ -30,6 +30,8 @@ from paddlenlp.data import (
 from paddlenlp.trainer import set_seed
 from paddlenlp.transformers import BertTokenizer
 
+from ..testing_utils import skip_for_none_ce_case
+
 
 class DataCollatorIntegrationTest(unittest.TestCase):
     def setUp(self):
@@ -251,6 +253,7 @@ class DataCollatorIntegrationTest(unittest.TestCase):
         self.assertTrue(paddle.any(masked_tokens))
         self.assertTrue(all(x == -100 for x in batch["labels"][~masked_tokens].tolist()))
 
+    @skip_for_none_ce_case
     def test_data_collator_for_language_modeling(self):
         no_pad_features = [{"input_ids": list(range(10))}, {"input_ids": list(range(10))}]
         pad_features = [{"input_ids": list(range(5))}, {"input_ids": list(range(10))}]

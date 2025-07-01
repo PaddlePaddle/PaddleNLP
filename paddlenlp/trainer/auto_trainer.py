@@ -29,10 +29,9 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
 
+from ..transformers.model_utils import clean_model_class_name, unwrap_model
 from ..transformers.segment_parallel_utils import split_inputs_sequence_dim
 from ..transformers.context_parallel_utils import split_sequence_dim_load_balance
-
-from ..transformers.model_utils import unwrap_model
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
     PREFIX_CHECKPOINT_DIR,
@@ -49,7 +48,9 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     ShardingOption,
     TrainOutput,
     _exec_mode_guard,
+    check_auto_parallel_pipeline_support,
     get_last_checkpoint,
+    get_pp_schedule,
     has_length,
     speed_metrics,
 )
@@ -80,6 +81,7 @@ class AutoTrainer(Trainer):
                 kwargs.update({"criterion": loss_func})
         self.auto_dist_config = kwargs.pop("auto_dist_config", None)
         model = kwargs.get("model", None)
+        self.model_type = kwargs.pop("model_type", None)
         assert model is not None
         if kwargs.get("args", None) is not None and kwargs["args"].use_intermediate_api:
             if not parallelize.has_parallelized_model:
@@ -96,12 +98,21 @@ class AutoTrainer(Trainer):
             if not param._is_initialized() and param._init_func is not None:
                 param.initialize()
         kwargs["model"] = model
-
         super().__init__(*args, **kwargs)
         assert self.args.enable_auto_parallel
 
         self.global_mesh = fleet.auto.get_mesh()
         self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
+        if self.args.pipeline_parallel_degree > 1 and check_auto_parallel_pipeline_support(self.model_type):
+            self.pp_schedule = get_pp_schedule(
+                model,
+                self.model_type,
+                self.args.n_microbatches,
+                self.criterion,
+                self.args.pipeline_schedule_mode,
+                self.args.pipeline_parallel_degree,
+                self.comm_group_in_pp,
+            )
         self._in_pir_mode = paddle.base.framework.get_flags("FLAGS_enable_pir_api")["FLAGS_enable_pir_api"]
 
     @classmethod
@@ -716,7 +727,56 @@ class AutoTrainer(Trainer):
 
         return (loss, outputs) if return_outputs else loss
 
+    def compute_pipeline_loss(self, model, inputs, return_outputs=False):
+        """
+        How the loss is computed by Trainer. By default, all models return the loss in the first element.
+        Subclass and override for custom behavior.
+        """
+        if self.criterion is not None:
+            if "labels" in inputs:
+                labels = inputs.pop("labels")
+            elif "start_positions" in inputs and "end_positions" in inputs:
+                labels = (inputs.pop("start_positions"), inputs.pop("end_positions"))
+            elif self.args.label_names is not None:
+                labels = []
+                for label in self.label_names:
+                    labels.append(inputs.pop(label))
+                labels = tuple(labels)
+            elif "generator_labels" in inputs:
+                labels = inputs["generator_labels"]
+        else:
+            labels = None
+
+        pp_rank = self.comm_group_in_pp.rank
+        losses = []
+        if pp_rank == 0:  # 第一个pp_stage，参数传入数据流
+            self.pp_schedule.step(**inputs)  # 最后的pp_stage，参数传入label, 并输出loss
+        elif pp_rank == self.args.pipeline_parallel_degree - 1:
+            self.pp_schedule.step(target=labels, losses=losses)
+        else:
+            self.pp_schedule.step()
+
+        final_loss = None
+        if len(losses) != 0:
+            final_loss = paddle.stack(losses).mean()
+
+        return final_loss
+
+    def dynamic_auto_parallel_pipeline_training(
+        self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]
+    ) -> paddle.Tensor:
+        assert self.args.pipeline_parallel_degree > 1, "pipeline_parallel_degree must be greater than 1."
+        assert check_auto_parallel_pipeline_support(
+            self.model_type
+        ), "dynamic auto_parallel pipeline only supports special models"
+        with self.autocast_smart_context_manager():
+            loss = self.compute_pipeline_loss(model, inputs)
+
+        return loss
+
     def dynamic_training(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
+        if self.args.pipeline_parallel_degree > 1 and check_auto_parallel_pipeline_support(self.model_type):
+            return self.dynamic_auto_parallel_pipeline_training(model, inputs)
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
 
@@ -931,7 +991,7 @@ class AutoTrainer(Trainer):
             config_to_save = copy.deepcopy(model_to_save.config)
             config_to_save.mp_degree = getattr(config_to_save, "config_to_save", 1)
             # Attach architecture to the config
-            config_to_save.architectures = [model_to_save.__class__.__name__]
+            config_to_save.architectures = [clean_model_class_name(model_to_save.__class__.__name__)]
 
             config_to_save.save_pretrained(output_dir)
             if self.model.can_generate():

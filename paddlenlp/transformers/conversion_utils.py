@@ -379,15 +379,44 @@ def naive_fuse_split_tp(
 
         return np.concatenate(splited, axis=axis)
 
-    splited = np.split(weight, fuse_tensor_parts * tensor_parallel_degree, axis=axis)
+    if isinstance(weight, paddle.Tensor):
 
-    if tensor_parallel_rank is None:
-        ret = []
-        for tensor_parallel_rank in range(tensor_parallel_degree):
-            ret.append(np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis))
-        return ret
+        def slice_concat_by_axis(weight, fuse_tensor_parts, tensor_parallel_degree, tensor_parallel_rank, axis=0):
+            total_splits = fuse_tensor_parts * tensor_parallel_degree
+            dim_size = weight.shape[axis]
+            split_size = dim_size // total_splits
 
-    return np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis)
+            slices = []
+            for idx in range(tensor_parallel_rank, total_splits, tensor_parallel_degree):
+                start = idx * split_size
+                end = (start + split_size) if (idx != total_splits - 1) else dim_size
+                slice_idx = [slice(None)] * len(weight.shape)
+                slice_idx[axis] = slice(start, end)
+                block = weight[tuple(slice_idx)]
+                slices.append(block)
+            result = paddle.concat(slices, axis=axis)
+            return result
+
+        if tensor_parallel_rank is not None:
+            return slice_concat_by_axis(
+                weight, fuse_tensor_parts, tensor_parallel_degree, tensor_parallel_rank, axis=axis
+            )
+        else:
+            splited = paddle.split(weight, fuse_tensor_parts * tensor_parallel_degree, axis=axis)
+            ret = []
+            for tensor_parallel_rank in range(tensor_parallel_degree):
+                ret.append(paddle.concat(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis))
+            return ret
+    else:
+        splited = np.split(weight, fuse_tensor_parts * tensor_parallel_degree, axis=axis)
+
+        if tensor_parallel_rank is None:
+            ret = []
+            for tensor_parallel_rank in range(tensor_parallel_degree):
+                ret.append(np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis))
+            return ret
+
+        return np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis)
 
 
 def normal_fuse_merge_tp(weight_list, is_column=True):
@@ -467,16 +496,38 @@ def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=No
     assert (
         size % tensor_parallel_degree == 0
     ), f"The chosen size {size} is not compatible with sharding on {tensor_parallel_degree} shards. for tensor shape {weight.shape}"
-
     if is_column:
-        splited_weights = np.split(weight, tensor_parallel_degree, axis=-1)
+        total_size = weight.shape[-1]
+        chunk_size = total_size // tensor_parallel_degree
+        if tensor_parallel_rank is not None:
+            start = tensor_parallel_rank * chunk_size
+            end = (tensor_parallel_rank + 1) * chunk_size
+            if isinstance(weight, paddle.Tensor):
+                splited_weights = weight[..., start:end].clone()
+            else:
+                splited_weights = weight[..., start:end]
+            return splited_weights
+        else:
+            splited_weights = [
+                weight[..., i * chunk_size : (i + 1) * chunk_size] for i in range(tensor_parallel_degree)
+            ]
+            return splited_weights
     else:
-        splited_weights = np.split(weight, tensor_parallel_degree, axis=0)
-
-    if tensor_parallel_rank is not None:
-        return splited_weights[tensor_parallel_rank]
-
-    return splited_weights
+        total_size = weight.shape[0]
+        chunk_size = total_size // tensor_parallel_degree
+        if tensor_parallel_rank is not None:
+            start = tensor_parallel_rank * chunk_size
+            end = (tensor_parallel_rank + 1) * chunk_size
+            if isinstance(weight, paddle.Tensor):
+                splited_weights = weight[start:end, ...].clone()
+            else:
+                splited_weights = weight[start:end, ...]
+            return splited_weights
+        else:
+            splited_weights = [
+                weight[i * chunk_size : (i + 1) * chunk_size, ...] for i in range(tensor_parallel_degree)
+            ]
+            return splited_weights
 
 
 """
@@ -518,13 +569,21 @@ def naive_merged_qkv_to_tensor_parallel_qkv(weight, num_attention_heads):
     """
     qkv_pairs = []
     partition_dim = -1
-    split_heads = np.split(weight, 3 * num_attention_heads, axis=partition_dim)
+    if isinstance(weight, paddle.Tensor):
+        split_heads = paddle.split(weight, 3 * num_attention_heads, axis=partition_dim)
 
-    for i in range(num_attention_heads):
-        qkv_pair = np.concatenate(split_heads[i::num_attention_heads], axis=partition_dim)
-        qkv_pairs.append(qkv_pair)
+        for i in range(num_attention_heads):
+            qkv_pair = paddle.concat(split_heads[i::num_attention_heads], axis=partition_dim)
+            qkv_pairs.append(qkv_pair)
+        return paddle.concat(qkv_pairs, axis=partition_dim)
+    else:
+        split_heads = np.split(weight, 3 * num_attention_heads, axis=partition_dim)
 
-    return np.concatenate(qkv_pairs, axis=partition_dim)
+        for i in range(num_attention_heads):
+            qkv_pair = np.concatenate(split_heads[i::num_attention_heads], axis=partition_dim)
+            qkv_pairs.append(qkv_pair)
+
+        return np.concatenate(qkv_pairs, axis=partition_dim)
 
 
 def splited_qkv_to_tensor_parallel_qkv(weight_list, num_attention_heads):
@@ -689,7 +748,10 @@ def get_tensor_parallel_split_func(tensor_parallel_degree, tensor_parallel_rank,
         if x is None:
             return None
         if transpose:
-            x = np.transpose(x, [1, 0])
+            if isinstance(x, paddle.Tensor):
+                x = paddle.transpose(x, [1, 0])
+            else:
+                x = np.transpose(x, [1, 0])
         if is_old_qkv:
             assert is_column, "QKV tensor should be column parallel linear."
             assert num_attention_heads is not None, "is_old_qkv need num_attention_heads"

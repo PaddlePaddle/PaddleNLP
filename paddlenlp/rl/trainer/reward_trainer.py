@@ -25,6 +25,7 @@ from paddle.distributed import fleet
 from paddle.io import Dataset
 
 from ...data import DataCollator
+from ...datasets.rlhf_datasets.protocol import DataProto
 from ...trainer.trainer import (
     EvalPrediction,
     TrainerCallback,
@@ -79,12 +80,13 @@ class RewardTrainer(RLTrainer):
     @paddle.no_grad()
     def compute_reward(
         self,
-        input_ids: paddle.Tensor,
-        position_ids: paddle.Tensor = None,
+        batch: DataProto,
         input_ids_tokenizer: PretrainedTokenizer = None,
-        label_ids: paddle.Tensor = None,
-        **kwargs,
     ) -> Dict[str, paddle.Tensor]:
+        input_ids = batch.batch["input_ids"]
+        position_ids = batch.batch["position_ids"]
+        label_ids = batch.batch["label_ids"]
+        prompt = batch.batch["prompt"]
         if not self.args.use_rm_server:
             if self.tokenizer is not input_ids_tokenizer:
                 # right padding
@@ -107,7 +109,7 @@ class RewardTrainer(RLTrainer):
                 position_ids=reward_position_ids,
             )[1]
         else:
-            prompt_len = kwargs["prompt"].shape[-1]
+            prompt_len = prompt.shape[-1]
             if label_ids is None:
                 raise ValueError("Rule-based reward needs labels.")
             src = input_ids_tokenizer.batch_decode(input_ids[:, :prompt_len], skip_special_tokens=False)
