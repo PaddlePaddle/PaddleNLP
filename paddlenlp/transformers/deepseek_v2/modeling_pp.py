@@ -57,6 +57,8 @@ from paddlenlp.transformers.fused_a2a import (
 )
 from paddlenlp.transformers.moe_layer import FusionMoeNode
 
+from ..fp8_utils import fp8_mlp_bwd, fp8_mlp_fwd
+
 __all__ = [
     "DeepseekV2ForCausalLMPipe",
 ]
@@ -128,6 +130,64 @@ class TensorMeta:
     def __init__(self, tensor):
         self.shape = tensor.shape
         self.dtype = tensor.dtype
+
+
+class PostProcessNode(ScheduleNode):
+    def __init__(self, send_mtp_embed, training, alpha, config, shared_experts=None, name="PostProcessNode"):
+        self.send_mtp_embed = send_mtp_embed
+        self.shared_experts = shared_experts
+        self.traning = training
+        self.config = config
+        self.alpha = alpha
+        self.name = name
+
+    def forward(self, inputs):
+
+        if isinstance(inputs, list):
+            inputs = tuple(inputs)
+
+        if self.send_mtp_embed:
+            (inputs_embeds_mtp, hidden_states, residual, l_aux, final_hidden_states) = inputs
+        else:
+            (hidden_states, residual, l_aux, final_hidden_states) = inputs
+
+        with paddle.no_grad():
+            if self.shared_experts is not None:
+                x_fp8, x_scale, shared_expert_output = fp8_mlp_fwd(
+                    hidden_states, self.shared_experts.w1, self.shared_experts.w2
+                )
+                final_hidden_states = final_hidden_states + shared_expert_output
+
+        self.x_fp8 = x_fp8
+        self.x_scale = x_scale
+        self.l_aux = l_aux
+        hidden_states = residual + final_hidden_states
+
+        if self.send_mtp_embed:
+            hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp], axis=-1)
+
+        return return_args(hidden_states)
+
+    @paddle.no_grad()
+    def backward(self, output_grad):
+        (do3,) = output_grad
+
+        assert not self.send_mtp_embed, "not support have mtp have yet"
+
+        dx, dw1, dw2 = fp8_mlp_bwd(do3, self.x_fp8, self.x_scale, self.shared_experts.w1, self.shared_experts.w2)
+
+        self.x_fp8 = None
+        self.x_scale = None
+
+        residual_grad = do3
+
+        hidden_states_grad = dx
+
+        l_aux_grad = paddle.ones(1, dtype=self.l_aux.dtype) * self.alpha
+
+        final_hidden_states_grad = do3
+
+        return (hidden_states_grad, residual_grad, l_aux_grad, final_hidden_states_grad)
 
 
 class DecoderLayerNode(ScheduleNode):
@@ -381,201 +441,344 @@ class OverlapedScheduleNode:
 
 
 class FusionFp8DecoderLayerNode(ScheduleNode):
-    def __init__(self, attn_and_gate_node, fp8_fusion_moe_node, post_process_node, mlp_layer, name=""):
+    def __init__(self, attn_and_gate_node, fp8_fusion_moe_node, post_process_node, mlp_layer, send_mtp_embed, name=""):
         self.attn_and_gate_node = attn_and_gate_node
         self.fp8_fusion_moe_node = fp8_fusion_moe_node
         self.post_process_node = post_process_node
+        self.send_mtp_embed = send_mtp_embed
+
         self.name = name
 
         self.moe_group = mlp_layer.moe_group
 
     def attn_forward(self, inputs):
-        (
-            inputs_embeds_mtp,
-            hidden_states,
-            residual,
-            probs,
-            routing_map,
-            l_aux,
-        ) = self.attn_and_gate_node.forward(inputs)
-        hs_fp8, hs_scale, token_indices, token_probs = self.fp8_fusion_moe_node.dispatch_quant_node.forward(
+        if self.send_mtp_embed:
+            (
+                inputs_embeds_mtp,
+                hidden_states,
+                residual,
+                probs,
+                routing_map,
+                l_aux,
+            ) = self.attn_and_gate_node.forward(inputs)
+        else:
+            (
+                hidden_states,
+                residual,
+                probs,
+                routing_map,
+                l_aux,
+            ) = self.attn_and_gate_node.forward(inputs)
+
+        hs_2d, token_indices, token_probs = self.fp8_fusion_moe_node.dispatch_quant_node.forward(
             hidden_states, probs, routing_map
         )
-        return (
-            inputs_embeds_mtp,
-            hidden_states,
-            residual,
-            l_aux,
-            hs_fp8,
-            hs_scale,
-            token_indices,
-            token_probs,
-        )
+        if self.send_mtp_embed:
+            return (
+                inputs_embeds_mtp,
+                hidden_states,
+                residual,
+                l_aux,
+                hs_2d,
+                token_indices,
+                token_probs,
+            )
+        else:
+            return (
+                hidden_states,
+                residual,
+                l_aux,
+                hs_2d,
+                token_indices,
+                token_probs,
+            )
 
     def dispatch_forward(self, inputs, previous_event=None, async_finish=False, allocate_on_comm_stream=False):
-        (
-            inputs_embeds_mtp,
-            hidden_states,
-            residual,
-            l_aux,
-            hs_fp8,
-            hs_scale,
-            token_indices,
-            token_probs,
-        ) = inputs
+        if self.send_mtp_embed:
+            (
+                inputs_embeds_mtp,
+                hidden_states,
+                residual,
+                l_aux,
+                hs_2d,
+                token_indices,
+                token_probs,
+            ) = inputs
+        else:
+            (
+                hidden_states,
+                residual,
+                l_aux,
+                hs_2d,
+                token_indices,
+                token_probs,
+            ) = inputs
 
-        (
-            hs_fp8_dispatched,
-            hs_scale_dispatched,
-            dispatched_indices,
-            dispatched_probs,
-        ) = self.fp8_fusion_moe_node.dispatch_node.forward(
-            hs_fp8,
-            hs_scale,
+        (hs_fp16_dispatched, dispatched_indices, dispatched_probs,) = self.fp8_fusion_moe_node.dispatch_node.forward(
+            hs_2d,
             token_indices,
             token_probs,
             previous_event=previous_event,
             async_finish=async_finish,
             allocate_on_comm_stream=allocate_on_comm_stream,
         )
-        return (
-            inputs_embeds_mtp,
-            hidden_states,
-            residual,
-            l_aux,
-            hs_fp8_dispatched,
-            hs_scale_dispatched,
-            dispatched_indices,
-            dispatched_probs,
-        )
+        if self.send_mtp_embed:
+            return (
+                inputs_embeds_mtp,
+                hidden_states,
+                residual,
+                l_aux,
+                hs_fp16_dispatched,
+                dispatched_indices,
+                dispatched_probs,
+            )
+        else:
+            return (
+                hidden_states,
+                residual,
+                l_aux,
+                hs_fp16_dispatched,
+                dispatched_indices,
+                dispatched_probs,
+            )
 
     def mlp_forward(self, inputs):
-        (
-            inputs_embeds_mtp,
-            hidden_states,
-            residual,
-            l_aux,
-            hs_fp8_dispatched,
-            hs_scale_dispatched,
-            dispatched_indices,
-            dispatched_probs,
-        ) = inputs
+        if self.send_mtp_embed:
+            (
+                inputs_embeds_mtp,
+                hidden_states,
+                residual,
+                l_aux,
+                hs_fp16_dispatched,
+                dispatched_indices,
+                dispatched_probs,
+            ) = inputs
+        else:
+            (
+                hidden_states,
+                residual,
+                l_aux,
+                hs_fp16_dispatched,
+                dispatched_indices,
+                dispatched_probs,
+            ) = inputs
         hidden_states_out = self.fp8_fusion_moe_node.mlp_node.forward(
-            hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs
+            hs_fp16_dispatched, dispatched_indices, dispatched_probs
         )
-        return (inputs_embeds_mtp, hidden_states, residual, l_aux, hidden_states_out)
+
+        if self.send_mtp_embed:
+            return (inputs_embeds_mtp, hidden_states, residual, l_aux, hidden_states_out)
+        else:
+            return (hidden_states, residual, l_aux, hidden_states_out)
 
     def combine_forward(self, inputs, async_finish=False):
-        (inputs_embeds_mtp, hidden_states, residual, l_aux, hidden_states_out) = inputs
+        if self.send_mtp_embed:
+            (inputs_embeds_mtp, hidden_states, residual, l_aux, hidden_states_out) = inputs
+        else:
+            (hidden_states, residual, l_aux, hidden_states_out) = inputs
+
         output_combie = self.fp8_fusion_moe_node.combine_node.forward(hidden_states_out, async_finish=async_finish)
-        return (inputs_embeds_mtp, hidden_states, residual, l_aux, output_combie)
+        if self.send_mtp_embed:
+            return (inputs_embeds_mtp, hidden_states, residual, l_aux, output_combie)
+        else:
+            return (hidden_states, residual, l_aux, output_combie)
 
     def post_process_forward(self, inputs):
-        (inputs_embeds_mtp, hidden_states, residual, l_aux, output_combie) = inputs
+        if self.send_mtp_embed:
+            (inputs_embeds_mtp, hidden_states, residual, l_aux, output_combie) = inputs
+        else:
+            (hidden_states, residual, l_aux, output_combie) = inputs
         final_hidden_states = self.fp8_fusion_moe_node.combine_quant_node.forward(output_combie)
-        inputs = (inputs_embeds_mtp, hidden_states, residual, l_aux, final_hidden_states)
+        if self.send_mtp_embed:
+            inputs = (inputs_embeds_mtp, hidden_states, residual, l_aux, final_hidden_states)
+        else:
+            inputs = (hidden_states, residual, l_aux, final_hidden_states)
         inputs = self.post_process_node.forward(inputs)
+
         return inputs
 
     def post_process_backward(self, output_grad):
-        (
-            inputs_embeds_mtp_grad,
-            hidden_states_grad,
-            residual_grad,
-            l_aux_grad,
-            final_hidden_states_grad,
-        ) = self.post_process_node.backward(output_grad)
-        output_combie_grad_fp8, output_combie_grad_scale = self.fp8_fusion_moe_node.combine_quant_node.backward(
-            final_hidden_states_grad
-        )
-        return (
-            inputs_embeds_mtp_grad,
-            hidden_states_grad,
-            residual_grad,
-            l_aux_grad,
-            output_combie_grad_fp8,
-            output_combie_grad_scale,
-        )
+        if self.send_mtp_embed:
+            (
+                inputs_embeds_mtp_grad,
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                final_hidden_states_grad,
+            ) = self.post_process_node.backward(output_grad)
+        else:
+            (
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                final_hidden_states_grad,
+            ) = self.post_process_node.backward(output_grad)
+        output_combie_grad = self.fp8_fusion_moe_node.combine_quant_node.backward(final_hidden_states_grad)
+        if self.send_mtp_embed:
+            return (
+                inputs_embeds_mtp_grad,
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                output_combie_grad,
+            )
+        else:
+            return (
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                output_combie_grad,
+            )
 
     def combine_backward(self, output_grad, async_finish=False):
-        (
-            inputs_embeds_mtp_grad,
-            hidden_states_grad,
-            residual_grad,
-            l_aux_grad,
-            output_combie_grad_fp8,
-            output_combie_grad_scale,
-        ) = output_grad
-        hidden_states_out_grad, hidden_states_out_grad_scale = self.fp8_fusion_moe_node.combine_node.backward(
-            output_combie_grad_fp8,
-            output_combie_grad_scale,
+        if self.send_mtp_embed:
+            (
+                inputs_embeds_mtp_grad,
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                output_combie_grad_bf16,
+            ) = output_grad
+        else:
+            (
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                output_combie_grad_bf16,
+            ) = output_grad
+
+        hidden_states_out_grad_bf16 = self.fp8_fusion_moe_node.combine_node.backward(
+            output_combie_grad_bf16,
             async_finish=async_finish,
         )
-        return (
-            inputs_embeds_mtp_grad,
-            hidden_states_grad,
-            residual_grad,
-            l_aux_grad,
-            hidden_states_out_grad,
-            hidden_states_out_grad_scale,
-        )
+
+        if self.send_mtp_embed:
+            return (
+                inputs_embeds_mtp_grad,
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                hidden_states_out_grad_bf16,
+            )
+        else:
+            return (
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                hidden_states_out_grad_bf16,
+            )
 
     def mlp_backward(self, output_grad):
-        (
-            inputs_embeds_mtp_grad,
-            hidden_states_grad,
-            residual_grad,
-            l_aux_grad,
-            hidden_states_out_grad,
-            hidden_states_out_grad_scale,
-        ) = output_grad
-        hs_fp8_dispatched_grad, dispatched_probs_grad = self.fp8_fusion_moe_node.mlp_node.backward(
-            hidden_states_out_grad, hidden_states_out_grad_scale
+        if self.send_mtp_embed:
+            (
+                inputs_embeds_mtp_grad,
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                hidden_states_out_grad,
+            ) = output_grad
+        else:
+            (
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                hidden_states_out_grad,
+            ) = output_grad
+        hs_fp16_dispatched_grad, dispatched_probs_grad = self.fp8_fusion_moe_node.mlp_node.backward(
+            hidden_states_out_grad
         )
 
-        return (
-            inputs_embeds_mtp_grad,
-            hidden_states_grad,
-            residual_grad,
-            l_aux_grad,
-            hs_fp8_dispatched_grad,
-            dispatched_probs_grad,
-        )
+        if self.send_mtp_embed:
+            return (
+                inputs_embeds_mtp_grad,
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                hs_fp16_dispatched_grad,
+                dispatched_probs_grad,
+            )
+        else:
+            return (
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                hs_fp16_dispatched_grad,
+                dispatched_probs_grad,
+            )
 
     def dispatch_backward(self, output_grad, async_finish=False):
-        (
-            inputs_embeds_mtp_grad,
-            hidden_states_grad,
-            residual_grad,
-            l_aux_grad,
-            hs_fp8_dispatched_grad,
-            dispatched_probs_grad,
-        ) = output_grad
-        hs_fp8_grad, token_probs_grad = self.fp8_fusion_moe_node.dispatch_node.backward(
-            hs_fp8_dispatched_grad, dispatched_probs_grad, async_finish=async_finish
+        if self.send_mtp_embed:
+            (
+                inputs_embeds_mtp_grad,
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                hs_bf16_dispatched_grad,
+                dispatched_probs_grad,
+            ) = output_grad
+        else:
+            (
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                hs_bf16_dispatched_grad,
+                dispatched_probs_grad,
+            ) = output_grad
+        hs_bf16_grad, token_probs_grad = self.fp8_fusion_moe_node.dispatch_node.backward(
+            hs_bf16_dispatched_grad, dispatched_probs_grad, async_finish=async_finish
         )
-        return (inputs_embeds_mtp_grad, hidden_states_grad, residual_grad, l_aux_grad, hs_fp8_grad, token_probs_grad)
+
+        if self.send_mtp_embed:
+            return (
+                inputs_embeds_mtp_grad,
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                hs_bf16_grad,
+                token_probs_grad,
+            )
+        else:
+            return (hidden_states_grad, residual_grad, l_aux_grad, hs_bf16_grad, token_probs_grad)
 
     def attn_backward(self, output_grad):
-        (
-            inputs_embeds_mtp_grad,
-            hidden_states_grad,
-            residual_grad,
-            l_aux_grad,
-            hs_fp8_grad,
-            token_probs_grad,
-        ) = output_grad
+        if self.send_mtp_embed:
+            (
+                inputs_embeds_mtp_grad,
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                hs_bf16_grad,
+                token_probs_grad,
+            ) = output_grad
+        else:
+            (
+                hidden_states_grad,
+                residual_grad,
+                l_aux_grad,
+                hs_bf16_grad,
+                token_probs_grad,
+            ) = output_grad
         hidden_states_grad_, probs_grad, routing_map_grad = self.fp8_fusion_moe_node.dispatch_quant_node.backward(
-            hs_fp8_grad, token_probs_grad
+            hs_bf16_grad, token_probs_grad
         )
-        output_grad = (
-            inputs_embeds_mtp_grad,
-            hidden_states_grad + hidden_states_grad_,
-            residual_grad,
-            probs_grad,
-            routing_map_grad,
-            l_aux_grad,
-        )
+
+        if self.send_mtp_embed:
+            output_grad = (
+                inputs_embeds_mtp_grad,
+                hidden_states_grad + hidden_states_grad_,
+                residual_grad,
+                probs_grad,
+                routing_map_grad,
+                l_aux_grad,
+            )
+        else:
+            output_grad = (
+                hidden_states_grad + hidden_states_grad_,
+                residual_grad,
+                probs_grad,
+                routing_map_grad,
+                l_aux_grad,
+            )
         output_grad = self.attn_and_gate_node.backward(output_grad)
         return output_grad
 
@@ -743,7 +946,7 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
         inputs_embeds = self.embed_tokens(input_ids)
 
         batch_size, seq_length = input_ids.shape
-        if self.config.num_nextn_predict_layers > 0:
+        if self.config.send_mtp_embed:
             seq_length -= self.config.num_nextn_predict_layers
 
             if attention_mask is not None:
@@ -766,7 +969,7 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
             attention_mask = paddle.tril(paddle.ones((seq_length, seq_length), dtype="bool"))
             attention_mask.stop_gradient = True
 
-        if self.config.num_nextn_predict_layers > 0:
+        if self.config.send_mtp_embed:
             inputs_embeds_extra = inputs_embeds[:, -self.config.num_nextn_predict_layers :, :]  # [B, S, D]
             inputs_embeds = inputs_embeds[:, : -self.config.num_nextn_predict_layers, :]
             inputs_embeds_ori = inputs_embeds
@@ -810,7 +1013,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
     def forward(self, args):
         hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
 
-        if self.config.num_nextn_predict_layers > 0:
+        if self.config.send_mtp_embed:
             batch_size, _, hidden_size = hidden_states.shape
             batch_size_mtp = hidden_size // (self.config.num_nextn_predict_layers + 1)
             inputs_embeds_mtp = hidden_states[..., -batch_size_mtp:]
@@ -856,7 +1059,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
                 attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             )
 
-        if self.config.num_nextn_predict_layers > 0:
+        if self.config.send_mtp_embed:
             hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp], axis=-1)
 
         return return_args(hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids)
@@ -866,7 +1069,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
         assert attention_mask is None
         assert attn_mask_startend_row_indices is None
         assert position_ids is None
-        assert self.config.num_nextn_predict_layers > 0
+        assert self.config.send_mtp_embed
 
         batch_size, _, hidden_size = hidden_states.shape
         batch_size_mtp = hidden_size // (self.config.num_nextn_predict_layers + 1)
@@ -896,37 +1099,62 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
         assert attention_mask is None
         assert attn_mask_startend_row_indices is None
         assert position_ids is None
-        assert self.config.num_nextn_predict_layers > 0
 
-        batch_size, _, hidden_size = hidden_states.shape
-        batch_size_mtp = hidden_size // (self.config.num_nextn_predict_layers + 1)
-        inputs_embeds_mtp = hidden_states[..., -batch_size_mtp:]
-        hidden_states = hidden_states[..., :batch_size_mtp]
+        send_mtp_embed = self.config.send_mtp_embed
+
+        if send_mtp_embed:
+            # slice from holy tensor
+            batch_size, _, hidden_size = hidden_states.shape
+            batch_size_mtp = hidden_size // (self.config.num_nextn_predict_layers + 1)
+            inputs_embeds_mtp = hidden_states[..., -batch_size_mtp:]
+            hidden_states = hidden_states[..., :batch_size_mtp]
 
         hidden_states, residual = self.self_attn_compute(hidden_states)
         _, _, d_model = hidden_states.shape
         probs, routing_map, l_aux, _ = self.mlp.router(hidden_states)
-        return (
-            inputs_embeds_mtp,
-            hidden_states,
-            residual,
-            probs,
-            routing_map,
-            l_aux,
-        )
+
+        if send_mtp_embed:
+            return (
+                inputs_embeds_mtp,
+                hidden_states,
+                residual,
+                probs,
+                routing_map,
+                l_aux,
+            )
+        else:
+            return (
+                hidden_states,
+                residual,
+                probs,
+                routing_map,
+                l_aux,
+            )
 
     def mlp_compute(self, inputs):
         if isinstance(inputs, list):
             inputs = tuple(inputs)
-        (
-            inputs_embeds_mtp,
-            hidden_states,
-            residual,
-            l_aux,
-            intermediate_hidden_states,
-            dispatched_indices,
-            dispatched_probs,
-        ) = inputs
+        send_mtp_embed = self.config.send_mtp_embed
+
+        if send_mtp_embed:
+            (
+                inputs_embeds_mtp,
+                hidden_states,
+                residual,
+                l_aux,
+                intermediate_hidden_states,
+                dispatched_indices,
+                dispatched_probs,
+            ) = inputs
+        else:
+            (
+                hidden_states,
+                residual,
+                l_aux,
+                intermediate_hidden_states,
+                dispatched_indices,
+                dispatched_probs,
+            ) = inputs
         has_gradient = not intermediate_hidden_states.stop_gradient
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
             expert_output = recompute(
@@ -940,14 +1168,20 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
             expert_output = self.expert_forward_compute(
                 intermediate_hidden_states, dispatched_indices, dispatched_probs
             )
-        return (inputs_embeds_mtp, hidden_states, residual, l_aux, expert_output)
+        if send_mtp_embed:
+            return (inputs_embeds_mtp, hidden_states, residual, l_aux, expert_output)
+        else:
+            return (hidden_states, residual, l_aux, expert_output)
 
     def post_process_compute(self, inputs):
-        assert self.config.num_nextn_predict_layers > 0
+        send_mtp_embed = self.config.send_mtp_embed
 
         if isinstance(inputs, list):
             inputs = tuple(inputs)
-        (inputs_embeds_mtp, hidden_states, residual, l_aux, combine_output) = inputs
+        if send_mtp_embed:
+            (inputs_embeds_mtp, hidden_states, residual, l_aux, combine_output) = inputs
+        else:
+            (hidden_states, residual, l_aux, combine_output) = inputs
         has_gradient = not hidden_states.stop_gradient
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
             hidden_states = recompute(
@@ -965,17 +1199,21 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
                 combine_output,
                 l_aux,
             )
-        if self.config.num_nextn_predict_layers > 0:
+        if send_mtp_embed:
             hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp], axis=-1)
 
         return return_args(hidden_states)
 
     def post_process_compute_for_fusion(self, inputs):
-        assert self.config.num_nextn_predict_layers > 0
+        send_mtp_embed = self.config.send_mtp_embed
 
         if isinstance(inputs, list):
             inputs = tuple(inputs)
-        (inputs_embeds_mtp, hidden_states, residual, l_aux, final_hidden_states) = inputs
+
+        if send_mtp_embed:
+            (inputs_embeds_mtp, hidden_states, residual, l_aux, final_hidden_states) = inputs
+        else:
+            (hidden_states, residual, l_aux, final_hidden_states) = inputs
 
         final_hidden_states = self.mlp.post_process(hidden_states, final_hidden_states, l_aux)
 
@@ -986,7 +1224,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
         if type(hidden_states) is tuple and len(hidden_states) == 1:
             hidden_states = hidden_states[0]
 
-        if self.config.num_nextn_predict_layers > 0:
+        if send_mtp_embed:
             hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp], axis=-1)
 
         return return_args(hidden_states)
@@ -998,12 +1236,20 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
                 if DSV3_USE_FP8_GEMM:
                     attn_and_gate_node = ScheduleNode(self.attn_compute_for_fusion, name="attn_and_gate_node")
                     fp8_fusion_moe_node = FusionMoeNode(self.mlp, name="fp8_fusion_moe_node")
-                    post_process_node = ScheduleNode(self.post_process_compute_for_fusion, name="post_process_node")
+                    post_process_node = PostProcessNode(
+                        self.config.send_mtp_embed,
+                        self.mlp.training,
+                        self.mlp.alpha,
+                        self.config,
+                        self.mlp.shared_experts,
+                        "post_process_node",
+                    )
                     return FusionFp8DecoderLayerNode(
                         attn_and_gate_node=attn_and_gate_node,
                         fp8_fusion_moe_node=fp8_fusion_moe_node,
                         post_process_node=post_process_node,
                         mlp_layer=self.mlp,
+                        send_mtp_embed=self.config.send_mtp_embed,
                         name="FusionFp8DecoderLayerNode",
                     )
                 else:
@@ -1093,7 +1339,7 @@ class DeepseekV2RMSNormPipe(nn.Layer):
     def forward(self, args):
         hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
 
-        if self.config.num_nextn_predict_layers > 0:
+        if self.config.send_mtp_embed:
             hidden_states_list = paddle.split(hidden_states, self.config.num_nextn_predict_layers + 1, axis=-1)
             hidden_states = hidden_states_list[0]
             hidden_states_mtp = hidden_states_list[-self.config.num_nextn_predict_layers :]
@@ -1118,7 +1364,7 @@ class DeepseekV2LMHeadPipe(DeepseekV2LMHead):
         return get_attr(self, "weight")
 
     def forward(self, args: Union[Tuple, paddle.Tensor]):
-        if self.config.num_nextn_predict_layers > 0:
+        if self.config.send_mtp_embed:
             logits = []
             for _hidden_states in args:
                 logits.append(super().forward(_hidden_states))
@@ -1133,7 +1379,7 @@ class DeepseekV2LMHeadPipe(DeepseekV2LMHead):
 
 class DeepseekV2PretrainingCriterionPipe(DeepseekV2PretrainingCriterion):
     def forward(self, logits, labels):
-        if self.config.num_nextn_predict_layers > 0:
+        if self.config.send_mtp_embed:
             mtp_logits = logits[1:]
             logits = logits[0]
             loss = super().forward(logits, labels, mtp_logits=mtp_logits)
@@ -1336,4 +1582,5 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         else:
             forward_loss = None
 
+        forward_inputs = [forward_inputs] if isinstance(forward_inputs, paddle.Tensor) else forward_inputs
         return forward_inputs, forward_loss, backward_input_grads
