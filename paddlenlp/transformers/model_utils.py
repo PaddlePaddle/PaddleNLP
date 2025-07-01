@@ -2979,7 +2979,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         if final_config["pp_config"] is not None and len(final_config["pp_config"]["split_spec"]) == 1:
             final_config["pp_config"]["split_spec"] = final_config["pp_config"]["split_spec"][0]
-
         return final_config
 
     def _generate_auto_dist_config(self, auto_dist_degree):
@@ -3013,10 +3012,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         if "context_parallel" in auto_dist_degree and auto_dist_degree["context_parallel"]:
             merged_config["cp_config"] is not None
-            if final_config["mp_config"] is not None:
-                final_config["mp_config"]["parallelize_plan"].update(merged_config["cp_config"]["parallelize_plan"])
-            else:
-                final_config["mp_config"] = merged_config["cp_config"]
+            final_config["cp_config"] = merged_config["cp_config"]
         
         if "pipeline_parallel" in auto_dist_degree and auto_dist_degree["pipeline_parallel"]:
             merged_config["pp_config"] is not None
