@@ -1347,7 +1347,6 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
             "pp_config": {"split_spec": f"{prefix}llama.layers", "global_spec": f"{prefix}llama.global_layer"},
             "cp_config": {
                 "parallelize_plan": {
-                    # f"{prefix}llama": dist.PrepareContextParallel(backend=bck),
                     f"{prefix}llama.layers.*.self_attn.rope_func": [
                         PrepareLayerInput(layer_input_rope_hook),
                         PrepareLayerOutput(layer_output_rope_hook),

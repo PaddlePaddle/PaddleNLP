@@ -1753,7 +1753,6 @@ class TrainingArguments:
                 degree = [self.dataset_world_size, self.pipeline_parallel_degree, sep_degree, self.tensor_parallel_degree]
             mesh_dims = list(zip(order, degree))
             fleet.auto.create_mesh(mesh_dims)
-            logger.info(f'\n get mesh: {fleet.auto.get_mesh()}')
 
             # init hcg for communication in trainer
             if self.hybrid_parallel_topo_order == "pp_first":

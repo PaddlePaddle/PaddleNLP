@@ -29,7 +29,6 @@ from paddle import nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
-from paddlenlp.utils.log import logger
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
 except ImportError:
@@ -441,7 +440,6 @@ class LlamaAttentionAuto(nn.Layer):
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] or [seq_len / n, bs, num_head * head_dim] (if sequence_parallel)
         # enter tp region
-        # print(f'hidden_states1111:{hidden_states}')
         if self.config.sequence_parallel:
             # [seq_len / n, bs, num_head * head_dim] -> [seq_len, bs, num_head * head_dim] (if sequence_parallel)
             hidden_states = dist.reshard(
@@ -496,22 +494,7 @@ class LlamaAttentionAuto(nn.Layer):
                 position_ids = dist.auto_parallel.api.dtensor_from_local(
                     position_ids, query_states.process_mesh, query_states.placements
                 )
-                # print(f'after position_ids:{position_ids}, position_ids local:{position_ids._local_value()}')
             if self.use_fused_rope:
-                # print(f'past_key_value:{past_key_value},query_states._local_value:{query_states._local_value().shape}')
-                # base_query_states = paddle.load(f'{paddle.distributed.get_rank()}_query_states.pdparams')
-                # base_value_states = paddle.load(f'{paddle.distributed.get_rank()}_value_states.pdparams')
-                # base_key_states = paddle.load(f'{paddle.distributed.get_rank()}_key_states.pdparams')
-                # base_query_states = dist.auto_parallel.api.dtensor_from_local(
-                #     base_query_states, query_states.process_mesh, query_states.placements
-                # )
-                # base_value_states = dist.auto_parallel.api.dtensor_from_local(
-                #     base_value_states, value_states.process_mesh, value_states.placements
-                # )
-                # base_key_states = dist.auto_parallel.api.dtensor_from_local(
-                #     base_key_states, key_states.process_mesh, key_states.placements
-                # )
-                # print(f'key_value:{key_states},query_states._local_value:{query_states._local_value().shape}')
                 query_states, key_states = fusion_ops.fusion_rope(
                     query_states,
                     key_states,
@@ -522,7 +505,6 @@ class LlamaAttentionAuto(nn.Layer):
                     self.rotary_emb,
                     self.config.context_parallel_degree,
                 )
-                # logger.info(f'222new_query_states:{query_states._local_value()}, new_key_states:{key_states._local_value()}')
                 if self.has_seq_mesh:
                     query_states = dist.reshard(
                         query_states,
@@ -1285,7 +1267,6 @@ class LlamaLMHeadAuto(nn.Layer):
         )
 
     def forward(self, hidden_states, tensor_parallel_output=None):
-        # todo:check placement 
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
         logits = paddle.matmul(hidden_states, self.weight, transpose_y=False)

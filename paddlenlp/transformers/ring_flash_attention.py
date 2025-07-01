@@ -35,9 +35,6 @@ class RingCommunicator:
         self.group_rank = group.rank
         self.send_rank = self.group.ranks[(self.group_rank + 1) % self.group.world_size]
         self.recv_rank = self.group.ranks[(self.group_rank - 1) % self.group.world_size]
-        # print(f'RingCommunicator rank {self.group_rank}, self.group:{self.group}')
-        # print(f'RingCommunicator send_rank {self.send_rank}, self.recv_rank:{self.recv_rank}')
-
 
         self._reqs = []
 
@@ -52,7 +49,7 @@ class RingCommunicator:
         else:
             self._k_buffer[self._next_buffer_idx].add_(key)
             self._v_buffer[self._next_buffer_idx].add_(value)
-            
+
     def get_buffers(self):
         return self._k_buffer[self._next_buffer_idx], self._v_buffer[self._next_buffer_idx]
 
@@ -183,7 +180,6 @@ def balanced_ring_flash_attention_fwd_func(
                 )
                 paddle.unsqueeze_(paddle.transpose_(block_lse, [0, 2, 1]), axis=-1)
                 out, lse = update_out_and_lse(out, lse, block_out, block_lse)
-            print(f'step {step} out:{out}, lse:{lse}')
 
         # TODO(zhangyuqin1998)：batch_isend_irecv异步流下，无法wait，需要修复。对性能有影响。
         # if step != cp_size - 1:
@@ -236,7 +232,6 @@ def balanced_ring_flash_attention_bwd_func(
             "the paddlenlp_ops by following the instructions "
             "provided at https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
         )
-    print(f'local_key:{local_key}, local_value:{local_value}')
     for step in range(cp_size):
         block_k, block_v = kv_comm_buffer.get_buffers()
 
@@ -259,13 +254,11 @@ def balanced_ring_flash_attention_bwd_func(
             query_grad_buffer.add_(block_q_grad)
         else:
             if step == 0:
-                print(f"step {step} local_query:{local_query}, block_k:{block_k}, block_v:{block_v}, local_out:{local_out}, lse:{lse}, out_grad:{out_grad}")
                 block_q_grad, block_k_grad, block_v_grad = flash_attn_bwd(
                     local_query, block_k, block_v, local_out, lse, fixed_seed_offset, None, out_grad, dropout, True
                 )
                 query_grad_buffer.add_(block_q_grad)
             elif step > rank:
-                print(f'step {step} local_query_second_chunk:{local_query_second_chunk}, block_k:{block_k}, block_v:{block_v}, local_out_second_chunk:{local_out_second_chunk}, lse_second_chunk:{lse_second_chunk}, out_grad_second_chunk:{out_grad_second_chunk}')
                 block_q_grad, block_k_grad, block_v_grad = flash_attn_bwd(
                     local_query_second_chunk,
                     block_k,
@@ -280,7 +273,6 @@ def balanced_ring_flash_attention_bwd_func(
                 )
                 query_grad_buffer[:, local_q_seq_len // 2 :, :, :].add_(block_q_grad)
             else:
-                print(f'step {step} local_query:{local_query}, block_k:{block_k}, block_v:{block_v}, local_out:{local_out}, lse:{lse}, out_grad:{out_grad}')
                 block_q_grad, block_k_grad, block_v_grad = flash_attn_bwd(
                     local_query,
                     block_k[:, : local_q_seq_len // 2, :, :],
@@ -294,7 +286,6 @@ def balanced_ring_flash_attention_bwd_func(
                     False,
                 )
                 query_grad_buffer.add_(block_q_grad)
-            print(f"step {step} block_q_grad:{block_q_grad}, block_k_grad:{block_k_grad}, block_v_grad:{block_v_grad}")
 
         # if step != cp_size - 1:
         #     kv_comm_buffer.wait()
@@ -307,7 +298,6 @@ def balanced_ring_flash_attention_bwd_func(
 
     grad_comm_buffer.wait()
     key_grad_buffer, value_grad_buffer = grad_comm_buffer.get_buffers()
-    print(f"key_grad_buffer:{key_grad_buffer}, value_grad_buffer:{value_grad_buffer}")
 
     return query_grad_buffer, key_grad_buffer, value_grad_buffer
 
@@ -353,7 +343,6 @@ class RingFlashAttention(PyLayer):
 
         if fixed_seed_offset is None:
             fixed_seed_offset = paddle.to_tensor([0, 0], place=paddle.CPUPlace(), dtype=paddle.int64)
-        print(f'out_grad:{out_grad}, query:{query}, key:{key}')
         query_grad, key_grad, value_grad = balanced_ring_flash_attention_bwd_func(
             group, out_grad, query, key, value, out, lse, fixed_seed_offset, attn_mask, dropout, is_causal
         )

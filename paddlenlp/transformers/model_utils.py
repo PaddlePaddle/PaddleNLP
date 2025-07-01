@@ -3006,7 +3006,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if "tensor_parallel" in auto_dist_degree and auto_dist_degree["tensor_parallel"]:
             merged_config["mp_config"] is not None
             final_config["mp_config"] = merged_config["mp_config"]
-            print(f'final_config1111:{final_config}')
 
         if "sequence_parallel" in auto_dist_degree and auto_dist_degree["sequence_parallel"]:
             merged_config["sp_config"] is not None
@@ -3041,7 +3040,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 "sharding_level": level,
                 "sharding_mesh_dim": auto_dist_degree.get("sharding_mesh_dim", None),
             }
-        print(f'final_config:{final_config}')
         return final_config
 
 

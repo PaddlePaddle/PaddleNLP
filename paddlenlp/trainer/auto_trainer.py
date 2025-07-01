@@ -787,14 +787,6 @@ class AutoTrainer(Trainer):
             self.scaler.scale(loss).backward()
         else:
             loss.backward()
-        # print(f'222 dynamic_training')
-        # for name, param in model.named_parameters():
-        #     if hasattr(param, "main_grad") and param.main_grad is not None:
-        #         grad_value = param.main_grad.numpy()
-        #         print(f"{name}: shape={grad_value.shape}, sample_values={grad_value.flatten()[:10]}")
-        #     elif hasattr(param, "grad") and param.grad is not None:
-        #         grad_value = param.grad.numpy()
-        #         print(f"{name}: 22shape={grad_value.shape}, sample_values={grad_value.flatten()[:10]}")
 
         return loss
 

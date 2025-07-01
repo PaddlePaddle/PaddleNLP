@@ -2523,7 +2523,7 @@ class Trainer:
         Return:
             `paddle.Tensor`: The tensor with training loss on this batch.
         """
-        print(f'into training_step')
+        
         if self.args.pipeline_parallel_degree > 1:
             return self.training_pipeline_step(model, inputs)
 
@@ -2539,11 +2539,6 @@ class Trainer:
             self.scaler.scale(loss).backward()
         else:
             loss.backward()
-        print(f'2222into training_step')
-        for name, param in model.named_parameters():
-            if hasattr(param, "main_grad") and param.main_grad is not None:
-                grad_value = param.main_grad.numpy()
-                print(f"{name}: shape={grad_value.shape}, sample_values={grad_value.flatten()[:10]}")
         return loss.detach()
 
     def training_pipeline_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
