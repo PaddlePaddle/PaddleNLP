@@ -546,7 +546,7 @@ class LlamaAttentionAuto(nn.Layer):
             if attention_mask is not None
             else None
         )
-        alibi_placement = [dist.Shard(0), dist.Replicate(), dist.Shard(1)]) if self.has_seq_mesh else [dist.Shard(0), dist.Shard(1)]
+        alibi_placement = [dist.Shard(0), dist.Replicate(), dist.Shard(1)] if self.has_seq_mesh else [dist.Shard(0), dist.Shard(1)]
         alibi = dist.reshard(alibi, get_mesh(self.ipp), alibi_placement) if alibi is not None else None
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
@@ -931,7 +931,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             )
         else:
             self.placements = (
-                [dist.Shard(1), dist.Replicate(), dist.Shard(0)] if self.config.sequence_parallel else [dist.Shard(0), dist.Replicate(), dist.Replicate()]
+                [dist.Shard(1), dist.Shard(0)] if self.config.sequence_parallel else [dist.Shard(0), dist.Replicate()]
             )
             embedding_placements = (
                 [dist.Replicate(), dist.Shard(1)]
