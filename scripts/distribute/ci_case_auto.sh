@@ -767,19 +767,19 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
         mem_base=-1
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
         
-        echo "---- run dygraph auto hybrid pp resueme from hybrid ckpt ----"
-        auto_task_name="llama_auto_bs8_fp16_dp2mp2pp2_hybrid_pp_resueme_from_hybrid_ckpt"
-        case_out_dir="output/$auto_task_name"
-        case_log_dir="output/$auto_task_name""_log"
-        rm -rf $case_out_dir
-        rm -rf $case_log_dir
+        echo "---- run dygraph auto hybrid pp resume from hybrid ckpt ----"
+        auto_task_name="llama_auto_bs8_fp16_dp2mp2pp2_hybrid_pp_resume_from_hybrid_ckpt"
+        auto_case_out_dir="auto_output/$auto_task_name"
+        auto_case_log_dir="auto_output/$auto_task_name""_log"
+        rm -rf $auto_case_out_dir
+        rm -rf $auto_case_log_dir
 
         python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
             --model_type "llama_pp" \
             --model_name_or_path "facebook/llama-7b" \
             --tokenizer_name_or_path "facebook/llama-7b" \
             --input_dir "./data" \
-            --output_dir $case_out_dir \
+            --output_dir $auto_case_out_dir \
             --split 949,50,1 \
             --max_seq_length 2048 \
             --hidden_size 1024 \
@@ -820,14 +820,14 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
             --enable_auto_parallel 1 \
             --to_static 0 \
             --max_grad_norm 0.0 \
-            --resume_from_checkpoint "output/llama_auto_bs8_fp16_dp2mp2pp2_hybrid_pp/checkpoint-9" \
+            --resume_from_checkpoint "${case_out_dir}/checkpoint-9" \
             >>${log_path}/$FUNCNAME 2>&1
-        pp_resueme_from_hybrid_ckpt_loss=`cat $case_out_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-        pp_resueme_from_hybrid_ckpt_ips=-1
-        pp_resueme_from_hybrid_ckpt_mem=-1
-        echo "pp_resueme from hybrid ckpt result: loss=$pp_resueme_from_hybrid_ckpt_loss ips=$pp_resueme_from_hybrid_ckpt_ips mem=$pp_resueme_from_hybrid_ckpt_mem"
+        pp_resume_from_hybrid_ckpt_loss=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+        pp_resume_from_hybrid_ckpt_ips=-1
+        pp_resume_from_hybrid_ckpt_mem=-1
+        echo "pp_resume from hybrid ckpt result: loss=$pp_resume_from_hybrid_ckpt_loss ips=$pp_resume_from_hybrid_ckpt_ips mem=$pp_resume_from_hybrid_ckpt_mem"
         
-        check_result $FUNCNAME ${loss_base} ${pp_resueme_from_hybrid_ckpt_loss} ${ips_base} ${pp_resueme_from_hybrid_ckpt_ips} ${mem_base} ${pp_resueme_from_hybrid_ckpt_mem}
+        check_result $FUNCNAME ${loss} ${pp_resume_from_hybrid_ckpt_loss} ${ips} ${pp_resume_from_hybrid_ckpt_ips} ${mem} ${pp_resume_from_hybrid_ckpt_mem}
         echo "=========== $FUNCNAME run  end ==========="
     fi
 }
