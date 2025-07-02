@@ -1652,9 +1652,10 @@ class DeepseekV2Attention(nn.Layer):
 
             outputs = self.memory_recompute_att(q_t1, compressed_kv, position_ids)
 
-            outputs = outputs.reshape([bsz, q_len, self.num_heads, -1])
-            outputs = outputs[..., : self.v_head_dim]
-            outputs = outputs.reshape([bsz, q_len, -1])
+            if self.v_head_dim * self.num_heads != outputs.shape[-1]:
+                outputs = outputs.reshape([bsz, q_len, self.num_heads, -1])
+                outputs = outputs[..., : self.v_head_dim]
+                outputs = outputs.reshape([bsz, q_len, -1])
         else:
             hidden_states = self.input_layernorm(hidden_states)
             if self.q_lora_rank is None:

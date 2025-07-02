@@ -180,6 +180,7 @@ class DeepseekV2Config(PretrainedConfig):
         speculate_model_type=False,
         using_flex_token=False,
         use_dualpipev=False,
+        send_mtp_embed=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -229,6 +230,7 @@ class DeepseekV2Config(PretrainedConfig):
         self.use_fp8 = False
         self.using_flex_token = using_flex_token
         self.use_dualpipev = use_dualpipev
+        self.send_mtp_embed = send_mtp_embed
 
         super().__init__(
             pad_token_id=pad_token_id,

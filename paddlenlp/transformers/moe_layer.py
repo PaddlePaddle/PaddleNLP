@@ -685,7 +685,7 @@ class FusionMlpNode:
         # expert_grad
         expert_out, probs_grad = self.experts_group_gemm_node.backward(unzipped_grad)
 
-        hs_fp8_dispatched_grad, dispatched_probs_grad = self.unzip_node.backward(
+        hs_bf16_dispatched_grad, dispatched_probs_grad = self.unzip_node.backward(
             expert_out,
             hidden_states_out_grad,
             probs_grad,
@@ -693,14 +693,14 @@ class FusionMlpNode:
             num_experts=len(self.tokens_per_expert),
         )
         self.reset_statue()
-        return hs_fp8_dispatched_grad, dispatched_probs_grad
+        return hs_bf16_dispatched_grad, dispatched_probs_grad
 
 
 class FusionMoeNode:
     def __init__(self, custom_map, name="fusion_moe_node"):
         self.token_dispatcher = custom_map.token_dispatcher
         self.moe_router_topk = custom_map.moe_router_topk
-
+        self.dispatch_quant_node = Fp8DispatchQuantNode(self.token_dispatcher)
         self.dispatch_node = Fp8DispatchNode(self.token_dispatcher)
         self.mlp_node = FusionMlpNode(custom_map, self.moe_router_topk, mem_efficient=True)
         self.combine_node = Fp8CombineNode(self.token_dispatcher)
