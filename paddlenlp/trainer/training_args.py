@@ -1745,22 +1745,23 @@ class TrainingArguments:
             self.strategy = strategy
             sep_degree = self.sep_parallel_degree if self.sep_parallel_degree > 1 else self.context_parallel_degree
             if self.hybrid_parallel_topo_order == "pp_first":
-                order = ["pp", "dp", "sep", "mp"]
+                order = ["pp", "dp", "mp"]
 
                 degree = [
                     self.pipeline_parallel_degree,
                     self.dataset_world_size,
-                    sep_degree,
                     self.tensor_parallel_degree,
                 ]
             elif self.hybrid_parallel_topo_order == "sharding_first":
-                order = ["dp", "pp", "sep", "mp"]
+                order = ["dp", "pp", "mp"]
                 degree = [
                     self.dataset_world_size,
                     self.pipeline_parallel_degree,
-                    sep_degree,
                     self.tensor_parallel_degree,
                 ]
+            if sep_degree > 1:
+                order.insert(-1, "sep")
+                degree.insert(-1, sep_degree)
             mesh_dims = list(zip(order, degree))
             fleet.auto.create_mesh(mesh_dims)
 

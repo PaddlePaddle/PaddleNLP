@@ -721,7 +721,7 @@ class LlamaDecoderLayerAuto(nn.Layer):
         hidden_states = self.post_attention_layernorm(hidden_states)
 
         # enter tp region
-        has_seq_mesh = self.config.context_parallel_degree > 1 or self.sep_parallel_degree > 1
+        has_seq_mesh = self.config.context_parallel_degree > 1 or self.config.sep_parallel_degree > 1
         if self.config.sequence_parallel:
             hidden_states = dist.reshard(
                 hidden_states,
