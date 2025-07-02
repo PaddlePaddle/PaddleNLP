@@ -26,8 +26,7 @@ except ImportError:
 
 
 try:
-    import deep_gemm
-    import FusedQuantOps as FQO
+    from paddle.incubate.fp8 import deep_gemm
 except:
     pass
 
@@ -311,7 +310,7 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
         o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=do3.dtype)
         deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1)
 
-        x_dequant_fp16 = FQO.fused_act_dequant(x_fp8, x_scale.T.contiguous())
+        x_dequant_fp16 = paddle.incubate.nn.functional.fused_act_dequant(x_fp8, x_scale.T.contiguous())
         x_dequant_fp16 = padding(x_dequant_fp16, 0)
 
         _, _, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
@@ -436,7 +435,7 @@ class FP8GroupGemmMlpFunctionNode:
         self.tokens_per_expert = tokens_per_expert
         self.m_indices = gen_m_indices(tokens_per_expert)
         # concat w1, shape is [num_groups, n, k]
-        w1_t_quant, w1_t_scale = FQO.fused_stack_transpose_quant(expert_w1)
+        w1_t_quant, w1_t_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(expert_w1, transpose=True)
         w1_t_quant = w1_t_quant.reshape([num_expert, -1, w1_t_quant.shape[-1]])
         w1_t_scale = w1_t_scale.reshape([num_expert, -1, w1_t_scale.shape[-1]])
 
@@ -472,14 +471,17 @@ class FP8GroupGemmMlpFunctionNode:
         [m_sum, k] = [m_sum, n] * [num_groups, n, k]
         """
         # concat and transpose w2
-        w2_quant, w2_scale = FQO.fused_stack_transpose_quant(expert_w2)
+        w2_quant, w2_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(expert_w2, transpose=True)
         w2_quant = w2_quant.reshape([num_expert, -1, w2_quant.shape[-1]])
         w2_scale = w2_scale.reshape([num_expert, -1, w2_scale.shape[-1]])
 
         # quant o2
-        o2_fp8, o2_scale = FQO.fused_spaq(o1, unzipped_probs, using_pow2_scaling=True)
+        with paddle.amp.auto_cast(False):
+            o2_fp8, o2_scale = paddle.incubate.nn.functional.fused_weighted_swiglu_act_quant(
+                o1, unzipped_probs, using_pow2_scaling=True
+            )
         o2_scale = paddle.transpose(paddle.transpose(o2_scale, [1, 0]).contiguous(), [1, 0])
-        self.unzipped_probs = unzipped_probs
+        self.unzipped_probs = unzipped_probs.unsqueeze(-1)
 
         # compute gemm
         o3 = paddle.zeros([o2_fp8.shape[0], w2_quant.shape[1]], dtype=o1.dtype)
@@ -495,7 +497,9 @@ class FP8GroupGemmMlpFunctionNode:
         [m_sum, n] = [m_sum, k] * [num_groups, k, n]
         """
         # recompute concated_w2_2d
-        bw_w2_quant, bw_w2_scale = FQO.fused_stack_quant(expert_w2)
+        bw_w2_quant, bw_w2_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(
+            expert_w2, transpose=False
+        )
         bw_w2_quant = bw_w2_quant.reshape([len(expert_w2), -1, bw_w2_quant.shape[-1]])
         bw_w2_scale = bw_w2_scale.reshape([len(expert_w2), -1, bw_w2_scale.shape[-1]])
 
@@ -509,7 +513,10 @@ class FP8GroupGemmMlpFunctionNode:
                 (unzipped_grad_fp8, unzipped_grad_scale), (bw_w2_quant, bw_w2_scale), do2_s, m_indices=self.m_indices
             )
 
-        do1, probs_grad, o2_s = FQO.fused_swiglu_probs_bwd(o1, do2_s, self.unzipped_probs)
+        with paddle.amp.auto_cast(False):
+            do1, probs_grad, o2_s = paddle.incubate.nn.functional.fused_swiglu_weighted_bwd(
+                o1, do2_s, self.unzipped_probs
+            )
 
         return do1, o2_s, probs_grad
 
@@ -523,7 +530,9 @@ class FP8GroupGemmMlpFunctionNode:
         [m_sum, k] = [m_sum, n] * [num_groups, n, k]
         """
         # recompute concated_w1_t
-        bw_w1_quant, bw_w1_scale = FQO.fused_stack_quant(expert_w1)
+        bw_w1_quant, bw_w1_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(
+            expert_w1, transpose=False
+        )
         bw_w1_quant = bw_w1_quant.reshape([len(expert_w1), -1, bw_w1_quant.shape[-1]])
         bw_w1_scale = bw_w1_scale.reshape([len(expert_w1), -1, bw_w1_scale.shape[-1]])
 
@@ -541,11 +550,7 @@ class FP8GroupGemmMlpFunctionNode:
         return dx
 
     def fused_transpose_split_quant(self, x, tokens_per_expert, pow_2_scales):
-        out, scale = [], []
-        for tokens in tokens_per_expert:
-            out.append(paddle.empty([x.shape[1], tokens], dtype="float8_e4m3fn"))
-            scale.append(paddle.empty([tokens // 128, x.shape[1]], dtype="float32"))
-        FQO.fused_transpose_split_quant(x, out, scale, pow_2_scales)
+        out, scale = paddle.incubate.nn.functional.fused_transpose_split_quant(x, tokens_per_expert, pow_2_scales)
         return out, scale
 
     def bwd_down_weight(self, do3, o2, expert_w2):
@@ -650,7 +655,7 @@ class FP8GroupGemmMlpFunctionNode:
         expert_w2 = [x.w2 for x in self.custom_map.experts if x is not None]
 
         if self.mem_efficient:
-            input = FQO.fused_act_dequant(self.input_fp8, self.input_scale)
+            input = paddle.incubate.nn.functional.fused_act_dequant(self.input_fp8, self.input_scale)
         else:
             input = self.input
 
