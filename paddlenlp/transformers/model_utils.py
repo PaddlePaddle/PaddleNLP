@@ -3013,7 +3013,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if "context_parallel" in auto_dist_degree and auto_dist_degree["context_parallel"]:
             merged_config["cp_config"] is not None
             final_config["cp_config"] = merged_config["cp_config"]
-        
+
         if "pipeline_parallel" in auto_dist_degree and auto_dist_degree["pipeline_parallel"]:
             merged_config["pp_config"] is not None
             final_config["pp_config"] = merged_config["pp_config"]

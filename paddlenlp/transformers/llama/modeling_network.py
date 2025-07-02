@@ -186,20 +186,23 @@ def scaled_dot_product_attention(
         attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
         return (attn_output, attn_weights) if output_attentions else attn_output
 
+
 class SDPALayer(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.config = config
 
-    def forward(self, 
-                query_states,
-                key_states, 
-                value_states,
-                attention_mask=None,
-                output_attentions=False,
-                alibi=None,
-                attn_mask_startend_row_indices=None,
-                backend=None):
+    def forward(
+        self,
+        query_states,
+        key_states,
+        value_states,
+        attention_mask=None,
+        output_attentions=False,
+        alibi=None,
+        attn_mask_startend_row_indices=None,
+        backend=None,
+    ):
         bsz, q_len, num_heads, head_dim = query_states.shape
         _, kv_seq_len, _, _ = value_states.shape
 
@@ -288,13 +291,7 @@ class ROPELayer(nn.Layer):
         super().__init__()
         self.config = config
 
-    def forward(self, 
-                query_states,
-                key_states, 
-                value_states,
-                position_ids,
-                rotary_emb=None,
-                past_key_value=None):
+    def forward(self, query_states, key_states, value_states, position_ids, rotary_emb=None, past_key_value=None):
         if self.config.use_fused_rope:
             assert past_key_value is None, "fuse rotary not support cache kv for now"
             batch_size, seq_length, num_heads, head_dim = query_states.shape
@@ -336,7 +333,8 @@ class ROPELayer(nn.Layer):
             # hack here, because elementwise infer spmd not support broadcast now
             query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
         return query_states, key_states
-      
+
+
 class LlamaRMSNormNet(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -550,8 +548,15 @@ class LlamaAttentionNet(nn.Layer):
             kv_seq_len += past_key_value[0].shape[-3]
 
         if self.config.rope:
-            query_states, key_states = self.rope_func(query_states, key_states, value_states, position_ids, rotary_emb=self.rotary_emb, past_key_value=past_key_value)
-            
+            query_states, key_states = self.rope_func(
+                query_states,
+                key_states,
+                value_states,
+                position_ids,
+                rotary_emb=self.rotary_emb,
+                past_key_value=past_key_value,
+            )
+
         # [bs, seq_len, num_head, head_dim]
         if past_key_value is not None:
             # reuse k, v, self_attention
@@ -603,7 +608,7 @@ class LlamaAttentionNet(nn.Layer):
             attn_output, attn_weights = outputs
         else:
             attn_output = outputs
-        
+
         bsz, q_len, num_heads, head_dim = query_states.shape
         attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
 
@@ -1085,7 +1090,9 @@ def layer_input_parallel_row_hook(process_mesh):
                 x = dist.shard_tensor(input, process_mesh, [dist.Shard(0), dist.Replicate(), dist.Replicate()])
                 res_inputs.append(dist.reshard(x, process_mesh, [dist.Shard(0), dist.Replicate(), dist.Replicate()]))
             else:
-                res_inputs.append(dist.reshard(input, process_mesh, [dist.Shard(0), dist.Replicate(), dist.Replicate()]))
+                res_inputs.append(
+                    dist.reshard(input, process_mesh, [dist.Shard(0), dist.Replicate(), dist.Replicate()])
+                )
         return tuple(res_inputs)
 
     return hook
@@ -1111,12 +1118,15 @@ def layer_input_replicate_hook(process_mesh):
         for input in inputs:
             if not input.is_dist():
                 x = dist.shard_tensor(input, process_mesh, [dist.Replicate(), dist.Replicate(), dist.Replicate()])
-                res_inputs.append(dist.reshard(x, process_mesh, [dist.Replicate(), dist.Replicate(), dist.Replicate()]))
+                res_inputs.append(
+                    dist.reshard(x, process_mesh, [dist.Replicate(), dist.Replicate(), dist.Replicate()])
+                )
             else:
                 res_inputs.append(dist.reshard(input, process_mesh, [dist.Replicate(), dist.Replicate()]))
         return tuple(res_inputs)
 
     return hook
+
 
 def layer_input_rope_hook(process_mesh):
     def hook(layer, inputs, output=None):
@@ -1143,9 +1153,7 @@ def layer_input_rope_hook(process_mesh):
                     (chunk_num - rank - 1) * chunk_size, (chunk_num - rank) * chunk_size, dtype="int64"
                 )
                 position_ids = paddle.concat([first_chunk_ids, second_chunk_ids]).expand((batch_size, seq_length))
-                position_ids = dist.auto_parallel.api.dtensor_from_local(
-                    position_ids, process_mesh, placements
-                )
+                position_ids = dist.auto_parallel.api.dtensor_from_local(position_ids, process_mesh, placements)
                 res_inputs.append(position_ids)
             else:
                 res_inputs.append(inputs[index])
@@ -1153,21 +1161,23 @@ def layer_input_rope_hook(process_mesh):
 
     return hook
 
+
 def layer_output_rope_hook(process_mesh):
     def hook(layer, inputs, outputs):
         res_outputs = []
         for output in outputs:
             process_mesh = output.process_mesh
             placements = output.placements
-            cp_index = process_mesh.dim_names.index('sep')  # get the axis for the split
+            cp_index = process_mesh.dim_names.index("sep")  # get the axis for the split
             cp_degree = process_mesh.shape[cp_index]
             assert cp_degree > 1, f"cp_degree:{cp_degree} must > 1"
-            placements[cp_index] = dist.Shard(1) # seq_dim:1
-            output = dist.reshard(output,process_mesh,placements)
+            placements[cp_index] = dist.Shard(1)  # seq_dim:1
+            output = dist.reshard(output, process_mesh, placements)
             res_outputs.append(output)
         return tuple(res_outputs)
 
     return hook
+
 
 class LlamaForCausalLMNet(LlamaPretrainedModelNet):
     enable_to_static_method = True
@@ -1352,10 +1362,10 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
                         PrepareLayerOutput(layer_output_rope_hook),
                     ],
                     f"{prefix}llama.layers.*.self_attn.sdpa": dist.ContextParallel(
-                        backend='p2p' if self.config.context_parallel_degree > 1 else 'all2all'
+                        backend="p2p" if self.config.context_parallel_degree > 1 else "all2all"
                     ),
                 }
-            }
+            },
         }
 
         return config
