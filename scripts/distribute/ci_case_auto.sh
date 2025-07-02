@@ -164,7 +164,7 @@ function llm_gpt_case_list_auto() {
         llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2
         llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2
         llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2
-        # llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
+        llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
         llm_gpt_pir_auto_bs4_TP2
         llm_gpt_pir_auto_bs4_TP2_PP2
         llm_gpt_pir_auto_bs8_DP2_TP2_PP2
@@ -223,7 +223,7 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
         
         export CUDA_DEVICE_MAX_CONNECTIONS=1
 
-        flags=("" "FLAGS_fuse_allreduce_in_opt" "FLAGS_fuse_reducescatter_in_opt" "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap")
+        flags=("" "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap")
         for i in "${!flags[@]}"; do
             flag="${flags[$i]}"
 
@@ -290,7 +290,7 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
                     --tensor_parallel_degree 1 \
                     --sharding "stage1" \
                     --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
-                    --sharding_parallel_config "" \
+                    --sharding_parallel_config "enable_tensor_fusion enable_overlap" \
                     --to_static 0 \
                     --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
                     --amp_custom_white_list "lookup_table" "lookup_table_v2" \
@@ -303,10 +303,6 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
                 echo "flag=$flag acc_step=$acc_step"
                 if [ -z "$flag" ]; then
                     loss_base=9.23504791
-                elif [ "$flag" = "FLAGS_fuse_allreduce_in_opt" ]; then
-                    loss_base=9.23502579
-                elif [ "$flag" = "FLAGS_fuse_reducescatter_in_opt" ]; then
-                    loss_base=9.23504105
                 elif [ "$flag" = "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap" ]; then
                     if [ $acc_step -eq 1 ]; then
                         loss_base=9.23504868
@@ -2653,7 +2649,7 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.58456802     # note: need to debug
-    loss_base=10.56716251
+    loss_base=10.56668091
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
@@ -3844,7 +3840,6 @@ function llama_baichuan_dygraph_auto_sp_async_reduce_scatter_bs8_bf16_DP4-MP2-SP
         export NVIDIA_TF32_OVERRIDE=0
 
         export CUDA_DEVICE_MAX_CONNECTIONS=1
-        export FLAGS_fuse_reducescatter_in_opt=1
         export FLAGS_enable_inplace_master_grad=1
         export FLAGS_auto_parallel_align_mode=1
         export FLAGS_max_inplace_grad_add=65536
