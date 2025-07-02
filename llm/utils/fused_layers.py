@@ -21,6 +21,7 @@ from paddle.distributed.fleet.utils.log_util import logger
 from paddle.framework import core
 
 _mp_async_allreduce = False
+_sp_async_reduce_scatter = False
 _raise_cuda_env_unset_warning = True
 
 
@@ -37,7 +38,37 @@ else:
     origin_linear = paddle.nn.functional.linear
 
 
-def sync_allreduce(task, dist_tensor, mp_placement_index):
+def mp_async_allreduce(x_grad):
+    if _mp_async_allreduce and x_grad.process_mesh is not None:
+        # Using small operation to preempt GPU SMs for all_reduce to achieve overlap.
+        if int(os.getenv("CUDA_DEVICE_MAX_CONNECTIONS", "0")) != 1:
+            global _raise_cuda_env_unset_warning
+            if _raise_cuda_env_unset_warning:
+                logger.warning(
+                    "You set mp_async_allreduce=True, but you forget to set environment "
+                    "variable CUDA_DEVICE_MAX_CONNECTIONS=1, which may leads to performance "
+                    "loss. Try to export CUDA_DEVICE_MAX_CONNECTIONS=1 for better performance."
+                )
+                _raise_cuda_env_unset_warning = False
+
+        mp_placement_index = x_grad.process_mesh.dim_names.index("mp")
+        if mp_placement_index != -1 and x_grad.placements[mp_placement_index].is_partial():
+            hcg = fleet.get_hybrid_communicate_group()
+            model_parallel_group = hcg.get_model_parallel_group()
+            task = dist.stream.all_reduce(
+                x_grad._local_value(),
+                group=model_parallel_group,
+                sync_op=False,
+            )
+            return task
+        else:
+            return None
+    else:
+        return None
+
+
+def sync_mp_allreduce(task, dist_tensor):
+    mp_placement_index = dist_tensor.process_mesh.dim_names.index("mp")
     new_placments = list()
     for idx, placment in enumerate(dist_tensor.placements):
         if idx == mp_placement_index:
@@ -70,28 +101,7 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
         x, weight, bias = ctx.saved_tensor()
         x_grad = paddle.matmul(y_grad, weight, transpose_y=True)
 
-        task = None
-        if _mp_async_allreduce and x_grad.process_mesh is not None:
-            # Using small operation to preempt GPU SMs for all_reduce to achieve overlap.
-            if int(os.getenv("CUDA_DEVICE_MAX_CONNECTIONS", "0")) != 1:
-                global _raise_cuda_env_unset_warning
-                if _raise_cuda_env_unset_warning:
-                    logger.warning(
-                        "You set mp_async_allreduce=True, but you forget to set environment "
-                        "variable CUDA_DEVICE_MAX_CONNECTIONS=1, which may leads to performance "
-                        "loss. Try to export CUDA_DEVICE_MAX_CONNECTIONS=1 for better performance."
-                    )
-                    _raise_cuda_env_unset_warning = False
-
-            mp_placement_index = x_grad.process_mesh.dim_names.index("mp")
-            if mp_placement_index != -1 and x_grad.placements[mp_placement_index].is_partial():
-                hcg = fleet.get_hybrid_communicate_group()
-                model_parallel_group = hcg.get_model_parallel_group()
-                task = dist.stream.all_reduce(
-                    x_grad._local_value(),
-                    group=model_parallel_group,
-                    sync_op=False,
-                )
+        mp_task = mp_async_allreduce(x_grad)
 
         # _C_ops.fused_linear_param_grad_add(x, y_grad, dw, db, multi precision, has bias)
         if bias is None:
@@ -99,29 +109,29 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
                 weight.main_grad, _ = _C_ops.fused_linear_param_grad_add(
                     x, y_grad, weight.main_grad, None, True, False
                 )
-                if task is not None:
-                    x_grad = sync_allreduce(task, x_grad, mp_placement_index)
+                if mp_task is not None:
+                    x_grad = sync_mp_allreduce(mp_task, x_grad)
                 return x_grad, None
             else:
                 if weight.grad is not None:
                     weight.grad, _ = _C_ops.fused_linear_param_grad_add(
                         x, y_grad, weight.grad, None, False if weight.grad.dtype != paddle.float32 else True, False
                     )
-                    if task is not None:
-                        x_grad = sync_allreduce(task, x_grad, mp_placement_index)
+                    if mp_task is not None:
+                        x_grad = sync_mp_allreduce(mp_task, x_grad)
                     return x_grad, None
                 else:
-                    if task is not None:
-                        x_grad = sync_allreduce(task, x_grad, mp_placement_index)
                     weight_grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False, False)
+                    if mp_task is not None:
+                        x_grad = sync_mp_allreduce(mp_task, x_grad)
                     return x_grad, weight_grad
 
         if hasattr(weight, "main_grad") and hasattr(bias, "main_grad"):
             weight.main_grad, bias.main_grad = _C_ops.fused_linear_param_grad_add(
                 x, y_grad, weight.main_grad, bias.main_grad, True, True
             )
-            if task is not None:
-                x_grad = sync_allreduce(task, x_grad, mp_placement_index)
+            if mp_task is not None:
+                x_grad = sync_mp_allreduce(mp_task, x_grad)
             return x_grad, None, None
         else:
             if weight.grad is not None:
@@ -129,20 +139,60 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
                 weight.grad, bias.grad = _C_ops.fused_linear_param_grad_add(
                     x, y_grad, weight.grad, bias.grad, False if weight.grad.dtype != paddle.float32 else True, True
                 )
-                if task is not None:
-                    x_grad = sync_allreduce(task, x_grad, mp_placement_index)
+                if mp_task is not None:
+                    x_grad = sync_mp_allreduce(mp_task, x_grad)
                 return x_grad, None, None
             else:
                 weight_grad, bias_grad = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False, True)
-                if task is not None:
-                    x_grad = sync_allreduce(task, x_grad, mp_placement_index)
+                if mp_task is not None:
+                    x_grad = sync_mp_allreduce(mp_task, x_grad)
                 return x_grad, weight_grad, bias_grad
 
 
-def mock_layers(mp_async_allreduce=False):
-    global _mp_async_allreduce
-    _mp_async_allreduce = mp_async_allreduce
+class OverlapLinearWithGradAdd(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, x, weight, bias=None, name=None):
+        y = origin_linear(x, weight, bias)
+        ctx.save_for_backward(x, weight, bias)
+        return y
 
-    paddle.nn.functional.linear = FusedLinearWithGradAdd.apply
-    if is_fused_matmul_bias_supported():
-        paddle.incubate.nn.functional.fused_linear = FusedLinearWithGradAdd.apply
+    @staticmethod
+    def backward(ctx, y_grad):
+        x, weight, bias = ctx.saved_tensor()
+        x_grad = paddle.matmul(y_grad, weight, transpose_y=True)
+
+        mp_task = mp_async_allreduce(x_grad)
+
+        y_grad = y_grad.reshape([-1, y_grad.shape[-1]])
+        weight_grad = paddle.matmul(
+            x.reshape([-1, x.shape[-1]]),
+            y_grad,
+            transpose_x=True,
+        )
+        if bias is None:
+            if mp_task is not None:
+                x_grad = sync_mp_allreduce(mp_task, x_grad)
+            return x_grad, weight_grad
+        else:
+            dbias = paddle.sum(y_grad, axis=0)
+            if mp_task is not None:
+                x_grad = sync_mp_allreduce(mp_task, x_grad)
+            return x_grad, weight_grad, dbias
+
+
+def mock_layers(
+    enable_fused_linear_grad_add=False, enable_mp_async_allreduce=False, enable_sp_async_reduce_scatter=False
+):
+    global _mp_async_allreduce
+    global _sp_async_reduce_scatter
+    _mp_async_allreduce = enable_mp_async_allreduce
+    _sp_async_reduce_scatter = enable_sp_async_reduce_scatter
+
+    if enable_fused_linear_grad_add:
+        paddle.nn.functional.linear = FusedLinearWithGradAdd.apply
+        if is_fused_matmul_bias_supported():
+            paddle.incubate.nn.functional.fused_linear = FusedLinearWithGradAdd.apply
+    else:
+        paddle.nn.functional.linear = OverlapLinearWithGradAdd.apply
+        if is_fused_matmul_bias_supported():
+            paddle.incubate.nn.functional.fused_linear = OverlapLinearWithGradAdd.apply
