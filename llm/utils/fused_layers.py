@@ -149,7 +149,7 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
                 return x_grad, weight_grad, bias_grad
 
 
-class OverlapLinearWithGradAdd(paddle.autograd.PyLayer):
+class OverlapLinear(paddle.autograd.PyLayer):
     @staticmethod
     def forward(ctx, x, weight, bias=None, name=None):
         y = origin_linear(x, weight, bias)
@@ -181,7 +181,7 @@ class OverlapLinearWithGradAdd(paddle.autograd.PyLayer):
 
 
 def mock_layers(
-    enable_fused_linear_grad_add=False, enable_mp_async_allreduce=False, enable_sp_async_reduce_scatter=False
+    enable_fused_linear_grad_add=True, enable_mp_async_allreduce=False, enable_sp_async_reduce_scatter=False
 ):
     global _mp_async_allreduce
     global _sp_async_reduce_scatter
@@ -193,6 +193,6 @@ def mock_layers(
         if is_fused_matmul_bias_supported():
             paddle.incubate.nn.functional.fused_linear = FusedLinearWithGradAdd.apply
     else:
-        paddle.nn.functional.linear = OverlapLinearWithGradAdd.apply
+        paddle.nn.functional.linear = OverlapLinear.apply
         if is_fused_matmul_bias_supported():
-            paddle.incubate.nn.functional.fused_linear = OverlapLinearWithGradAdd.apply
+            paddle.incubate.nn.functional.fused_linear = OverlapLinear.apply
