@@ -15,7 +15,6 @@
 """Paddle Llama model"""
 from __future__ import annotations
 
-import numpy as np
 import math
 import os
 import warnings
@@ -149,7 +148,7 @@ def scaled_dot_product_attention(
                 value_states,
                 attn_mask=None,
                 is_causal=True,
-                backend='p2p',
+                backend="p2p",
             )
         else:
             attn_output = fusion_ops.fusion_flash_attention(
@@ -204,11 +203,18 @@ def scaled_dot_product_attention(
 def get_colwise_placement(has_seq_mesh):
     return [dist.Replicate(), dist.Replicate(), dist.Shard(1)] if has_seq_mesh else [dist.Replicate(), dist.Shard(1)]
 
+
 def get_rowwise_placement(has_seq_mesh):
     return [dist.Replicate(), dist.Replicate(), dist.Shard(0)] if has_seq_mesh else [dist.Replicate(), dist.Shard(0)]
 
+
 def get_replicate_placement(has_seq_mesh):
-    return [dist.Replicate(), dist.Replicate(), dist.Replicate()] if has_seq_mesh else [dist.Replicate(), dist.Replicate()]
+    return (
+        [dist.Replicate(), dist.Replicate(), dist.Replicate()]
+        if has_seq_mesh
+        else [dist.Replicate(), dist.Replicate()]
+    )
+
 
 class LlamaRMSNormAuto(nn.Layer):
     def __init__(self, config, ipp):
@@ -228,7 +234,6 @@ class LlamaRMSNormAuto(nn.Layer):
             get_replicate_placement(has_seq_mesh),
         )
         self.variance_epsilon = config.rms_norm_eps
-        
 
     def forward(self, hidden_states):
         if self.config.use_fused_rms_norm:
@@ -445,7 +450,9 @@ class LlamaAttentionAuto(nn.Layer):
             hidden_states = dist.reshard(
                 hidden_states,
                 get_mesh(self.ipp),
-                [dist.Shard(1), dist.Replicate(), dist.Replicate()] if self.has_seq_mesh else [dist.Shard(1), dist.Replicate()],
+                [dist.Shard(1), dist.Replicate(), dist.Replicate()]
+                if self.has_seq_mesh
+                else [dist.Shard(1), dist.Replicate()],
             )
 
         if self.fuse_attention_qkv and not enable_fuse_ffn_qkv_pass():
@@ -509,12 +516,12 @@ class LlamaAttentionAuto(nn.Layer):
                     query_states = dist.reshard(
                         query_states,
                         get_mesh(self.ipp),
-                        [dist.Shard(0),  dist.Shard(1), dist.Shard(2)],
+                        [dist.Shard(0), dist.Shard(1), dist.Shard(2)],
                     )
                     key_states = dist.reshard(
                         key_states,
                         get_mesh(self.ipp),
-                        [dist.Shard(0),  dist.Shard(1), dist.Shard(2)],
+                        [dist.Shard(0), dist.Shard(1), dist.Shard(2)],
                     )
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
@@ -542,11 +549,19 @@ class LlamaAttentionAuto(nn.Layer):
             value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         attention_mask = (
-            dist.reshard(attention_mask, get_mesh(self.ipp), [dist.Shard(0), dist.Replicate(), dist.Replicate()] if self.has_seq_mesh else [dist.Shard(0), dist.Replicate()])
+            dist.reshard(
+                attention_mask,
+                get_mesh(self.ipp),
+                [dist.Shard(0), dist.Replicate(), dist.Replicate()]
+                if self.has_seq_mesh
+                else [dist.Shard(0), dist.Replicate()],
+            )
             if attention_mask is not None
             else None
         )
-        alibi_placement = [dist.Shard(0), dist.Replicate(), dist.Shard(1)] if self.has_seq_mesh else [dist.Shard(0), dist.Shard(1)]
+        alibi_placement = (
+            [dist.Shard(0), dist.Replicate(), dist.Shard(1)] if self.has_seq_mesh else [dist.Shard(0), dist.Shard(1)]
+        )
         alibi = dist.reshard(alibi, get_mesh(self.ipp), alibi_placement) if alibi is not None else None
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
@@ -593,7 +608,9 @@ class LlamaAttentionAuto(nn.Layer):
             attn_output = dist.reshard(
                 attn_output,
                 get_mesh(self.ipp),
-                [dist.Shard(1), dist.Replicate(), dist.Shard(0)] if self.has_seq_mesh else [dist.Shard(1), dist.Shard(0)],
+                [dist.Shard(1), dist.Replicate(), dist.Shard(0)]
+                if self.has_seq_mesh
+                else [dist.Shard(1), dist.Shard(0)],
             )
         if not output_attentions:
             attn_weights = None
@@ -709,7 +726,9 @@ class LlamaDecoderLayerAuto(nn.Layer):
             hidden_states = dist.reshard(
                 hidden_states,
                 get_mesh(self.ipp),
-                [dist.Shard(1), dist.Replicate(), dist.Replicate()] if has_seq_mesh else [dist.Shard(1), dist.Replicate()],
+                [dist.Shard(1), dist.Replicate(), dist.Replicate()]
+                if has_seq_mesh
+                else [dist.Shard(1), dist.Replicate()],
             )
 
         hidden_states = self.mlp(hidden_states)
@@ -914,10 +933,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             self.hidden_size,
         )
         self.placements = None
-        if (
-            self.config.context_parallel_degree > 1
-            or self.config.sep_parallel_degree > 1
-        ):
+        if self.config.context_parallel_degree > 1 or self.config.sep_parallel_degree > 1:
             # [dp,sep,mp]
             self.placements = (
                 [dist.Shard(1), dist.Replicate(), dist.Shard(0)]
@@ -1228,7 +1244,6 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                     loss = paddle.mean(masked_lm_loss).unsqueeze(0)
                     return loss.unsqueeze(0)
 
-                dp_placement = [dist.Shard(0), dist.Replicate(), dist.Replicate()] if self.config.context_parallel_degree > 1 or self.config.sep_parallel_degree > 1 else [dist.Shard(0), dist.Replicate()]
                 out_dist_attrs = [
                     [dist.Shard(0), dist.Replicate()],
                 ]
@@ -1393,7 +1408,9 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
             hidden_states = dist.reshard(
                 hidden_states,
                 get_mesh(-1),
-                [dist.Shard(1), dist.Replicate(), dist.Replicate()] if self.config.context_parallel_degree > 1 or self.config.sep_parallel_degree > 1 else [dist.Shard(1), dist.Replicate()],
+                [dist.Shard(1), dist.Replicate(), dist.Replicate()]
+                if self.config.context_parallel_degree > 1 or self.config.sep_parallel_degree > 1
+                else [dist.Shard(1), dist.Replicate()],
             )
             hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
 

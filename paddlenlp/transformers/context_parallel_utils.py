@@ -26,10 +26,8 @@
 
 
 import paddle
+from paddle.distributed.auto_parallel.ring_attention import shard_seq_load_balance
 from paddle.distributed.fleet import fleet
-from paddle.distributed.auto_parallel.ring_attention import (
-    shard_seq_load_balance,
-)
 
 
 def split_inputs_sequence_dim_load_balance(inputs, rank=None, degree=None):
@@ -66,12 +64,13 @@ def split_inputs_sequence_dim_load_balance(inputs, rank=None, degree=None):
         raise ValueError(f"the inputs should be a list or a dict, but is type: {type(inputs)}")
     return res
 
+
 def split_sequence_dim_load_balance(inputs):
-    '''
+    """
     for auto_parallel mode
-    '''
+    """
     if isinstance(inputs, paddle.Tensor):
-        return shard_seq_load_balance(inputs,1)
+        return shard_seq_load_balance(inputs, 1)
     elif isinstance(inputs, dict):
         res = {}
         for k, tensor in inputs.items():
@@ -83,4 +82,3 @@ def split_sequence_dim_load_balance(inputs):
     else:
         raise ValueError(f"the inputs should be a list or a dict, but is type: {type(inputs)}")
     return res
-
