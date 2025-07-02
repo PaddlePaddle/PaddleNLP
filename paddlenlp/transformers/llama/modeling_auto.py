@@ -282,7 +282,7 @@ class LlamaMLPAuto(nn.Layer):
         self.down_proj.weight = dist.shard_tensor(
             self.down_proj.weight,
             get_mesh(self.ipp),
-            get_rowwise_placement(has_seq_mesh),,
+            get_rowwise_placement(has_seq_mesh),
         )
 
     def forward(self, x):
