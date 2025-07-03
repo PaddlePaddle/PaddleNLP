@@ -591,13 +591,6 @@ class FP8Mlp(paddle.nn.Layer):
         return FP8MlpFunction.apply(x, self.w1, self.w2)
 
 
-def gen_m_indices(tokens_per_expert):
-    tokens = []
-    for i in range(len(tokens_per_expert)):
-        tokens.append(paddle.full([tokens_per_expert[i]], i, dtype="int32"))
-    out = paddle.concat(tokens, axis=0)
-    return out
-
 def split_group_gemm(x_fp8, x_scale, w_fp8, w_scale, tokens_per_expert, gemm_out):
     start_idx = 0
     for i, token_num in enumerate(tokens_per_expert):
@@ -615,14 +608,15 @@ def split_group_gemm(x_fp8, x_scale, w_fp8, w_scale, tokens_per_expert, gemm_out
 
     return gemm_out
 
+
 class FP8GroupGemmMlpFunctionNode:
     def __init__(
-        self, 
-        custom_map, 
+        self,
+        custom_map,
         recompute_fwd_gate_up=False,
         dequant_input=False,
         is_split_group_gemm=False,
-        name="experts_group_gemm_contiguous_node"
+        name="experts_group_gemm_contiguous_node",
     ):
         self.experts = custom_map.experts
         self.recompute_fwd_gate_up = recompute_fwd_gate_up
@@ -679,7 +673,7 @@ class FP8GroupGemmMlpFunctionNode:
             tokens.append(paddle.full([tokens_per_expert[i]], i, dtype="int32"))
         out = paddle.concat(tokens, axis=0)
         return out
-    
+
     def fwd_gate_up(self, x_bf16, expert_w1, num_expert, tokens_per_expert):
         """
         o1 = x * w1
@@ -687,7 +681,7 @@ class FP8GroupGemmMlpFunctionNode:
         """
         self.tokens_per_expert = tokens_per_expert
         if not self.is_split_group_gemm:
-            self.m_indices = gen_m_indices(tokens_per_expert)
+            self.m_indices = self.gen_m_indices(tokens_per_expert)
         # concat w1, shape is [num_groups, n, k]
         w1_t_quant, w1_t_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(expert_w1, transpose=True)
         w1_t_quant = w1_t_quant.reshape([num_expert, -1, w1_t_quant.shape[-1]])
@@ -887,14 +881,14 @@ class FP8GroupGemmMlpFunctionNode:
         """
         if input_x is None:
             if self.dequant_input:
-                input_x = FQO.fused_act_dequant(self.input_fp8, self.input_scale)
+                input_x = paddle.incubate.nn.functional.fused_act_dequant(self.input_fp8, self.input_scale)
             else:
                 input_x = self.input
         if clear_input:
             self.input = None
             self.input_fp8 = None
             self.input_scale = None
-        
+
         input_x_t_fp8, input_x_t_scale = self.fused_transpose_split_quant(input_x, self.tokens_per_expert, True)
         del input_x
         do1_t_fp8, do1_t_scale = self.fused_transpose_split_quant(do1, self.tokens_per_expert, True)
@@ -945,7 +939,7 @@ class FP8GroupGemmMlpFunctionNode:
             o3 = paddle.zeros(shape, dtype=dtype)
             self.unzipped_probs = unzipped_probs.unsqueeze(-1)
             return o3
-        
+
         # get w1/w2
         expert_w1 = [x.w1 for x in self.experts if x is not None]
         expert_w2 = [x.w2 for x in self.experts if x is not None]
@@ -961,7 +955,7 @@ class FP8GroupGemmMlpFunctionNode:
             clear_o1 = True
 
         # o3
-        o3, unzipped_probs = self.fwd_down(o1, unzipped_probs, expert_w2, num_expert)
+        o3, unzipped_probs = self.fwd_down(o1, unzipped_probs, expert_w2, num_expert, clear_o1)
 
         # save for bwd
         self.unzipped_probs = unzipped_probs
