@@ -699,7 +699,7 @@ class FP8GroupGemmMlpFunctionNode:
         x_scale = paddle.transpose(paddle.transpose(x_scale, [1, 0]).contiguous(), [1, 0])
 
         # compute gemm
-        o1 = paddle.zeros([x_fp8.shape[0], w1_t_quant.shape[1]], dtype=expert_w1[0].dtype)
+        o1 = paddle.empty([x_fp8.shape[0], w1_t_quant.shape[1]], dtype=expert_w1[0].dtype)
         if numpy.prod(x_fp8.shape) != 0:
             if self.is_split_group_gemm:
                 split_group_gemm(x_fp8, x_scale, w1_t_quant, w1_t_scale, tokens_per_expert, o1)
@@ -772,14 +772,16 @@ class FP8GroupGemmMlpFunctionNode:
         unzipped_grad_fp8, unzipped_grad_scale = kitchen_quant(
             unzipped_grad, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        do2_s = paddle.zeros([unzipped_grad_fp8.shape[0], bw_w2_quant.shape[1]], dtype=unzipped_grad.dtype)
+        do2_s = paddle.empty([unzipped_grad_fp8.shape[0], bw_w2_quant.shape[1]], dtype=unzipped_grad.dtype)
         if numpy.prod(unzipped_grad_fp8.shape) != 0:
             if self.is_split_group_gemm:
                 split_group_gemm(
                     unzipped_grad_fp8, unzipped_grad_scale, bw_w2_quant, bw_w2_scale, self.tokens_per_expert, do2_s
                 )
             else:
-
+                unzipped_grad_scale = paddle.transpose(
+                    paddle.transpose(unzipped_grad_scale, [1, 0]).contiguous(), [1, 0]
+                )
                 deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
                     (unzipped_grad_fp8, unzipped_grad_scale),
                     (bw_w2_quant, bw_w2_scale),
@@ -818,7 +820,7 @@ class FP8GroupGemmMlpFunctionNode:
         # compute gemm
         dx_shape = [do1_fp8.shape[0], bw_w1_quant.shape[1]]
         if dx is None:
-            dx = paddle.zeros(shape=dx_shape, dtype=do1.dtype)
+            dx = paddle.empty(shape=dx_shape, dtype=do1.dtype)
         else:
             assert dx.shape == dx_shape, f"{dx.shape} vs {dx_shape}"
             dx.zero_()
@@ -826,6 +828,7 @@ class FP8GroupGemmMlpFunctionNode:
             if self.is_split_group_gemm:
                 split_group_gemm(do1_fp8, do1_scale, bw_w1_quant, bw_w1_scale, self.tokens_per_expert, dx)
             else:
+                do1_scale = paddle.transpose(paddle.transpose(do1_scale, [1, 0]).contiguous(), [1, 0])
                 deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
                     (do1_fp8, do1_scale), (bw_w1_quant, bw_w1_scale), dx, m_indices=self.m_indices
                 )
