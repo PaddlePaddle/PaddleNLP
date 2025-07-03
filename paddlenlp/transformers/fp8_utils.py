@@ -955,7 +955,7 @@ class FP8GroupGemmMlpFunctionNode:
             clear_o1 = True
 
         # o3
-        o3, unzipped_probs = self.fwd_down(o1, unzipped_probs, expert_w2, num_expert, clear_o1)
+        o3, unzipped_probs = self.fwd_down(o1, unzipped_probs, expert_w2, num_expert, clear_o1=clear_o1)
 
         # save for bwd
         self.unzipped_probs = unzipped_probs
