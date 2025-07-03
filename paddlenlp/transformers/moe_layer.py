@@ -593,7 +593,6 @@ class FusionMlpNode:
             dequant_input=dequant_input,
             is_split_group_gemm=is_split_group_gemm,
         )
-        
         self.unzip_node = UnZipNode(self.token_dispatcher)
         self.zip_node = ZipNode(self.token_dispatcher)
         self.dispatched_indices = None

@@ -19,14 +19,12 @@
 
 #define CUMSUM_BLOCK_SIZE 48  // cumsum开销和并行度之间的tradeoff的结果，勿动
 #define CUMSUM_INVALID_TAG -1  // 用于标记无效的cumsum，尝试过-114514但失败了
-#ifndef MAX_NUM_EXPERTS
-#define MAX_NUM_EXPERTS 8
-#endif
 
-typedef struct __align__(16) {
+template <int MAX_NUM_EXPERTS>
+struct __align__(16) expert_base_offset {
   int data[MAX_NUM_EXPERTS];
-}
-expert_base_offset;
+};
+
 
 // 多阶段算法，控制每block处理的行数来权衡额外开销
 //  首先解析routemap来更新专家当前所收到的token数，然后check前一个block给的前缀和并更新给下一个block
@@ -35,13 +33,14 @@ template <typename X_T,
           typename routemap_T,
           typename probs_T,
           bool has_scale,
-          bool fill_x>
+          bool fill_x,
+          int MAX_NUM_EXPERTS_C>
 __global__ void tokens_unzip_stable_kernel(
     const X_T *__restrict__ X,
     const routemap_T *__restrict__ routemap_topk,
     const probs_T *__restrict__ probs_topk,
     const float *__restrict__ XScale,
-    const expert_base_offset expert_base_offset,
+    const expert_base_offset<MAX_NUM_EXPERTS_C> expert_base_offset,
     X_T *__restrict__ X_unzipped,
     int *__restrict__ zipped_expertwise_rowmap,
     probs_T *__restrict__ probs_unzipped,
@@ -53,9 +52,9 @@ __global__ void tokens_unzip_stable_kernel(
     const int num_experts,
     const int topk) {
   const int block_row_base = blockIdx.x * CUMSUM_BLOCK_SIZE;
-  int cumsum_offset[MAX_NUM_EXPERTS];
-  int local_expert_offsets[MAX_NUM_EXPERTS];
-  int local_cumsum[MAX_NUM_EXPERTS];
+  int cumsum_offset[MAX_NUM_EXPERTS_C];
+  int local_expert_offsets[MAX_NUM_EXPERTS_C];
+  int local_cumsum[MAX_NUM_EXPERTS_C];
 #pragma unroll
   for (int i = 0; i < num_experts; i++) {
     cumsum_offset[i] =
@@ -66,13 +65,14 @@ __global__ void tokens_unzip_stable_kernel(
     local_cumsum[i] = 0;
   }
   const int base_row_idx = blockIdx.x * CUMSUM_BLOCK_SIZE;
-  __shared__ int shared_expert_rowmap[CUMSUM_BLOCK_SIZE][MAX_NUM_EXPERTS];
-  __shared__ probs_T shared_expert_probmap[CUMSUM_BLOCK_SIZE][MAX_NUM_EXPERTS];
+  __shared__ int shared_expert_rowmap[CUMSUM_BLOCK_SIZE][MAX_NUM_EXPERTS_C];
+  __shared__ probs_T
+      shared_expert_probmap[CUMSUM_BLOCK_SIZE][MAX_NUM_EXPERTS_C];
 
   // --------------------- thread0 单线程任务传递 -------------------------
   if (threadIdx.x == 0) [[unlikely]] {
-    int local_expert_rowmap[CUMSUM_BLOCK_SIZE][MAX_NUM_EXPERTS];
-    probs_T local_expert_probs[CUMSUM_BLOCK_SIZE][MAX_NUM_EXPERTS];
+    int local_expert_rowmap[CUMSUM_BLOCK_SIZE][MAX_NUM_EXPERTS_C];
+    probs_T local_expert_probs[CUMSUM_BLOCK_SIZE][MAX_NUM_EXPERTS_C];
 #pragma unroll
     for (int i = 0; i < CUMSUM_BLOCK_SIZE; i++) {
 #pragma unroll
@@ -160,12 +160,13 @@ __global__ void tokens_unzip_stable_kernel(
   }
 }
 // ---------------------------- Dispatch ---------------------------------
+template <int MAX_NUM_EXPERTS_C>
 void dispatch_tokens_unzip_stable(
     const paddle::Tensor &X,
     const paddle::Tensor &expert_routemap_topk,
     const paddle::Tensor &expert_prob_topk,
     const paddle::optional<paddle::Tensor> &XScale,
-    const expert_base_offset &expert_offsets,
+    const expert_base_offset<MAX_NUM_EXPERTS_C> &expert_offsets,
     paddle::Tensor &X_unzipped,
     paddle::Tensor &zipped_expertwise_rowmap,
     paddle::Tensor &token_prob_unzipped,
@@ -189,26 +190,30 @@ void dispatch_tokens_unzip_stable(
 #define GET_DATA(tensor, type) tensor.data<type>()
 
 // 分发处理不同的类型组合
-#define DISPATCH_CASE_IMPL(TOKEN_T, PROB_T, INT_T, HAS_SCALE, FILL_X)          \
-  do {                                                                         \
-    auto kernel =                                                              \
-        tokens_unzip_stable_kernel<TOKEN_T, INT_T, PROB_T, HAS_SCALE, FILL_X>; \
-    kernel<<<grid, block, 0, X.stream()>>>(                                    \
-        GET_DATA(X, TOKEN_T),                                                  \
-        GET_DATA(expert_routemap_topk, INT_T),                                 \
-        GET_DATA(expert_prob_topk, PROB_T),                                    \
-        XScale ? XScale->data<float>() : nullptr,                              \
-        expert_offsets,                                                        \
-        GET_DATA(X_unzipped, TOKEN_T),                                         \
-        GET_DATA(zipped_expertwise_rowmap, INT_T),                             \
-        GET_DATA(token_prob_unzipped, PROB_T),                                 \
-        XScale_unzipped.data<float>(),                                         \
-        global_expertwise_block_cumsum.data<int>(),                            \
-        total_zipped_tokens_num,                                               \
-        token_length,                                                          \
-        scale_length,                                                          \
-        num_experts,                                                           \
-        topk);                                                                 \
+#define DISPATCH_CASE_IMPL(TOKEN_T, PROB_T, INT_T, HAS_SCALE, FILL_X) \
+  do {                                                                \
+    auto kernel = tokens_unzip_stable_kernel<TOKEN_T,                 \
+                                             INT_T,                   \
+                                             PROB_T,                  \
+                                             HAS_SCALE,               \
+                                             FILL_X,                  \
+                                             MAX_NUM_EXPERTS_C>;      \
+    kernel<<<grid, block, 0, X.stream()>>>(                           \
+        GET_DATA(X, TOKEN_T),                                         \
+        GET_DATA(expert_routemap_topk, INT_T),                        \
+        GET_DATA(expert_prob_topk, PROB_T),                           \
+        XScale ? XScale->data<float>() : nullptr,                     \
+        expert_offsets,                                               \
+        GET_DATA(X_unzipped, TOKEN_T),                                \
+        GET_DATA(zipped_expertwise_rowmap, INT_T),                    \
+        GET_DATA(token_prob_unzipped, PROB_T),                        \
+        XScale_unzipped.data<float>(),                                \
+        global_expertwise_block_cumsum.data<int>(),                   \
+        total_zipped_tokens_num,                                      \
+        token_length,                                                 \
+        scale_length,                                                 \
+        num_experts,                                                  \
+        topk);                                                        \
   } while (0)
 
 #define DISPATCH_CASE(TOKEN_T, PROB_T, INT_T, HAS_SCALE)            \
@@ -283,114 +288,124 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
       ((max_tokens_per_expert_in + 127) / 128) * 128;
   const int output_rows = num_experts * max_tokens_per_expert;
   */
-  expert_base_offset expert_offset;
-  int tokens_cumulated = 0;
-  for (int i = 0; i < MAX_NUM_EXPERTS; i++) {
-    if (i < num_experts) {
-      expert_offset.data[i] = tokens_cumulated;
-      tokens_cumulated +=
-          ((tokens_per_expert[i] + padding_multiplex - 1) / padding_multiplex) *
-          padding_multiplex;
-    } else {
-      expert_offset.data[i] = 0;
-    }
-  }
-
-  const int output_rows = tokens_cumulated;
-  const int topk_calculated = expert_routemap_topk.shape()[1];
   //------------------------ 输出缓冲区分配  ------------------------
   paddle::Tensor X_unzipped, XScale_unzipped, zipped_expertwise_rowmap,
       token_prob_unzipped;
 
-  // FP8 scale unziped缓冲区分配
-  if (XScale && fill_x) {
-    XScale_unzipped = paddle::empty(
-        {output_rows, quanted_cols}, XScale->dtype(), XScale->place());
-  } else {  // 让输出时不报错，但实际不会用到
-    XScale_unzipped = paddle::empty({0}, paddle::DataType::FLOAT32, X.place());
-  }
+  PD_SWITCH_NUM_EXPERTS(
+      num_experts, ([&] {
+        expert_base_offset<MAX_NUM_EXPERTS_C> expert_offset;
+        int tokens_cumulated = 0;
+        for (int i = 0; i < MAX_NUM_EXPERTS_C; i++) {
+          if (i < num_experts) {
+            expert_offset.data[i] = tokens_cumulated;
+            tokens_cumulated +=
+                ((tokens_per_expert[i] + padding_multiplex - 1) /
+                 padding_multiplex) *
+                padding_multiplex;
+          } else {
+            expert_offset.data[i] = 0;
+          }
+        }
 
-  if (fill_x) {
-    X_unzipped = paddle::empty({output_rows, cols}, X.dtype(), X.place());
-  } else {
-    X_unzipped = paddle::empty({0, cols}, X.dtype(), X.place());
-  }
-  zipped_expertwise_rowmap =
-      paddle::empty({rows, num_experts}, paddle::DataType::INT32, X.place());
-  token_prob_unzipped = paddle::empty(
-      {output_rows}, expert_prob_topk.dtype(), expert_prob_topk.place());
+        const int output_rows = tokens_cumulated;
+        const int topk_calculated = expert_routemap_topk.shape()[1];
 
-  // ------------------------ 缓冲区初始化（适配padding）----------------
-  if (fill_x) {
-    if (X.dtype() == paddle::DataType::BFLOAT16) {
-      auto X_unzipped_ptr =
-          reinterpret_cast<void *>(X_unzipped.data<phi::bfloat16>());
-      cudaMemsetAsync(X_unzipped_ptr,
-                      0,
-                      sizeof(phi::bfloat16) * output_rows * cols,
-                      X.stream());
-    } else if (X.dtype() == paddle::DataType::FLOAT8_E4M3FN) {
-      auto X_unzipped_ptr =
-          reinterpret_cast<void *>(X_unzipped.data<phi::float8_e4m3fn>());
-      cudaMemsetAsync(X_unzipped_ptr,
-                      0,
-                      sizeof(phi::float8_e4m3fn) * output_rows * cols,
-                      X.stream());
-    }
-    if (XScale) {
-      auto XScale_unzipped_ptr =
-          reinterpret_cast<void *>(XScale_unzipped.data<float>());
-      cudaMemsetAsync(XScale_unzipped_ptr,
-                      0,
-                      sizeof(float) * output_rows * quanted_cols,
-                      XScale_unzipped.stream());
-    }
-  }
-  if (expert_prob_topk.dtype() == paddle::DataType::BFLOAT16) {
-    auto token_prob_unzipped_ptr =
-        reinterpret_cast<void *>(token_prob_unzipped.data<phi::bfloat16>());
-    cudaMemsetAsync(token_prob_unzipped_ptr,
-                    0,
-                    sizeof(phi::bfloat16) * output_rows,
-                    token_prob_unzipped.stream());
-  } else if (expert_prob_topk.dtype() == paddle::DataType::FLOAT32) {
-    auto token_prob_unzipped_ptr =
-        reinterpret_cast<void *>(token_prob_unzipped.data<float>());
-    cudaMemsetAsync(token_prob_unzipped_ptr,
-                    0,
-                    sizeof(float) * output_rows,
-                    token_prob_unzipped.stream());
-  }
-  // ------------ 前缀和辅助数组相关逻辑，“推”式block通信 -------------------
-  const int cumsum_blocknum =
-      (rows + CUMSUM_BLOCK_SIZE - 1) / CUMSUM_BLOCK_SIZE;
-  auto global_expertwise_block_cumsum = paddle::empty(
-      {cumsum_blocknum + 1, num_experts}, paddle::DataType::INT32, X.place());
-  auto global_expertwise_block_cumsum_ptr =
-      reinterpret_cast<void *>(global_expertwise_block_cumsum.data<int>());
-  // 设置为非法值CUMSUM_INVALID_TAG，用于线程块等待时使用
-  cudaMemsetAsync(global_expertwise_block_cumsum_ptr,
-                  CUMSUM_INVALID_TAG,
-                  sizeof(int) * (cumsum_blocknum + 1) * num_experts,
-                  global_expertwise_block_cumsum.stream());
-  if(rows != 0){
-    dispatch_tokens_unzip_stable(X,
-                                expert_routemap_topk,
-                                expert_prob_topk,
-                                XScale,
-                                expert_offset,
-                                X_unzipped,
-                                zipped_expertwise_rowmap,
-                                token_prob_unzipped,
-                                XScale_unzipped,
-                                global_expertwise_block_cumsum,
-                                rows,
-                                cols,
-                                topk_calculated,
-                                num_experts,
-                                quanted_cols,
-                                fill_x);
-  }
+        // FP8 scale unziped缓冲区分配
+        if (XScale && fill_x) {
+          XScale_unzipped = paddle::empty(
+              {output_rows, quanted_cols}, XScale->dtype(), XScale->place());
+        } else {  // 让输出时不报错，但实际不会用到
+          XScale_unzipped =
+              paddle::empty({0}, paddle::DataType::FLOAT32, X.place());
+        }
+
+        if (fill_x) {
+          X_unzipped = paddle::empty({output_rows, cols}, X.dtype(), X.place());
+        } else {
+          X_unzipped = paddle::empty({0, cols}, X.dtype(), X.place());
+        }
+        zipped_expertwise_rowmap = paddle::empty(
+            {rows, num_experts}, paddle::DataType::INT32, X.place());
+        token_prob_unzipped = paddle::empty(
+            {output_rows}, expert_prob_topk.dtype(), expert_prob_topk.place());
+
+        // ------------------------ 缓冲区初始化（适配padding）----------------
+        if (fill_x) {
+          if (X.dtype() == paddle::DataType::BFLOAT16) {
+            auto X_unzipped_ptr =
+                reinterpret_cast<void *>(X_unzipped.data<phi::bfloat16>());
+            cudaMemsetAsync(X_unzipped_ptr,
+                            0,
+                            sizeof(phi::bfloat16) * output_rows * cols,
+                            X.stream());
+          } else if (X.dtype() == paddle::DataType::FLOAT8_E4M3FN) {
+            auto X_unzipped_ptr =
+                reinterpret_cast<void *>(X_unzipped.data<phi::float8_e4m3fn>());
+            cudaMemsetAsync(X_unzipped_ptr,
+                            0,
+                            sizeof(phi::float8_e4m3fn) * output_rows * cols,
+                            X.stream());
+          }
+          if (XScale) {
+            auto XScale_unzipped_ptr =
+                reinterpret_cast<void *>(XScale_unzipped.data<float>());
+            cudaMemsetAsync(XScale_unzipped_ptr,
+                            0,
+                            sizeof(float) * output_rows * quanted_cols,
+                            XScale_unzipped.stream());
+          }
+        }
+        if (expert_prob_topk.dtype() == paddle::DataType::BFLOAT16) {
+          auto token_prob_unzipped_ptr = reinterpret_cast<void *>(
+              token_prob_unzipped.data<phi::bfloat16>());
+          cudaMemsetAsync(token_prob_unzipped_ptr,
+                          0,
+                          sizeof(phi::bfloat16) * output_rows,
+                          token_prob_unzipped.stream());
+        } else if (expert_prob_topk.dtype() == paddle::DataType::FLOAT32) {
+          auto token_prob_unzipped_ptr =
+              reinterpret_cast<void *>(token_prob_unzipped.data<float>());
+          cudaMemsetAsync(token_prob_unzipped_ptr,
+                          0,
+                          sizeof(float) * output_rows,
+                          token_prob_unzipped.stream());
+        }
+        // ------------ 前缀和辅助数组相关逻辑，“推”式block通信
+        // -------------------
+        const int cumsum_blocknum =
+            (rows + CUMSUM_BLOCK_SIZE - 1) / CUMSUM_BLOCK_SIZE;
+        auto global_expertwise_block_cumsum =
+            paddle::empty({cumsum_blocknum + 1, num_experts},
+                          paddle::DataType::INT32,
+                          X.place());
+        auto global_expertwise_block_cumsum_ptr = reinterpret_cast<void *>(
+            global_expertwise_block_cumsum.data<int>());
+        // 设置为非法值CUMSUM_INVALID_TAG，用于线程块等待时使用
+        cudaMemsetAsync(global_expertwise_block_cumsum_ptr,
+                        CUMSUM_INVALID_TAG,
+                        sizeof(int) * (cumsum_blocknum + 1) * num_experts,
+                        global_expertwise_block_cumsum.stream());
+        if (rows != 0) {
+          dispatch_tokens_unzip_stable<MAX_NUM_EXPERTS_C>(
+              X,
+              expert_routemap_topk,
+              expert_prob_topk,
+              XScale,
+              expert_offset,
+              X_unzipped,
+              zipped_expertwise_rowmap,
+              token_prob_unzipped,
+              XScale_unzipped,
+              global_expertwise_block_cumsum,
+              rows,
+              cols,
+              topk_calculated,
+              num_experts,
+              quanted_cols,
+              fill_x);
+        }
+      }));
   return {X_unzipped,
           zipped_expertwise_rowmap,
           token_prob_unzipped,
@@ -650,9 +665,9 @@ struct UnzippedProbInfo {
   int64_t offset;
 };
 
-template <typename T>
+template <typename T, int MAX_NUM_EXPERTS_C>
 __global__ void tokens_zip_prob_kernel(
-    phi::Array<UnzippedProbInfo<T>, MAX_NUM_EXPERTS> unzipped_probs,
+    phi::Array<UnzippedProbInfo<T>, MAX_NUM_EXPERTS_C> unzipped_probs,
     const int *__restrict__ zipped_expertwise_rowmap,
     const int *__restrict__ dispatched_indices,
     T *zipped_probs,
@@ -696,33 +711,37 @@ std::vector<paddle::Tensor> tokens_zip_prob_impl(
   int num_expert = zipped_expertwise_rowmap_shape[1];
   int topk = dispatched_indices_shape[1];
   PD_CHECK(unzipped_probs.size() == num_expert);
-  PD_CHECK(num_expert <= MAX_NUM_EXPERTS);
 
   auto zipped_probs =
       paddle::empty({zipped_rows, topk}, dtype, unzipped_probs[0].place());
-  phi::Array<UnzippedProbInfo<T>, MAX_NUM_EXPERTS> unzipped_probs_info;
-  int64_t offset = 0;
-  for (int i = 0; i < num_expert; ++i) {
-    auto shape = unzipped_probs[i].shape();
-    PD_CHECK(shape.size() == 1);
-    unzipped_probs_info[i].data = unzipped_probs[i].data<T>();
-    unzipped_probs_info[i].offset = offset;
-    offset += shape[0];
-  }
 
-  int thread = 1024;
-  int grid = LimitGridDim((zipped_rows * topk + thread - 1) / thread);
+  PD_SWITCH_NUM_EXPERTS(
+      num_expert, ([&] {
+        phi::Array<UnzippedProbInfo<T>, MAX_NUM_EXPERTS_C> unzipped_probs_info;
+        int64_t offset = 0;
+        for (int i = 0; i < num_expert; ++i) {
+          auto shape = unzipped_probs[i].shape();
+          PD_CHECK(shape.size() == 1);
+          unzipped_probs_info[i].data = unzipped_probs[i].data<T>();
+          unzipped_probs_info[i].offset = offset;
+          offset += shape[0];
+        }
 
-  if (grid > 0) {
-    tokens_zip_prob_kernel<T><<<grid, thread, 0, zipped_probs.stream()>>>(
-        unzipped_probs_info,
-        zipped_expertwise_rowmap.data<int>(),
-        dispatched_indices.data<int>(),
-        zipped_probs.data<T>(),
-        zipped_rows,
-        topk,
-        num_expert);
-  }
+        int thread = 1024;
+        int grid = LimitGridDim((zipped_rows * topk + thread - 1) / thread);
+
+        if (grid > 0) {
+          tokens_zip_prob_kernel<T, MAX_NUM_EXPERTS_C>
+              <<<grid, thread, 0, zipped_probs.stream()>>>(
+                  unzipped_probs_info,
+                  zipped_expertwise_rowmap.data<int>(),
+                  dispatched_indices.data<int>(),
+                  zipped_probs.data<T>(),
+                  zipped_rows,
+                  topk,
+                  num_expert);
+        }
+      }));
   return {zipped_probs};
 }
 

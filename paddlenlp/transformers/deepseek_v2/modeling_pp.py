@@ -153,13 +153,10 @@ class PostProcessNode(ScheduleNode):
 
         with paddle.no_grad():
             if self.shared_experts is not None:
-                shared_expert_output = fp8_mlp_fwd(
-                    hidden_states, self.shared_experts.w1, self.shared_experts.w2
-                )
+                shared_expert_output = fp8_mlp_fwd(hidden_states, self.shared_experts.w1, self.shared_experts.w2)
                 final_hidden_states = final_hidden_states + shared_expert_output
 
         self.x = hidden_states
-        
         self.l_aux = l_aux
         hidden_states = residual + final_hidden_states
 
@@ -1233,7 +1230,13 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
             if self.mlp.using_flex_token:
                 if DSV3_USE_FP8_GEMM:
                     attn_and_gate_node = ScheduleNode(self.attn_compute_for_fusion, name="attn_and_gate_node")
-                    fp8_fusion_moe_node = FusionMoeNode(self.mlp, name="fp8_fusion_moe_node")
+                    fp8_fusion_moe_node = FusionMoeNode(
+                        self.mlp,
+                        recompute_fwd_gate_up=self.config.recompute_fwd_gate_up,
+                        dequant_input=self.config.dequant_input,
+                        is_split_group_gemm=self.config.is_split_group_gemm,
+                        name="fp8_fusion_moe_node",
+                    )
                     post_process_node = PostProcessNode(
                         self.config.send_mtp_embed,
                         self.mlp.training,
