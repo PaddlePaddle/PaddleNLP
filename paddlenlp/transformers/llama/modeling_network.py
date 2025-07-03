@@ -291,7 +291,16 @@ class ROPELayer(nn.Layer):
         super().__init__()
         self.config = config
 
-    def forward(self, query_states, key_states, value_states, position_ids, rotary_emb=None, past_key_value=None):
+    def forward(
+        self,
+        query_states,
+        key_states,
+        value_states,
+        position_ids,
+        rotary_emb=None,
+        past_key_value=None,
+        kv_seq_len=None,
+    ):
         if self.config.use_fused_rope:
             assert past_key_value is None, "fuse rotary not support cache kv for now"
             batch_size, seq_length, num_heads, head_dim = query_states.shape
@@ -555,6 +564,7 @@ class LlamaAttentionNet(nn.Layer):
                 position_ids,
                 rotary_emb=self.rotary_emb,
                 past_key_value=past_key_value,
+                kv_seq_len=kv_seq_len,
             )
 
         # [bs, seq_len, num_head, head_dim]
