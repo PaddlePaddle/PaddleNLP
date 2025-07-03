@@ -284,27 +284,34 @@ def fp8_mlp_fwd(x, w1, w2):
     if len(x_orig_shape) > 2:
         o3 = o3.reshape([x_orig_shape[0], -1, o3.shape[-1]])
 
-    return x_fp8, x_scale, o3
+    return o3
 
 
-def fp8_mlp_bwd(do3, x_fp8, x_scale, w1, w2):
+def fp8_mlp_bwd(do3, x, w1, w2):
     do3_orig_shape = do3.shape
     do3 = do3.reshape([-1, do3_orig_shape[-1]])
 
-    x_orig_shape = x_fp8.shape
+    x_orig_shape = x.shape
+    x = x.reshape([-1, x_orig_shape[-1]])
+
+    if x.shape[0] % 128 == 0:
+        x_fp8, x_scale, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            x, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+        )
+    else:
+        x_fp8, x_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            x, output_scale_transpose=True, quant_method="1x128", input_transpose=False
+        )
+        x = padding(x, 0)
+        _, _, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            x, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+        )
 
     _, _, w1_fp8, w1_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
         w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True
     )
     o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=do3.dtype)
     deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_sacle), o1, num_sms=112)
-
-    x_dequant_fp16 = paddle.incubate.nn.functional.fused_act_dequant(x_fp8, x_scale.T.contiguous())
-    x_dequant_fp16 = padding(x_dequant_fp16, 0)
-
-    _, _, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        x_dequant_fp16, output_scale_transpose=True, quant_method="1x128", input_transpose=True
-    )
 
     # ===== [recompute] o2 = swiglu(o1) =====
     o2 = swiglu(o1)
@@ -577,7 +584,10 @@ def split_group_gemm(x_fp8, x_scale, w_fp8, w_scale, tokens_per_expert, gemm_out
         x_scale_tma_align = x_scale[start_idx:end_idx].T.contiguous().T
 
         deep_gemm.gemm_fp8_fp8_bf16_nt(
-            (x_fp8[start_idx:end_idx], x_scale_tma_align), (w_fp8[i], w_scale[i]), gemm_out[start_idx:end_idx], num_sms=112
+            (x_fp8[start_idx:end_idx], x_scale_tma_align),
+            (w_fp8[i], w_scale[i]),
+            gemm_out[start_idx:end_idx],
+            num_sms=112,
         )
 
         start_idx = end_idx
@@ -763,7 +773,7 @@ class FP8GroupGemmMlpFunctionNode:
                     (bw_w2_quant, bw_w2_scale),
                     do2_s,
                     m_indices=self.m_indices,
-                    num_sms=112
+                    num_sms=112,
                 )
 
         with paddle.amp.auto_cast(False):

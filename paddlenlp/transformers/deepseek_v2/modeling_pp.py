@@ -153,13 +153,10 @@ class PostProcessNode(ScheduleNode):
 
         with paddle.no_grad():
             if self.shared_experts is not None:
-                x_fp8, x_scale, shared_expert_output = fp8_mlp_fwd(
-                    hidden_states, self.shared_experts.w1, self.shared_experts.w2
-                )
+                shared_expert_output = fp8_mlp_fwd(hidden_states, self.shared_experts.w1, self.shared_experts.w2)
                 final_hidden_states = final_hidden_states + shared_expert_output
 
-        self.x_fp8 = x_fp8
-        self.x_scale = x_scale
+        self.x = hidden_states
         self.l_aux = l_aux
         hidden_states = residual + final_hidden_states
 
@@ -174,10 +171,9 @@ class PostProcessNode(ScheduleNode):
 
         assert not self.send_mtp_embed, "not support have mtp have yet"
 
-        dx = fp8_mlp_bwd(do3, self.x_fp8, self.x_scale, self.shared_experts.w1, self.shared_experts.w2)
+        dx = fp8_mlp_bwd(do3, self.x, self.shared_experts.w1, self.shared_experts.w2)
 
-        self.x_fp8 = None
-        self.x_scale = None
+        self.x = None
 
         residual_grad = do3
 
