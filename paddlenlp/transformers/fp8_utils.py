@@ -316,18 +316,19 @@ def fp8_mlp_bwd(do3, x, w1, w2):
     do3 = do3.reshape([-1, do3_orig_shape[-1]])
     x_orig_shape = x.shape
     x = x.reshape([-1, x_orig_shape[-1]])
+    
     if x.shape[0] % 128 == 0:
-         x_fp8, x_scale, x_t_fp8, x_t_scale = kitchen_quant(
-                x_dequant_fp16, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+        x_fp8, x_scale, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                x, output_scale_transpose=True, quant_method="1x128", input_transpose=True
             )
     else:
-        x_fp8, x_scale = kitchen_quant(
-                x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+        x_fp8, x_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                x, output_scale_transpose=True, quant_method="1x128", input_transpose=False
             )
         x = padding(x, 0)
-        _, _, x_t_fp8, x_t_scale = kitchen_quant(
-            x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
-        )
+        _, _, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                x, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+            )
 
     _, _, w1_fp8, w1_sacle = kitchen_quant(
         w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True

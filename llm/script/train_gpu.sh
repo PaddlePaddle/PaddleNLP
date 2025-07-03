@@ -94,7 +94,7 @@ export DSV3_USE_ATTEN_RECOMPUTE=True
 export FA_VERSION=3
 export NVSHMEM_BOOTSTRAP_UID_SOCK_IFNAME=eth0
 
-/root/paddlejob/workspace/env_run/liuhongyu/install/nsys/bin/nsys profile --stats true -w true -t cuda,nvtx \
+#/root/paddlejob/workspace/env_run/liuhongyu/install/nsys/bin/nsys profile --stats true -w true -t cuda,nvtx \
 python3 -m paddle.distributed.launch \
     --log_dir output/paddle_distributed_logs \
     --master $master:$port \
