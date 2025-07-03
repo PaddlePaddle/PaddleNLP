@@ -1,11 +1,22 @@
-import numpy as np
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import paddle
 import TokenDispatcherUtils as TDU
 
 
-def fabricate_dispatch_result(
-    seqlen, token_length, topk, num_experts, data_type="bfloat32", broadcast_ratio=0.5
-):
+def fabricate_dispatch_result(seqlen, token_length, topk, num_experts, data_type="bfloat32", broadcast_ratio=0.5):
     tokens = paddle.randn([seqlen, token_length], dtype=data_type)
 
     tokens_scale = paddle.empty([0])
@@ -47,9 +58,7 @@ def fabricate_dispatch_result(
     valid_experts = valid_indices[valid_mask]
 
     # 使用histogram统计每个专家的token数
-    expert_counts = paddle.histogram(
-        valid_experts, bins=num_experts, min=0, max=num_experts - 1
-    )
+    expert_counts = paddle.histogram(valid_experts, bins=num_experts, min=0, max=num_experts - 1)
     expert_counts = paddle.cast(expert_counts, "int32")
     expert_counts = list(expert_counts)
     print("expert counts: ", expert_counts)
@@ -78,11 +87,7 @@ def test_unzip_zip():
         for expert_num in [4, 8, 16, 32]:
             for topk in [4, 8, 12]:
                 print("###################################")
-                print(
-                    "testing with {} experts and topk {}, datatype is {}".format(
-                        expert_num, topk, dt
-                    )
-                )
+                print("testing with {} experts and topk {}, datatype is {}".format(expert_num, topk, dt))
                 (
                     tokens,
                     tokens_scale,
@@ -112,7 +117,8 @@ def test_unzip_zip():
                     topk=topk,
                     num_experts=expert_num,
                     tokens_per_expert=expert_tokens_count,
-                    padding_multiplex=128
+                    padding_multiplex=128,
+                    fill_output=True,
                 )
                 tokens_recovered, probs_recovered = TDU.tokens_zip(
                     (unzipped_tokens * unzipped_probs.unsqueeze(-1)).astype("bfloat16"),
@@ -122,11 +128,7 @@ def test_unzip_zip():
                     total_zipped_tokens=SEQLEN,
                     num_experts=expert_num,
                 )
-                print(
-                    "unzip-zip tokens 最大绝对误差：{}, 相对误差：{}".format(
-                        *tensor_max_abs_rel_err(tokens, tokens_recovered)
-                    )
-                )
+                print("unzip-zip tokens 最大绝对误差：{}, 相对误差：{}".format(*tensor_max_abs_rel_err(tokens, tokens_recovered)))
                 print(
                     "unzip-zip probs 最大绝对误差：{}, 相对误差：{}".format(
                         *tensor_max_abs_rel_err(dispatched_probs, probs_recovered)
