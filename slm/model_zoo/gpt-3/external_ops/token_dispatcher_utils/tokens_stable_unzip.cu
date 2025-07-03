@@ -310,9 +310,6 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
 
         const int output_rows = tokens_cumulated;
         const int topk_calculated = expert_routemap_topk.shape()[1];
-        //------------------------ 输出缓冲区分配  ------------------------
-        paddle::Tensor X_unzipped, XScale_unzipped, zipped_expertwise_rowmap,
-            token_prob_unzipped;
 
         // FP8 scale unziped缓冲区分配
         if (XScale && fill_x) {
