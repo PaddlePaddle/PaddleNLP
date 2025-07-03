@@ -3848,7 +3848,6 @@ function llama_baichuan_dygraph_auto_sp_async_reduce_scatter_bs8_bf16_DP4-MP2-SP
     "sequence_parallel": 1,
     "sharding": "stage1",
     "sharding_parallel_degree": 4,
-    "sharding_parallel_config": "enable_tensor_fusion enable_overlap",
     "tensor_parallel_config": "enable_mp_async_allreduce replace_with_parallel_cross_entropy enable_sp_async_reduce_scatter",
     "data_parallel_config": "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate",
     "pipeline_parallel_config": "enable_send_recv_overlap enable_split_backward",
