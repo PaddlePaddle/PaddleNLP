@@ -930,6 +930,7 @@ def qkv_pre_process(
     cos, sin = rotary_emb(value_states, seq_len=kv_seq_len)
     cos = cos[None, :, None, :]
     sin = sin[None, :, None, :]
+
     q_pe, k_pe = apply_rotary_pos_emb(q_pe, k_pe, cos, sin, position_ids, False)
 
     query_states = paddle.concat([q_nope, q_pe], axis=-1)

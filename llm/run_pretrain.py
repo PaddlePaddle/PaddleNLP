@@ -48,6 +48,11 @@ from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
 
+# print(sys.executable)
+
+# sys.exit()
+
+
 # Pretaining Environment Variables to support sharding stage1 overlap optimization.
 os.environ["USE_CASUAL_MASK"] = "True"
 
@@ -505,20 +510,21 @@ def main():
             )
     else:
         # 修改这里降低模型层数，deepseek前3层为dense层，之后才有稀疏层
-        # config.num_hidden_layers = 4  # v3是61
-        # config.first_k_dense_replace = 0  # v3是3
-        # # 修改这里降低模型专家数量，如果希望进行EP并行，专家数量要能够被并行度整除
-        # config.n_routed_experts = 64  # v3是256
+        config.num_hidden_layers = 6  # v3是61
+        config.first_k_dense_replace = 0  # v3是3
+        # 修改这里降低模型专家数量，如果希望进行EP并行，专家数量要能够被并行度整除
+        config.n_routed_experts = 32  # v3是256
         # config.num_experts_per_tok = 8  # v3是8
-        # config.topk_group = 4  # v3是4
+        config.topk_group = 4  # v3是4
 
-        # config.using_flex_token = True
-        # config.num_nextn_predict_layers = 1
-        # config.using_fake_gate = True
-        # config.use_fused_rms_norm = True
-        # config.fuse_attention_ffn = True
-        # config.use_fused_rope = True
-        # config.token_drop_steps = 0
+        config.using_flex_token = True
+        config.num_nextn_predict_layers = 0
+        config.using_fake_gate = True
+        config.use_fused_rms_norm = True
+        config.fuse_attention_ffn = True
+        config.use_fused_rope = True
+        config.token_drop_steps = 0
+        config.tie_word_embeddings = True
         model = model_class.from_config(config, dtype=dtype)
 
     if training_args.recompute:
@@ -611,4 +617,7 @@ def main():
 
 
 if __name__ == "__main__":
+    memory_size = int(67 * 1024 * 1024 * 1024)
+    x = paddle.empty([memory_size], dtype=paddle.uint8)
+    del x
     main()

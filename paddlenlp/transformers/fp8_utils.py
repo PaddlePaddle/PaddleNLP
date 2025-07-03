@@ -148,7 +148,7 @@ class FP8LinearFunction(paddle.autograd.PyLayer):
         )
 
         out = paddle.empty([x_fp8.shape[0], w_fp8.shape[0]], dtype=x.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w_fp8, w_sacle), out)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w_fp8, w_sacle), out, num_sms=112)
         out = out.reshape([x_orig_shape[0], -1, weight.shape[-1]])
 
         # save for bwd
@@ -222,7 +222,7 @@ class FP8LinearKeepXFunction(paddle.autograd.PyLayer):
 
         # compute out = mm(x, w_t)
         out = paddle.empty([x_fp8.shape[0], w_fp8.shape[0]], dtype=x.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w_fp8, w_sacle), out)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w_fp8, w_sacle), out, num_sms=112)
         out = out.reshape([x_orig_shape[0], -1, weight.shape[-1]])
 
         ctx.save_for_backward(x, weight)
@@ -258,7 +258,7 @@ class FP8LinearKeepXFunction(paddle.autograd.PyLayer):
             )
 
         dx = paddle.empty([dout_fp8.shape[0], w_fp8.shape[0]], dout.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((dout_fp8, dout_scale.T), (w_fp8, w_sacle), dx)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((dout_fp8, dout_scale.T), (w_fp8, w_sacle), dx, num_sms=112)
         dx = dx.reshape(dx_orig_shape)
 
         # ===== dw1 = deep_gemm(x_t_fp8, dout_t_fp8)
@@ -293,7 +293,7 @@ def fp8_mlp_fwd(x, w1, w2):
         w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
     )
     o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=x.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_sacle), o1)
+    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_sacle), o1, num_sms=112)
 
     # ===== o2 = swiglu(o1) =====
     o2 = swiglu(o1)
@@ -304,31 +304,37 @@ def fp8_mlp_fwd(x, w1, w2):
         w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
     )
     o3 = paddle.empty([o2_fp8.shape[0], w2_t_fp8.shape[0]], dtype=o1.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((o2_fp8, o2_scale.T), (w2_t_fp8, w2_t_scale), o3)
+    deep_gemm.gemm_fp8_fp8_bf16_nt((o2_fp8, o2_scale.T), (w2_t_fp8, w2_t_scale), o3, num_sms=112)
     if len(x_orig_shape) > 2:
         o3 = o3.reshape([x_orig_shape[0], -1, o3.shape[-1]])
 
-    return x_fp8, x_scale, o3
+    return o3
 
 
-def fp8_mlp_bwd(do3, x_fp8, x_scale, w1, w2):
+def fp8_mlp_bwd(do3, x, w1, w2):
     do3_orig_shape = do3.shape
     do3 = do3.reshape([-1, do3_orig_shape[-1]])
-
-    x_orig_shape = x_fp8.shape
+    x_orig_shape = x.shape
+    x = x.reshape([-1, x_orig_shape[-1]])
+    if x.shape[0] % 128 == 0:
+         x_fp8, x_scale, x_t_fp8, x_t_scale = kitchen_quant(
+                x_dequant_fp16, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+            )
+    else:
+        x_fp8, x_scale = kitchen_quant(
+                x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+            )
+        x = padding(x, 0)
+        _, _, x_t_fp8, x_t_scale = kitchen_quant(
+            x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+        )
 
     _, _, w1_fp8, w1_sacle = kitchen_quant(
         w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
     )
     o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=do3.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_sacle), o1)
+    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_sacle), o1, num_sms=112)
 
-    x_dequant_fp16 = paddle.incubate.nn.functional.fused_act_dequant(x_fp8, x_scale.T.contiguous())
-    x_dequant_fp16 = padding(x_dequant_fp16, 0)
-
-    _, _, x_t_fp8, x_t_scale = kitchen_quant(
-        x_dequant_fp16, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
-    )
 
     # ===== [recompute] o2 = swiglu(o1) =====
     o2 = swiglu(o1)
@@ -350,7 +356,7 @@ def fp8_mlp_bwd(do3, x_fp8, x_scale, w1, w2):
         w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
     )
     do2 = paddle.empty([do3_fp8.shape[0], w2_fp8.shape[0]], do3.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((do3_fp8, do3_scale.T), (w2_fp8, w2_scale), do2)
+    deep_gemm.gemm_fp8_fp8_bf16_nt((do3_fp8, do3_scale.T), (w2_fp8, w2_scale), do2, num_sms=112)
 
     # ===== dw2 = deep_gemm(o2_t_fp8, do3_t_fp8)
     o2 = padding(o2, 0)
@@ -407,7 +413,7 @@ def fp8_mlp_bwd(do3, x_fp8, x_scale, w1, w2):
         w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
     )
     dx = paddle.empty([do1_fp8.shape[0], w1_fp8.shape[0]], do1.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8, do1_scale.T), (w1_fp8, w1_sacle), dx)
+    deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8, do1_scale.T), (w1_fp8, w1_sacle), dx, num_sms=112)
     if len(x_orig_shape) > 2:
         dx = dx.reshape([x_orig_shape[0], -1, dx.shape[-1]])
 
@@ -601,7 +607,7 @@ def split_group_gemm(x_fp8, x_scale, w_fp8, w_scale, tokens_per_expert, gemm_out
         x_scale_tma_align = x_scale[start_idx:end_idx].T.contiguous().T
 
         deep_gemm.gemm_fp8_fp8_bf16_nt(
-            (x_fp8[start_idx:end_idx], x_scale_tma_align), (w_fp8[i], w_scale[i]), gemm_out[start_idx:end_idx]
+            (x_fp8[start_idx:end_idx], x_scale_tma_align), (w_fp8[i], w_scale[i]), gemm_out[start_idx:end_idx], num_sms=112
         )
 
         start_idx = end_idx
@@ -619,9 +625,9 @@ class FP8GroupGemmMlpFunctionNode:
         name="experts_group_gemm_contiguous_node",
     ):
         self.experts = custom_map.experts
-        self.recompute_fwd_gate_up = recompute_fwd_gate_up
-        self.dequant_input = dequant_input
-        self.is_split_group_gemm = is_split_group_gemm
+        self.recompute_fwd_gate_up = False
+        self.dequant_input = True
+        self.is_split_group_gemm = False
         self.tokens_per_expert = None
         self.m_indices = None
         self.unzipped_probs = None
@@ -693,10 +699,10 @@ class FP8GroupGemmMlpFunctionNode:
         else:
             # quant x_bf16
             x_fp8, x_scale = kitchen_quant(
-                x_bf16, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
-            )
+                x_bf16, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+            )            
 
-        x_scale = paddle.transpose(paddle.transpose(x_scale, [1, 0]).contiguous(), [1, 0])
+            x_scale = x_scale.T
 
         # compute gemm
         o1 = paddle.empty([x_fp8.shape[0], w1_t_quant.shape[1]], dtype=expert_w1[0].dtype)
@@ -705,7 +711,7 @@ class FP8GroupGemmMlpFunctionNode:
                 split_group_gemm(x_fp8, x_scale, w1_t_quant, w1_t_scale, tokens_per_expert, o1)
             else:
                 deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
-                    (x_fp8, x_scale), (w1_t_quant, w1_t_scale), o1, m_indices=self.m_indices
+                    (x_fp8, x_scale), (w1_t_quant, w1_t_scale), o1, m_indices=self.m_indices, num_sms=112
                 )
 
         if self.dequant_input:
@@ -752,7 +758,7 @@ class FP8GroupGemmMlpFunctionNode:
                 split_group_gemm(o2_fp8, o2_scale, w2_quant, w2_sacle, self.tokens_per_expert, o3)
             else:
                 deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
-                    (o2_fp8, o2_scale), (w2_quant, w2_sacle), o3, m_indices=self.m_indices
+                    (o2_fp8, o2_scale), (w2_quant, w2_sacle), o3, m_indices=self.m_indices,num_sms=112
                 )
         return o3, unzipped_probs
 
@@ -787,6 +793,7 @@ class FP8GroupGemmMlpFunctionNode:
                     (bw_w2_quant, bw_w2_scale),
                     do2_s,
                     m_indices=self.m_indices,
+                    num_sms=112
                 )
 
         with paddle.amp.auto_cast(False):
@@ -830,7 +837,7 @@ class FP8GroupGemmMlpFunctionNode:
             else:
                 do1_scale = paddle.transpose(paddle.transpose(do1_scale, [1, 0]).contiguous(), [1, 0])
                 deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
-                    (do1_fp8, do1_scale), (bw_w1_quant, bw_w1_scale), dx, m_indices=self.m_indices
+                    (do1_fp8, do1_scale), (bw_w1_quant, bw_w1_scale), dx, m_indices=self.m_indices, num_sms=112
                 )
 
         return dx
@@ -956,6 +963,8 @@ class FP8GroupGemmMlpFunctionNode:
             clear_o1 = False
         else:
             clear_o1 = True
+
+        self.tokens_per_expert = tokens_per_expert
 
         # o3
         o3, unzipped_probs = self.fwd_down(o1, unzipped_probs, expert_w2, num_expert, clear_o1=clear_o1)

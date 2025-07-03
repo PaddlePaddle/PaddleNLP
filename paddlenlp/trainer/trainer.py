@@ -1009,6 +1009,9 @@ class Trainer:
         if self.args.ignore_data_skip:
             self.timers and self.timers("read-data").start()
 
+        print("force offload optimizer")
+        self._offload_optimizer()
+
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
                 train_dataloader.batch_sampler, DistributedBatchSampler
@@ -1244,9 +1247,11 @@ class Trainer:
                                 f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
                             )
                     elif isinstance(self.optimizer, HybridParallelOptimizer):
-                        self.optimizer._step(parameters_list)
+                        #self.optimizer._step(parameters_list)
+                        print("pass")
                     else:
-                        self.optimizer.step()
+                        print("pass")
+                        #self.optimizer.step()
 
                     if self.args.offload_optim:
                         self._offload_optimizer()
@@ -1268,6 +1273,17 @@ class Trainer:
                     self.callback_handler.on_optimizer_end(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
                     )
+
+                    print("===> run step ", self.state.global_step, flush=1)
+                    if self.state.global_step == 11:
+                        paddle.base.core.nvprof_start()
+                        # paddle.base.core.nvprof_enable_record_event()
+                        # paddle.base.core.nvprof_nvtx_push(str(self.state.global_step))
+                    if self.state.global_step == 13:
+                        # paddle.base.core.nvprof_nvtx_pop()
+                        paddle.base.core.nvprof_stop()
+                        import sys
+                        sys.exit()
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
