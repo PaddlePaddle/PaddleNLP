@@ -174,7 +174,7 @@ class PostProcessNode(ScheduleNode):
 
         assert not self.send_mtp_embed, "not support have mtp have yet"
 
-        dx, dw1, dw2 = fp8_mlp_bwd(do3, self.x_fp8, self.x_scale, self.shared_experts.w1, self.shared_experts.w2)
+        dx = fp8_mlp_bwd(do3, self.x_fp8, self.x_scale, self.shared_experts.w1, self.shared_experts.w2)
 
         self.x_fp8 = None
         self.x_scale = None

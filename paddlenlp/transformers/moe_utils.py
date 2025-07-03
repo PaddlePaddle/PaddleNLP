@@ -14,9 +14,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
 import paddle
 
 from .fp8_utils import dequantize_fp8_to_fp32
+
+if not hasattr(paddle.Tensor, "_clear_to_zero_allocation"):
+
+    def _clear_to_zero_allocation(self):
+        """
+        _clear_to_zero_allocation
+        """
+        old_shape = self.shape
+        dst = paddle.empty([0], dtype=self.dtype)
+        dst_t = dst.value().get_tensor()
+        src_t = self.value().get_tensor()
+        src_t._share_data_with(dst_t)
+        src_t._set_dims(old_shape)
+
+    setattr(paddle.Tensor, "_clear_to_zero_allocation", _clear_to_zero_allocation)
+
+
+if not hasattr(paddle.Tensor, "_holder_size"):
+
+    def _holder_size(self):
+        """
+        _holder_size
+        """
+        if self._is_initialized():
+            return int(np.prod(self.shape)) * paddle.core.size_of_dtype(self.dtype)
+        else:
+            return 0
+
+    setattr(paddle.Tensor, "_holder_size", _holder_size)
 
 
 def topk_to_permuted_indices(x, num_tokens_per_expert_list, topk):

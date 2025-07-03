@@ -382,7 +382,15 @@ class MoELayer(nn.Layer):
             hidden_states, token_indices, token_probs = self.token_dispatcher.pre_dispatch(
                 hidden_states, probs, routing_map
             )
-            output = FusionMoe.apply(hidden_states, token_indices, token_probs, self)
+            output = FusionMoe.apply(
+                hidden_states,
+                token_indices,
+                token_probs,
+                self,
+                recompute_fwd_gate_up=self.config.recompute_fwd_gate_up,
+                dequant_input=self.config.dequant_input,
+                is_split_group_gemm=self.config.is_split_group_gemm,
+            )
         else:
             (
                 dispatched_input,
@@ -574,10 +582,17 @@ class FusionMlpNode:
     The FusedMoeLayer class includes operations for unzipping, expert computation, and zipping.
     """
 
-    def __init__(self, custom_map, max_topk, mem_efficient=False):
+    def __init__(
+        self, custom_map, max_topk, recompute_fwd_gate_up=False, dequant_input=False, is_split_group_gemm=True
+    ):
         self.token_dispatcher = custom_map.token_dispatcher
         self.experts = custom_map.experts
-        self.experts_group_gemm_node = FP8GroupGemmMlpFunctionNode(custom_map, mem_efficient=mem_efficient)
+        self.experts_group_gemm_node = FP8GroupGemmMlpFunctionNode(
+            custom_map,
+            recompute_fwd_gate_up=recompute_fwd_gate_up,
+            dequant_input=dequant_input,
+            is_split_group_gemm=is_split_group_gemm,
+        )
         self.unzip_node = UnZipNode(self.token_dispatcher)
         self.zip_node = ZipNode(self.token_dispatcher)
         self.dispatched_indices = None
@@ -697,12 +712,25 @@ class FusionMlpNode:
 
 
 class FusionMoeNode:
-    def __init__(self, custom_map, name="fusion_moe_node"):
+    def __init__(
+        self,
+        custom_map,
+        recompute_fwd_gate_up=False,
+        dequant_input=False,
+        is_split_group_gemm=True,
+        name="fusion_moe_node",
+    ):
         self.token_dispatcher = custom_map.token_dispatcher
         self.moe_router_topk = custom_map.moe_router_topk
         self.dispatch_quant_node = Fp8DispatchQuantNode(self.token_dispatcher)
         self.dispatch_node = Fp8DispatchNode(self.token_dispatcher)
-        self.mlp_node = FusionMlpNode(custom_map, self.moe_router_topk, mem_efficient=True)
+        self.mlp_node = FusionMlpNode(
+            custom_map,
+            self.moe_router_topk,
+            recompute_fwd_gate_up=recompute_fwd_gate_up,
+            dequant_input=dequant_input,
+            is_split_group_gemm=is_split_group_gemm,
+        )
         self.combine_node = Fp8CombineNode(self.token_dispatcher)
         self.combine_quant_node = Fp8CombineQuantNode(self.token_dispatcher)
         self.name = name
@@ -732,8 +760,22 @@ class FusionMoeNode:
 
 class FusionMoe(paddle.autograd.PyLayer):
     @staticmethod
-    def forward(ctx, hidden_states, probs, routing_map, custom_map):
-        ctx.node = FusionMoeNode(custom_map)
+    def forward(
+        ctx,
+        hidden_states,
+        probs,
+        routing_map,
+        custom_map,
+        recompute_fwd_gate_up=False,
+        dequant_input=False,
+        is_split_group_gemm=True,
+    ):
+        ctx.node = FusionMoeNode(
+            custom_map,
+            recompute_fwd_gate_up=recompute_fwd_gate_up,
+            dequant_input=dequant_input,
+            is_split_group_gemm=is_split_group_gemm,
+        )
         return ctx.node.forward(hidden_states, probs, routing_map)
 
     @staticmethod
