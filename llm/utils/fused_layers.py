@@ -174,10 +174,10 @@ class OverlapLinear(paddle.autograd.PyLayer):
                 x_grad = sync_mp_allreduce(mp_task, x_grad)
             return x_grad, weight_grad
         else:
-            dbias = paddle.sum(y_grad, axis=0)
+            bias_grad = paddle.sum(y_grad, axis=0)
             if mp_task is not None:
                 x_grad = sync_mp_allreduce(mp_task, x_grad)
-            return x_grad, weight_grad, dbias
+            return x_grad, weight_grad, bias_grad
 
 
 def mock_layers(
