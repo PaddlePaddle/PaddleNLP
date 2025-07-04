@@ -107,3 +107,22 @@ __device__ __forceinline__ void vectorized_memcpy(const T* src,
     }
   }
 }
+
+#define PD_SWITCH_NUM_EXPERTS_IMPL(__num_expert, __max_num_experts, ...) \
+  if (__num_expert <= __max_num_experts) {                               \
+    constexpr auto MAX_NUM_EXPERTS_C = __max_num_experts;                \
+    do {                                                                 \
+      __VA_ARGS__();                                                     \
+    } while (0);                                                         \
+    break;                                                               \
+  }
+
+
+#define PD_SWITCH_NUM_EXPERTS(__num_experts_expr, ...)           \
+  do {                                                           \
+    auto __num_expert = (__num_experts_expr);                    \
+    PD_SWITCH_NUM_EXPERTS_IMPL(__num_expert, 8, __VA_ARGS__);    \
+    PD_SWITCH_NUM_EXPERTS_IMPL(__num_expert, 16, __VA_ARGS__);   \
+    PD_SWITCH_NUM_EXPERTS_IMPL(__num_expert, 32, __VA_ARGS__);   \
+    PD_THROW("Unsupported expert number %d", int(__num_expert)); \
+  } while (0)

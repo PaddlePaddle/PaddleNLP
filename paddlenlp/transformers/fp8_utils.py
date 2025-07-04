@@ -26,45 +26,17 @@ except ImportError:
 
 
 try:
-    import deep_gemm
-    import kitchen
-    import kitchen.quantization_subchannel_block_hybrid
-    from kitchen.quantization import QParams, ScalingType
+    from paddle.incubate.fp8 import deep_gemm
 except:
     pass
 
 
 __all__ = [
-    "kitchen_quant",
     "kitchen_fp8_gemm",
     "dequantize_fp8_to_fp32",
     "FP8Linear",
     "FP8GroupGemmMlpFunctionNode",
 ]
-
-
-def kitchen_quant(x, backend=None, is_1d_scaled=True, return_transpose=False, pow_2_scales=True):
-    if backend is None:
-        backend = kitchen.ops.Backend.CUBLAS
-    quant_tile_shape = (1, 128) if is_1d_scaled else (128, 128)
-    x_qparams = QParams(
-        quant_dtype=paddle.float8_e4m3fn,
-        scaling_type=ScalingType.VECTOR_TILED_X_AND_G_BLOCK_TILED_W,
-        eps=0,
-        pow_2_scales=pow_2_scales,
-        quant_tile_shape=quant_tile_shape,
-    )
-    quantize_op = kitchen.quantization_subchannel_block_hybrid.HybridBlockAndVectorTiledQuantizeOp(backend)
-    qresult_ref = quantize_op.quantize(x, x_qparams, return_transpose)
-    if return_transpose:
-        return (
-            qresult_ref.data,
-            qresult_ref.scale,
-            qresult_ref.data_t,
-            qresult_ref.scale_t,
-        )
-    else:
-        return (qresult_ref.data, qresult_ref.scale)
 
 
 def kitchen_fp8_gemm(
@@ -77,7 +49,7 @@ def kitchen_fp8_gemm(
         accumulate = False
         out_dtype = rtn_dtype
     if numpy.prod(x_fp8.shape) != 0 and numpy.prod(w_fp8.shape) != 0:
-        y = kitchen.ops.fp8_gemm_blockwise(
+        y = paddle.incubate.nn.functional.fp8_gemm_blockwise(
             a=x_fp8,
             a_decode_scale=x_scale,
             b=w_fp8,
@@ -122,7 +94,8 @@ def padding(x, axis):
 
 class FP8LinearFunction(paddle.autograd.PyLayer):
     @staticmethod
-    def forward(ctx, x, weight):
+    def forward(ctx, x, custom_map):
+        weight = custom_map.weight
         x_orig_shape = x.shape
         x_t = x.T
 
@@ -131,24 +104,24 @@ class FP8LinearFunction(paddle.autograd.PyLayer):
 
         # quant
         if x.shape[0] % 512 != 0:
-            x_fp8, x_scale = kitchen_quant(
-                x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+            x_fp8, x_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                x, output_scale_transpose=True, quant_method="1x128", input_transpose=False
             )
             x = padding(x, 0)
-            _, _, x_t_fp8, x_t_scale = kitchen_quant(
-                x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+            _, _, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                x, output_scale_transpose=True, quant_method="1x128", input_transpose=True
             )
         else:
-            x_fp8, x_scale, x_t_fp8, x_t_scale = kitchen_quant(
-                x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+            x_fp8, x_scale, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                x, output_scale_transpose=True, quant_method="1x128", input_transpose=True
             )
 
-        _, _, w_fp8, w_sacle = kitchen_quant(
-            weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+        _, _, w_fp8, w_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            weight, output_scale_transpose=False, quant_method="128x128", input_transpose=True
         )
 
         out = paddle.empty([x_fp8.shape[0], w_fp8.shape[0]], dtype=x.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w_fp8, w_sacle), out)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w_fp8, w_sacle), out, num_sms=112)
         out = out.reshape([x_orig_shape[0], -1, weight.shape[-1]])
 
         # save for bwd
@@ -163,19 +136,19 @@ class FP8LinearFunction(paddle.autograd.PyLayer):
         # ===== dx = deep_gemm(dout_fp8, w_fp8)
         dout_2d = dout.reshape([-1, dout.shape[-1]])
         if dout_2d.shape[0] % 512 != 0:
-            dout_fp8, dout_scale = kitchen_quant(
-                dout_2d, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+            dout_fp8, dout_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                dout_2d, output_scale_transpose=True, quant_method="1x128", input_transpose=False
             )
             dout_2d = padding(dout_2d, 0)
-            _, _, dout_t_fp8, dout_t_scale = kitchen_quant(
-                dout_2d, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+            _, _, dout_t_fp8, dout_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                dout_2d, output_scale_transpose=True, quant_method="1x128", input_transpose=True
             )
         else:
-            dout_fp8, dout_scale, dout_t_fp8, dout_t_scale = kitchen_quant(
-                dout_2d, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+            dout_fp8, dout_scale, dout_t_fp8, dout_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                dout_2d, output_scale_transpose=True, quant_method="1x128", input_transpose=True
             )
-        w_fp8, w_sacle = kitchen_quant(
-            weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        w_fp8, w_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            weight, output_scale_transpose=False, quant_method="128x128", input_transpose=False
         )
         dx = paddle.empty([ctx.x_t_shape[1], ctx.x_t_shape[0]], dout.dtype)
         dx_orig_shape = dout.shape[:-1]
@@ -184,9 +157,23 @@ class FP8LinearFunction(paddle.autograd.PyLayer):
         dx = dx.reshape(dx_orig_shape)
 
         # ===== dw1 = deep_gemm(x_t_fp8, dout_t_fp8)
-        dweight = kitchen_fp8_gemm(x_t_fp8, x_t_scale, dout_t_fp8, dout_t_scale, True, True, rtn_dtype=paddle.float32)
+        if hasattr(weight, "main_grad"):
+            if weight.main_grad is None:
+                weight.main_grad = paddle.zeros(shape=weight.shape, dtype=paddle.float32)
+            kitchen_fp8_gemm(
+                x_t_fp8, x_t_scale, dout_t_fp8, dout_t_scale, True, True, weight.main_grad, rtn_dtype=paddle.float32
+            )
+        else:
+            if weight.grad is None:
+                weight.grad = paddle.zeros(shape=weight.shape, dtype=paddle.float32)
+            kitchen_fp8_gemm(
+                x_t_fp8, x_t_scale, dout_t_fp8, dout_t_scale, True, True, weight.grad, rtn_dtype=paddle.float32
+            )
 
-        return dx, dweight
+        if hasattr(weight, "_apply_backward_hook"):
+            weight._apply_backward_hook()
+
+        return dx
 
 
 class FP8Linear(paddle.nn.Layer):
@@ -201,28 +188,29 @@ class FP8Linear(paddle.nn.Layer):
         )
 
     def forward(self, x):
-        return FP8LinearFunction.apply(x, self.weight)
+        return FP8LinearFunction.apply(x, self)
 
 
 class FP8LinearKeepXFunction(paddle.autograd.PyLayer):
     @staticmethod
-    def forward(ctx, x, weight):
+    def forward(ctx, x, custom_map):
+        weight = custom_map.weight
         x_orig_shape = x.shape
 
         # deep_gemm only support 2D
         x = x.reshape([-1, x_orig_shape[-1]]).contiguous()
 
         # quant
-        x_fp8, x_scale = kitchen_quant(
-            x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+        x_fp8, x_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            x, output_scale_transpose=True, quant_method="1x128", input_transpose=False
         )
-        _, _, w_fp8, w_sacle = kitchen_quant(
-            weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+        _, _, w_fp8, w_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            weight, output_scale_transpose=False, quant_method="128x128", input_transpose=True
         )
 
         # compute out = mm(x, w_t)
         out = paddle.empty([x_fp8.shape[0], w_fp8.shape[0]], dtype=x.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w_fp8, w_sacle), out)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w_fp8, w_sacle), out, num_sms=112)
         out = out.reshape([x_orig_shape[0], -1, weight.shape[-1]])
 
         ctx.save_for_backward(x, weight)
@@ -235,36 +223,50 @@ class FP8LinearKeepXFunction(paddle.autograd.PyLayer):
 
         # padding
         x = padding(x, 0)
-        _, _, x_t_fp8, x_t_scale = kitchen_quant(
-            x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+        _, _, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            x, output_scale_transpose=True, quant_method="1x128", input_transpose=True
         )
 
-        w_fp8, w_sacle = kitchen_quant(
-            weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        w_fp8, w_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            weight, output_scale_transpose=False, quant_method="128x128", input_transpose=False
         )
 
         dout_2d = dout.reshape([-1, dout.shape[-1]])
         if dout_2d.shape[0] % 512 != 0:
-            dout_fp8, dout_scale = kitchen_quant(
-                dout_2d, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+            dout_fp8, dout_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                dout_2d, output_scale_transpose=True, quant_method="1x128", input_transpose=False
             )
             dout_2d = padding(dout_2d, 0)
-            _, _, dout_t_fp8, dout_t_scale = kitchen_quant(
-                dout_2d, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+            _, _, dout_t_fp8, dout_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                dout_2d, output_scale_transpose=True, quant_method="1x128", input_transpose=True
             )
         else:
-            dout_fp8, dout_scale, dout_t_fp8, dout_t_scale = kitchen_quant(
-                dout_2d, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+            dout_fp8, dout_scale, dout_t_fp8, dout_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                dout_2d, output_scale_transpose=True, quant_method="1x128", input_transpose=True
             )
 
         dx = paddle.empty([dout_fp8.shape[0], w_fp8.shape[0]], dout.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((dout_fp8, dout_scale.T), (w_fp8, w_sacle), dx)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((dout_fp8, dout_scale.T), (w_fp8, w_sacle), dx, num_sms=112)
         dx = dx.reshape(dx_orig_shape)
 
         # ===== dw1 = deep_gemm(x_t_fp8, dout_t_fp8)
-        dweight = kitchen_fp8_gemm(x_t_fp8, x_t_scale, dout_t_fp8, dout_t_scale, True, True, rtn_dtype=paddle.float32)
+        if hasattr(weight, "main_grad"):
+            if weight.main_grad is None:
+                weight.main_grad = paddle.zeros(shape=weight.shape, dtype=paddle.float32)
+            kitchen_fp8_gemm(
+                x_t_fp8, x_t_scale, dout_t_fp8, dout_t_scale, True, True, weight.main_grad, rtn_dtype=paddle.float32
+            )
+        else:
+            if weight.grad is None:
+                weight.grad = paddle.zeros(shape=weight.shape, dtype=paddle.float32)
+            kitchen_fp8_gemm(
+                x_t_fp8, x_t_scale, dout_t_fp8, dout_t_scale, True, True, weight.grad, rtn_dtype=paddle.float32
+            )
 
-        return dx, dweight
+        if hasattr(weight, "_apply_backward_hook"):
+            weight._apply_backward_hook()
+
+        return dx
 
 
 class FP8KeepXLinear(paddle.nn.Layer):
@@ -279,7 +281,7 @@ class FP8KeepXLinear(paddle.nn.Layer):
         )
 
     def forward(self, x):
-        return FP8LinearKeepXFunction.apply(x, self.weight)
+        return FP8LinearKeepXFunction.apply(x, self)
 
 
 def fp8_mlp_fwd(x, w1, w2):
@@ -287,107 +289,172 @@ def fp8_mlp_fwd(x, w1, w2):
     x = x.reshape([-1, x_orig_shape[-1]])
 
     # ===== o1 = deep_gemm(x_fp8, w1_t_fp8) =====
-    x_fp8, x_scale = kitchen_quant(x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False)
+    x_fp8, x_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        x, output_scale_transpose=True, quant_method="1x128", input_transpose=False
+    )
 
-    _, _, w1_fp8, w1_sacle = kitchen_quant(
-        w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+    _, _, w1_fp8, w1_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True
     )
     o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=x.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_sacle), o1)
+    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_sacle), o1, num_sms=112)
 
     # ===== o2 = swiglu(o1) =====
     o2 = swiglu(o1)
-    o2_fp8, o2_scale = kitchen_quant(o2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False)
+    o2_fp8, o2_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        o2, output_scale_transpose=True, quant_method="1x128", input_transpose=False
+    )
 
     # ===== o3 = deep_gemm(o2_fp8, w2_t_fp8) =====
-    _, _, w2_t_fp8, w2_t_scale = kitchen_quant(
-        w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+    _, _, w2_t_fp8, w2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        w2, output_scale_transpose=False, quant_method="128x128", input_transpose=True
     )
     o3 = paddle.empty([o2_fp8.shape[0], w2_t_fp8.shape[0]], dtype=o1.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((o2_fp8, o2_scale.T), (w2_t_fp8, w2_t_scale), o3)
+    deep_gemm.gemm_fp8_fp8_bf16_nt((o2_fp8, o2_scale.T), (w2_t_fp8, w2_t_scale), o3, num_sms=112)
     if len(x_orig_shape) > 2:
         o3 = o3.reshape([x_orig_shape[0], -1, o3.shape[-1]])
 
-    return x_fp8, x_scale, o3
+    return o3
 
 
-def fp8_mlp_bwd(do3, x_fp8, x_scale, w1, w2):
+def fp8_mlp_bwd(do3, x, w1, w2):
     do3_orig_shape = do3.shape
     do3 = do3.reshape([-1, do3_orig_shape[-1]])
 
-    x_orig_shape = x_fp8.shape
+    x_orig_shape = x.shape
+    x = x.reshape([-1, x_orig_shape[-1]])
 
-    _, _, w1_fp8, w1_sacle = kitchen_quant(
-        w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+    if x.shape[0] % 128 == 0:
+        x_fp8, x_scale, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            x, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+        )
+    else:
+        x_fp8, x_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            x, output_scale_transpose=True, quant_method="1x128", input_transpose=False
+        )
+        x = padding(x, 0)
+        _, _, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            x, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+        )
+
+    _, _, w1_fp8, w1_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True
     )
     o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=do3.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_sacle), o1)
-
-    x_dequant_fp16 = paddle.incubate.nn.functional.fused_act_dequant(x_fp8, x_scale.T.contiguous())
-    x_dequant_fp16 = padding(x_dequant_fp16, 0)
-
-    _, _, x_t_fp8, x_t_scale = kitchen_quant(
-        x_dequant_fp16, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
-    )
+    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_sacle), o1, num_sms=112)
 
     # ===== [recompute] o2 = swiglu(o1) =====
     o2 = swiglu(o1)
 
     # ===== do2 = deep_gemm(do3_fp8, w2_fp8)
     if do3.shape[0] % 512 != 0:
-        do3_fp8, do3_scale = kitchen_quant(
-            do3, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+        do3_fp8, do3_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            do3, output_scale_transpose=True, quant_method="1x128", input_transpose=False
         )
         do3 = padding(do3, 0)
-        _, _, do3_t_fp8, do3_t_scale = kitchen_quant(
-            do3, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+        _, _, do3_t_fp8, do3_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            do3, output_scale_transpose=True, quant_method="1x128", input_transpose=True
         )
     else:
-        do3_fp8, do3_scale, do3_t_fp8, do3_t_scale = kitchen_quant(
-            do3, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+        do3_fp8, do3_scale, do3_t_fp8, do3_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            do3, output_scale_transpose=True, quant_method="1x128", input_transpose=True
         )
-    w2_fp8, w2_scale = kitchen_quant(
-        w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+    w2_fp8, w2_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        w2, output_scale_transpose=False, quant_method="128x128", input_transpose=False
     )
     do2 = paddle.empty([do3_fp8.shape[0], w2_fp8.shape[0]], do3.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((do3_fp8, do3_scale.T), (w2_fp8, w2_scale), do2)
+    deep_gemm.gemm_fp8_fp8_bf16_nt((do3_fp8, do3_scale.T), (w2_fp8, w2_scale), do2, num_sms=112)
 
     # ===== dw2 = deep_gemm(o2_t_fp8, do3_t_fp8)
     o2 = padding(o2, 0)
-    _, _, o2_t_fp8, o2_t_scale = kitchen_quant(
-        o2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+    _, _, o2_t_fp8, o2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        o2, output_scale_transpose=True, quant_method="1x128", input_transpose=True
     )
 
-    dw2 = kitchen_fp8_gemm(o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, True, True, rtn_dtype=paddle.float32)
+    if hasattr(w2, "main_grad"):
+        if w2.main_grad is None:
+            w2.main_grad = paddle.zeros(shape=w2.shape, dtype=paddle.float32)
+        kitchen_fp8_gemm(
+            o2_t_fp8,
+            o2_t_scale,
+            do3_t_fp8,
+            do3_t_scale,
+            True,
+            True,
+            w2.main_grad,
+            paddle.float32,
+        )
+    else:
+        if w2.grad is None:
+            w2.grad = paddle.zeros(shape=w2.shape, dtype=paddle.float32)
+        kitchen_fp8_gemm(
+            o2_t_fp8,
+            o2_t_scale,
+            do3_t_fp8,
+            do3_t_scale,
+            True,
+            True,
+            w2.grad,
+            paddle.float32,
+        )
+    if hasattr(w2, "_apply_backward_hook"):
+        w2._apply_backward_hook()
 
     # ===== do1 = swiglu_grad(o1, None, do2) =====
     do1, _ = paddle._C_ops.swiglu_grad(o1, None, do2)
 
     # ===== dx = deep_gemm(do1_fp8, w1_fp8)
     if do1.shape[0] % 512 != 0:
-        do1_fp8, do1_scale = kitchen_quant(
-            do1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+        do1_fp8, do1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            do1, output_scale_transpose=True, quant_method="1x128", input_transpose=False
         )
         do1 = padding(do1, 0)
-        _, _, do1_t_fp8, do1_t_scale = kitchen_quant(
-            do1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+        _, _, do1_t_fp8, do1_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            do1, output_scale_transpose=True, quant_method="1x128", input_transpose=True
         )
     else:
-        do1_fp8, do1_scale, do1_t_fp8, do1_t_scale = kitchen_quant(
-            do1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+        do1_fp8, do1_scale, do1_t_fp8, do1_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            do1, output_scale_transpose=True, quant_method="1x128", input_transpose=True
         )
-    w1_fp8, w1_sacle = kitchen_quant(
-        w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+    w1_fp8, w1_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        w1, output_scale_transpose=False, quant_method="128x128", input_transpose=False
     )
     dx = paddle.empty([do1_fp8.shape[0], w1_fp8.shape[0]], do1.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8, do1_scale.T), (w1_fp8, w1_sacle), dx)
+    deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8, do1_scale.T), (w1_fp8, w1_sacle), dx, num_sms=112)
     if len(x_orig_shape) > 2:
         dx = dx.reshape([x_orig_shape[0], -1, dx.shape[-1]])
 
     # ===== dw1 = deep_gemm(x_t_fp8, do1_t_fp8)
-    dw1 = kitchen_fp8_gemm(x_t_fp8, x_t_scale, do1_t_fp8, do1_t_scale, True, True, rtn_dtype=paddle.float32)
+    if hasattr(w1, "main_grad"):
+        if w1.main_grad is None:
+            w1.main_grad = paddle.zeros(shape=w1.shape, dtype=paddle.float32)
+        kitchen_fp8_gemm(
+            x_t_fp8,
+            x_t_scale,
+            do1_t_fp8,
+            do1_t_scale,
+            True,
+            True,
+            w1.main_grad,
+            paddle.float32,
+        )
+    else:
+        if w1.grad is None:
+            w1.grad = paddle.zeros(shape=w1.shape, dtype=paddle.float32)
+        kitchen_fp8_gemm(
+            x_t_fp8,
+            x_t_scale,
+            do1_t_fp8,
+            do1_t_scale,
+            True,
+            True,
+            w1.grad,
+            paddle.float32,
+        )
+    if hasattr(w1, "_apply_backward_hook"):
+        w1._apply_backward_hook()
 
-    return dx, dw1, dw2
+    return dx
 
 
 class FP8MlpFunction(paddle.autograd.PyLayer):
@@ -398,25 +465,25 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
         x = x.reshape([-1, x_orig_shape[-1]])
 
         # ===== o1 = deep_gemm(x_fp8, w1_t_fp8) =====
-        x_fp8, x_scale = kitchen_quant(
-            x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+        x_fp8, x_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            x, output_scale_transpose=True, quant_method="1x128", input_transpose=False
         )
 
-        _, _, w1_fp8, w1_sacle = kitchen_quant(
-            w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+        _, _, w1_fp8, w1_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True
         )
         o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=x.dtype)
         deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_sacle), o1)
 
         # ===== o2 = swiglu(o1) =====
         o2 = swiglu(o1)
-        o2_fp8, o2_scale = kitchen_quant(
-            o2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+        o2_fp8, o2_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            o2, output_scale_transpose=True, quant_method="1x128", input_transpose=False
         )
 
         # ===== o3 = deep_gemm(o2_fp8, w2_t_fp8) =====
-        _, _, w2_t_fp8, w2_t_scale = kitchen_quant(
-            w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+        _, _, w2_t_fp8, w2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            w2, output_scale_transpose=False, quant_method="128x128", input_transpose=True
         )
         o3 = paddle.empty([o2_fp8.shape[0], w2_t_fp8.shape[0]], dtype=o1.dtype)
         deep_gemm.gemm_fp8_fp8_bf16_nt((o2_fp8, o2_scale.T), (w2_t_fp8, w2_t_scale), o3)
@@ -443,8 +510,8 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
         x_fp8, x_scale, w1, w2, x_orig_shape = ctx.saved_tensor()
         x_orig_shape = x_orig_shape.numpy()
 
-        _, _, w1_fp8, w1_sacle = kitchen_quant(
-            w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+        _, _, w1_fp8, w1_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True
         )
         o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=do3.dtype)
         deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_sacle), o1)
@@ -452,8 +519,8 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
         x_dequant_fp16 = paddle.incubate.nn.functional.fused_act_dequant(x_fp8, x_scale.T.contiguous())
         x_dequant_fp16 = padding(x_dequant_fp16, 0)
 
-        _, _, x_t_fp8, x_t_scale = kitchen_quant(
-            x_dequant_fp16, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+        _, _, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            x_dequant_fp16, output_scale_transpose=True, quant_method="1x128", input_transpose=True
         )
 
         # ===== [recompute] o2 = swiglu(o1) =====
@@ -461,27 +528,27 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
 
         # ===== do2 = deep_gemm(do3_fp8, w2_fp8)
         if do3.shape[0] % 512 != 0:
-            do3_fp8, do3_scale = kitchen_quant(
-                do3, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+            do3_fp8, do3_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                do3, output_scale_transpose=True, quant_method="1x128", input_transpose=False
             )
             do3 = padding(do3, 0)
-            _, _, do3_t_fp8, do3_t_scale = kitchen_quant(
-                do3, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+            _, _, do3_t_fp8, do3_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                do3, output_scale_transpose=True, quant_method="1x128", input_transpose=True
             )
         else:
-            do3_fp8, do3_scale, do3_t_fp8, do3_t_scale = kitchen_quant(
-                do3, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+            do3_fp8, do3_scale, do3_t_fp8, do3_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                do3, output_scale_transpose=True, quant_method="1x128", input_transpose=True
             )
-        w2_fp8, w2_scale = kitchen_quant(
-            w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        w2_fp8, w2_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            w2, output_scale_transpose=False, quant_method="128x128", input_transpose=False
         )
         do2 = paddle.empty([do3_fp8.shape[0], w2_fp8.shape[0]], do3.dtype)
         deep_gemm.gemm_fp8_fp8_bf16_nt((do3_fp8, do3_scale.T), (w2_fp8, w2_scale), do2)
 
         # ===== dw2 = deep_gemm(o2_t_fp8, do3_t_fp8)
         o2 = padding(o2, 0)
-        _, _, o2_t_fp8, o2_t_scale = kitchen_quant(
-            o2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+        _, _, o2_t_fp8, o2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            o2, output_scale_transpose=True, quant_method="1x128", input_transpose=True
         )
 
         dw2 = kitchen_fp8_gemm(o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, True, True, rtn_dtype=paddle.float32)
@@ -491,19 +558,19 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
 
         # ===== dx = deep_gemm(do1_fp8, w1_fp8)
         if do1.shape[0] % 512 != 0:
-            do1_fp8, do1_scale = kitchen_quant(
-                do1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+            do1_fp8, do1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                do1, output_scale_transpose=True, quant_method="1x128", input_transpose=False
             )
             do1 = padding(do1, 0)
-            _, _, do1_t_fp8, do1_t_scale = kitchen_quant(
-                do1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+            _, _, do1_t_fp8, do1_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                do1, output_scale_transpose=True, quant_method="1x128", input_transpose=True
             )
         else:
-            do1_fp8, do1_scale, do1_t_fp8, do1_t_scale = kitchen_quant(
-                do1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+            do1_fp8, do1_scale, do1_t_fp8, do1_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                do1, output_scale_transpose=True, quant_method="1x128", input_transpose=True
             )
-        w1_fp8, w1_sacle = kitchen_quant(
-            w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        w1_fp8, w1_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            w1, output_scale_transpose=False, quant_method="128x128", input_transpose=False
         )
         dx = paddle.empty([do1_fp8.shape[0], w1_fp8.shape[0]], do1.dtype)
         deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8, do1_scale.T), (w1_fp8, w1_sacle), dx)
@@ -537,18 +604,40 @@ class FP8Mlp(paddle.nn.Layer):
         return FP8MlpFunction.apply(x, self.w1, self.w2)
 
 
-def gen_m_indices(tokens_per_expert):
-    tokens = []
-    for i in range(len(tokens_per_expert)):
-        tokens.append(paddle.full([tokens_per_expert[i]], i, dtype="int32"))
-    out = paddle.concat(tokens, axis=0)
-    return out
+def split_group_gemm(x_fp8, x_scale, w_fp8, w_scale, tokens_per_expert, gemm_out):
+    start_idx = 0
+    for i, token_num in enumerate(tokens_per_expert):
+        if token_num == 0:
+            continue
+        end_idx = start_idx + token_num
+
+        x_scale_tma_align = x_scale[start_idx:end_idx].T.contiguous().T
+
+        deep_gemm.gemm_fp8_fp8_bf16_nt(
+            (x_fp8[start_idx:end_idx], x_scale_tma_align),
+            (w_fp8[i], w_scale[i]),
+            gemm_out[start_idx:end_idx],
+            num_sms=112,
+        )
+
+        start_idx = end_idx
+
+    return gemm_out
 
 
 class FP8GroupGemmMlpFunctionNode:
-    def __init__(self, custom_map, mem_efficient=False, name="experts_group_gemm_contiguous_node"):
-        self.custom_map = custom_map
-        self.mem_efficient = mem_efficient
+    def __init__(
+        self,
+        custom_map,
+        recompute_fwd_gate_up=False,
+        dequant_input=False,
+        is_split_group_gemm=False,
+        name="experts_group_gemm_contiguous_node",
+    ):
+        self.experts = custom_map.experts
+        self.recompute_fwd_gate_up = recompute_fwd_gate_up
+        self.dequant_input = dequant_input
+        self.is_split_group_gemm = is_split_group_gemm
         self.tokens_per_expert = None
         self.m_indices = None
         self.unzipped_probs = None
@@ -556,15 +645,50 @@ class FP8GroupGemmMlpFunctionNode:
         self.input_fp8 = None
         self.input_scale = None
         self.o1 = None
+
+    def cached_tensors(self):
+        return [
+            self.tokens_per_expert,
+            self.m_indices,
+            self.unzipped_probs,
+            self.input,
+            self.input_fp8,
+            self.input_scale,
+            self.o1,
+        ]
+
+    def set_cached_tensors(self, tensors):
+        (
+            self.tokens_per_expert,
+            self.m_indices,
+            self.unzipped_probs,
+            self.input,
+            self.input_fp8,
+            self.input_scale,
+            self.o1,
+        ) = tensors
+
+    def clear_cached_tensors(self):
+        self.set_cached_tensors([None] * len(self.cached_tensors))
 
     def reset_statue(self):
         self.tokens_per_expert = None
         self.m_indices = None
+        self.clear_activation_tensors()
+
+    def clear_activation_tensors(self):
         self.unzipped_probs = None
         self.input = None
         self.input_fp8 = None
         self.input_scale = None
         self.o1 = None
+
+    def gen_m_indices(self, tokens_per_expert):
+        tokens = []
+        for i in range(len(tokens_per_expert)):
+            tokens.append(paddle.full([tokens_per_expert[i]], i, dtype="int32"))
+        out = paddle.concat(tokens, axis=0)
+        return out
 
     def fwd_gate_up(self, x_bf16, expert_w1, num_expert, tokens_per_expert):
         """
@@ -572,39 +696,45 @@ class FP8GroupGemmMlpFunctionNode:
         [m_sum, n] = [m_sum, k] * [num_groups, k, n] (m_sum = sum(tokens_per_expert))
         """
         self.tokens_per_expert = tokens_per_expert
-        self.m_indices = gen_m_indices(tokens_per_expert)
+        if not self.is_split_group_gemm:
+            self.m_indices = self.gen_m_indices(tokens_per_expert)
         # concat w1, shape is [num_groups, n, k]
         w1_t_quant, w1_t_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(expert_w1, transpose=True)
         w1_t_quant = w1_t_quant.reshape([num_expert, -1, w1_t_quant.shape[-1]])
         w1_t_scale = w1_t_scale.reshape([num_expert, -1, w1_t_scale.shape[-1]])
 
-        # quant x_bf16
-        x_fp8, x_scale = kitchen_quant(
-            x_bf16, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
-        )
-
-        x_scale = x_scale.T
+        if x_bf16 is None:
+            x_fp8, x_scale = self.input_fp8, self.input_scale
+            assert x_fp8 is not None and x_scale is not None
+        else:
+            # quant x_bf16
+            x_fp8, x_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                x_bf16, output_scale_transpose=True, quant_method="1x128", input_transpose=False
+            )
+            x_scale = x_scale.T
 
         # compute gemm
-        o1 = paddle.empty([x_bf16.shape[0], w1_t_quant.shape[1]], dtype=x_bf16.dtype)
+        o1 = paddle.empty([x_fp8.shape[0], w1_t_quant.shape[1]], dtype=expert_w1[0].dtype)
         if numpy.prod(x_fp8.shape) != 0:
-            deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
-                (x_fp8, x_scale), (w1_t_quant, w1_t_scale), o1, m_indices=self.m_indices
-            )
+            if self.is_split_group_gemm:
+                split_group_gemm(x_fp8, x_scale, w1_t_quant, w1_t_scale, tokens_per_expert, o1)
+            else:
+                deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
+                    (x_fp8, x_scale), (w1_t_quant, w1_t_scale), o1, m_indices=self.m_indices, num_sms=112
+                )
 
-        if self.mem_efficient:
+        if self.dequant_input:
             self.input_fp8 = x_fp8
             self.input_scale = x_scale
         else:
             self.input = x_bf16
-
         return o1
 
     def fwd_swiglu(self, o1):
         o2 = swiglu(o1)
         return o2
 
-    def fwd_down(self, o1, unzipped_probs, expert_w2, num_expert):
+    def fwd_down(self, o1, unzipped_probs, expert_w2, num_expert, o3=None, clear_o1=False):
         """
         o3 = o2 * w2
         [m_sum, k] = [m_sum, n] * [num_groups, n, k]
@@ -620,17 +750,27 @@ class FP8GroupGemmMlpFunctionNode:
                 o1, unzipped_probs, using_pow2_scaling=True
             )
         o2_scale = paddle.transpose(paddle.transpose(o2_scale, [1, 0]).contiguous(), [1, 0])
-        self.unzipped_probs = unzipped_probs.unsqueeze(-1)
+        unzipped_probs = unzipped_probs.unsqueeze(-1)
+
+        if clear_o1:
+            o1._clear_to_zero_allocation()
 
         # compute gemm
-        o3 = paddle.empty([o2_fp8.shape[0], w2_quant.shape[1]], dtype=o1.dtype)
+        o3_shape = [o2_fp8.shape[0], w2_quant.shape[1]]
+        if o3 is not None:
+            assert o3.shape == o3_shape, "{} vs {}".format(o3.shape, o3_shape)
+        else:
+            o3 = paddle.empty(o3_shape, dtype=o1.dtype)
         if numpy.prod(o2_fp8.shape) != 0:
-            deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
-                (o2_fp8, o2_scale), (w2_quant, w2_sacle), o3, m_indices=self.m_indices
-            )
-        return o3
+            if self.is_split_group_gemm:
+                split_group_gemm(o2_fp8, o2_scale, w2_quant, w2_sacle, self.tokens_per_expert, o3)
+            else:
+                deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
+                    (o2_fp8, o2_scale), (w2_quant, w2_sacle), o3, m_indices=self.m_indices, num_sms=112
+                )
+        return o3, unzipped_probs
 
-    def bwd_dowm_input(self, expert_w2, unzipped_grad, o1):
+    def bwd_dowm_input(self, expert_w2, unzipped_grad, o1, inplace_swiglu_prob=False):
         """
         do2 = do3 * w2_t
         [m_sum, n] = [m_sum, k] * [num_groups, k, n]
@@ -643,14 +783,25 @@ class FP8GroupGemmMlpFunctionNode:
         bw_w2_scale = bw_w2_scale.reshape([len(expert_w2), -1, bw_w2_scale.shape[-1]])
 
         # compute gemm
-        unzipped_grad_fp8, unzipped_grad_scale = kitchen_quant(
-            unzipped_grad, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+        unzipped_grad_fp8, unzipped_grad_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            unzipped_grad, output_scale_transpose=True, quant_method="1x128", input_transpose=False
         )
+        unzipped_grad_scale = unzipped_grad_scale.T
+
         do2_s = paddle.empty([unzipped_grad_fp8.shape[0], bw_w2_quant.shape[1]], dtype=unzipped_grad.dtype)
         if numpy.prod(unzipped_grad_fp8.shape) != 0:
-            deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
-                (unzipped_grad_fp8, unzipped_grad_scale.T), (bw_w2_quant, bw_w2_scale), do2_s, m_indices=self.m_indices
-            )
+            if self.is_split_group_gemm:
+                split_group_gemm(
+                    unzipped_grad_fp8, unzipped_grad_scale, bw_w2_quant, bw_w2_scale, self.tokens_per_expert, do2_s
+                )
+            else:
+                deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
+                    (unzipped_grad_fp8, unzipped_grad_scale),
+                    (bw_w2_quant, bw_w2_scale),
+                    do2_s,
+                    m_indices=self.m_indices,
+                    num_sms=112,
+                )
 
         with paddle.amp.auto_cast(False):
             do1, probs_grad, o2_s = paddle.incubate.nn.functional.fused_swiglu_weighted_bwd(
@@ -663,7 +814,7 @@ class FP8GroupGemmMlpFunctionNode:
         do1, _ = paddle._C_ops.swiglu_grad(o1, None, do2)
         return do1
 
-    def bwd_gate_up_input(self, do1, expert_w1):
+    def bwd_gate_up_input(self, do1, expert_w1, dx=None):
         """
         dx = do1 * w1_t
         [m_sum, k] = [m_sum, n] * [num_groups, n, k]
@@ -676,16 +827,24 @@ class FP8GroupGemmMlpFunctionNode:
         bw_w1_scale = bw_w1_scale.reshape([len(expert_w1), -1, bw_w1_scale.shape[-1]])
 
         # quant do1
-        do1_fp8, do1_scale = kitchen_quant(
-            do1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+        do1_fp8, do1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            do1, output_scale_transpose=True, quant_method="1x128", input_transpose=False
         )
-
+        do1_scale = do1_scale.T
         # compute gemm
-        dx = paddle.empty(shape=[do1_fp8.shape[0], bw_w1_quant.shape[1]], dtype=paddle.bfloat16)
+        dx_shape = [do1_fp8.shape[0], bw_w1_quant.shape[1]]
+        if dx is None:
+            dx = paddle.empty(shape=dx_shape, dtype=do1.dtype)
+        else:
+            assert dx.shape == dx_shape, f"{dx.shape} vs {dx_shape}"
         if numpy.prod(do1_fp8.shape) != 0:
-            deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
-                (do1_fp8, do1_scale.T), (bw_w1_quant, bw_w1_scale), dx, m_indices=self.m_indices
-            )
+            if self.is_split_group_gemm:
+                split_group_gemm(do1_fp8, do1_scale, bw_w1_quant, bw_w1_scale, self.tokens_per_expert, dx)
+            else:
+                deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
+                    (do1_fp8, do1_scale), (bw_w1_quant, bw_w1_scale), dx, m_indices=self.m_indices, num_sms=112
+                )
+
         return dx
 
     def fused_transpose_split_quant(self, x, tokens_per_expert, pow_2_scales):
@@ -727,13 +886,26 @@ class FP8GroupGemmMlpFunctionNode:
                     expert_w2[i].grad,
                     paddle.float32,
                 )
+            if hasattr(expert_w2[i], "_apply_backward_hook"):
+                expert_w2[i]._apply_backward_hook()
 
-    def bwd_gate_up_weight(self, do1, input_x, expert_w1):
+    def bwd_gate_up_weight(self, do1, input_x, expert_w1, clear_input=False):
         """
         dw1 = dx_t * do1
         [k, n] = [k, m_sum] * [m_sum, n] (m_sum = sum(tokens_per_expert))
         """
+        if input_x is None:
+            if self.dequant_input:
+                input_x = paddle.incubate.nn.functional.fused_act_dequant(self.input_fp8, self.input_scale)
+            else:
+                input_x = self.input
+        if clear_input:
+            self.input = None
+            self.input_fp8 = None
+            self.input_scale = None
+
         input_x_t_fp8, input_x_t_scale = self.fused_transpose_split_quant(input_x, self.tokens_per_expert, True)
+        del input_x
         do1_t_fp8, do1_t_scale = self.fused_transpose_split_quant(do1, self.tokens_per_expert, True)
 
         for i in range(len(expert_w1)):
@@ -763,64 +935,75 @@ class FP8GroupGemmMlpFunctionNode:
                     expert_w1[i].grad,
                     paddle.float32,
                 )
+            if hasattr(expert_w1[i], "_apply_backward_hook"):
+                expert_w1[i]._apply_backward_hook()
 
     @paddle.no_grad()
-    def forward(self, hs_out, unzipped_probs, tokens_per_expert, origin_token_per_experts):
+    def forward(self, hs_out, unzipped_probs, tokens_per_expert, origin_token_per_experts, output=None):
         self.origin_token_per_experts = origin_token_per_experts
-        if hs_out.shape[0] == 0:
-            o3 = paddle.zeros_like(hs_out)
+        if hs_out is None:
+            assert self.input_fp8 is not None
+            assert self.input_scale is not None
+            shape = self.input_fp8.shape
+            dtype = paddle.bfloat16
+        else:
+            shape = hs_out.shape
+            dtype = hs_out.dtype
+
+        if shape[0] == 0:
+            o3 = paddle.zeros(shape, dtype=dtype)
             self.unzipped_probs = unzipped_probs.unsqueeze(-1)
             return o3
+
         # get w1/w2
-        expert_w1 = [x.w1 for x in self.custom_map.experts if x is not None]
-        expert_w2 = [x.w2 for x in self.custom_map.experts if x is not None]
+        expert_w1 = [x.w1 for x in self.experts if x is not None]
+        expert_w2 = [x.w2 for x in self.experts if x is not None]
 
         num_expert = len(expert_w1)
 
         # o1
         o1 = self.fwd_gate_up(hs_out, expert_w1, num_expert, tokens_per_expert)
-        self.o1 = o1
+        if not self.recompute_fwd_gate_up:
+            self.o1 = o1
+            clear_o1 = False
+        else:
+            clear_o1 = True
 
         # o3
-        o3 = self.fwd_down(o1, unzipped_probs, expert_w2, num_expert)
+        o3, unzipped_probs = self.fwd_down(o1, unzipped_probs, expert_w2, num_expert, clear_o1=clear_o1)
 
+        # save for bwd
+        self.unzipped_probs = unzipped_probs
         return o3
 
     @paddle.no_grad()
     def backward(self, out_grad):
         # recompute expert_w2 and expert_w1
-        expert_w1 = [x.w1 for x in self.custom_map.experts if x is not None]
-        expert_w2 = [x.w2 for x in self.custom_map.experts if x is not None]
+        expert_w1 = [x.w1 for x in self.experts if x is not None]
+        expert_w2 = [x.w2 for x in self.experts if x is not None]
 
-        if self.mem_efficient:
-            input = paddle.incubate.nn.functional.fused_act_dequant(self.input_fp8, self.input_scale)
+        if self.recompute_fwd_gate_up:
+            o1 = self.fwd_gate_up(None, expert_w1, len(expert_w1), self.tokens_per_expert)
         else:
-            input = self.input
+            o1 = self.o1
 
         # do2
-        do1, o2_s, probs_grad = self.bwd_dowm_input(expert_w2, out_grad, self.o1)
-
-        # release o1 and reset o1
-        del self.o1
+        do1, o2_s, probs_grad = self.bwd_dowm_input(expert_w2, out_grad, o1, inplace_swiglu_prob=True)
+        del o1
         self.o1 = None
 
-        # dx
-        dx = self.bwd_gate_up_input(do1, expert_w1)
-
         # dw1
-        self.bwd_gate_up_weight(do1, input, expert_w1)
-
-        # release do1 and input
-        del do1
-        del input
-        if self.mem_efficient:
-            self.input_fp8 = None
-            self.input_scale = None
-        else:
-            self.input = None
+        self.bwd_gate_up_weight(do1, None, expert_w1, clear_input=True)
+        self.input_fp8 = None
+        self.input_scale = None
+        self.input = None
 
         # dw2
         self.bwd_down_weight(out_grad, o2_s, expert_w2)
+
+        # dx
+        dx = self.bwd_gate_up_input(do1, expert_w1, dx=out_grad)
+        del do1
 
         self.reset_statue()
         return dx, probs_grad
