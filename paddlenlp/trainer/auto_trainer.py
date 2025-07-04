@@ -25,9 +25,12 @@ import paddle.distributed.auto_parallel.intermediate.parallelize as parallelize
 import paddle.nn as nn
 from paddle.distributed import fleet
 from paddle.profiler.utils import switch_job_schedule_profiler
+from paddle.profiler.profiler import Profiler
+from paddle.profiler import profiler
 from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
+from paddlenlp.experimental.galvatron.profiler.runtime_profiler import RuntimeProfiler
 
 from ..transformers.model_utils import clean_model_class_name, unwrap_model
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
@@ -112,6 +115,14 @@ class AutoTrainer(Trainer):
                 self.comm_group_in_pp,
             )
         self._in_pir_mode = paddle.base.framework.get_flags("FLAGS_enable_pir_api")["FLAGS_enable_pir_api"]
+
+        # @added by linguangming
+        self.runtime_profiler_args = kwargs['runtime_profiler_args']
+        print(f"[auto_parallel] AutoTrainer get runtime_profiler_args")
+        self.runtime_profiler_args = kwargs["runtime_profiler_args"]
+        self.runtime_profiler = RuntimeProfiler(self.runtime_profiler_args)
+        self.runtime_profiler.set_time_profiler(start_iter=10, end_iter=20)
+        self.runtime_profiler.set_memory_profiler(max_profile_memory_iter=5)
 
     @classmethod
     def parallel_model(cls, model, training_args: AutoTrainingArguments):
@@ -211,12 +222,14 @@ class AutoTrainer(Trainer):
                     self.args.gradient_accumulation_steps,
                 )
             elif ShardingOption.SHARD_GRAD_OP in self.args.sharding:
+                print(f'[linguangming] [paddlenlp.trainer.auto_trainer.py] sharding zero2')
                 self.optimizer = dist.shard_optimizer(
                     self.optimizer,
                     dist.ShardingStage2(sharding_mesh_dim=sharding_parallel_mesh_dimension),
                     self.args.gradient_accumulation_steps,
                 )
             elif ShardingOption.FULL_SHARD in self.args.sharding:
+                print(f'[linguangming] [paddlenlp.trainer.auto_trainer.py] sharding zero3')
                 self.optimizer = dist.shard_optimizer(
                     self.optimizer,
                     dist.ShardingStage3(sharding_mesh_dim=sharding_parallel_mesh_dimension),
@@ -270,7 +283,7 @@ class AutoTrainer(Trainer):
 
         if args.to_static:
             return
-        self.do_grad_scaling = True if self.args.fp16 else False
+        self.do_grad_scaling = True if self.args.fp16 else False # NOTE 此处可能有问题
         self.scaler = dist.shard_scaler(paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss))
 
     def _get_item_from_loss(self, loss):
@@ -444,7 +457,7 @@ class AutoTrainer(Trainer):
         steps_trained_in_current_epoch = 0
         steps_trained_progress_bar = None
 
-        # Check if continuing training from a checkpoint
+        # Check if continuing training from a checkpoint  
         if (
             resume_from_checkpoint is not None
             and distributed_isfile(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
@@ -563,6 +576,14 @@ class AutoTrainer(Trainer):
                     if schedule_start_step >= 0:
                         switch_job_schedule_profiler(model, step, schedule_start_step, schedule_end_step)
 
+                if self.runtime_profiler_args is not None:
+                    self.runtime_profiler.profile_time_start(step)
+                    self.runtime_profiler.profile_memory(step, stage="Before Forward")
+                    
+                # if step == 5:
+                #     paddle_profiler = Profiler(targets=[profiler.ProfilerTarget.CPU, profiler.ProfilerTarget.GPU], 
+                #                                on_trace_ready = profiler.export_chrome_tracing('./no-flash_attn'))
+                #     paddle_profiler.start()
                 for inputs in inputs_list:
                     if step_control % args.gradient_accumulation_steps == 0:
                         self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
@@ -588,6 +609,9 @@ class AutoTrainer(Trainer):
                     ):
 
                         self.timers and self.timers("forward-backward").stop()
+                        
+                        if self.runtime_profiler_args is not None:
+                            self.runtime_profiler.profile_memory(step, stage="After Backward")
 
                         self.timers and self.timers("optimizer-step").start()
 
@@ -600,7 +624,11 @@ class AutoTrainer(Trainer):
                         )
 
                         self.optimizer_step()
-
+                        
+                        if self.runtime_profiler_args is not None:
+                            self.runtime_profiler.post_profile_memory(step)
+                            self.runtime_profiler.profile_time_end(step)
+                            
                         self.timers and self.timers("optimizer-step").stop()
 
                         self.callback_handler.on_optimizer_end(
@@ -616,7 +644,12 @@ class AutoTrainer(Trainer):
                     else:
                         self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
                         step_control += 1
-
+                    # if step == 5:
+                    #     paddle_profiler.step()
+                
+                # if step == 5:
+                #     paddle_profiler.stop()
+                
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
 
@@ -777,9 +810,15 @@ class AutoTrainer(Trainer):
             return self.dynamic_auto_parallel_pipeline_training(model, inputs)
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
-
+    
         if loss is not None and self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = loss / self.args.gradient_accumulation_steps
+
+        if self.runtime_profiler_args is not None:
+            self.runtime_profiler.profile_memory(self.state.global_step, stage="After Forward")
+        
+        if self.runtime_profiler_args.profile_forward_only:
+            return loss
 
         if self.do_grad_scaling:
             self.scaler.scale(loss).backward()
@@ -790,6 +829,7 @@ class AutoTrainer(Trainer):
 
     def static_training(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         input_ids, labels = tuple(inputs.values())
+        print(f'static training coming')
         loss = model(input_ids, labels)
 
         if loss is not None and self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
@@ -798,7 +838,9 @@ class AutoTrainer(Trainer):
         return loss
 
     def training_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
+        print("start model.train()")
         model.train()
+        print("end model.train()")
 
         inputs = self._prepare_inputs(inputs)
 
@@ -840,11 +882,14 @@ class AutoTrainer(Trainer):
 
             if optimizer_was_run:
                 self.lr_scheduler.step()
-
+            
+            self.runtime_profiler.profile_memory(self.state.global_step, stage="After Optimizer")
+            
             self.optimizer.clear_grad()
         else:
             # TODO: support optimizer_was_run in static mode
             self.lr_scheduler.step()
+            self.runtime_profiler.profile_memory(self.state.global_step, stage="After Optimizer")
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         with _exec_mode_guard("dynamic"):

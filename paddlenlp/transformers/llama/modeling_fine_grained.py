@@ -1,17 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 EleutherAI and the HuggingFace Inc. team. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# @added-by linguangming
 """Paddle Llama model"""
 from __future__ import annotations
 
@@ -19,7 +6,7 @@ import math
 import os
 import warnings
 from functools import partial
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 import paddle
 import paddle.distributed as dist
@@ -79,8 +66,8 @@ except:
     flash_attention = None
 
 __all__ = [
-    "LlamaForCausalLM3DAuto",
-    "LlamaPretrainingCriterion3DAuto",
+    "LlamaForCausalLMFineGrained",
+    "LlamaPretrainingCriterionFineGrained"
 ]
 
 
@@ -93,27 +80,6 @@ def enable_fuse_ffn_qkv_pass():
         return True
     else:
         return False
-
-
-def is_pp_enable():
-    mesh = fleet.auto.get_mesh()
-    return "pp" in mesh.dim_names
-
-
-def get_mesh(pp_idx=0):
-    mesh = fleet.auto.get_mesh()
-    if "pp" in mesh.dim_names:
-        mesh = mesh.get_mesh_with_dim("pp", pp_idx)
-    return mesh
-
-
-def global_mesh_starts_with_pp():
-    mesh = fleet.auto.get_mesh()
-    if is_pp_enable():
-        return mesh.get_mesh_with_dim("pp")
-    else:
-        return mesh
-
 
 def scaled_dot_product_attention(
     query_states,
@@ -193,8 +159,8 @@ colwise_placements = [dist.Replicate(), dist.Shard(1)]
 rowise_placement = [dist.Replicate(), dist.Shard(0)]
 
 
-class LlamaRMSNormAuto(nn.Layer):
-    def __init__(self, config, ipp):
+class LlamaRMSNormFineGrained(nn.Layer):
+    def __init__(self, config, mesh):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.weight = paddle.create_parameter(
@@ -202,10 +168,10 @@ class LlamaRMSNormAuto(nn.Layer):
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(1.0),
         )
-        self.ipp = ipp
+        self.mesh = mesh
         self.weight = dist.shard_tensor(
             self.weight,
-            get_mesh(self.ipp),
+            self.mesh,
             [dist.Replicate(), dist.Replicate()],
         )
         self.variance_epsilon = config.rms_norm_eps
@@ -213,6 +179,7 @@ class LlamaRMSNormAuto(nn.Layer):
 
     def forward(self, hidden_states):
         if self.config.use_fused_rms_norm:
+            # print(f'[linguangming] hidden_states mesh is {hidden_states.process_mesh}, self.weight mesh is {self.weight.process_mesh}')
             return fusion_ops.fusion_rms_norm(
                 hidden_states, self.weight, self.variance_epsilon, self.config.use_fast_layer_norm
             )
@@ -227,41 +194,41 @@ class LlamaRMSNormAuto(nn.Layer):
         return hidden_states * self.weight
 
 
-class LlamaMLPAuto(nn.Layer):
-    def __init__(self, config, ipp: Optional[int] = None):
+class LlamaMLPFineGrained(nn.Layer):
+    def __init__(self, config, mesh):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
         self.fuse_attention_ffn = config.fuse_attention_ffn
-        self.ipp = ipp
+        self.mesh = mesh
         self.config = config
 
         if config.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass():
             self.gate_up_fused_proj = nn.Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
             self.gate_up_fused_proj.weight = dist.shard_tensor(
                 self.gate_up_fused_proj.weight,
-                get_mesh(self.ipp),
+                self.mesh,
                 colwise_placements,
             )
         else:
             self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.gate_proj.weight = dist.shard_tensor(
                 self.gate_proj.weight,
-                get_mesh(self.ipp),
+                self.mesh,
                 colwise_placements,
             )
 
             self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.up_proj.weight = dist.shard_tensor(
                 self.up_proj.weight,
-                get_mesh(self.ipp),
+                self.mesh,
                 colwise_placements,
             )
 
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
         self.down_proj.weight = dist.shard_tensor(
             self.down_proj.weight,
-            get_mesh(self.ipp),
+            self.mesh,
             rowise_placement,
         )
 
@@ -274,10 +241,10 @@ class LlamaMLPAuto(nn.Layer):
         return out
 
 
-class LlamaAttentionAuto(nn.Layer):
+class LlamaAttentionFineGrained(nn.Layer):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(self, config: LlamaConfig, layerwise_recompute: bool = False, ipp: Optional[int] = None):
+    def __init__(self, config: LlamaConfig, layerwise_recompute: bool = False, mesh= None):
         super().__init__()
 
         self.config = config
@@ -302,7 +269,7 @@ class LlamaAttentionAuto(nn.Layer):
         self.enable_recompute = False
         self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
-        self.ipp = ipp
+        self.mesh = mesh
 
         self.use_fused_rope = config.use_fused_rope
         if self.use_fused_rope and get_env_device() not in ["npu", "mlu", "xpu", "gcu", "intel_hpu"]:
@@ -321,7 +288,7 @@ class LlamaAttentionAuto(nn.Layer):
             )
             self.qkv_proj.weight = dist.shard_tensor(
                 self.qkv_proj.weight,
-                get_mesh(self.ipp),
+                self.mesh,
                 colwise_placements,
             )
 
@@ -333,7 +300,7 @@ class LlamaAttentionAuto(nn.Layer):
             )
             self.q_proj.weight = dist.shard_tensor(
                 self.q_proj.weight,
-                get_mesh(self.ipp),
+                self.mesh,
                 colwise_placements,
             )
 
@@ -344,7 +311,7 @@ class LlamaAttentionAuto(nn.Layer):
             )
             self.k_proj.weight = dist.shard_tensor(
                 self.k_proj.weight,
-                get_mesh(self.ipp),
+                self.mesh,
                 colwise_placements,
             )
 
@@ -355,7 +322,7 @@ class LlamaAttentionAuto(nn.Layer):
             )
             self.v_proj.weight = dist.shard_tensor(
                 self.v_proj.weight,
-                get_mesh(self.ipp),
+                self.mesh,
                 colwise_placements,
             )
 
@@ -366,7 +333,7 @@ class LlamaAttentionAuto(nn.Layer):
         )
         self.o_proj.weight = dist.shard_tensor(
             self.o_proj.weight,
-            get_mesh(self.ipp),
+            self.mesh,
             rowise_placement,
         )
 
@@ -423,7 +390,7 @@ class LlamaAttentionAuto(nn.Layer):
             # [seq_len / n, bs, num_head * head_dim] -> [seq_len, bs, num_head * head_dim] (if sequence_parallel)
             hidden_states = dist.reshard(
                 hidden_states,
-                get_mesh(self.ipp),
+                self.mesh,
                 [dist.Shard(1), dist.Replicate()],
             )
 
@@ -521,11 +488,12 @@ class LlamaAttentionAuto(nn.Layer):
             value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         attention_mask = (
-            dist.reshard(attention_mask, get_mesh(self.ipp), [dist.Shard(0), dist.Replicate()])
+            dist.reshard(attention_mask, self.mesh, [dist.Shard(0), dist.Replicate()])
             if attention_mask is not None
             else None
         )
-        alibi = dist.reshard(alibi, get_mesh(self.ipp), [dist.Shard(0), dist.Shard(1)]) if alibi is not None else None
+        alibi = dist.reshard(alibi, self.mesh, [dist.Shard(0), dist.Shard(1)]) if alibi is not None else None
+        
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
             self.enable_recompute
@@ -570,7 +538,7 @@ class LlamaAttentionAuto(nn.Layer):
             # [bs, q_len, num_head * head_dim] -> [q_len / n, bs, num_head * head_dim]
             attn_output = dist.reshard(
                 attn_output,
-                get_mesh(self.ipp),
+                self.mesh,
                 [dist.Shard(1), dist.Shard(0)],
             )
         if not output_attentions:
@@ -590,21 +558,21 @@ class LlamaAttentionAuto(nn.Layer):
         return outputs
 
 
-class LlamaDecoderLayerAuto(nn.Layer):
-    def __init__(self, config, layerwise_recompute: bool = False, ipp: Optional[int] = None):
+class LlamaDecoderLayerFineGrained(nn.Layer):
+    def __init__(self, config, layerwise_recompute: bool = False, mesh=None):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size
-        self.self_attn = LlamaAttentionAuto(config, layerwise_recompute, ipp)
-        self.mlp = LlamaMLPAuto(config, ipp)
-        self.input_layernorm = LlamaRMSNormAuto(config, ipp)
-        self.post_attention_layernorm = LlamaRMSNormAuto(config, ipp)
+        self.self_attn = LlamaAttentionFineGrained(config, layerwise_recompute, mesh)
+        self.mlp = LlamaMLPFineGrained(config, mesh)
+        self.input_layernorm = LlamaRMSNormFineGrained(config, mesh)
+        self.post_attention_layernorm = LlamaRMSNormFineGrained(config, mesh)
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
         # Enable_recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
         self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
-        self.ipp = ipp
+        self.mesh = mesh
 
     def forward(
         self,
@@ -630,8 +598,8 @@ class LlamaDecoderLayerAuto(nn.Layer):
             cache (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
         """
         # [bs, seq_len, embed_dim] or [seq_len / n, bs, embed_dim] (if sequence_parallel)
+        # print(f'[linguangming] enter decoder, hidden_states mesh is {hidden_states.process_mesh}' )
         residual = hidden_states
-
         hidden_states = self.input_layernorm(hidden_states)
 
         # Self Attention
@@ -676,7 +644,7 @@ class LlamaDecoderLayerAuto(nn.Layer):
             present_key_value = outputs[2 if output_attentions else 1]
 
         hidden_states = residual + hidden_states
-
+        
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
@@ -685,7 +653,7 @@ class LlamaDecoderLayerAuto(nn.Layer):
         if self.config.sequence_parallel:
             hidden_states = dist.reshard(
                 hidden_states,
-                get_mesh(self.ipp),
+                self.mesh,
                 [dist.Shard(1), dist.Replicate()],
             )
 
@@ -695,12 +663,12 @@ class LlamaDecoderLayerAuto(nn.Layer):
         if self.config.sequence_parallel:
             hidden_states = dist.reshard(
                 hidden_states,
-                get_mesh(self.ipp),
+                self.mesh,
                 [dist.Shard(1), dist.Shard(0)],
             )
 
         hidden_states = residual + hidden_states
-
+        
         outputs = (hidden_states,)
 
         if output_attentions:
@@ -716,7 +684,7 @@ class LlamaDecoderLayerAuto(nn.Layer):
         return outputs
 
 
-class LlamaPretrainedModelAuto(PretrainedModel):
+class LlamaPretrainedModelFineGrained(PretrainedModel):
     config_class = LlamaConfig
     base_model_prefix = "llama"
     pretrained_init_configuration = LLAMA_PRETRAINED_INIT_CONFIGURATION
@@ -746,8 +714,8 @@ class LlamaPretrainedModelAuto(PretrainedModel):
             model_mappings.extend(layer_mappings)
 
         init_name_mappings(mappings=model_mappings)
-        # base-model prefix "LlamaModelAuto"
-        if "LlamaModelAuto" not in config.architectures:
+        # base-model prefix "LlamaModelFineGrained"
+        if "LlamaModelFineGrained" not in config.architectures:
             for mapping in model_mappings:
                 mapping[0] = "model." + mapping[0]
                 mapping[1] = "llama." + mapping[1]
@@ -817,7 +785,7 @@ class LlamaPretrainedModelAuto(PretrainedModel):
             (
                 nn.Linear,
                 nn.Embedding,
-                LlamaLMHeadAuto,
+                LlamaLMHeadFineGrained,
             ),
         ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -837,29 +805,32 @@ class LlamaPretrainedModelAuto(PretrainedModel):
         # sublayer is init first
         # scale RowParallelLinear weight
         with paddle.no_grad():
-            if isinstance(layer, LlamaMLPAuto):
+            if isinstance(layer, LlamaMLPFineGrained):
                 factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
                 layer.down_proj.weight.scale_(factor)
-            if isinstance(layer, LlamaAttentionAuto):
+            if isinstance(layer, LlamaAttentionFineGrained):
                 factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
                 layer.o_proj.weight.scale_(factor)
     '''
 
 
 @register_base_model
-class LlamaModelAuto(LlamaPretrainedModelAuto):
+class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
     """
-    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`LlamaDecoderLayerAuto`]
+    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`LlamaDecoderLayerFineGrained`]
     Args:
         config: LlamaConfig
     """
 
-    def __init__(self, config: LlamaConfig):
+    def __init__(self, config: LlamaConfig, meshs:List[dist.ProcessMesh], pp_division:List[List[int]]):
         super().__init__(config)
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
         self.recompute_granularity = config.recompute_granularity
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
+        self.meshs = meshs
+        self.pp_division = pp_division
+        
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
         self.embed_tokens = nn.Embedding(
@@ -868,38 +839,53 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         )
 
         embedding_placements = (
-            [dist.Replicate(), dist.Shard(1)]
+            [dist.Replicate(), dist.Shard(1)] # NOTE 这个是数据并行放在最前面，所以是正确的，这样就能保证张量并行是在相邻的,但是为什么是在hidden_size维度上进行切分？？？(好像也没什么特别的区别)
             if self.config.tensor_parallel_degree > 1
             else [dist.Replicate(), dist.Replicate()]
         )
         self.embed_tokens.weight = dist.shard_tensor(
             self.embed_tokens.weight,
-            get_mesh(),
+            self.meshs[0],
             embedding_placements,
         )
 
-        def get_layer_pp_info(layer_index):
-            mesh = fleet.auto.get_mesh()
-            if is_pp_enable() is False:
-                return None, False
-            else:
-                pp_degree = mesh.get_dim_size("pp")
-                layer_per_stage = math.ceil(config.num_hidden_layers / pp_degree)
-                input_need_reshard = layer_index % layer_per_stage == 0
-                return layer_index // layer_per_stage, input_need_reshard
+        def is_pipeline_stage_first_layer_func(layer_index):
+            for i in range(len(self.pp_division)):
+                if self.pp_division[i][0] == layer_index:
+                    return True
+            return False
+        
+        def rank_stage_id():
+            world_size = dist.get_world_size()
+            stage_num = len(self.pp_division)
+            stage_card_num = world_size // stage_num
+            rank = dist.get_rank()
+            stage_id = rank // stage_card_num
+            return stage_id
+        
+        def layer_stage_id(layer_index):
+            for i in range(len(self.pp_division)):
+                if layer_index in self.pp_division[i]:
+                    return i
+            return -1
 
         decoder_layers = []
-        self.next_pp_stage_indexes = []
+        self.is_pipeline_stage_first_layer = [False for _ in range(config.num_hidden_layers)]
+        from paddlenlp.experimental.galvatron.runtime.redistributed import DummyLayer
         for i in range(config.num_hidden_layers):
-            pp_stage_id, input_need_reshard = get_layer_pp_info(i)
-            decoder_layers.append(LlamaDecoderLayerAuto(config, i not in self.no_recompute_layers, pp_stage_id))
-            if input_need_reshard:
-                self.next_pp_stage_indexes.append(i)
+            decoder_layer = LlamaDecoderLayerFineGrained(config, i not in self.no_recompute_layers, self.meshs[i + 1])
+            if layer_stage_id(i) == rank_stage_id():
+                decoder_layers.append(decoder_layer)
+            else:
+                # If the layer is not in the current stage, we use a dummy layer to avoid errors
+                decoder_layers.append(DummyLayer(self.meshs[i + 1]))
+            # decoder_layers.append(LlamaDecoderLayerFineGrained(config, i not in self.no_recompute_layers, self.meshs[i + 1])) # i + 1 because the first mesh is for embedding
+            self.is_pipeline_stage_first_layer[i] = is_pipeline_stage_first_layer_func(i)   
 
         self.layers = nn.LayerList(decoder_layers)
-        self.norm = LlamaRMSNormAuto(config, pp_stage_id)
+        self.norm = LlamaRMSNormFineGrained(config, self.meshs[-1])
 
-        self.gradient_checkpointing = False
+        self.gradient_checkpointing = False # [NOTE] 这个是干啥的 unused
 
         self.placements = (
             [dist.Shard(1), dist.Shard(0)] if self.config.sequence_parallel else [dist.Shard(0), dist.Replicate()]
@@ -992,20 +978,19 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
         if inputs_embeds is None:
             with paddle.amp.auto_cast(False):
-                inputs_embeds = self.embed_tokens(input_ids)
+                inputs_embeds = self.embed_tokens(input_ids) # TODO 嵌入层出来的就是fp32类型的 所以导致后续都是fp32类型
 
         if self.config.sequence_parallel:
             # [B, S, H] -> [S, B, H]
             inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])
 
-        global_mesh = global_mesh_starts_with_pp()
         if position_ids is None and self.config.sep_parallel_degree > 1:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
         if position_ids is not None:
             position_ids = dist.shard_tensor(
                 position_ids,
-                global_mesh,
-                [dist.Replicate() for _ in range(len(global_mesh._shape))],
+                self.meshs[0],
+                [dist.Replicate() for _ in range(len(self.meshs[0]._shape))],
             )
         # embed positions
         if not self.config.use_flash_attention and attention_mask is None:
@@ -1015,9 +1000,9 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         if self.config.alibi:
             if attention_mask is None:
                 attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
-            alibi_place = [dist.Replicate() for _ in range(len(global_mesh._shape))]
+            alibi_place = [dist.Replicate() for _ in range(len(self.meshs[0]._shape))]
             alibi = build_alibi_tensor(attention_mask, self.config.num_attention_heads, dtype=inputs_embeds.dtype)
-            alibi = dist.shard_tensor(alibi, global_mesh, alibi_place)
+            alibi = dist.shard_tensor(alibi, self.meshs[0], alibi_place)
         else:
             alibi = None
         if self.config.use_flash_attention and not self.config.alibi:
@@ -1030,42 +1015,45 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             )  # [bs, 1, seq_len, seq_len]
             attention_mask = dist.shard_tensor(
                 attention_mask,
-                global_mesh,
-                [dist.Replicate() for _ in range(len(global_mesh._shape))],
+                self.meshs[0],
+                [dist.Replicate() for _ in range(len(self.meshs[0]._shape))],
             )
+            
         hidden_states = inputs_embeds
-        # print(f'[linguangming] hidden_states is {hidden_states}')
-        hidden_states = dist.reshard(hidden_states, get_mesh(), self.placements)
-        # return tuple(hidden_states)
-
+        hidden_states = dist.reshard(hidden_states, self.meshs[0], self.placements) # [NOTE] 此处修改
+        print(f'after embedding hidden_states is {hidden_states}')
+        
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
         for idx, (decoder_layer) in enumerate(self.layers):
+            rank = dist.get_rank()
+                
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
             past_key_value = past_key_values[idx] if past_key_values is not None else None
 
             has_gradient = not hidden_states.stop_gradient
-            ipp = decoder_layer.ipp
-            if not is_pp_enable():
+
+            if len(self.pp_division) == 1:
                 position_ids_input = position_ids
                 attention_mask_input = attention_mask
                 alibi_input = alibi
             else:
-                if position_ids is not None:
-                    position_ids_input = dist.reshard(
+                position_ids_input = (
+                    dist.reshard(
                         position_ids,
-                        get_mesh(ipp),
+                        decoder_layer.mesh,
                         [dist.Replicate(), dist.Replicate()],
                     )
-                else:
-                    position_ids_input = position_ids
+                    if position_ids is not None
+                    else None
+                )
                 attention_mask_input = (
                     dist.reshard(
                         attention_mask,
-                        get_mesh(ipp),
+                        decoder_layer.mesh,
                         [dist.Replicate(), dist.Replicate()],
                     )
                     if attention_mask is not None
@@ -1074,55 +1062,52 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                 alibi_input = (
                     dist.reshard(
                         alibi,
-                        get_mesh(ipp),
+                        decoder_layer.mesh,
                         [dist.Replicate(), dist.Replicate()],
                     )
                     if alibi is not None
                     else None
                 )
-            if idx in self.next_pp_stage_indexes:
-                hidden_states = dist.reshard(
-                    hidden_states,
-                    get_mesh(ipp),
-                    self.placements,
-                )
-
-            # if dist.get_rank() in [4, 5, 6, 7] and idx == 0:
-            #     continue # 不执行
             
-            # if dist.get_rank() in [4, 5, 6, 7] and idx in [0, 1]:
-            #     print(f'[linguangming] skip idx {idx} rank {dist.get_rank()}')
-            #     continue
-            # if dist.get_rank() in [0, 1, 2, 3] and idx in [2, 3]:
-            #     print(f'[linguangming] skip idx {idx} rank {dist.get_rank()}')
-            #     continue
+            # pp stage, hidden_states transfer to next stage
+            if self.is_pipeline_stage_first_layer[idx]:
+                print(f'[linguangming] [modeling_fine_grained.py], rank {rank} is pipeline stage first layer {idx}, hidden_states mesh: {hidden_states.process_mesh}, decoder_layer mesh: {decoder_layer.mesh}')
+                hidden_states = dist.reshard(hidden_states, decoder_layer.mesh, self.placements)
             
-            if (
-                self.enable_recompute
-                and idx not in self.no_recompute_layers
-                and has_gradient
-                and self.recompute_granularity == "full"
-            ):
-                layer_outputs = recompute(
-                    decoder_layer,
-                    hidden_states,
-                    position_ids_input,
-                    attention_mask_input,
-                    output_attentions,
-                    past_key_value,
-                    use_cache,
-                    alibi_input,
-                )
-            else:
-                layer_outputs = decoder_layer(
-                    hidden_states,
-                    position_ids_input,
-                    attention_mask_input,
-                    output_attentions,
-                    past_key_value,
-                    use_cache,
-                    alibi_input,
-                )
+            from paddlenlp.experimental.galvatron.runtime.redistributed import DummyLayer
+            if isinstance(decoder_layer, DummyLayer):
+                if self.enable_recompute and idx not in self.no_recompute_layers and has_gradient and self.recompute_granularity == "full":
+                    layer_outputs = recompute(decoder_layer, hidden_states)
+                else:
+                    print(f'[linguangming] [modeling_fine_grained.py], rank {rank}, running dummy layer {idx}')
+                    layer_outputs = decoder_layer(hidden_states)
+            else:    
+                if (
+                    self.enable_recompute
+                    and idx not in self.no_recompute_layers
+                    and has_gradient
+                    and self.recompute_granularity == "full"
+                ):
+                    layer_outputs = recompute(
+                        decoder_layer,
+                        hidden_states,
+                        position_ids_input,
+                        attention_mask_input,
+                        output_attentions,
+                        past_key_value,
+                        use_cache,
+                        alibi_input,
+                    )
+                else:
+                    layer_outputs = decoder_layer(
+                        hidden_states,
+                        position_ids_input,
+                        attention_mask_input,
+                        output_attentions,
+                        past_key_value,
+                        use_cache,
+                        alibi_input,
+                    )
 
             if type(layer_outputs) is tuple:
                 hidden_states = layer_outputs[0]
@@ -1134,7 +1119,40 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
+                
+            if idx != len(self.layers) - 1 and hidden_states.process_mesh.shape[0] != self.layers[idx + 1].mesh.shape[0] and dist.get_rank() in hidden_states.process_mesh.process_ids:
+                print(f'[linguangming] [modeling_fine_grained.py], layer{idx} -> layer{idx + 1} should call redistributed')
+                from paddlenlp.experimental.galvatron.runtime.redistributed import SpiltBatchFwdGatherBatchBwd, GatherBatchFwdSplitBatchBwd
+                if hidden_states.process_mesh.shape[0] < self.layers[idx + 1].mesh.shape[0]: # dp degree increase
+                    hidden_states = SpiltBatchFwdGatherBatchBwd.apply(hidden_states, self.layers[idx + 1].mesh)
+                elif hidden_states.process_mesh.shape[0] > self.layers[idx + 1].mesh.shape[0]: # dp degree decrease
+                    hidden_states = GatherBatchFwdSplitBatchBwd.apply(hidden_states, self.layers[idx + 1].mesh)
+                    
+            if idx != len(self.layers) - 1 and hidden_states.process_mesh.shape[0] != self.layers[idx + 1].mesh.shape[0] and dist.get_rank() not in hidden_states.process_mesh.process_ids:
+                from paddlenlp.experimental.galvatron.runtime.redistributed import DummyRedistributed
+                if dist.get_rank() in [0, 1, 2, 3]:
+                    print(f'[linguangming] [modeling_fine_grained.py], rank {rank} is not in hidden_states mesh {hidden_states.process_mesh}, skip decoder_layer {idx}')
+                    comm_activate_tensor = paddle.zeros((1,), dtype=hidden_states.dtype)
+                    comm_activate_mesh = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", 'tp'])
+                    comm_activate_dtensor = dist.shard_tensor(comm_activate_tensor, comm_activate_mesh, [dist.Replicate(), dist.Replicate()])
+                    comm_activate_tensor.stop_gradient = True
+                else:
+                    print(f'[linguangming] [modeling_fine_grained.py], rank {rank} is not in hidden_states mesh {hidden_states.process_mesh}, skip decoder_layer {idx}')
+                    # hidden_states = DummyRedistributed.apply(hidden_states, self.layers[idx + 1].mesh)
+                    comm_activate_tensor = paddle.zeros((1,), dtype=hidden_states.dtype)
+                    comm_activate_mesh = dist.ProcessMesh([[1], [2], [3], [4]], dim_names=["dp", 'tp'])
+                    comm_activate_dtensor = dist.shard_tensor(comm_activate_tensor, comm_activate_mesh, [dist.Replicate(), dist.Replicate()])
+                    # comm_activate_tensor.stop_gradient = True
+                    
+                    # rubbish_leaner = nn.Linear(4, 4, bias_attr=False)
+                    # rubbish_leaner.weight = dist.shard_tensor(
+                    #     rubbish_leaner.weight,
+                    #     comm_activate_mesh,
+                    #     [dist.Shard(1), dist.Shard(0)],
+                    # )
 
+
+        # norm layer
         hidden_states = self.norm(hidden_states)
 
         # add hidden states from the last decoder layer
@@ -1154,7 +1172,8 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         )
 
 
-class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
+# 用于计算交叉熵损失
+class LlamaPretrainingCriterionFineGrained(paddle.nn.Layer):
     """
     Criterion for Llama.
     It calculates the final loss.
@@ -1162,7 +1181,7 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
 
     def __init__(self, config):
 
-        super(LlamaPretrainingCriterion3DAuto, self).__init__()
+        super(LlamaPretrainingCriterionFineGrained, self).__init__()
         self.ignore_index = getattr(config, "ignore_index", -100)
         self.config = config
         self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
@@ -1190,24 +1209,26 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                     masked_lm_labels.unsqueeze(2),
                 )
 
-            # XPU dose not support allgather mask with bool dtype, so we use local_map here.
+            # XPU dose not support allgather mask with bool dtype, so we use LocalLayer here.
             if get_env_device() == "xpu":
 
-                def coculate_loss(x, mask):
-                    masked_lm_loss = paddle.masked_select(x, mask).astype("float32")
-                    loss = paddle.mean(masked_lm_loss).unsqueeze(0)
-                    return loss.unsqueeze(0)
+                class LocalLossLayer(paddle.distributed.LocalLayer):
+                    def __init__(self, out_dist_attrs, grad_dist_attrs):
+                        super().__init__(out_dist_attrs, grad_dist_attrs)
+
+                    def forward(self, x, mask):
+                        masked_lm_loss = paddle.masked_select(x, mask).astype("float32")
+                        loss = paddle.mean(masked_lm_loss).unsqueeze(0)
+                        return loss.unsqueeze(0)
 
                 out_dist_attrs = [
-                    [dist.Shard(0), dist.Replicate()],
+                    (masked_lm_loss.process_mesh, [dist.Shard(0), dist.Replicate()]),
                 ]
                 grad_dist_attrs = [
-                    [dist.Shard(0), dist.Replicate()],
+                    (masked_lm_loss.process_mesh, [dist.Shard(0), dist.Replicate()]),
                     None,
                 ]
-                loss_func = dist.local_map(
-                    coculate_loss, out_dist_attrs, grad_dist_attrs, masked_lm_loss.process_mesh, reshard_inputs=True
-                )
+                loss_func = LocalLossLayer(out_dist_attrs, grad_dist_attrs)
 
                 loss = loss_func(masked_lm_loss, masked_lm_loss > 0)
                 loss = loss.mean()
@@ -1217,11 +1238,11 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
 
         return loss
 
-
-class LlamaLMHeadAuto(nn.Layer):
-    def __init__(self, config: LlamaConfig):
-        super(LlamaLMHeadAuto, self).__init__()
+class LlamaLMHeadFineGrained(nn.Layer):
+    def __init__(self, config: LlamaConfig, mesh):
+        super(LlamaLMHeadFineGrained, self).__init__()
         self.config = config
+        self.mesh = mesh
 
         vocab_size = config.vocab_size
         self.weight = self.create_parameter(
@@ -1230,7 +1251,7 @@ class LlamaLMHeadAuto(nn.Layer):
         )
         self.weight = dist.shard_tensor(
             self.weight,
-            get_mesh(-1),
+            self.mesh,
             colwise_placements,
         )
 
@@ -1241,15 +1262,16 @@ class LlamaLMHeadAuto(nn.Layer):
         return logits
 
 
-class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
+class LlamaForCausalLMFineGrained(LlamaPretrainedModelFineGrained):
     enable_to_static_method = True
 
-    def __init__(self, config):
+    def __init__(self, config, meshs:List[dist.ProcessMesh], pp_division:List[List[int]]):  # 直接传递mesh 好像有点粗暴
         super().__init__(config)
         self.config = config
-
-        self.llama = LlamaModelAuto(config)
-        self.lm_head = LlamaLMHeadAuto(config)
+        self.meshs = meshs
+        
+        self.llama = LlamaModelFineGrained(config, meshs, pp_division) # 这个地方传递一个策略描述器会好一些，算了，先直接写成是传递一个list[mesh]
+        self.lm_head = LlamaLMHeadFineGrained(config, meshs[-1])
 
     def get_input_embeddings(self):
         return self.llama.embed_tokens
@@ -1360,17 +1382,17 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
         if self.config.sequence_parallel:
             hidden_states = dist.reshard(
                 hidden_states,
-                get_mesh(-1),
+                self.meshs[-1],
                 [dist.Shard(1), dist.Replicate()],
             )
             hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
 
         # if labels is None，means we need full output, instead of tensor_parallel_output
-        # tensor_parallel_output is together with ParallelCrossEntropy
+        # tensor_parallel_output is togather with ParallelCrossEntropy
         tensor_parallel_output = (
             self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )
 
-        logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+        logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output) # actually, tensor_parallel_output is unused
 
         return logits
