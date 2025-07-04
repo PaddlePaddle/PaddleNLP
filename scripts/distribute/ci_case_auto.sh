@@ -4228,7 +4228,7 @@ if [[ $status = "prepare_case" ]];then
     export FLAGS_install_deps=$3
     export FLAGS_download_data=$4
     if [[ $2 = "llama_case_list_auto" ]];then
-        #before_hook_for_llama 
+        before_hook_for_llama 
         llama_case_list_auto prepare_case
     elif [[ $2 = "llm_gpt_case_list_auto" ]];then
         before_hook_for_gpt
