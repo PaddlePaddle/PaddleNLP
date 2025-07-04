@@ -20,9 +20,9 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.utils.log_util import logger
 from paddle.framework import core
 
+_raise_cuda_env_unset_warning = True
 _mp_async_allreduce = False
 _sp_async_reduce_scatter = False
-_raise_cuda_env_unset_warning = True
 
 
 def is_fused_matmul_bias_supported():
