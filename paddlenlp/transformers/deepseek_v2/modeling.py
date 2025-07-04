@@ -74,7 +74,7 @@ from ..model_outputs import (
 from ..model_utils import PretrainedModel, register_base_model
 from ..moe_gate import PretrainedMoEGate
 from ..moe_layer import MoELayer
-from ..utils import device_guard
+from ..utils import cast_if_needed, device_guard
 from . import fp8_linear as linear_utils
 from .configuration import DeepseekV2Config
 
@@ -737,6 +737,41 @@ class DeepseekV2MLP(nn.Layer):
         return out
 
 
+class FusedNormGateFunc(paddle.autograd.PyLayer):
+    """recompute of postnorm and gate"""
+
+    @staticmethod
+    def forward(ctx, x, rms_norm_weight, moe_gate_weight, eps):
+        ctx.dtype = paddle.float32
+        norm_output, invar = fused_ln.fused_rms_norm(x, rms_norm_weight, eps)
+        with paddle.amp.auto_cast(False):
+            gate_logits = F.linear(cast_if_needed(norm_output, ctx.dtype), cast_if_needed(moe_gate_weight, ctx.dtype))
+
+        ctx.save_for_backward(x, rms_norm_weight, moe_gate_weight, eps)
+        return gate_logits, norm_output
+
+    @staticmethod
+    def backward(ctx, d_gate_logits, d_norm_output):
+        x, rms_norm_weight, moe_gate_weight, eps = ctx.saved_tensor()
+        # recompute rmsnorm
+        norm_output, invar = fused_ln.fused_rms_norm(x, rms_norm_weight, eps)
+        d_norm_output_linear, d_moe_gate_weight = paddle._C_ops.matmul_grad(
+            cast_if_needed(norm_output, ctx.dtype),
+            cast_if_needed(moe_gate_weight, ctx.dtype),
+            d_gate_logits,
+            False,
+            False,
+        )
+        d_norm_output_linear, d_moe_gate_weight = cast_if_needed(
+            d_norm_output_linear, norm_output.dtype
+        ), cast_if_needed(d_moe_gate_weight, moe_gate_weight.dtype)
+
+        d_norm_output = d_norm_output + d_norm_output_linear
+        dx, d_rms_norm_weight = fused_ln.fused_rms_norm_grad_func(x, rms_norm_weight, invar, d_norm_output, eps)
+
+        return dx, d_rms_norm_weight, d_moe_gate_weight
+
+
 class FakeGate(paddle.autograd.PyLayer):
     @staticmethod
     def forward(ctx, hidden_states, weight):
@@ -756,7 +791,7 @@ class FakeGate(paddle.autograd.PyLayer):
 
 
 class MoEGate(PretrainedMoEGate):
-    def __init__(self, config, num_experts, expert_hidden_size, **kwargs):
+    def __init__(self, config, num_experts, expert_hidden_size, norm_weight=None, norm_eps=None, **kwargs):
         super().__init__(config, num_experts, expert_hidden_size, **kwargs)
         # [hidden_size, n_expert]
 
@@ -778,7 +813,10 @@ class MoEGate(PretrainedMoEGate):
                 default_initializer=nn.initializer.Constant(0.0),
             )
             self.e_score_correction_bias.is_distributed = True
-
+        if hasattr(self.config, "using_norm_gate_recompute") and self.config.using_norm_gate_recompute:
+            assert norm_weight is not None and norm_eps is not None
+            self.norm_weight = norm_weight
+            self.norm_eps = norm_eps
         self.using_flex_token = False
 
     def forward(self, hidden_states):
@@ -789,23 +827,33 @@ class MoEGate(PretrainedMoEGate):
         _, _, h_dim = hidden_states.shape
 
         # compute gating score
-        with paddle.amp.auto_cast(False):
-            hidden_states = hidden_states.cast(self.weight.dtype)
+        if hasattr(self.config, "using_norm_gate_recompute") and self.config.using_norm_gate_recompute:
+            logits, norm_out = FusedNormGateFunc.apply(hidden_states, self.norm_weight, self.weight, self.norm_eps)
+        else:
+            with paddle.amp.auto_cast(False):
+                hidden_states = hidden_states.cast(self.weight.dtype)
+                if hasattr(self.config, "using_fake_gate") and self.config.using_fake_gate:
+                    logits = FakeGate.apply(hidden_states, self.weight)
+                else:
+                    logits = F.linear(hidden_states, self.weight, None)
 
-            if hasattr(self.config, "using_fake_gate") and self.config.using_fake_gate:
-                logits = FakeGate.apply(hidden_states, self.weight)
-            else:
-                logits = F.linear(hidden_states, self.weight, None)
+        scores = self.gate_score_func(logits=logits)
+        scores = scores.cast(paddle.float32)
 
-            scores = self.gate_score_func(logits=logits)
-            scores = scores.cast(paddle.float32)
-
+        # Compute all possible return values
         if self.using_flex_token:
-            scores, routing_map, exp_counts, l_aux, l_zloss = self.topkgating_nodrop(scores)
-            return scores, routing_map, l_aux, l_zloss
+            scores, routing_map, exp_counts, l_aux, l_zloss = self.topkgating_nodrop(
+                scores
+            )  # (scores, routing_map, exp_counts, l_aux, l_zloss)
+            ret = (scores, routing_map, l_aux, l_zloss)
+        else:
+            ret = self.topkgating(scores)  # (capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss)
 
-        capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.topkgating(scores)
-        return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss
+        # Append norm_out if needed
+        if hasattr(self.config, "using_norm_gate_recompute") and self.config.using_norm_gate_recompute:
+            ret = (*ret, norm_out)
+
+        return ret
 
 
 class AddAuxiliaryLoss(paddle.autograd.PyLayer):
@@ -833,7 +881,7 @@ class DeepseekV2MoE(MoELayer):
     A mixed expert module containing shared experts.
     """
 
-    def __init__(self, config: DeepseekV2Config):
+    def __init__(self, config: DeepseekV2Config, norm_weight=None, norm_eps=None):
         assert config.tensor_parallel_degree <= 1, "tensor_parallel_degree should be 1"
 
         gate = MoEGate(
@@ -847,8 +895,12 @@ class DeepseekV2MoE(MoELayer):
             norm_topk_prob=config.norm_topk_prob,
             routed_scaling_factor=config.routed_scaling_factor,
             drop_tokens=False,
+            norm_weight=norm_weight,
+            norm_eps=norm_eps,
         )
         DeepseekV2MLPClass = FP8Mlp if DSV3_USE_FP8_GEMM else DeepseekV2MLP
+
+        self.using_norm_gate_recompute = config.using_norm_gate_recompute
 
         super().__init__(
             config=config,
@@ -862,6 +914,7 @@ class DeepseekV2MoE(MoELayer):
             gate=gate,
             capacity=2.0,
             moe_group="expert",
+            using_norm_gate_recompute=self.using_norm_gate_recompute,
         )
 
         moe_grad_group = fleet.get_hybrid_communicate_group().expert_grad_comm_group
@@ -874,8 +927,30 @@ class DeepseekV2MoE(MoELayer):
             self.shared_experts = DeepseekV2MLPClass(config=config, intermediate_size=intermediate_size, is_moe=False)
 
     def forward(self, hidden_states):
-        final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
-        final_hidden_states = self.post_process(hidden_states, final_hidden_states, l_aux)
+        if self.using_norm_gate_recompute:
+            super().update_flex_token()
+            if self.using_flex_token:
+                probs, routing_map, l_aux, l_zloss, norm_out = self.router(hidden_states)
+                hidden_states = norm_out
+                final_hidden_states, l_aux, l_zloss = super().forward(
+                    hidden_states, probs=probs, routing_map=routing_map, l_aux=l_aux, l_zloss=l_zloss
+                )
+            else:
+                capacity, topk_weight, topk_ids, token_priority, l_aux, l_zloss, norm_out = self.gate(hidden_states)
+                hidden_states = norm_out
+                final_hidden_states, l_aux, l_zloss = super().forward(
+                    hidden_states,
+                    capacity=capacity,
+                    topk_weight=topk_weight,
+                    topk_ids=topk_ids,
+                    token_priority=token_priority,
+                    l_aux=l_aux,
+                    l_zloss=l_zloss,
+                )
+            final_hidden_states = self.post_process(hidden_states, final_hidden_states, l_aux)
+        else:
+            final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
+            final_hidden_states = self.post_process(hidden_states, final_hidden_states, l_aux)
         return final_hidden_states
 
     def post_process(self, hidden_states, final_hidden_states, l_aux):
@@ -1774,6 +1849,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
         self.enable_recompute = False
         self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
+        self.using_norm_gate_recompute = config.using_norm_gate_recompute
 
         self.hidden_size = config.hidden_size
 
@@ -1781,17 +1857,23 @@ class DeepseekV2DecoderLayer(nn.Layer):
 
         DeepseekV2MLPClass = FP8Mlp if DSV3_USE_FP8_GEMM else DeepseekV2MLP
 
-        self.mlp = (
-            DeepseekV2MoE(config)
-            if (
-                config.n_routed_experts is not None
-                and layer_idx >= config.first_k_dense_replace
-                and layer_idx % config.moe_layer_freq == 0
-            )
-            else DeepseekV2MLPClass(config)
-        )
         self.input_layernorm = DeepseekV2RMSNorm(config)
         self.post_attention_layernorm = DeepseekV2RMSNorm(config)
+
+        if (
+            config.n_routed_experts is not None
+            and layer_idx >= config.first_k_dense_replace
+            and layer_idx % config.moe_layer_freq == 0
+        ):
+            self.mlp = (
+                DeepseekV2MoE(
+                    config, self.post_attention_layernorm.weight, self.post_attention_layernorm.variance_epsilon
+                )
+                if config.using_norm_gate_recompute
+                else DeepseekV2MoE(config)
+            )
+        else:
+            self.mlp = DeepseekV2MLPClass(config)
 
     def forward(
         self,
@@ -1871,7 +1953,9 @@ class DeepseekV2DecoderLayer(nn.Layer):
         # Fully Connected
         residual = hidden_states
 
-        hidden_states = self.post_attention_layernorm(hidden_states)
+        if not self.using_norm_gate_recompute:
+            hidden_states = self.post_attention_layernorm(hidden_states)
+
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
 
