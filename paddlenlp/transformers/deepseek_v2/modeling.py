@@ -1953,7 +1953,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
         # Fully Connected
         residual = hidden_states
 
-        if not self.using_norm_gate_recompute:
+        if not (self.using_norm_gate_recompute and isinstance(self.mlp, DeepseekV2MoE)):
             hidden_states = self.post_attention_layernorm(hidden_states)
 
         hidden_states = self.mlp(hidden_states)
