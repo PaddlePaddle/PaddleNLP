@@ -94,7 +94,8 @@ def padding(x, axis):
 
 class FP8LinearFunction(paddle.autograd.PyLayer):
     @staticmethod
-    def forward(ctx, x, weight):
+    def forward(ctx, x, custom_map):
+        weight = custom_map.weight
         x_orig_shape = x.shape
         x_t = x.T
 
@@ -156,9 +157,23 @@ class FP8LinearFunction(paddle.autograd.PyLayer):
         dx = dx.reshape(dx_orig_shape)
 
         # ===== dw1 = deep_gemm(x_t_fp8, dout_t_fp8)
-        dweight = kitchen_fp8_gemm(x_t_fp8, x_t_scale, dout_t_fp8, dout_t_scale, True, True, rtn_dtype=paddle.float32)
+        if hasattr(weight, "main_grad"):
+            if weight.main_grad is None:
+                weight.main_grad = paddle.zeros(shape=weight.shape, dtype=paddle.float32)
+            kitchen_fp8_gemm(
+                x_t_fp8, x_t_scale, dout_t_fp8, dout_t_scale, True, True, weight.main_grad, rtn_dtype=paddle.float32
+            )
+        else:
+            if weight.grad is None:
+                weight.grad = paddle.zeros(shape=weight.shape, dtype=paddle.float32)
+            kitchen_fp8_gemm(
+                x_t_fp8, x_t_scale, dout_t_fp8, dout_t_scale, True, True, weight.grad, rtn_dtype=paddle.float32
+            )
 
-        return dx, dweight
+        if hasattr(weight, "_apply_backward_hook"):
+            weight._apply_backward_hook()
+
+        return dx
 
 
 class FP8Linear(paddle.nn.Layer):
@@ -173,12 +188,13 @@ class FP8Linear(paddle.nn.Layer):
         )
 
     def forward(self, x):
-        return FP8LinearFunction.apply(x, self.weight)
+        return FP8LinearFunction.apply(x, self)
 
 
 class FP8LinearKeepXFunction(paddle.autograd.PyLayer):
     @staticmethod
-    def forward(ctx, x, weight):
+    def forward(ctx, x, custom_map):
+        weight = custom_map.weight
         x_orig_shape = x.shape
 
         # deep_gemm only support 2D
@@ -234,9 +250,23 @@ class FP8LinearKeepXFunction(paddle.autograd.PyLayer):
         dx = dx.reshape(dx_orig_shape)
 
         # ===== dw1 = deep_gemm(x_t_fp8, dout_t_fp8)
-        dweight = kitchen_fp8_gemm(x_t_fp8, x_t_scale, dout_t_fp8, dout_t_scale, True, True, rtn_dtype=paddle.float32)
+        if hasattr(weight, "main_grad"):
+            if weight.main_grad is None:
+                weight.main_grad = paddle.zeros(shape=weight.shape, dtype=paddle.float32)
+            kitchen_fp8_gemm(
+                x_t_fp8, x_t_scale, dout_t_fp8, dout_t_scale, True, True, weight.main_grad, rtn_dtype=paddle.float32
+            )
+        else:
+            if weight.grad is None:
+                weight.grad = paddle.zeros(shape=weight.shape, dtype=paddle.float32)
+            kitchen_fp8_gemm(
+                x_t_fp8, x_t_scale, dout_t_fp8, dout_t_scale, True, True, weight.grad, rtn_dtype=paddle.float32
+            )
 
-        return dx, dweight
+        if hasattr(weight, "_apply_backward_hook"):
+            weight._apply_backward_hook()
+
+        return dx
 
 
 class FP8KeepXLinear(paddle.nn.Layer):
@@ -251,7 +281,7 @@ class FP8KeepXLinear(paddle.nn.Layer):
         )
 
     def forward(self, x):
-        return FP8LinearKeepXFunction.apply(x, self.weight)
+        return FP8LinearKeepXFunction.apply(x, self)
 
 
 def fp8_mlp_fwd(x, w1, w2):
