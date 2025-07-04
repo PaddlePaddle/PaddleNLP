@@ -38,6 +38,7 @@ from paddlenlp.transformers import (
     CosineAnnealingWithWarmupDecay,
     GPTConfig,
     GPTForCausalLMAuto,
+    GPTForCausalLMAutoPP,
     GPTForCausalLMNet,
     GPTPretrainingCriterionAuto,
     GPTPretrainingCriterionNet,
@@ -48,6 +49,7 @@ from paddlenlp.utils.tools import get_env_device
 
 MODEL_CLASSES = {
     "gpt": (GPTConfig, GPTForCausalLMAuto, GPTPretrainingCriterionAuto),
+    "gpt_pp": (GPTConfig, GPTForCausalLMAutoPP, GPTPretrainingCriterionAuto),
     "gpt_network": (GPTConfig, GPTForCausalLMNet, GPTPretrainingCriterionNet),
 }
 
@@ -98,6 +100,10 @@ class PreTrainingArguments(AutoTrainingArguments):
     autotuner_benchmark: bool = field(
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
+    )
+    n_microbatches: int = field(
+        default=1,
+        metadata={"help": "Control the num of microbatches in one pp step."},
     )
     pre_alloc_memory: float = field(
         default=0.0,
@@ -441,7 +447,9 @@ def main():
     if training_args.enable_linear_fused_grad_add:
         from llm.utils.fused_layers import mock_layers
 
-        mock_layers()
+        mock_layers(
+            mp_async_allreduce=True if "enable_mp_async_allreduce" in training_args.tensor_parallel_config else False
+        )
 
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
@@ -537,6 +545,7 @@ def main():
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
+    config.to_static = training_args.to_static
 
     if training_args.strategy.pipeline.enable and config.virtual_pp_degree > 1:
         pipeline = training_args.strategy.pipeline
@@ -546,6 +555,14 @@ def main():
     config.hidden_dropout_prob = model_args.hidden_dropout_prob
     config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
     print("Final pre-training config:", config)
+    if (
+        "replace_with_parallel_cross_entropy" in training_args.tensor_parallel_config
+        and config.tensor_parallel_degree > 1
+        and config.to_static is False
+    ):
+        from llm.utils.replace_ops import replace_cross_entropy
+
+        replace_cross_entropy()
 
     # Set the dtype for loading model
     dtype = "float32"
@@ -601,6 +618,7 @@ def main():
 
     trainer = PretrainingTrainer(
         model=model,
+        model_type=model_args.model_type,
         criterion=criterion,
         args=training_args,
         data_collator=data_collator,
