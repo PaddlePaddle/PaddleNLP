@@ -679,10 +679,9 @@ class FP8GroupGemmMlpFunctionNode:
         else:
             # quant x_bf16
             x_fp8, x_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-                x_bf16, output_scale_transpose=False, quant_method="1x128", input_transpose=False
+                x_bf16, output_scale_transpose=True, quant_method="1x128", input_transpose=False
             )
-
-        x_scale = paddle.transpose(paddle.transpose(x_scale, [1, 0]).contiguous(), [1, 0])
+            x_scale = x_scale.T
 
         # compute gemm
         o1 = paddle.empty([x_fp8.shape[0], w1_t_quant.shape[1]], dtype=expert_w1[0].dtype)
@@ -730,9 +729,8 @@ class FP8GroupGemmMlpFunctionNode:
         o3_shape = [o2_fp8.shape[0], w2_quant.shape[1]]
         if o3 is not None:
             assert o3.shape == o3_shape, "{} vs {}".format(o3.shape, o3_shape)
-            o3.zero_()
         else:
-            o3 = paddle.zeros(o3_shape, dtype=o1.dtype)
+            o3 = paddle.empty(o3_shape, dtype=o1.dtype)
         if numpy.prod(o2_fp8.shape) != 0:
             if self.is_split_group_gemm:
                 split_group_gemm(o2_fp8, o2_scale, w2_quant, w2_sacle, self.tokens_per_expert, o3)
@@ -756,8 +754,10 @@ class FP8GroupGemmMlpFunctionNode:
 
         # compute gemm
         unzipped_grad_fp8, unzipped_grad_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            unzipped_grad, output_scale_transpose=False, quant_method="1x128", input_transpose=False
+            unzipped_grad, output_scale_transpose=True, quant_method="1x128", input_transpose=False
         )
+        unzipped_grad_scale = unzipped_grad_scale.T
+
         do2_s = paddle.empty([unzipped_grad_fp8.shape[0], bw_w2_quant.shape[1]], dtype=unzipped_grad.dtype)
         if numpy.prod(unzipped_grad_fp8.shape) != 0:
             if self.is_split_group_gemm:
@@ -765,9 +765,6 @@ class FP8GroupGemmMlpFunctionNode:
                     unzipped_grad_fp8, unzipped_grad_scale, bw_w2_quant, bw_w2_scale, self.tokens_per_expert, do2_s
                 )
             else:
-                unzipped_grad_scale = paddle.transpose(
-                    paddle.transpose(unzipped_grad_scale, [1, 0]).contiguous(), [1, 0]
-                )
                 deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
                     (unzipped_grad_fp8, unzipped_grad_scale),
                     (bw_w2_quant, bw_w2_scale),
@@ -801,21 +798,19 @@ class FP8GroupGemmMlpFunctionNode:
 
         # quant do1
         do1_fp8, do1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            do1, output_scale_transpose=False, quant_method="1x128", input_transpose=False
+            do1, output_scale_transpose=True, quant_method="1x128", input_transpose=False
         )
-
+        do1_scale = do1_scale.T
         # compute gemm
         dx_shape = [do1_fp8.shape[0], bw_w1_quant.shape[1]]
         if dx is None:
             dx = paddle.empty(shape=dx_shape, dtype=do1.dtype)
         else:
             assert dx.shape == dx_shape, f"{dx.shape} vs {dx_shape}"
-            dx.zero_()
         if numpy.prod(do1_fp8.shape) != 0:
             if self.is_split_group_gemm:
                 split_group_gemm(do1_fp8, do1_scale, bw_w1_quant, bw_w1_scale, self.tokens_per_expert, dx)
             else:
-                do1_scale = paddle.transpose(paddle.transpose(do1_scale, [1, 0]).contiguous(), [1, 0])
                 deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
                     (do1_fp8, do1_scale), (bw_w1_quant, bw_w1_scale), dx, m_indices=self.m_indices, num_sms=112
                 )
