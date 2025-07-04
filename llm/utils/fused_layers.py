@@ -139,7 +139,9 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
                 return x_grad, weight_grad, bias_grad
 
 
-def mock_layers(mp_async_allreduce=False):
+def mock_layers(do_enable_sp_async_reduce_scatter=False, mp_async_allreduce=False):
+    if do_enable_sp_async_reduce_scatter:
+        mp_async_allreduce = False
     global _mp_async_allreduce
     _mp_async_allreduce = mp_async_allreduce
 
