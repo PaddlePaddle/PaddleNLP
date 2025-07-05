@@ -56,7 +56,12 @@ from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.log import logger
 
 from ..utils.download import resolve_file_path
-from .aistudio_utils import aistudio_download
+
+# TODO(@zewu): upgrade aistudio to the newest version
+try:
+    from .aistudio_utils import aistudio_download
+except:
+    aistudio_download = None
 
 HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
 
