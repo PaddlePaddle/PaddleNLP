@@ -18,52 +18,72 @@ import numpy as np
 import paddle
 import TokenDispatcherUtils as TDU
 
-seed = 2048
-hidden_size = 7168
-zipped_rows = 5800
-unzipped_rows = 4788
-subbatch_rows = 380
-dtype = paddle.bfloat16
 
-func = TDU.tokens_zip_unique_add
-
-paddle.seed(seed)
-np.random.seed(seed)
-random.seed(seed)
-
-zipped_origin = paddle.randn([0, hidden_size], dtype=paddle.float32)
-unzipped = paddle.randn([unzipped_rows, hidden_size], dtype=dtype)
-index_unzipped = random.sample(range(zipped_rows), unzipped_rows)
-assert len(index_unzipped) == len(set(index_unzipped))
-index_unzipped = paddle.to_tensor(index_unzipped, dtype=paddle.int64)
-
-output_dtype = zipped_origin.dtype
-
-
-md5sum = None
-for use_subbatch in [False, True]:
-    zipped = zipped_origin.clone()
-    if use_subbatch and hasattr(TDU, "tokens_zip_unique_add_subbatch"):
+def tokens_zip_unique_add_with_subbatch(zipped, unzipped, index_unzipped, zipped_rows, subbatch_rows=None):
+    if subbatch_rows is None or subbatch_rows <= 0:
+        return TDU.tokens_zip_unique_add(zipped, unzipped, index_unzipped, zipped_rows)
+    else:
         num_split = (zipped_rows + subbatch_rows - 1) // subbatch_rows
-        rows = [subbatch_rows] * (num_split - 1)
-        if zipped_rows % subbatch_rows == 0:
-            rows.append(subbatch_rows)
+        remainder = zipped_rows % subbatch_rows
+        if remainder == 0:
+            rows = [subbatch_rows] * num_split
         else:
-            rows.append(zipped_rows % subbatch_rows)
-        if zipped.shape[0] == 0:
-            tmp = [paddle.zeros([r, hidden_size], dtype=output_dtype) for r in rows]
-        else:
-            tmp = paddle.split(zipped, rows, axis=0)
-        args = [tmp, unzipped, index_unzipped, zipped_rows, subbatch_rows]
-        output = TDU.tokens_zip_unique_add_subbatch(*args)
-        output = paddle.concat(output, axis=0)
-    else:
-        args = [zipped, unzipped, index_unzipped, zipped_rows]
-        output = TDU.tokens_zip_unique_add(*args)
+            rows = [subbatch_rows] * (num_split - 1) + [remainder]
 
-    cur_md5sum = output._md5sum()
-    if md5sum is None:
-        md5sum = output._md5sum()
-        print(f"MD5SUM: {md5sum}")
-    else:
-        assert md5sum == cur_md5sum, f"{md5sum} vs {cur_md5sum}"
+        if isinstance(zipped, paddle.Tensor):
+            if zipped.shape[0] == 0:
+                dtype = zipped.dtype
+                hidden_size = zipped.shape[1]
+                zipped = [paddle.zeros([r, hidden_size], dtype=dtype) for r in rows]
+            else:
+                zipped = paddle.split(zipped, rows, axis=0)
+        return TDU.tokens_zip_unique_add_subbatch(zipped, unzipped, index_unzipped, zipped_rows, subbatch_rows)
+
+
+def generate_index_unzipped(zipped_rows, unzipped_rows):
+    index = random.sample(range(zipped_rows), unzipped_rows)
+    assert len(index) == len(set(index))
+    return paddle.to_tensor(index, dtype=paddle.int64)
+
+
+def main():
+    seed = 2048
+    hidden_size = 7168
+    zipped_rows = 5800
+    unzipped_rows = 4788
+    subbatch_rows = 380
+    dtype = paddle.bfloat16
+
+    paddle.seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+    zipped_origin = paddle.randn([zipped_rows, hidden_size], dtype=paddle.float32)
+    unzipped = paddle.randn([unzipped_rows, hidden_size], dtype=dtype)
+    index_unzipped = generate_index_unzipped(zipped_rows, unzipped_rows)
+
+    md5sum = None
+    for use_subbatch in [False, True]:
+        random.seed(seed + 100)
+        args = [zipped_origin.clone(), unzipped, index_unzipped, zipped_rows]
+        if use_subbatch and hasattr(TDU, "tokens_zip_unique_add_subbatch"):
+            args.append(subbatch_rows)
+
+        for _ in range(4):
+            output = tokens_zip_unique_add_with_subbatch(*args)
+            args[0] = output
+            args[2] = generate_index_unzipped(zipped_rows, unzipped_rows)
+
+        if isinstance(output, (list, tuple)):
+            output = paddle.concat(output, axis=0)
+
+        cur_md5sum = output._md5sum()
+        if md5sum is None:
+            md5sum = output._md5sum()
+            print(f"MD5SUM: {md5sum}")
+        else:
+            assert md5sum == cur_md5sum, f"{md5sum} vs {cur_md5sum}"
+
+
+if __name__ == "__main__":
+    main()
