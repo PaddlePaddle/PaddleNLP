@@ -20,7 +20,7 @@ import TokenDispatcherUtils as TDU
 
 
 def tokens_zip_unique_add_with_subbatch(zipped, unzipped, index_unzipped, zipped_rows, subbatch_rows=None):
-    if subbatch_rows is None or subbatch_rows <= 0:
+    if subbatch_rows is None or subbatch_rows <= 0 or zipped_rows <= 0:
         return TDU.tokens_zip_unique_add(zipped, unzipped, index_unzipped, zipped_rows)
     else:
         if isinstance(zipped, paddle.Tensor):
