@@ -23,13 +23,6 @@ def tokens_zip_unique_add_with_subbatch(zipped, unzipped, index_unzipped, zipped
     if subbatch_rows is None or subbatch_rows <= 0:
         return TDU.tokens_zip_unique_add(zipped, unzipped, index_unzipped, zipped_rows)
     else:
-        num_split = (zipped_rows + subbatch_rows - 1) // subbatch_rows
-        remainder = zipped_rows % subbatch_rows
-        if remainder == 0:
-            rows = [subbatch_rows] * num_split
-        else:
-            rows = [subbatch_rows] * (num_split - 1) + [remainder]
-
         if isinstance(zipped, paddle.Tensor):
             num_split = (zipped_rows + subbatch_rows - 1) // subbatch_rows
             remainder = zipped_rows % subbatch_rows
