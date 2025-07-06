@@ -31,6 +31,13 @@ def tokens_zip_unique_add_with_subbatch(zipped, unzipped, index_unzipped, zipped
             rows = [subbatch_rows] * (num_split - 1) + [remainder]
 
         if isinstance(zipped, paddle.Tensor):
+            num_split = (zipped_rows + subbatch_rows - 1) // subbatch_rows
+            remainder = zipped_rows % subbatch_rows
+            if remainder == 0:
+                rows = [subbatch_rows] * num_split
+            else:
+                rows = [subbatch_rows] * (num_split - 1) + [remainder]
+
             if zipped.shape[0] == 0:
                 dtype = zipped.dtype
                 hidden_size = zipped.shape[1]
