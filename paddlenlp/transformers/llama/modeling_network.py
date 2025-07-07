@@ -1163,6 +1163,8 @@ def layer_input_rope_hook(process_mesh):
                     (chunk_num - rank - 1) * chunk_size, (chunk_num - rank) * chunk_size, dtype="int64"
                 )
                 position_ids = paddle.concat([first_chunk_ids, second_chunk_ids]).expand((batch_size, seq_length))
+                mp_axis = process_mesh.dim_names.index("mp")
+                placements[mp_axis] = dist.Replicate()  # mp placament shard(2) -> replicate
                 position_ids = dist.auto_parallel.api.dtensor_from_local(position_ids, process_mesh, placements)
                 res_inputs.append(position_ids)
             else:

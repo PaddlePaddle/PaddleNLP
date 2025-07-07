@@ -499,8 +499,11 @@ class LlamaAttentionAuto(nn.Layer):
                     (chunk_num - rank - 1) * chunk_size, (chunk_num - rank) * chunk_size, dtype="int64"
                 )
                 position_ids = paddle.concat([first_chunk_ids, second_chunk_ids]).expand((batch_size, seq_length))
+                placement = query_states.placements
+                mp_axis = query_states.process_mesh.dim_names.index("mp")
+                placement[mp_axis] = dist.Replicate()  # mp placament shard(2) -> replicate
                 position_ids = dist.auto_parallel.api.dtensor_from_local(
-                    position_ids, query_states.process_mesh, query_states.placements
+                    position_ids, query_states.process_mesh, placement
                 )
             if self.use_fused_rope:
                 query_states, key_states = fusion_ops.fusion_rope(
