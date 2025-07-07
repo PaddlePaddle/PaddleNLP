@@ -485,6 +485,7 @@ class LlamaAttentionAuto(nn.Layer):
 
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-3]
+
         if self.config.rope:
             if self.config.context_parallel_degree > 1:
                 mesh = dist.auto_parallel.get_mesh()
@@ -904,6 +905,27 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
+        self.embed_tokens = nn.Embedding(
+            self.vocab_size,
+            self.hidden_size,
+        )
+        if self.config.context_parallel_degree > 1 or self.config.sep_parallel_degree > 1:
+            embedding_placements = (
+                [dist.Replicate(), dist.Replicate(), dist.Shard(1)]
+                if self.config.tensor_parallel_degree > 1
+                else [dist.Replicate(), dist.Replicate(), dist.Replicate()]
+            )
+        else:
+            embedding_placements = (
+                [dist.Replicate(), dist.Shard(1)]
+                if self.config.tensor_parallel_degree > 1
+                else [dist.Replicate(), dist.Replicate()]
+            )
+        self.embed_tokens.weight = dist.shard_tensor(
+            self.embed_tokens.weight,
+            get_mesh(),
+            embedding_placements,
+        )
 
         def get_layer_pp_info(layer_index):
             mesh = fleet.auto.get_mesh()
@@ -928,37 +950,16 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
         self.gradient_checkpointing = False
 
-        self.embed_tokens = nn.Embedding(
-            self.vocab_size,
-            self.hidden_size,
-        )
-        self.placements = None
         if self.config.context_parallel_degree > 1 or self.config.sep_parallel_degree > 1:
-            # [dp,sep,mp]
             self.placements = (
                 [dist.Shard(1), dist.Replicate(), dist.Shard(0)]
                 if self.config.sequence_parallel
-                else [dist.Shard(0), dist.Shard(1), dist.Replicate()]
-            )
-            embedding_placements = (
-                [dist.Replicate(), dist.Replicate(), dist.Shard(1)]
-                if self.config.tensor_parallel_degree > 1
-                else [dist.Replicate(), dist.Replicate(), dist.Replicate()]
+                else [dist.Shard(0), dist.Shard(1), dist.Replicate()]  # seq dim shard(1)
             )
         else:
             self.placements = (
                 [dist.Shard(1), dist.Shard(0)] if self.config.sequence_parallel else [dist.Shard(0), dist.Replicate()]
             )
-            embedding_placements = (
-                [dist.Replicate(), dist.Shard(1)]
-                if self.config.tensor_parallel_degree > 1
-                else [dist.Replicate(), dist.Replicate()]
-            )
-        self.embed_tokens.weight = dist.shard_tensor(
-            self.embed_tokens.weight,
-            get_mesh(),
-            embedding_placements,
-        )
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1114,7 +1115,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                     position_ids_input = dist.reshard(
                         position_ids,
                         get_mesh(ipp),
-                        [dist.Replicate(), dist.Replicate(), dist.Replicate()],
+                        [dist.Replicate() for _ in range(len(get_mesh(ipp)._shape))],
                     )
                 else:
                     position_ids_input = position_ids
