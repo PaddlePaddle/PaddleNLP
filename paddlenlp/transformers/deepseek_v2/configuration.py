@@ -181,6 +181,7 @@ class DeepseekV2Config(PretrainedConfig):
         using_flex_token=False,
         use_dualpipev=False,
         send_mtp_embed=False,
+        using_post_norm_recompute=False,
         recompute_fwd_gate_up=False,
         is_split_group_gemm=False,
         **kwargs,
@@ -233,6 +234,7 @@ class DeepseekV2Config(PretrainedConfig):
         self.using_flex_token = using_flex_token
         self.use_dualpipev = use_dualpipev
         self.send_mtp_embed = send_mtp_embed
+        self.using_post_norm_recompute = using_post_norm_recompute
         self.recompute_fwd_gate_up = recompute_fwd_gate_up
         self.is_split_group_gemm = is_split_group_gemm
 
