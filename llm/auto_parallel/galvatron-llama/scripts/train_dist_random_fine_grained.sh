@@ -9,6 +9,7 @@ rm -rf "output/$task_name""_log"
 
 export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
+export CUDA_MODULE_LOADING=EAGER # For 4090 cluster
 
 TRAINER="./train_dist_random_fine_grained.py"
 LAUNCHER="python -u -m paddle.distributed.launch"
@@ -50,7 +51,7 @@ MODEL_ARGS="
 
 # [mbsz, accumulation_steps] [recompute] [amp]
 CONFIG_ARGS="
-    --per_device_train_batch_size 2 \
+    --per_device_train_batch_size 4 \
     --gradient_accumulation_steps 4 \
     --recompute false \
     --recompute_use_reentrant true \
@@ -67,10 +68,10 @@ CONFIG_ARGS="
 PARALLEL_ARGS=(
     --to_static 1
     --sharding_parallel_degree 2
-    --sharding "stage2"
-    --tensor_parallel_degree 2
+    --sharding "stage3"
+    --tensor_parallel_degree 4
     --sequence_parallel true
-    --pipeline_parallel_degree 2
+    --pipeline_parallel_degree 1
     --virtual_pp_degree 1
     --pipeline_schedule_mode "1F1B"
     --sep_parallel_degree 1

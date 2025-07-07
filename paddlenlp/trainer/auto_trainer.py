@@ -171,7 +171,7 @@ class AutoTrainer(Trainer):
 
     def _get_meshes_for_loader(self):
         def _get_mesh(pp_idx=0):
-            return self.global_mesh.get_mesh_with_dim("pp")[pp_idx]
+            return self.global_mesh.get_mesh_with_dim("pp")[pp_idx]  # [NOTE] 注意此处需要修改
 
         # Note(lizhiyu): If the values returned by `DataLoader` don't have the format `[images, labels]`,
         # error may occurs here.
@@ -225,6 +225,14 @@ class AutoTrainer(Trainer):
                 )
             else:
                 self.optimizer = dist.shard_optimizer(self.optimizer, None, self.args.gradient_accumulation_steps)
+            print(f'[linguangming] after shard_optimizer, the model is')  # [NOTE] 查看是否能够看出参数的拆分效果
+            print(model)
+            for name, param in model.named_parameters():
+                print(f'[linguangming] now auto_trainer.py line 230, param name: {name}')
+                print(param.shape)
+                print(param._local_shape)
+            # print(f'[linguangming] now auto_trainer.py line 230, exit')
+            # exit(0)
 
         if self.args.to_static:
             unified_strategy = dist.Strategy()

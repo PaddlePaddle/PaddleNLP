@@ -420,6 +420,8 @@ def main():
     
     # mesh的构建先写一个固定的 (先全部使用统一的mesh)
     if pp == 2 and tp == 2 and dp == 2:
+        # meshs = [dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", "mp"]) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4], [5], [6], [7]], dim_names=["dp", "mp"]) for _ in range(ave_layers)]
+        # meshs = [dist.ProcessMesh([[0, 1, 2, 3]], dim_names=["dp", "mp"]) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4, 5, 6, 7]], dim_names=["dp", "mp"]) for _ in range(ave_layers)]
         meshs = [dist.ProcessMesh([[0, 1], [2, 3]], dim_names=["dp", "mp"]) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4, 5], [6, 7]], dim_names=["dp", "mp"]) for _ in range(ave_layers)]
     elif pp == 2 and tp == 1 and dp == 4:
         meshs = [dist.ProcessMesh([[0], [1], [2], [3]], dim_names=['dp', 'mp']) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4], [5], [6], [7]], dim_names=['dp', 'mp']) for _ in range(ave_layers)]
@@ -435,23 +437,34 @@ def main():
     # one demo
     if pp == 2 and tp == 2 and dp == 2:
         meshs[2] = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", "mp"])
+        # meshs[2] = dist.ProcessMesh([[0, 1, 2, 3]], dim_names=["dp", "mp"])
+        # meshs[2] = dist.ProcessMesh([[0, 1], [2, 3]], dim_names=["dp", "mp"])
+        # meshs[3] = dist.ProcessMesh([[4], [5], [6
+        pass
         # meshs[6] = dist.ProcessMesh([[4], [5], [6], [7]], dim_names=["dp", "mp"])
     elif pp == 2 and tp == 1 and dp == 4:
-        meshs[2] = dist.ProcessMesh([[0, 1, 2, 3]], dim_names=['dp', 'mp'])
+        # meshs[2] = dist.ProcessMesh([[0, 1, 2, 3]], dim_names=['dp', 'mp'])
+        meshs[2] = dist.ProcessMesh([[0, 1], [2, 3]], dim_names=['dp', 'mp'])
     elif pp == 2 and tp == 4 and dp == 1:
         meshs[2] = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=['dp', 'mp'])
     elif pp == 1 and tp == 2 and dp == 4:
         meshs[2] = dist.ProcessMesh([[0, 1, 2, 3], [4, 5, 6, 7]], dim_names=['dp', 'mp'])
     elif pp == 1 and tp == 4 and dp == 2:
         meshs[2] = dist.ProcessMesh([[0, 1], [2, 3], [4, 5], [6, 7]], dim_names=['dp', 'mp'])
-        meshs[3] = dist.ProcessMesh([[0, 1], [2, 3], [4, 5], [6, 7]], dim_names=['dp', 'mp'])
-        meshs[6] = dist.ProcessMesh([[0], [1], [2], [3], [4], [5], [6], [7]], dim_names=['dp', 'mp']) # 第五层
+        # meshs[3] = dist.ProcessMesh([[0, 1], [2, 3], [4, 5], [6, 7]], dim_names=['dp', 'mp'])
+        # meshs[6] = dist.ProcessMesh([[0], [1], [2], [3], [4], [5], [6], [7]], dim_names=['dp', 'mp']) # 第五层
     else:
         assert False, f"Unsupported pp={pp}, tp={tp}, dp={dp} configuration for now."
     
     print("[auto-parallel] meshs:")
     for i, mesh in enumerate(meshs):
         print(f"Layer {i}: {mesh.process_ids} with dim_names {mesh.dim_names} and mesh shape {mesh.shape}")
+
+    # from paddlenlp.experimental.galvatron.runtime.redistributed import add_comm_group
+    # add_comm_group([0, 2])
+    # add_comm_group([1, 3])
+    # add_comm_group([4, 6])
+    # add_comm_group([5, 7])
 
     with paddle.LazyGuard():
         model = model_class.from_config(config, dtype="float32", meshs=meshs, pp_division=pp_division)

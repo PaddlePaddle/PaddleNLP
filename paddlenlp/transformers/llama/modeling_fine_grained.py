@@ -848,6 +848,7 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
             self.meshs[0],
             embedding_placements,
         )
+        setattr(self.embed_tokens.weight, 'zero_stage', 2)
 
         def is_pipeline_stage_first_layer_func(layer_index):
             for i in range(len(self.pp_division)):
@@ -874,12 +875,14 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
         from paddlenlp.experimental.galvatron.runtime.redistributed import DummyLayer
         for i in range(config.num_hidden_layers):
             decoder_layer = LlamaDecoderLayerFineGrained(config, i not in self.no_recompute_layers, self.meshs[i + 1])
-            if layer_stage_id(i) == rank_stage_id():
-                decoder_layers.append(decoder_layer)
-            else:
-                # If the layer is not in the current stage, we use a dummy layer to avoid errors
-                decoder_layers.append(DummyLayer(self.meshs[i + 1]))
-            # decoder_layers.append(LlamaDecoderLayerFineGrained(config, i not in self.no_recompute_layers, self.meshs[i + 1])) # i + 1 because the first mesh is for embedding
+            # 不使用dummy layer
+            decoder_layers.append(decoder_layer)
+            # 使用dummy layer
+            # if layer_stage_id(i) == rank_stage_id():
+            #     decoder_layers.append(decoder_layer)
+            # else:
+            #     # If the layer is not in the current stage, we use a dummy layer to avoid errors
+            #     decoder_layers.append(DummyLayer(self.meshs[i + 1]))
             self.is_pipeline_stage_first_layer[i] = is_pipeline_stage_first_layer_func(i)   
 
         self.layers = nn.LayerList(decoder_layers)
@@ -1129,28 +1132,14 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
                     hidden_states = GatherBatchFwdSplitBatchBwd.apply(hidden_states, self.layers[idx + 1].mesh)
                     
             if idx != len(self.layers) - 1 and hidden_states.process_mesh.shape[0] != self.layers[idx + 1].mesh.shape[0] and dist.get_rank() not in hidden_states.process_mesh.process_ids:
+                print(f'[linguangming] skip but use apply to generate comm group')
                 from paddlenlp.experimental.galvatron.runtime.redistributed import DummyRedistributed
-                if dist.get_rank() in [0, 1, 2, 3]:
-                    print(f'[linguangming] [modeling_fine_grained.py], rank {rank} is not in hidden_states mesh {hidden_states.process_mesh}, skip decoder_layer {idx}')
-                    comm_activate_tensor = paddle.zeros((1,), dtype=hidden_states.dtype)
-                    comm_activate_mesh = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", 'tp'])
-                    comm_activate_dtensor = dist.shard_tensor(comm_activate_tensor, comm_activate_mesh, [dist.Replicate(), dist.Replicate()])
-                    comm_activate_tensor.stop_gradient = True
-                else:
-                    print(f'[linguangming] [modeling_fine_grained.py], rank {rank} is not in hidden_states mesh {hidden_states.process_mesh}, skip decoder_layer {idx}')
-                    # hidden_states = DummyRedistributed.apply(hidden_states, self.layers[idx + 1].mesh)
-                    comm_activate_tensor = paddle.zeros((1,), dtype=hidden_states.dtype)
-                    comm_activate_mesh = dist.ProcessMesh([[1], [2], [3], [4]], dim_names=["dp", 'tp'])
-                    comm_activate_dtensor = dist.shard_tensor(comm_activate_tensor, comm_activate_mesh, [dist.Replicate(), dist.Replicate()])
-                    # comm_activate_tensor.stop_gradient = True
-                    
-                    # rubbish_leaner = nn.Linear(4, 4, bias_attr=False)
-                    # rubbish_leaner.weight = dist.shard_tensor(
-                    #     rubbish_leaner.weight,
-                    #     comm_activate_mesh,
-                    #     [dist.Shard(1), dist.Shard(0)],
-                    # )
-
+                hidden_states = DummyRedistributed.apply(hidden_states, self.layers[idx + 1].mesh)
+                # from paddlenlp.experimental.galvatron.runtime.redistributed import SpiltBatchFwdGatherBatchBwd, GatherBatchFwdSplitBatchBwd
+                # if hidden_states.process_mesh.shape[0] < self.layers[idx + 1].mesh.shape[0]: # dp degree increase
+                #     hidden_states = SpiltBatchFwdGatherBatchBwd.apply(hidden_states, self.layers[idx + 1].mesh)
+                # elif hidden_states.process_mesh.shape[0] > self.layers[idx + 1].mesh.shape[0]: # dp degree decrease
+                #     hidden_states = GatherBatchFwdSplitBatchBwd.apply(hidden_states, self.layers[idx + 1].mesh)
 
         # norm layer
         hidden_states = self.norm(hidden_states)
