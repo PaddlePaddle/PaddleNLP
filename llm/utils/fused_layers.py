@@ -18,6 +18,9 @@ import paddle.distributed as dist
 from paddle import _C_ops
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils.log_util import logger
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+    _check_environment_for_overlap,
+)
 from paddle.framework import core
 
 _raise_cuda_env_unset_warning = True
@@ -67,6 +70,40 @@ def mp_async_allreduce(x_grad):
         return None
 
 
+def sp_async_reducesctter(x_grad):
+    if _sp_async_reduce_scatter and x_grad.process_mesh is not None:
+        mp_placement_index = x_grad.process_mesh.dim_names.index("mp")
+        if mp_placement_index != -1 and x_grad.placements[mp_placement_index].is_partial():
+            hcg = fleet.get_hybrid_communicate_group()
+            model_parallel_group = hcg.get_model_parallel_group()
+            parallelism = model_parallel_group.nranks
+
+            assert (
+                x_grad.shape[0] % parallelism == 0
+            ), f"Input sequence length {x_grad.shape[0]} can't be divided exactly by sequence parallelism {parallelism}"
+
+            # reduce-scatter dx
+            x_grad_global_shape = x_grad.shape
+            x_grad_global_shape[0] = x_grad_global_shape[0] // parallelism
+            x_grad_local = x_grad._local_value()
+            x_grad_local_shape = x_grad_local.shape
+            x_grad_local_shape[0] = x_grad_local_shape[0] // parallelism
+            dx_local = paddle.empty(shape=x_grad_local_shape, dtype=x_grad.dtype)
+            task = dist.stream.reduce_scatter(
+                dx_local,
+                x_grad_local,
+                op=dist.ReduceOp.SUM,
+                group=model_parallel_group,
+                sync_op=False,
+            )
+            _check_environment_for_overlap()
+            return task, dx_local, x_grad_global_shape
+        else:
+            return None
+    else:
+        return None
+
+
 def sync_mp_allreduce(task, dist_tensor):
     mp_placement_index = dist_tensor.process_mesh.dim_names.index("mp")
     new_placments = list()
@@ -89,6 +126,50 @@ def sync_mp_allreduce(task, dist_tensor):
     )
 
 
+def sync_sp_reducescatter(task, dist_tensor):
+    task, dx_local, x_grad_global_shape = task
+    placements = [dist.Shard(1), dist.Shard(0)]
+    place = paddle.framework._current_expected_place()
+    place = paddle.framework._get_paddle_place(place)
+
+    task.wait()
+
+    return paddle.Tensor(
+        dx_local,
+        dims=x_grad_global_shape,
+        process_mesh=dist_tensor.process_mesh,
+        placements=placements,
+        place=place,
+    )
+
+
+# modify from Paddle/python/paddle/distributed/auto_parallel/moe_utils.py
+def _dist_reshape(dist_tensor):
+    local_tensor = dist_tensor._local_value()
+    tgt_global_shape = [dist_tensor.shape[0] * dist_tensor.shape[1], dist_tensor.shape[2]]
+    tgt_local_shape = [local_tensor.shape[0] * local_tensor.shape[1], local_tensor.shape[2]]
+
+    place = paddle.framework._current_expected_place()
+    place = paddle.framework._get_paddle_place(place)
+
+    local_tensor = local_tensor.reshape(tgt_local_shape)
+
+    if dist_tensor.placements[1].is_shard():
+        new_placements = [dist.Shard(0), dist.Shard(1)]
+    else:
+        new_placements = [dist.Shard(0), dist.Replicate()]
+
+    out = paddle.Tensor(
+        local_tensor,
+        dims=tgt_global_shape,
+        process_mesh=dist_tensor.process_mesh,
+        placements=new_placements,
+        place=place,
+    )
+    out.stop_gradient = dist_tensor.stop_gradient
+    return out
+
+
 class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
     @staticmethod
     def forward(ctx, x, weight, bias=None, name=None):
@@ -101,7 +182,10 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
         x, weight, bias = ctx.saved_tensor()
         x_grad = paddle.matmul(y_grad, weight, transpose_y=True)
 
-        mp_task = mp_async_allreduce(x_grad)
+        if _sp_async_reduce_scatter:
+            mp_task = sp_async_reducesctter(x_grad)
+        else:
+            mp_task = mp_async_allreduce(x_grad)
 
         # _C_ops.fused_linear_param_grad_add(x, y_grad, dw, db, multi precision, has bias)
         if bias is None:
@@ -110,7 +194,10 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
                     x, y_grad, weight.main_grad, None, True, False
                 )
                 if mp_task is not None:
-                    x_grad = sync_mp_allreduce(mp_task, x_grad)
+                    if _sp_async_reduce_scatter:
+                        x_grad = sync_sp_reducescatter(mp_task, x_grad)
+                    else:
+                        x_grad = sync_mp_allreduce(mp_task, x_grad)
                 return x_grad, None
             else:
                 if weight.grad is not None:
@@ -118,12 +205,18 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
                         x, y_grad, weight.grad, None, False if weight.grad.dtype != paddle.float32 else True, False
                     )
                     if mp_task is not None:
-                        x_grad = sync_mp_allreduce(mp_task, x_grad)
+                        if _sp_async_reduce_scatter:
+                            x_grad = sync_sp_reducescatter(mp_task, x_grad)
+                        else:
+                            x_grad = sync_mp_allreduce(mp_task, x_grad)
                     return x_grad, None
                 else:
                     weight_grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False, False)
                     if mp_task is not None:
-                        x_grad = sync_mp_allreduce(mp_task, x_grad)
+                        if _sp_async_reduce_scatter:
+                            x_grad = sync_sp_reducescatter(mp_task, x_grad)
+                        else:
+                            x_grad = sync_mp_allreduce(mp_task, x_grad)
                     return x_grad, weight_grad
 
         if hasattr(weight, "main_grad") and hasattr(bias, "main_grad"):
@@ -131,7 +224,10 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
                 x, y_grad, weight.main_grad, bias.main_grad, True, True
             )
             if mp_task is not None:
-                x_grad = sync_mp_allreduce(mp_task, x_grad)
+                if _sp_async_reduce_scatter:
+                    x_grad = sync_sp_reducescatter(mp_task, x_grad)
+                else:
+                    x_grad = sync_mp_allreduce(mp_task, x_grad)
             return x_grad, None, None
         else:
             if weight.grad is not None:
@@ -140,12 +236,18 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
                     x, y_grad, weight.grad, bias.grad, False if weight.grad.dtype != paddle.float32 else True, True
                 )
                 if mp_task is not None:
-                    x_grad = sync_mp_allreduce(mp_task, x_grad)
+                    if _sp_async_reduce_scatter:
+                        x_grad = sync_sp_reducescatter(mp_task, x_grad)
+                    else:
+                        x_grad = sync_mp_allreduce(mp_task, x_grad)
                 return x_grad, None, None
             else:
                 weight_grad, bias_grad = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False, True)
                 if mp_task is not None:
-                    x_grad = sync_mp_allreduce(mp_task, x_grad)
+                    if _sp_async_reduce_scatter:
+                        x_grad = sync_sp_reducescatter(mp_task, x_grad)
+                    else:
+                        x_grad = sync_mp_allreduce(mp_task, x_grad)
                 return x_grad, weight_grad, bias_grad
 
 
@@ -161,22 +263,34 @@ class OverlapLinear(paddle.autograd.PyLayer):
         x, weight, bias = ctx.saved_tensor()
         x_grad = paddle.matmul(y_grad, weight, transpose_y=True)
 
-        mp_task = mp_async_allreduce(x_grad)
+        if _sp_async_reduce_scatter:
+            mp_task = sp_async_reducesctter(x_grad)
+        else:
+            mp_task = mp_async_allreduce(x_grad)
 
-        y_grad = y_grad.reshape([-1, y_grad.shape[-1]])
+        if _sp_async_reduce_scatter:
+            y_grad = _dist_reshape(y_grad)
+        else:
+            y_grad = y_grad.reshape([-1, y_grad.shape[-1]])
         weight_grad = paddle.matmul(
-            x.reshape([-1, x.shape[-1]]),
+            _dist_reshape(x) if _sp_async_reduce_scatter else x.reshape([-1, x.shape[-1]]),
             y_grad,
             transpose_x=True,
         )
         if bias is None:
             if mp_task is not None:
-                x_grad = sync_mp_allreduce(mp_task, x_grad)
+                if _sp_async_reduce_scatter:
+                    x_grad = sync_sp_reducescatter(mp_task, x_grad)
+                else:
+                    x_grad = sync_mp_allreduce(mp_task, x_grad)
             return x_grad, weight_grad
         else:
             bias_grad = paddle.sum(y_grad, axis=0)
             if mp_task is not None:
-                x_grad = sync_mp_allreduce(mp_task, x_grad)
+                if _sp_async_reduce_scatter:
+                    x_grad = sync_sp_reducescatter(mp_task, x_grad)
+                else:
+                    x_grad = sync_mp_allreduce(mp_task, x_grad)
             return x_grad, weight_grad, bias_grad
 
 
