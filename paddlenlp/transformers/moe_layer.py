@@ -747,7 +747,7 @@ class FusionMlpNode:
         return expert_out_zipped
 
     @paddle.no_grad()
-    def backward(self, hidden_states_out_grad):
+    def backward(self, hidden_states_out_grad, with_dw=True):
         """
         反向传播函数。
 
@@ -772,7 +772,10 @@ class FusionMlpNode:
         record_stream_for_multi_input(hidden_states_out_grad)
 
         # expert_grad
-        expert_out, probs_grad = self.experts_group_gemm_node.backward(unzipped_grad)
+        if with_dw:
+            expert_out, probs_grad = self.experts_group_gemm_node.backward(unzipped_grad)
+        else:
+            expert_out, probs_grad = self.experts_group_gemm_node.backward_dx(unzipped_grad)
 
         hs_dispatched_grad, dispatched_probs_grad = self.unzip_node.backward(
             expert_out,
@@ -781,8 +784,13 @@ class FusionMlpNode:
             self.dispatched_indices,
             num_experts=len(self.tokens_per_expert),
         )
-        self.reset_statue()
+        if with_dw:
+            self.reset_statue()
         return hs_dispatched_grad, dispatched_probs_grad
+
+    @paddle.no_grad()
+    def backward_dw(self):
+        self.experts_group_gemm_node.backward_dw()
 
 
 class FusionMoeNode:
@@ -836,11 +844,11 @@ class FusionMoeNode:
             return output
 
     @paddle.no_grad()
-    def backward(self, output_grad):
+    def backward(self, output_grad, with_dw=True):
         output_combine_grad = self.combine_quant_node.backward(output_grad)
         hidden_states_out_grad = self.combine_node.backward(output_combine_grad)
 
-        hs_dispatched_grad, dispatched_probs_grad = self.mlp_node.backward(hidden_states_out_grad)
+        hs_dispatched_grad, dispatched_probs_grad = self.mlp_node.backward(hidden_states_out_grad, with_dw=with_dw)
 
         if DSV3_USE_FP8_DISPATCH:
             hs_fp8_grad, token_probs_grad = self.dispatch_node.backward(hs_dispatched_grad, dispatched_probs_grad)
@@ -849,6 +857,10 @@ class FusionMoeNode:
         else:
             hs_bf16_grad, token_probs_grad = self.dispatch_node.backward(hs_dispatched_grad, dispatched_probs_grad)
             return hs_bf16_grad, None, token_probs_grad
+
+    @paddle.no_grad()
+    def backward_dw(self):
+        self.mlp_node.backward_dw()
 
 
 class FusionMoe(paddle.autograd.PyLayer):

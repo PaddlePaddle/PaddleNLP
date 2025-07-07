@@ -784,6 +784,7 @@ class FP8GroupGemmMlpFunctionNode:
         # compute gemm
         if isinstance(unzipped_grad, tuple):
             (unzipped_grad_fp8, unzipped_grad_scale) = unzipped_grad
+            unzipped_grad_scale = unzipped_grad_scale.T.contiguous().T
         else:
             unzipped_grad_fp8, unzipped_grad_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
                 unzipped_grad, output_scale_transpose=True, quant_method="1x128", input_transpose=False
@@ -1015,3 +1016,56 @@ class FP8GroupGemmMlpFunctionNode:
 
         self.reset_statue()
         return dx, probs_grad
+
+    @paddle.no_grad()
+    def backward_dx(self, out_grad):
+        # recompute expert_w2 and expert_w1
+        expert_w1 = [x.w1 for x in self.experts if x is not None]
+        expert_w2 = [x.w2 for x in self.experts if x is not None]
+
+        if self.recompute_fwd_gate_up:
+            o1 = self.fwd_gate_up(None, expert_w1, len(expert_w1), self.tokens_per_expert)
+        else:
+            o1 = self.o1
+
+        # do2
+        do1, o2_s, probs_grad = self.bwd_dowm_input(expert_w2, out_grad, o1, inplace_swiglu_prob=True)
+        del o1
+        self.o1 = None
+
+        self.do1 = do1
+        self.o2_s = o2_s
+
+        self.out_grad = out_grad
+
+        # dx
+        dx = self.bwd_gate_up_input(do1, expert_w1, dx=out_grad[0] if isinstance(out_grad, tuple) else out_grad)
+
+        return dx, probs_grad
+
+    @paddle.no_grad()
+    def backward_dw(self):
+        # recompute expert_w2 and expert_w1
+        expert_w1 = [x.w1 for x in self.experts if x is not None]
+        expert_w2 = [x.w2 for x in self.experts if x is not None]
+
+        # dw1
+        self.bwd_gate_up_weight(self.do1, None, expert_w1, clear_input=True)
+        self.input_fp8 = None
+        self.input_scale = None
+        self.input = None
+        self.do1 = None
+
+        # dw2
+        if isinstance(self.out_grad, tuple):
+            out_grad_dequant_fp16 = paddle.incubate.nn.functional.fused_act_dequant(self.out_grad[0], self.out_grad[1])
+            self.out_grad = None
+            self.bwd_down_weight(out_grad_dequant_fp16, self.o2_s, expert_w2)
+            del out_grad_dequant_fp16
+        else:
+            self.bwd_down_weight(self.out_grad, self.o2_s, expert_w2)
+
+        self.o2_s = None
+
+        self.reset_statue()
+        return
