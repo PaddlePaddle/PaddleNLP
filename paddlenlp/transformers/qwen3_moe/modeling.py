@@ -94,6 +94,7 @@ class ExpertParallelQwen3MoeSparseMoeBlock(MoELayer):
             expert_kwargs={"config": config},
             gate=gate,
             capacity=2.0,
+            moe_group=config.moe_group,
         )
 
         self.top_k = config.num_experts_per_tok
@@ -101,7 +102,6 @@ class ExpertParallelQwen3MoeSparseMoeBlock(MoELayer):
 
     def forward(self, hidden_states):
         final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
-
         return final_hidden_states, l_aux
 
 
@@ -191,6 +191,7 @@ class Qwen3MoeDecoderLayer(nn.Layer):
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
         attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
+        batch_size=None,
         **kwargs,
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
@@ -215,6 +216,8 @@ class Qwen3MoeDecoderLayer(nn.Layer):
 
         hidden_states = self.input_layernorm(hidden_states)
 
+        sp_batch_size = kwargs.pop("batch_size", None) if batch_size is None else batch_size
+
         # Self Attention
         has_gradient = not hidden_states.stop_gradient
         if (
@@ -233,16 +236,20 @@ class Qwen3MoeDecoderLayer(nn.Layer):
                 use_cache,
                 attn_mask_startend_row_indices,
                 use_reentrant=self.config.recompute_use_reentrant,
+                batch_size=sp_batch_size,  # Qwen3Attention 有batch_szie这个参数，手动传递
+                **kwargs,
             )
         else:
-            outputs = self.self_attn(
+            outputs = self.self_attn(  # Qwen3Attention
                 hidden_states,
-                position_ids,
-                past_key_value,
-                attention_mask,
-                output_attentions,
-                use_cache,
+                position_ids=position_ids,  # kwargs
+                past_key_value=past_key_value,
+                attention_mask=attention_mask,
+                output_attentions=output_attentions,
+                use_cache=use_cache,
                 attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                batch_size=sp_batch_size,  # Qwen3Attention 有batch_szie这个参数，手动传递
+                **kwargs,  # 传递剩下的kwargs
             )
 
         if type(outputs) is tuple:
@@ -260,12 +267,34 @@ class Qwen3MoeDecoderLayer(nn.Layer):
 
         # Fully Connected
         residual = hidden_states
-        hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states = self.mlp(hidden_states)
-        if isinstance(hidden_states, tuple):
-            hidden_states, router_logits = hidden_states
+        hidden_states = self.post_attention_layernorm(hidden_states)  # hha
+
+        # ==================== BEGIN FINAL FIX ====================
+        # 为了兼容序列并行 (输入是2D) 和非序列并行 (输入是3D)
+        is_2d_input = len(hidden_states.shape) == 2
+        if is_2d_input:
+            # 如果是序列并行产生的 2D 张量 [num_tokens, hidden_size]
+            # 我们需要将其 reshape 为 MoE 层期望的 3D 格式。
+            # 最安全的做法是将其视为 [num_tokens, 1, hidden_size]
+            # 这样 batch_size=num_tokens, seq_len=1
+            original_shape = hidden_states.shape
+            hidden_states = hidden_states.unsqueeze(1)
+
+        # 现在 hidden_states 保证是 3D 的
+
+        mlp_output = self.mlp(hidden_states)
+
+        if isinstance(mlp_output, tuple):
+            hidden_states, router_logits = mlp_output
         else:
+            hidden_states = mlp_output
             router_logits = None
+
+        if is_2d_input:
+            # 如果原始输入是 2D，我们需要在计算后恢复其形状
+            # [num_tokens, 1, hidden_size] -> [num_tokens, hidden_size]
+            hidden_states = hidden_states.reshape(original_shape)
+        # ===================== END FINAL FIX =====================
 
         hidden_states = residual + hidden_states
 
@@ -290,6 +319,33 @@ class Qwen3MoePretrainedModel(PretrainedModel):
     config_class = Qwen3MoeConfig
     base_model_prefix = "model"
     _keys_to_ignore_on_load_unexpected = [r"self_attn.rotary_emb.inv_freq"]
+
+    @classmethod
+    def get_tensor_parallel_convert_actions(
+        cls, config, loaded_state_dict_keys, is_split=True, ignore_error=False, base_model_prefix=None
+    ):
+        """
+        Get the tensor parallel convert actions for the model.
+        This function is overridden to handle the case where MoE experts are grouped and should not be split across TP ranks.
+        """
+        # Get the default tensor parallel actions from the base class by calling super() with the exact same arguments.
+        tp_actions = super().get_tensor_parallel_convert_actions(
+            config,
+            loaded_state_dict_keys,
+            is_split=is_split,
+            ignore_error=ignore_error,
+            base_model_prefix=base_model_prefix,
+        )
+
+        # If moe_group is set, expert parameters should not be split.
+        # We remove them from the tp_actions dictionary.
+        if "Qwen3MoeForCausalLM" in config.architectures and config.moe_group == "tp":
+            # Iterate over a copy of the keys to safely modify the dictionary
+            for key in list(tp_actions.keys()):
+                if "mlp.experts" in key:
+                    del tp_actions[key]
+
+        return tp_actions
 
     @classmethod
     def _get_name_mappings(cls, config: Qwen3MoeConfig) -> list[StateDictNameMapping]:
@@ -443,7 +499,11 @@ class Qwen3MoePretrainedModel(PretrainedModel):
                     for fuse_keys in fuse_qkv_keys:
                         keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_keys])
                         final_actions[keys] = partial(
-                            fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                            fn,
+                            split_nums=3,
+                            is_qkv=True,
+                            num_heads=num_heads,
+                            num_key_value_heads=num_key_value_heads,
                         )
             if not fuse_attention_ffn:
                 for i in range(config.num_hidden_layers):
@@ -595,15 +655,31 @@ class Qwen3MoeModel(Qwen3MoePretrainedModel):
         past_key_value: Tensor,
         use_cache: bool,
         attn_mask_startend_row_indices=None,
+        batch_size=None,
+        **kwargs,
     ):
-        def create_custom_forward(module):
+        # 定义一个闭包，它会捕获所有需要的关键字参数
+        def create_custom_forward(module, **kwargs_to_bind):
             def custom_forward(*inputs):
-                return module(*inputs)
+                # 当 recompute 调用 custom_forward(*inputs) 时，
+                # 它会执行 module(*inputs, **kwargs_to_bind)
+                return module(*inputs, **kwargs_to_bind)
 
             return custom_forward
 
-        hidden_states = recompute(
-            create_custom_forward(layer_module),
+        # 准备好所有要绑定的关键字参数
+        kwargs_for_layer = {
+            "attn_mask_startend_row_indices": attn_mask_startend_row_indices,
+            "batch_size": batch_size,
+            **kwargs,
+        }
+
+        # 创建实例
+        wrapped_layer = create_custom_forward(layer_module, **kwargs_for_layer)
+
+        # 调用 recompute，和方案一完全一样
+        layer_outputs = recompute(
+            wrapped_layer,
             hidden_states,
             position_ids,
             attention_mask,
@@ -611,11 +687,10 @@ class Qwen3MoeModel(Qwen3MoePretrainedModel):
             output_router_logits,
             past_key_value,
             use_cache,
-            attn_mask_startend_row_indices,
             use_reentrant=self.config.recompute_use_reentrant,
         )
 
-        return hidden_states
+        return layer_outputs
 
     def forward(
         self,
@@ -632,6 +707,8 @@ class Qwen3MoeModel(Qwen3MoePretrainedModel):
         attn_mask_startend_row_indices=None,
         **kwargs,
     ) -> Union[Tuple, MoEModelOutputWithPast]:
+        # batch_size = kwargs.pop("batch_size", None)
+
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
 
         output_router_logits = (
@@ -648,6 +725,7 @@ class Qwen3MoeModel(Qwen3MoePretrainedModel):
             raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time")
         elif input_ids is not None:
             batch_size, seq_length = input_ids.shape
+
         elif inputs_embeds is not None:
             batch_size, seq_length, _ = inputs_embeds.shape
         else:
@@ -679,11 +757,13 @@ class Qwen3MoeModel(Qwen3MoePretrainedModel):
             attention_mask = None
         else:
             # [bs, seq_len]
+
             attention_mask = (
                 paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
                 if attention_mask is None
                 else attention_mask
             )
+
             attention_mask = self._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
             )  # [bs, 1, seq_len, seq_len]
@@ -723,9 +803,11 @@ class Qwen3MoeModel(Qwen3MoePretrainedModel):
                     past_key_value,
                     use_cache,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                    batch_size=batch_size,
+                    **kwargs,  # 传递剩下的kwargs
                 )
             else:
-                layer_outputs = decoder_layer(
+                layer_outputs = decoder_layer(  # here
                     hidden_states,
                     position_ids,
                     attention_mask,
@@ -734,6 +816,8 @@ class Qwen3MoeModel(Qwen3MoePretrainedModel):
                     past_key_value,
                     use_cache,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                    batch_size=batch_size,  # here add for qwen3moe 传递 batch_size
+                    **kwargs,  # 传递剩下的kwargs
                 )
 
             # NOTE: clear outdate cache after it has been used for memory saving
@@ -792,7 +876,7 @@ class Qwen3MoeForCausalLM(Qwen3MoePretrainedModel):
         self.config = config
 
         self.model = Qwen3MoeModel(config)
-        self.lm_head = Qwen3MoeLMHead(config)
+        self.lm_head = Qwen3MoeLMHead(config)  # Qwen2LMHead
         self.criterion = Qwen3MoePretrainingCriterion(config)
         self.router_aux_loss_coef = config.router_aux_loss_coef
         self.num_experts = config.num_experts
@@ -905,6 +989,7 @@ class Qwen3MoeForCausalLM(Qwen3MoePretrainedModel):
         output_router_logits: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         attn_mask_startend_row_indices=None,
+        **kwargs,  # here add for qwen3moe
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -922,9 +1007,8 @@ class Qwen3MoeForCausalLM(Qwen3MoePretrainedModel):
             )
             attention_mask = None
 
-        # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.model(
-            input_ids=input_ids,  # [bs, seq_len]
+            input_ids=input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
             inputs_embeds=inputs_embeds,
@@ -935,6 +1019,7 @@ class Qwen3MoeForCausalLM(Qwen3MoePretrainedModel):
             output_router_logits=output_router_logits,
             return_dict=return_dict,
             attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+            **kwargs,  # 传递剩下的kwargs(如有)
         )
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]
@@ -961,8 +1046,11 @@ class Qwen3MoeForCausalLM(Qwen3MoePretrainedModel):
             else:
                 loss = paddle.sum(masked_lm_loss * binary_sequence) / count
             logits = None
+
         else:
-            logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+            logits = self.lm_head(
+                hidden_states, tensor_parallel_output=tensor_parallel_output, batch_size=input_ids.shape[0]
+            )
 
             loss = None
             if labels is not None:

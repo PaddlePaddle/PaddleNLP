@@ -441,7 +441,15 @@ class Qwen2MoeMLP(nn.Layer):
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
 
-        if config.tensor_parallel_degree > 1:
+        if config.moe_group == "tp":
+            use_parallel_linear = False
+        elif config.moe_group == "dp":
+            use_parallel_linear = True
+        else:
+            use_parallel_linear = False
+
+        # 只有在张量并行度 > 1 且 *不是* 用于专家并行(EP)的场景下，才使用并行化的Linear层。
+        if use_parallel_linear:
             if self.fuse_attention_ffn:
                 self.gate_up_fused_proj = ColumnParallelLinear(
                     self.hidden_size,
@@ -469,6 +477,8 @@ class Qwen2MoeMLP(nn.Layer):
                 has_bias=False,
             )
         else:
+            # 1. 单卡或非tp (config.tensor_parallel_degree <= 1)
+            # 2. tp，但此MLP被用作一个完整的专家
             if self.fuse_attention_ffn:
                 self.gate_up_fused_proj = Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
             else:
@@ -772,6 +782,7 @@ class Qwen2MoeGate(PretrainedMoEGate):
 
         with paddle.amp.auto_cast(False):
             scores = self.gate_score_func(logits=logits)
+
             scores = scores.cast(paddle.get_default_dtype())
 
         capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.topkgating(scores)
@@ -1118,7 +1129,11 @@ class Qwen2MoePretrainedModel(PretrainedModel):
                     for fuse_keys in fuse_qkv_keys:
                         keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_keys])
                         final_actions[keys] = partial(
-                            fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                            fn,
+                            split_nums=3,
+                            is_qkv=True,
+                            num_heads=num_heads,
+                            num_key_value_heads=num_key_value_heads,
                         )
             if not fuse_attention_ffn:
                 for i in range(config.num_hidden_layers):
@@ -1569,7 +1584,7 @@ class Qwen2MoeForCausalLM(Qwen2MoePretrainedModel):
         attention_mask=None,
         inputs_embeds=None,
         output_router_logits=False,
-        **kwargs
+        **kwargs,
     ):
         batch_size, seq_length = input_ids.shape
         position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
