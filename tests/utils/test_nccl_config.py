@@ -60,7 +60,7 @@ class TestNcclConfig(unittest.TestCase):
         strategy = fleet.DistributedStrategy()
         strategy.hybrid_configs = {"dp_degree": 2, "mp_degree": 2, "pp_degree": 2}
 
-        strategy = init_nccl_config(strategy)
+        strategy = init_nccl_config(self.nccl_config_path, strategy)
         assert strategy.hybrid_configs["default_comm_group_configs"].nccl_config.protoStr == "ll"
         assert strategy.hybrid_configs["default_comm_group_configs"].nccl_config.nchannels == 1
         assert strategy.hybrid_configs["default_comm_group_configs"].nccl_config.buffsize_align == 1024

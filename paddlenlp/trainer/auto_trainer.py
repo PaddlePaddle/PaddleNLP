@@ -992,8 +992,12 @@ class AutoTrainer(Trainer):
                 model_to_save.generation_config.save_pretrained(output_dir)
 
         if self.args.should_save_model_state:
-            self._save_ckpt_func(self.model.state_dict(), output_dir)
-            logger.info(f"Model weights and optimizer states saved in {output_dir}")
+            if state_dict is None:
+                self._save_ckpt_func(self.model.state_dict(), output_dir)
+                logger.info(f"Model weights saved in {output_dir}")
+            else:
+                self._save_ckpt_func(state_dict, output_dir)
+                logger.info(f"Model weights and optimizer states saved in {output_dir}")
 
     def _load_from_checkpoint(self, resume_from_checkpoint=None):
 
