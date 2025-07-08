@@ -1,0 +1,179 @@
+name: Build PR CI-Docker For paddlenlp
+
+on:
+  workflow_call:
+    inputs:
+      upstream_event:
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PR_ID: ${{ github.event.pull_request.number }}
+  COMMIT_ID: ${{ github.event.pull_request.head.sha }}
+  BRANCH: ${{ github.event.pull_request.base.ref }}
+  UPSTREAM_EVENT: ${{ inputs.upstream_event }}
+  no_proxy: "localhost,bj.bcebos.com,su.bcebos.com,bcebos.com,apiin.im.baidu.com,gitee.com,aliyun.com,.baidu.com,.tuna.tsinghua.edu.cn"
+
+jobs:
+  build-paddlenlp-ci-docker:
+    name: build-paddlenlp-ci-docker
+    runs-on: [self-hosted, 4gpu]
+    outputs:
+      run_build: ${{ steps.event_name.outputs.run_build }}
+      run_downstream: ${{ steps.event_name.outputs.run_downstream }}
+      image_name: ${{ steps.set_image_name.outputs.image_name }}
+    steps:
+      - name: Download Code
+        id: event_name
+        env:
+          work_dir: ${{ github.workspace }}
+        run: |
+          rm -rf * .[^.]*
+          echo "Downloading PaddleNLP.tar.gz"
+          wget -q --no-proxy  https://paddle-qa.bj.bcebos.com/CodeSync/develop/PaddleNLP.tar --no-check-certificate
+          echo "Extracting PaddleNLP.tar.gz"
+          tar xf PaddleNLP.tar && rm -rf PaddleNLP.tar
+          source ${{ github.workspace }}/../../../proxy
+          cd PaddleNLP
+          git config --global user.name "PaddleCI"
+          git config --global user.email "paddle_ci@example.com"
+          git pull
+          git submodule update --init --recursive --force
+          run_build=false
+          run_downstream=false
+          if [[ "${{ env.UPSTREAM_EVENT }}" == "push" ]]; then
+            run_build=true
+            run_downstream=false
+          elif [[ "${{ env.UPSTREAM_EVENT }}" == "schedule" ]]; then
+            run_build=true
+            run_downstream=true
+          elif [[ "${{ env.UPSTREAM_EVENT }}" == "pull_request" ]]; then
+            git fetch origin pull/${PR_ID}/head
+            git checkout -b PR_${PR_ID} FETCH_HEAD
+            git remote add upstream https://github.com/PaddlePaddle/PaddleNLP.git
+            git fetch upstream ${BRANCH}
+            git merge ${BRANCH}
+            git diff --numstat ${BRANCH} |awk '{print $NF}'
+            files=$(git diff --numstat ${BRANCH} -- | awk '{print $NF}')
+            target_lists_for_pr=(
+                "requirements"
+                "scripts/regression/requirements_ci.txt"
+                "tests/requirements.txt"
+                "setup.py"
+                ".github/workflows/build-ci-docker-images.yml"
+                ".github/workflows/ci-docker-images-paddlenlp.yml"
+            )
+            for file_name in `git diff --numstat ${BRANCH} -- |awk '{print $NF}'`;do
+              for ((i=0; i<${#target_lists_for_pr[@]}; i++)); do
+                arr_file_name=(${file_name//// })
+                dir1=${arr_file_name[0]}
+                dir2=${arr_file_name[1]}
+                dir3=${arr_file_name[2]}
+                dir4=${arr_file_name[3]}
+                file_item=$dir1/$dir2/$dir3/$dir4
+                if [ ! -f "${file_name}" ]; then
+                    continue
+                fi
+                if [[ "${file_item}" == *"${target_lists_for_pr[i]}"* ]];then
+                    run_build=true
+                    run_downstream=true
+                    break 2
+                fi
+              done
+            done
+          fi
+          echo "run_build=${run_build}" >> ${{ github.env }}
+          echo "run_downstream=${run_downstream}" >> ${{ github.env }}
+          echo "run_downstream=${run_downstream}" >> "$GITHUB_OUTPUT"
+          git log --pretty=oneline -10
+
+      - name: Write Dockerfile Inline
+        env:
+          work_dir: ${{ github.workspace }}/PaddleNLP
+        run: |
+          cat <<EOF > Dockerfile
+          FROM iregistry.baidu-int.com/paddlecloud/base-images:paddlecloud-ubuntu18.04-gcc8.2-cuda11.8-cudnn8.6-nccl2.15.5-libsndfile
+          RUN unlink /usr/bin/python3 && ln -sf python3.10 /usr/bin/python3
+          RUN python -m pip config --user set global.index http://pip.baidu-int.com/search/
+          RUN python -m pip config --user set global.index-url http://pip.baidu-int.com/simple
+          RUN python -m pip config --user set global.trusted-host pip.baidu-int.com
+          RUN python -m pip install bce-python-sdk==0.8.74
+          RUN python -m pip install --no-cache-dir https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuSome-LinuxCentos-Gcc82-Cuda118-Cudnn86-Trt85-Py310-CINN-Compile/latest/paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl
+          COPY PaddleNLP/ /tmp/paddlenlp/
+          WORKDIR /tmp/paddlenlp
+          RUN python -m pip install -r requirements.txt
+          RUN python -m pip install -r requirements-dev.txt
+          RUN python -m pip install -r scripts/regression/requirements_ci.txt
+          RUN python -m pip install -r tests/requirements.txt
+          RUN python setup.py bdist_wheel > /dev/null
+          RUN python -m pip install dist/*.whl
+          WORKDIR /
+          RUN rm -rf /tmp/paddlenlp
+          CMD ["python3"]
+          EOF
+
+      - name: Set Image Name
+        id: set_image_name
+        run: |
+          if [[ "${{ env.UPSTREAM_EVENT }}" =~ ^(push|schedule)$ ]]; then
+            image_name=iregistry.baidu-int.com/paddlecloud/base-images:paddlecloud-ubuntu18.04-gcc8.2-cuda11.8-cudnn8.6-nccl2.15.5-paddlenlp-latest
+          elif [[ "${{ env.UPSTREAM_EVENT }}" == "pull_request" ]]; then
+            image_name=iregistry.baidu-int.com/paddlecloud/base-images:paddlecloud-ubuntu18.04-gcc8.2-cuda11.8-cudnn8.6-nccl2.15.5-paddlenlp-${PR_ID}-${COMMIT_ID}
+          fi
+          echo "image_name=${image_name}" >> ${{ github.env }}
+          echo "image_name=${image_name}" >> "$GITHUB_OUTPUT"
+      
+      - name: Build Docker Image
+        run: |
+          if [[ "${{ env.run_build }}" == false ]]; then
+            echo "No need to build docker image"
+          else
+            docker build -t ${{ env.image_name }} .
+          fi
+    
+  test-paddlenlp-ci-docker-llm:
+    name: test-paddlenlp-ci-docker-llm
+    needs: build-paddlenlp-ci-docker
+    uses: ./.github/workflows/llm.yml
+    with:
+      run_downstream: ${{ needs.build-paddlenlp-ci-docker.outputs.run_downstream }}
+      image_name: ${{ needs.build-paddlenlp-ci-docker.outputs.image_name }}
+
+  test-paddlenlp-ci-docker-unittest:
+    name: test-paddlenlp-ci-docker-unittest
+    needs: build-paddlenlp-ci-docker
+    uses: ./.github/workflows/unittest-gpu.yml
+    with:
+      run_downstream: ${{ needs.build-paddlenlp-ci-docker.outputs.run_downstream }}
+      image_name: ${{ needs.build-paddlenlp-ci-docker.outputs.image_name }}
+
+  clean-paddlenlp-ci-image:
+    name: clean-paddlenlp-ci-image
+    needs: [build-paddlenlp-ci-docker, test-paddlenlp-ci-docker-llm, test-paddlenlp-ci-docker-unittest]
+    runs-on: [self-hosted, 4gpu]
+    steps:
+      - name: Remove CI Image
+        env:
+          RUN_DOWNSTREAM: ${{ needs.build-paddlenlp-ci-docker.outputs.run_downstream }}
+        run: |
+          if [[ "${RUN_DOWNSTREAM}" == "false" ]]; then
+            echo "Not in a pull_request or test_build event. Skipping..."
+          else
+            image_name="iregistry.baidu-int.com/paddlecloud/base-images:paddlecloud-ubuntu18.04-gcc8.2-cuda11.8-cudnn8.6-nccl2.15.5-paddlenlp-${PR_ID}-${COMMIT_ID}"
+            CONTAINERS=$(docker ps -a --filter "ancestor=$image_name" --format "{{.ID}}")
+
+            if [ -z "$CONTAINERS" ]; then
+                echo "$image_name is not using by any container, deleting..."
+                docker rmi "$image_name"
+            else
+                echo "$image_name is using by containers:"
+                echo "$CONTAINERS"
+            fi
+          fi
+
+          # 安全删除悬空镜像（无悬空镜像时跳过）
+          docker images -f "dangling=true" -q | xargs -r docker rmi -f

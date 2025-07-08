@@ -4,6 +4,14 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [develop]
+  workflow_call:
+    inputs:
+      run_downstream:
+        required: true
+        type: string
+      image_name:
+        required: true
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -26,6 +34,8 @@ env:
   NLP_DIR: /workspace/PaddleNLP
   HF_DATASETS_CACHE: /ssd1/paddlenlp/huggingface/datasets
   TRANSFORMERS_CACHE: /ssd1/paddlenlp/huggingface
+  GITHUB_EVENT_NAME: ${{ github.event_name }}
+  RUN_DOWNSTREAM: ${{ inputs.run_downstream }}
 
 defaults:
   run:
@@ -40,7 +50,7 @@ jobs:
         env:
           work_dir: ${{ github.workspace }}
         run: |
-          sudo rm -rf * .[^.]*
+          rm -rf * .[^.]*
           echo "Downloading PaddleNLP.tar.gz"
           wget -q --no-proxy  https://paddle-qa.bj.bcebos.com/CodeSync/develop/PaddleNLP.tar --no-check-certificate
           echo "Extracting PaddleNLP.tar.gz"
@@ -51,12 +61,16 @@ jobs:
           git config --global user.email "paddle_ci@example.com"
           git pull
           git submodule update --init --recursive --force
-          git fetch origin pull/${PR_ID}/head
-          git checkout -b PR_${PR_ID} FETCH_HEAD
-          git remote add upstream https://github.com/PaddlePaddle/PaddleNLP.git
-          git fetch upstream ${BRANCH}
-          git merge ${BRANCH}
-          git diff --numstat ${BRANCH} |awk '{print $NF}'
+          if [ -n "${PR_ID}" ]; then
+            git fetch origin pull/${PR_ID}/head
+            git checkout -b PR_${PR_ID} FETCH_HEAD
+            git remote add upstream https://github.com/PaddlePaddle/PaddleFormers.git
+            git fetch upstream ${BRANCH}
+            git merge ${BRANCH}
+            git diff --numstat ${BRANCH} -- | awk '{print $NF}'
+          else
+            echo "Not in a pull_request event. Skipping PR-specific operations."
+          fi
           git log --pretty=oneline -10
       
       - name: Parse GPU ID From Runner Label
@@ -72,7 +86,17 @@ jobs:
             echo "cudaid=0,1,2,3" >> ${{ github.env }}
           fi
       
-      - name: Check Docker Image And Run Container
+      - name: Determine Image Name
+        env:
+          IMAGE_NAME: ${{ inputs.image_name }}
+        run: |
+          if [[ -n "${IMAGE_NAME}" ]]; then
+            echo "IMAGE_NAME=${IMAGE_NAME}" >> ${{ github.env }}
+          else
+            echo "IMAGE_NAME=iregistry.baidu-int.com/paddlecloud/base-images:paddlecloud-ubuntu18.04-gcc8.2-cuda11.8-cudnn8.6-nccl2.15.5-paddlenlp-latest" >> ${{ github.env }}
+          fi
+
+      - name: Run Container
         env:
           CACHE_DIR: /home/data/cfs/.cache
           FLAGS_dynamic_static_unified_comm: "True"
@@ -81,48 +105,55 @@ jobs:
         run: |
           container_name=${TASK}-${core_index}-$(date +%Y%m%d-%H%M%S)
           echo "container_name=${container_name}" >> ${{ github.env }}
-          docker_image=iregistry.baidu-int.com/paddlecloud/base-images:paddlecloud-ubuntu18.04-gcc8.2-cuda11.8-cudnn8.6-nccl2.15.5-paddlenlp-latest
-          nvidia-docker run -d -t --name ${container_name} --net=host -v /dev/shm:/dev/shm --shm-size=32G \
-            -v ${{ github.workspace }}/../../..:${{ github.workspace }}/../../.. \
-            -v ${{ github.workspace }}:/workspace \
-            -v /home/.cache/pip:/home/.cache/pip \
-            -v /ssd1/paddlenlp:/ssd1/paddlenlp \
-            -e BRANCH \
-            -e AGILE_COMPILE_BRANCH \
-            -e PR_ID \
-            -e COMMIT_ID \
-            -e work_dir \
-            -e PADDLENLP_ROOT \
-            -e ci_scripts \
-            -e no_proxy \
-            -e CI_name \
-            -e paddle_whl \
-            -e FLAGS_dynamic_static_unified_comm \
-            -e python_version \
-            -e CUDA_VISIBLE_DEVICES=${{ env.cudaid }} \
-            -w /workspace --runtime=nvidia ${docker_image}
+          if [[ "${{ env.RUN_DOWNSTREAM }}" == "false" ]]; then
+            echo "Not in a pull_request or test_build event. Skipping..."
+          else
+            nvidia-docker run -d -t --name ${container_name} --net=host -v /dev/shm:/dev/shm --shm-size=32G \
+              -v ${{ github.workspace }}/../../..:${{ github.workspace }}/../../.. \
+              -v ${{ github.workspace }}:/workspace \
+              -v /home/.cache/pip:/home/.cache/pip \
+              -v /ssd1/paddlenlp:/ssd1/paddlenlp \
+              -e BRANCH \
+              -e AGILE_COMPILE_BRANCH \
+              -e PR_ID \
+              -e COMMIT_ID \
+              -e work_dir \
+              -e PADDLENLP_ROOT \
+              -e ci_scripts \
+              -e no_proxy \
+              -e CI_name \
+              -e paddle_whl \
+              -e FLAGS_dynamic_static_unified_comm \
+              -e python_version \
+              -e CUDA_VISIBLE_DEVICES=${{ env.cudaid }} \
+              -w /workspace --runtime=nvidia ${{ env.IMAGE_NAME }}
+          fi
 
       - name: Test
         env:
           work_dir: ${{ github.workspace }}
         run: |
-          docker exec -t ${{ env.container_name }} /bin/bash -c '
-          ldconfig
-          unlink /usr/bin/python3
-          ln -sf $(which python${python_version}) /usr/bin/python3
-          pip config set global.cache-dir "/home/.cache/pip"
-          echo "[global]
-          timeout = 60
-          index = https://pip.baidu-int.com/search/
-          index-url = https://pip.baidu-int.com/simple/
-          trusted-host = pip.baidu-int.com" > /etc/pip.conf
-          '
-          docker exec -t ${{ env.container_name }} /bin/bash -c '
-          ldconfig
-          set -e
-          cd /workspace/PaddleNLP && git config --global --add safe.directory $PWD
-          timeout 2h bash scripts/regression/run_ci.sh python${python_version} ${paddle_whl}
-          '
+          if [[ "${{ env.RUN_DOWNSTREAM }}" == "false" ]]; then
+            echo "Not in a pull_request or test_build event. Skipping..."
+          else
+            docker exec -t ${{ env.container_name }} /bin/bash -c '
+            ldconfig
+            unlink /usr/bin/python3
+            ln -sf $(which python${python_version}) /usr/bin/python3
+            pip config set global.cache-dir "/home/.cache/pip"
+            echo "[global]
+            timeout = 60
+            index = https://pip.baidu-int.com/search/
+            index-url = https://pip.baidu-int.com/simple/
+            trusted-host = pip.baidu-int.com" > /etc/pip.conf
+            '
+            docker exec -t ${{ env.container_name }} /bin/bash -c '
+            ldconfig
+            set -e
+            cd /workspace/PaddleNLP && git config --global --add safe.directory $PWD
+            timeout 2h bash scripts/regression/run_ci.sh python${python_version} ${paddle_whl}
+            '
+          fi
 
       - name: Upload Allure-reports & Logs
         if: always()
@@ -131,33 +162,44 @@ jobs:
           bos_file: ${{ github.workspace }}/../../../bos/BosClient.py
           allure_file: ${{ github.workspace }}/../../../allure-2.19.0/bin/allure
         run: |
-          docker exec -t ${{ env.container_name }} /bin/bash -c '
-          if [ ! -f "${{ env.bos_file }}" ]; then
-            wget -q --no-proxy -O ${{ env.home_path }}/bos_new.tar.gz https://xly-devops.bj.bcebos.com/home/bos_new.tar.gz --no-check-certificate
-            mkdir ${{ env.home_path }}/bos
-            tar xf ${{ env.home_path }}/bos_new.tar.gz -C ${{ env.home_path }}/bos
+          if [[ "${{ env.RUN_DOWNSTREAM }}" == "false" ]]; then
+            echo "Not in a pull_request or test_build event. Skipping..."
+          else
+            docker exec -t ${{ env.container_name }} /bin/bash -c '
+            if [ ! -f "${{ env.bos_file }}" ]; then
+              wget -q --no-proxy -O ${{ env.home_path }}/bos_new.tar.gz https://xly-devops.bj.bcebos.com/home/bos_new.tar.gz --no-check-certificate
+              mkdir ${{ env.home_path }}/bos
+              tar xf ${{ env.home_path }}/bos_new.tar.gz -C ${{ env.home_path }}/bos
+            fi
+            if [ ! -f "${{ env.allure_file }}" ]; then
+              wget -q --no-proxy -O ${{ env.home_path }}/allure-2.19.0.zip https://xly-devops.bj.bcebos.com/tools/allure-2.19.0.zip --no-check-certificate
+              unzip -q ${{ env.home_path }}/allure-2.19.0.zip
+            fi
+            if [[ "${{ env.RUN_DOWNSTREAM }}" == "" && -n "${PR_ID}" ]]; then
+              bos_prefix="${PR_ID}/${COMMIT_ID}"
+            elif [[ "${{ env.RUN_DOWNSTREAM }}" == "true" && -n "${PR_ID}" ]]; then
+              bos_prefix="${PR_ID}/${COMMIT_ID}/test_build"
+            else
+              bos_prefix="schedule/$(date +%Y%m%d)"
+            fi
+            cd /workspace/PaddleNLP/model_logs
+            for FILE in /workspace/PaddleNLP/model_logs/*; do
+              file=$(basename "$FILE")
+              python ${{ env.bos_file }} $file paddle-github-action/PR/PaddleNLP/llm/${bos_prefix}/logs
+              echo "$file: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/llm/${bos_prefix}/logs/$file"
+            done
+            cd /workspace/PaddleNLP/
+            ${{ env.allure_file }} generate result -o report
+            tar -czf products.tar.gz report model_logs
+            python ${{ env.bos_file }} products.tar.gz paddle-github-action/PR/PaddleNLP/llm/${bos_prefix}/logs
+            echo "products: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/llm/${bos_prefix}/logs/products.tar.gz"
+            '
           fi
-          if [ ! -f "${{ env.allure_file }}" ]; then
-            wget -q --no-proxy -O ${{ env.home_path }}/allure-2.19.0.zip https://xly-devops.bj.bcebos.com/tools/allure-2.19.0.zip --no-check-certificate
-            unzip -q ${{ env.home_path }}/allure-2.19.0.zip
-          fi
-          cd /workspace/PaddleNLP/model_logs
-          for FILE in /workspace/PaddleNLP/model_logs/*; do
-            file=$(basename "$FILE")
-            python ${{ env.bos_file }} $file paddle-github-action/PR/PaddleNLP/llm/${PR_ID}/${COMMIT_ID}/logs
-            echo "$file: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/llm/${PR_ID}/${COMMIT_ID}/logs/$file"
-          done
-          cd /workspace/PaddleNLP/
-          ${{ env.allure_file }} generate result -o report
-          tar -czf products.tar.gz report model_logs
-          python ${{ env.bos_file }} products.tar.gz paddle-github-action/PR/PaddleNLP/llm/${PR_ID}/${COMMIT_ID}/logs
-          echo "products: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/llm/${PR_ID}/${COMMIT_ID}/logs/products.tar.gz"
-          '
 
       - name: Terminate And Delete the Container
         if: always()
         run: |
-          docker rm -f ${{ env.container_name }}
+          docker rm -f ${{ env.container_name }} 2>/dev/null || true
 
   upload-products:
     name: upload-products
@@ -168,8 +210,19 @@ jobs:
       - name: Wget Files
         if: always()
         run: |
-          wget -q --no-proxy  https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/llm/${PR_ID}/${COMMIT_ID}/logs/products.tar.gz --no-check-certificate
-          tar -xzf products.tar.gz
+          if [[ "${{ env.RUN_DOWNSTREAM }}" == "false" ]]; then
+            echo "Not in a pull_request or test_build event. Skipping..."
+          else
+            if [[ "${{ env.RUN_DOWNSTREAM }}" == "" && -n "${PR_ID}" ]]; then
+              bos_prefix="${PR_ID}/${COMMIT_ID}"
+            elif [[ "${{ env.RUN_DOWNSTREAM }}" == "true" && -n "${PR_ID}" ]]; then
+              bos_prefix="${PR_ID}/${COMMIT_ID}/test_build"
+            else
+              bos_prefix="schedule/$(date +%Y%m%d)"
+            fi
+            wget -q --no-proxy  https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/llm/${bos_prefix}/logs/products.tar.gz --no-check-certificate
+            tar -xzf products.tar.gz
+          fi
 
       - name: Upload Allure Report
         if: always()
