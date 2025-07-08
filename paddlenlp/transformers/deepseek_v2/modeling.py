@@ -940,7 +940,7 @@ class DeepseekV2MoE(MoELayer):
         if config.n_shared_experts is not None:
             intermediate_size = config.moe_intermediate_size * config.n_shared_experts
             if self.using_post_norm_recompute:
-                assert isinstance(DeepseekV2MLPClass, FP8Mlp)
+                assert DeepseekV2MLPClass is FP8Mlp
                 self.shared_experts = DeepseekV2MLPClass(
                     config=config,
                     intermediate_size=intermediate_size,
