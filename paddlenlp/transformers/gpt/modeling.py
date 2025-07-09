@@ -40,7 +40,6 @@ try:
 except:
     pass
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
-from paddle.utils import try_import
 
 from ...utils.converter import StateDictNameMapping
 from ...utils.log import logger
@@ -138,11 +137,6 @@ def seed_guard_context(name=None):
         return get_rng_state_tracker().rng_state(name)
     else:
         return contextlib.nullcontext()
-
-
-def fast_layer_norm(input, weight, bias, eps):
-    fast_ln_lib = try_import("fast_ln")
-    return fast_ln_lib.fast_ln(input, weight, bias, eps)[0]
 
 
 def _make_causal_mask(input_ids_shape, past_key_values_length):
@@ -784,11 +778,6 @@ class GPTLayerNorm(OriginLayerNorm):
 
         self.config = config
         _check_normalized_shape(self._normalized_shape)
-
-    def forward(self, input):
-        if self.config.use_fast_layer_norm:
-            return fast_layer_norm(input, self.weight, self.bias, self._epsilon)
-        return super().forward(input)
 
 
 class GPTPretrainedModel(PretrainedModel):

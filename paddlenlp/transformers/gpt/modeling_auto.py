@@ -30,7 +30,6 @@ import paddle.tensor as tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
-from paddle.utils import try_import
 
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
@@ -93,11 +92,6 @@ def seed_guard_context(name=None):
         return contextlib.nullcontext()
 
 
-def fast_layer_norm(input, weight, bias, eps):
-    fast_ln_lib = try_import("fast_ln")
-    return fast_ln_lib.fast_ln(input, weight, bias, eps)[0]
-
-
 class GPTLayerNorm(nn.LayerNorm):
     def __init__(self, config, normalized_shape, ipp=-1, epsilon=1e-05, weight_attr=None, bias_attr=None, name=None):
         super().__init__(
@@ -113,11 +107,6 @@ class GPTLayerNorm(nn.LayerNorm):
     def _check_normalized_shape(self, normalized_shape):
         if isinstance(normalized_shape, (list, tuple)):
             assert len(normalized_shape) == 1
-
-    def forward(self, input):
-        if self.config.use_fast_layer_norm:
-            return fast_layer_norm(input, self.weight, self.bias, self._epsilon)
-        return super().forward(input)
 
 
 def _make_causal_mask(input_ids_shape, past_key_values_length):

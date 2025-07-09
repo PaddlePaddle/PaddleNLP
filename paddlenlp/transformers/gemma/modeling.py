@@ -26,7 +26,6 @@ from paddle.autograd import PyLayer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
-from paddle.utils import try_import
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -82,11 +81,6 @@ def _get_interleave(n):
             _get_interleave_power_of_2(closest_power_of_2)
             + _get_interleave(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]
         )
-
-
-def rms_norm_fused(x_in, w, eps):
-    fused_ln = try_import("fused_ln")
-    return fused_ln.fused_rms_norm(x_in, w, eps)[0]
 
 
 def assign_kv_heads(num_kv_heads: int, num_gpus: int):
@@ -369,7 +363,9 @@ class GemmaRMSNorm(nn.Layer):
 
     def forward(self, x):
         if self.config.use_fused_rms_norm:
-            return rms_norm_fused(x, self.weight + 1, self.variance_epsilon)
+            return paddle.incubate.nn.functional.fused_rms_norm_ext(x, self.weight + 1, self.variance_epsilon)[
+                0
+            ].astype(self.weight.dtype)
 
         output = self._norm(x.astype(paddle.float32)).astype(x.dtype)
         return output * (self.weight + 1)
