@@ -226,6 +226,8 @@ if cc >= 90 and cuda_version >= 12.0:
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_block_gemm.cu",
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm_ptr_scale.cu",
     ]
+    sources += find_end_files("./gpu/mla_attn", ".cu")
+
     sources += [
         "gpu/sparse/sparse_compressor.cu",
         "gpu/sparse/sparse_mm.cu",
