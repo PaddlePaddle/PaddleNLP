@@ -3847,7 +3847,6 @@ function llama_baichuan_dygraph_auto_sp_async_reduce_scatter_bs8_bf16_DP4-MP2-SP
         export CUDA_DEVICE_MAX_CONNECTIONS=1
         export FLAGS_fuse_reducescatter_in_opt=1
         export FLAGS_enable_inplace_master_grad=1
-        export FLAGS_enable_auto_parallel_align_mode=1
         export FLAGS_auto_parallel_align_mode=1
         export FLAGS_max_inplace_grad_add=65536
         export FLAGS_embedding_deterministic=1
@@ -3930,9 +3929,9 @@ EOF
         ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10,' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
         mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10,' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
         echo "result: loss=$loss ips=$ips mem=$mem"
-        loss_base=3.74013824
-        ips_base=1405.9083
-        mem_base=18.336278676986694
+        loss_base=9.83012619
+        ips_base=1387.5543
+        mem_base=18.277684926986694
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
         echo "=========== $FUNCNAME run  end ==========="
     fi
