@@ -470,10 +470,11 @@ def main():
         and training_args.sequence_parallel
         and "enable_sp_async_reduce_scatter" in training_args.tensor_parallel_config
     )
-    if training_args.enable_linear_fused_grad_add and not do_enable_sp_async_reduce_scatter:
+    if training_args.enable_linear_fused_grad_add:
         from llm.utils.fused_layers import mock_layers
 
         mock_layers(
+            do_enable_sp_async_reduce_scatter,
             mp_async_allreduce=True if "enable_mp_async_allreduce" in training_args.tensor_parallel_config else False
         )
 
