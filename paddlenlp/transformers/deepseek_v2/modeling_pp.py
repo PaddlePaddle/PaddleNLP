@@ -613,7 +613,7 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
                 l_aux_grad,
                 final_hidden_states_grad,
             ) = self.post_process_node.backward(output_grad)
-        output_combine_grad = self.fp8_fusion_moe_node.combine_quant_node.backward(
+        output_combine_grad, quant_event = self.fp8_fusion_moe_node.combine_quant_node.backward(
             final_hidden_states_grad, event_to_wait, ring_id
         )
         if self.send_mtp_embed:
@@ -623,6 +623,7 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
                 residual_grad,
                 l_aux_grad,
                 output_combine_grad,
+                quant_event,
             )
         else:
             return (
@@ -630,6 +631,7 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
                 residual_grad,
                 l_aux_grad,
                 output_combine_grad,
+                quant_event,
             )
 
     def combine_backward(self, output_grad, async_finish=False):
@@ -640,6 +642,7 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
                 residual_grad,
                 l_aux_grad,
                 output_combine_grad,
+                quant_event,
             ) = output_grad
         else:
             (
@@ -647,11 +650,13 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
                 residual_grad,
                 l_aux_grad,
                 output_combine_grad,
+                quant_event,
             ) = output_grad
 
         hidden_states_out_grad = self.fp8_fusion_moe_node.combine_node.backward(
             output_combine_grad,
             async_finish=async_finish,
+            previous_event=quant_event,
         )
 
         if self.send_mtp_embed:

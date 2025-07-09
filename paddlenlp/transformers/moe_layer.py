@@ -639,13 +639,14 @@ class Fp8CombineQuantNode:
                     output_combine_grad, output_scale_transpose=False, quant_method="1x128", input_transpose=False
                 )
                 output_grad._record_stream()
-                # if event_to_wait is not None and ring_id is not None:
-                #     quant_event = deep_ep.get_event_from_custom_stream(custom_stream.stream_base)
+                quant_event = None
+                if event_to_wait is not None and ring_id is not None:
+                    quant_event = deep_ep.get_event_from_custom_stream(custom_stream.stream_base)
                 #     quant_event.comm_stream_wait(ring_id)
-            return (output_combine_grad_fp8, output_combine_grad_scale)
+            return (output_combine_grad_fp8, output_combine_grad_scale), quant_event
         else:
             output_combine_grad = paddle.reshape(output_grad, self.output_combine_shape)
-            return output_combine_grad
+            return output_combine_grad, None
 
 
 class FusionMlpNode:
