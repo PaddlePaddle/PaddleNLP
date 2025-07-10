@@ -5,7 +5,11 @@ on: [push, pull_request]
 jobs:
   Lint:
     name: Lint
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, gpu-4-7]
+    env:
+          ACTIONS_RUNNER_FORCED_INTERNAL_NODE_VERSION: node16
+          ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
+          ACTIONS_ALLOW_UNSECURE_NODE_VERSION: true
     steps:
       - uses: actions/checkout@v3
         with:
