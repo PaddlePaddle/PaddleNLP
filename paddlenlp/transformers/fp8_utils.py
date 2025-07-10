@@ -600,8 +600,6 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
         x_fp8, x_scale, w1, w2, x_orig_shape = ctx.saved_tensor()
 
         # ===== compute x_t_fp8, x_t_scale for dw1 =====
-        x_orig_shape = x_orig_shape.numpy()
-
         x_dequant_fp16 = paddle.incubate.nn.functional.fused_act_dequant(x_fp8, x_scale.T.contiguous())
         x_dequant_fp16 = padding(x_dequant_fp16, 0)
 
@@ -660,10 +658,10 @@ class FP8NormMlpRecomputeFunction(paddle.autograd.PyLayer):
         x, norm_w, w1, w2, norm_eps, x_orig_shape = ctx.saved_tensor()
 
         # ===== recompute norm =====
-        x_orig_shape = x_orig_shape.numpy()
         norm_output, invar = fused_ln.fused_rms_norm(x, norm_w, norm_eps)
 
         # ===== compute x_t_fp8, x_t_scale for dw1 =====
+        norm_output = norm_output.reshape([-1, x_orig_shape[-1]])
         x_fp8, x_scale, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
             norm_output, output_scale_transpose=True, quant_method="1x128", input_transpose=True
         )
@@ -716,7 +714,7 @@ class FP8Mlp(paddle.nn.Layer):
 
     def forward(self, x):
         if self.using_post_norm_recompute:
-            return FP8NormMlpRecomputeFunction.apply(x, self.w1, self.w2, self.norm_weight, self.norm_eps)
+            return FP8NormMlpRecomputeFunction.apply(x, self.norm_weight, self.w1, self.w2, self.norm_eps)
         else:
             return FP8MlpFunction.apply(x, self.w1, self.w2)
 
