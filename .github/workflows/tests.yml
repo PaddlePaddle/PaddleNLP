@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   Test:
     name: Test
-    runs-on: [self-hosted, gpu-4-7]
+    runs-on: [self-hosted, 4gpu]
     env:
           ACTIONS_RUNNER_FORCED_INTERNAL_NODE_VERSION: node16
           ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
