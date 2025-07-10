@@ -1369,16 +1369,28 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
             "pp_config": {"split_spec": f"{prefix}llama.layers", "global_spec": f"{prefix}llama.global_layer"},
             "cp_config": {
                 "parallelize_plan": {
-                    f"{prefix}llama.layers.*.self_attn.rope_func": [
-                        PrepareLayerInput(layer_input_rope_hook),
-                        PrepareLayerOutput(layer_output_rope_hook),
-                    ],
                     f"{prefix}llama.layers.*.self_attn.sdpa": dist.ContextParallel(
                         backend="p2p" if self.config.context_parallel_degree > 1 else "all2all"
                     ),
                 }
             },
         }
+        if self.config.context_parallel_degree > 1:
+            config["cp_config"]["parallelize_plan"].update(
+                {
+                    f"{prefix}llama.layers.*.self_attn.rope_func": [
+                        PrepareLayerInput(layer_input_rope_hook),
+                        PrepareLayerOutput(layer_output_rope_hook),
+                    ]
+                }
+            )
+        elif self.config.sep_parallel_degree > 1:
+            # fuse_rope is not support dtensor spmd yet,thus need to extraly reshard sequence dim
+            config["cp_config"]["parallelize_plan"].update(
+                {
+                    f"{prefix}llama.layers.*.self_attn.rope_func": PrepareLayerOutput(layer_output_rope_hook),
+                }
+            )
 
         return config
 
