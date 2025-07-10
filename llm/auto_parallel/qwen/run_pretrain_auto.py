@@ -433,13 +433,6 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    if training_args.enable_linear_fused_grad_add:
-        from llm.utils.fused_layers import mock_layers
-
-        mock_layers(
-            mp_async_allreduce=True if "enable_mp_async_allreduce" in training_args.tensor_parallel_config else False
-        )
-
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
 
@@ -555,6 +548,27 @@ def main():
     with paddle.LazyGuard():
         model = model_class.from_config(config, dtype=dtype)
         criterion = criterion_class(config)
+
+    do_enable_linear_fused_grad_add = training_args.enable_linear_fused_grad_add
+    dp_enable_mp_async_allreduce = (
+        training_args.enable_auto_parallel
+        and training_args.tensor_parallel_degree > 1
+        and "enable_mp_async_allreduce" in training_args.tensor_parallel_config
+    )
+    do_enable_sp_async_reduce_scatter = (
+        training_args.enable_auto_parallel
+        and training_args.tensor_parallel_degree > 1
+        and training_args.sequence_parallel
+        and "enable_sp_async_reduce_scatter" in training_args.tensor_parallel_config
+    )
+    if (
+        do_enable_linear_fused_grad_add or dp_enable_mp_async_allreduce or do_enable_sp_async_reduce_scatter
+    ) and not training_args.to_static:
+        from llm.utils.fused_layers import mock_layers
+
+        mock_layers(
+            model, do_enable_linear_fused_grad_add, dp_enable_mp_async_allreduce, do_enable_sp_async_reduce_scatter
+        )
 
     # load_model(model)
     # shard_model(model)
