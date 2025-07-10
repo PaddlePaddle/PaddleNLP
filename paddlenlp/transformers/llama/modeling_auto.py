@@ -209,7 +209,7 @@ def get_colwise_placement(has_seq_mesh, has_seq_parallel):
         else:
             return [dist.Replicate(), dist.Replicate(), dist.Shard(1)]
     else:
-        [dist.Replicate(), dist.Shard(1)]
+        return [dist.Replicate(), dist.Shard(1)]
 
 
 def get_rowwise_placement(has_seq_mesh, has_seq_parallel):
@@ -219,7 +219,7 @@ def get_rowwise_placement(has_seq_mesh, has_seq_parallel):
         else:
             return [dist.Replicate(), dist.Replicate(), dist.Shard(0)]
     else:
-        [dist.Replicate(), dist.Shard(0)]
+        return [dist.Replicate(), dist.Shard(0)]
 
 
 def get_replicate_placement(has_seq_mesh):
