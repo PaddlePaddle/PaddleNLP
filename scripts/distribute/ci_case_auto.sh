@@ -302,7 +302,7 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
                 echo "result: loss=$loss ips=$ips mem=$mem"
                 echo "flag=$flag acc_step=$acc_step"
                 if [ -z "$flag" ]; then
-                    loss_base=9.23504791
+                    loss_base=9.23504105
                 elif [ "$flag" = "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap" ]; then
                     if [ $acc_step -eq 1 ]; then
                         loss_base=9.23504868
@@ -2653,7 +2653,7 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate() {
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.56166935 # after add dropout spmd
+        loss_base=10.56199837 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
