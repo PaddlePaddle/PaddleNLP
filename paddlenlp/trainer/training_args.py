@@ -1037,9 +1037,7 @@ class TrainingArguments:
     )
     zcc_ema_loss_threshold: Optional[float] = field(
         default=None,
-        metadata={
-            "help": "If set not None, only do EMA when the training loss is smaller than the threshold value"
-        },
+        metadata={"help": "If set not None, only do EMA when the training loss is smaller than the threshold value"},
     )
     save_tokenizer: Optional[bool] = field(
         default=True,
@@ -1407,14 +1405,14 @@ class TrainingArguments:
                         "enable_dynamic_shape": "enable_dynamic_shape" in pipeline_parallel_config,
                     }
 
-                    sync_param = "sync_param" in pipeline_parallel_config
-                    sync_moment = "sync_moment" in pipeline_parallel_config
+                    pp_sync_param = "sync_param" in pipeline_parallel_config
+                    pp_sync_moment = "sync_moment" in pipeline_parallel_config
 
-                    if sync_param:
+                    if pp_sync_param:
                         logger.info("setting pp sync_param")
                         strategy.hybrid_configs["pp_configs"].sync_param = True
 
-                    if sync_moment:
+                    if pp_sync_moment:
                         logger.info("setting pp sync_moment")
                         strategy.hybrid_configs["pp_configs"].sync_moment = True
 
