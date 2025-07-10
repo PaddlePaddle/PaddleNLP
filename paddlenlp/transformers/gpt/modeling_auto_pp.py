@@ -139,6 +139,13 @@ def manual_model_split(model, stage_idx, group, mode, pp_degree):
 
     layer_lists = model.layers
 
+    
+    shared_params_names = {
+            "gpt_shared_weight": ["embedding_0.w_0.dist", "gptlm_head_auto_0.w_0.dist"]
+        }
+
+    shared_mp = build_shared_param_map(model, shared_params_names)
+
     def _build_stage(model, stage_idx, group):
         new_model = None
         if stage_idx == 0:
@@ -151,7 +158,7 @@ def manual_model_split(model, stage_idx, group, mode, pp_degree):
             new_model = GPTChunk(
                 layer_lists[stage_idx * chunk_size : (stage_idx + 1) * chunk_size], is_first=False, is_last=False
             )
-        stage = PipelineStage(new_model, stage_idx, chunk_num, group=group)
+        stage = PipelineStage(new_model, stage_idx, chunk_num, group=group, shared_map=shared_mp)
         return stage
 
     stages = []
@@ -159,6 +166,27 @@ def manual_model_split(model, stage_idx, group, mode, pp_degree):
         stage = _build_stage(model, stage_idx + i * pp_degree, group)
         stages.append(stage)
     return stages
+
+def build_shared_param_map(model, shared_params_names):
+    shared_mp = []
+    for key, pair in shared_params_names.items():
+        assert len(pair) == 2, (
+            "Only exactly two parameters are supported for sharing."
+        )
+        ori_name = pair[0]
+        sync_name = pair[1]
+        ori_param = get_param_from_name(ori_name, model)
+        sync_param = get_param_from_name(sync_name, model)
+        shared_mp.append({
+            "params": [ori_param, sync_param]
+        })
+    return shared_mp
+
+def get_param_from_name(param_name, model):
+    for param in model.parameters():
+        if param.name == param_name:
+            return param
+    raise ValueError(f"{param_name} not found in model parameters")
 
 
 def get_gpt_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group):
