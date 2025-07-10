@@ -529,18 +529,13 @@ class GPTDecoderLayerAuto(nn.Layer):
         self.linear2 = nn.Linear(config.intermediate_size, config.hidden_size, bias_attr=True)
 
         self.linear1.weight = dist.shard_tensor(self.linear1.weight, get_mesh(ipp), [dist.Replicate(), dist.Shard(1)])
-        self.linear1.bias = dist.shard_tensor(self.linear1.bias, get_mesh(ipp), [dist.Replicate(), dist.Shard(0)])
+        self.linear1.bias = dist.shard_tensor(self.linear1.bias, get_mesh(ipp), [dist.Replicate(), dist.Replicate()])
         self.linear2.weight = dist.shard_tensor(self.linear2.weight, get_mesh(ipp), [dist.Replicate(), dist.Shard(0)])
         self.linear2.bias = dist.shard_tensor(self.linear2.bias, get_mesh(ipp), [dist.Replicate(), dist.Replicate()])
         # fix : change nn.LayerNorm(config.hidden_size, epsilon=1e-5, bias_attr=True) to GPTLayerNorm()
         self.norm1 = GPTLayerNorm(config, config.hidden_size, self.ipp, epsilon=1e-5, bias_attr=True)
         self.norm2 = GPTLayerNorm(config, config.hidden_size, self.ipp, epsilon=1e-5, bias_attr=True)
 
-        if config.sequence_parallel:
-            mark_as_sequence_parallel_parameter(self.norm1.weight)
-            mark_as_sequence_parallel_parameter(self.norm1.bias)
-            mark_as_sequence_parallel_parameter(self.norm2.weight)
-            mark_as_sequence_parallel_parameter(self.norm2.bias)
         if config.use_fused_dropout_add:
             self.fused_dropout_add1 = FusedDropoutAdd(config.attention_probs_dropout_prob, mode="upscale_in_train")
             self.fused_dropout_add2 = FusedDropoutAdd(config.hidden_dropout_prob, mode="upscale_in_train")
@@ -658,7 +653,7 @@ class GPTEmbeddingsAuto(nn.Layer):
             config.hidden_size,
         )
         self.word_embeddings.weight = dist.shard_tensor(
-            self.word_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Replicate()]
+            self.word_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(1)]
         )
         self.position_embeddings.weight = dist.shard_tensor(
             self.position_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(1)]
@@ -693,7 +688,7 @@ class GPTEmbeddingsAuto(nn.Layer):
             embeddings = paddle.reshape_(embeddings, [bs * seq_len, hidden_size])
             # [bs * seq_len / n, dim] (n is mp parallelism)
             # embeddings = ScatterOp.apply(embeddings)
-            embeddings = dist.reshard(embeddings, get_mesh(), [dist.Replicate(), dist.Shard(0)])
+            embeddings = dist.reshard(embeddings, get_mesh(), [dist.Replicate(), dist.Shard(1)])
         # Use a ternary operator for a more concise assignment of current_seed
         current_seed = "local_seed" if self.config.sequence_parallel else "global_seed"
         # The 'with' block ensures the correct seed context is used
