@@ -820,13 +820,17 @@ class OverlapedFUsionScheduleNode:
 
         paddle.base.core.nvprof_nvtx_push("combine_backward")
         output_grad = self.backward_node.combine_backward(output_grad, async_finish=True)
+        # get combine event
+        combine_backward_event = deep_ep.get_event_from_comm_stream( self.backward_node.moe_group.id)
         paddle.base.core.nvprof_nvtx_pop()
+
         paddle.base.core.nvprof_nvtx_push("attn_forward")
         inputs = self.forward_node.attn_forward(inputs)
         paddle.base.core.nvprof_nvtx_pop()
-
-        calc_stream_wait(self.backward_node.moe_group.id)
         attn_compute_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
+
+
+        combine_backward_event.calc_stream_wait( self.backward_node.moe_group.id )
         paddle.base.core.nvprof_nvtx_push("mlp_backward_dx")
         output_grad = self.backward_node.mlp_backward(output_grad)
         paddle.base.core.nvprof_nvtx_pop()
@@ -835,28 +839,35 @@ class OverlapedFUsionScheduleNode:
             inputs, previous_event=attn_compute_event, async_finish=True, allocate_on_comm_stream=True
         )
         paddle.base.core.nvprof_nvtx_pop()
+        dispatch_forward_event = deep_ep.get_event_from_comm_stream( self.forward_node.moe_group.id )
+
         paddle.base.core.nvprof_nvtx_push("dispatch_backward")
         output_grad = self.backward_node.dispatch_backward(output_grad, async_finish=True)
         paddle.base.core.nvprof_nvtx_pop()
+        # get dispatch backward event
+        dispatch_backward_event = deep_ep.get_event_from_comm_stream(self.backward_node.moe_group.id)
 
         paddle.base.core.nvprof_nvtx_push("dispatch_backward_dw")
         self.backward_node.mlp_backward_dw()
         paddle.base.core.nvprof_nvtx_pop()
 
-        calc_stream_wait(self.forward_node.moe_group.id)
+        dispatch_forward_event.calc_stream_wait( self.forward_node.moe_group.id)
         paddle.base.core.nvprof_nvtx_push("mlp_forward")
         inputs = self.forward_node.mlp_forward(inputs)
         paddle.base.core.nvprof_nvtx_pop()
 
-        calc_stream_wait(self.backward_node.moe_group.id)
         paddle.base.core.nvprof_nvtx_push("combine_forward")
         inputs = self.forward_node.combine_forward(inputs, async_finish=True)
         paddle.base.core.nvprof_nvtx_pop()
+        combine_forward_event = deep_ep.get_event_from_comm_stream( self.forward_node.moe_group.id)
+
+
+        dispatch_backward_event.calc_stream_wait(self.backward_node.moe_group.id)
         paddle.base.core.nvprof_nvtx_push("attn_backward")
         output_grad = self.backward_node.attn_backward(output_grad)
         paddle.base.core.nvprof_nvtx_pop()
 
-        calc_stream_wait(self.forward_node.moe_group.id)
+        combine_forward_event.calc_stream_wait(self.forward_node.moe_group.id)
         paddle.base.core.nvprof_nvtx_push("post_process_forward")
         inputs = self.forward_node.post_process_forward(inputs)
         paddle.base.core.nvprof_nvtx_pop()
