@@ -158,7 +158,7 @@ def manual_model_split(model, stage_idx, group, mode, pp_degree):
             new_model = GPTChunk(
                 layer_lists[stage_idx * chunk_size : (stage_idx + 1) * chunk_size], is_first=False, is_last=False
             )
-        stage = PipelineStage(new_model, stage_idx, chunk_num, group=group, shared_map=shared_mp)
+        stage = PipelineStage(new_model, stage_idx, chunk_num, group=group, shared_parameters=shared_mp)
         return stage
 
     stages = []
