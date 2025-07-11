@@ -1743,12 +1743,25 @@ class TrainingArguments:
                 amp.custom_white_list = self.amp_custom_white_list if self.amp_custom_white_list is not None else []
 
             self.strategy = strategy
+            sep_degree = self.sep_parallel_degree if self.sep_parallel_degree > 1 else self.context_parallel_degree
             if self.hybrid_parallel_topo_order == "pp_first":
                 order = ["pp", "dp", "mp"]
-                degree = [self.pipeline_parallel_degree, self.dataset_world_size, self.tensor_parallel_degree]
+
+                degree = [
+                    self.pipeline_parallel_degree,
+                    self.dataset_world_size,
+                    self.tensor_parallel_degree,
+                ]
             elif self.hybrid_parallel_topo_order == "sharding_first":
                 order = ["dp", "pp", "mp"]
-                degree = [self.dataset_world_size, self.pipeline_parallel_degree, self.tensor_parallel_degree]
+                degree = [
+                    self.dataset_world_size,
+                    self.pipeline_parallel_degree,
+                    self.tensor_parallel_degree,
+                ]
+            if sep_degree > 1:
+                order.insert(-1, "sep")
+                degree.insert(-1, sep_degree)
             mesh_dims = list(zip(order, degree))
             fleet.auto.create_mesh(mesh_dims)
 
@@ -1767,6 +1780,7 @@ class TrainingArguments:
                 "dp_degree": self.dataset_world_size,
                 "mp_degree": self.tensor_parallel_degree,
                 "pp_degree": self.pipeline_parallel_degree,
+                "sep_degree": sep_degree,
                 "order": order,
             }
             fleet.init(is_collective=True, strategy=strategy)

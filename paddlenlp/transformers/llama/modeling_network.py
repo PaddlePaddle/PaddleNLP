@@ -25,6 +25,7 @@ import paddle.nn.functional as F
 from paddle import nn
 from paddle.distributed.auto_parallel.intermediate.tensor_parallel import (
     PrepareLayerInput,
+    PrepareLayerOutput,
 )
 from paddle.distributed.fleet.utils import recompute
 
@@ -186,6 +187,163 @@ def scaled_dot_product_attention(
         return (attn_output, attn_weights) if output_attentions else attn_output
 
 
+class SDPALayer(nn.Layer):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+
+    def forward(
+        self,
+        query_states,
+        key_states,
+        value_states,
+        attention_mask=None,
+        output_attentions=False,
+        alibi=None,
+        attn_mask_startend_row_indices=None,
+        backend=None,
+    ):
+        bsz, q_len, num_heads, head_dim = query_states.shape
+        _, kv_seq_len, _, _ = value_states.shape
+
+        if self.config.use_flash_attention and flash_attention:
+            # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
+            # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
+            version = paddle.version.full_version
+            if version != "0.0.0" and version <= "2.5.2":
+                if alibi is not None:
+                    raise ValueError("Flash Attention doesn't support alibi")
+                attn_output, attn_weights = flash_attention(
+                    query_states,
+                    key_states,
+                    value_states,
+                    causal=True,
+                    return_softmax=output_attentions,
+                )
+            else:
+                if alibi is not None:
+                    attention_mask = attention_mask.cast(alibi.dtype) + alibi
+                if attn_mask_startend_row_indices is not None:
+                    if len(attn_mask_startend_row_indices.shape) == 2:
+                        attn_mask_startend_row_indices = paddle.unsqueeze(attn_mask_startend_row_indices, axis=1)
+                    attn_output = F.flashmask_attention(
+                        query_states,
+                        key_states,
+                        value_states,
+                        startend_row_indices=attn_mask_startend_row_indices.unsqueeze(-1),
+                        causal=True,
+                    )
+                else:
+                    attn_output = F.scaled_dot_product_attention(
+                        query_states,
+                        key_states,
+                        value_states,
+                        attn_mask=attention_mask,
+                        is_causal=attention_mask is None and query_states.shape[1] != 1,
+                        backend=backend,
+                    )
+                attn_weights = None
+
+            # attn_output = attn_output.reshape([bsz, q_len, head_dim * query_states.shape[-2]])
+            return (attn_output, attn_weights) if output_attentions else attn_output
+        else:
+            #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
+            query_states = paddle.transpose(query_states, [0, 2, 1, 3])
+            # merge with the next transpose
+            key_states = paddle.transpose(key_states, [0, 2, 1, 3])
+            value_states = paddle.transpose(value_states, [0, 2, 1, 3])
+            # matmul and devide by sqrt(head_dim)
+            attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+            # then add alibi bias
+            if alibi is not None:
+                attn_weights = attn_weights + alibi
+            if list(attn_weights.shape) != [bsz, num_heads, q_len, kv_seq_len]:
+                raise ValueError(
+                    f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
+                    f" {attn_weights.shape}"
+                )
+
+            # NOTE: we only call get_triangle_upper_mask under PP setup
+            # FIXME ZHUI when we use pipeline parallel, the attention_mask can be None
+            # we just make it triangle_upper_mask
+            if attention_mask is None:
+                attention_mask = get_triangle_upper_mask(attn_weights)
+
+            attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
+            if list(attention_mask.shape) != [bsz, 1, q_len, kv_seq_len]:
+                raise ValueError(
+                    f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
+                )
+
+            attn_weights = attn_weights + attention_mask
+            with paddle.amp.auto_cast(False):
+                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+
+            attn_output = paddle.matmul(attn_weights, value_states)
+            attn_output = attn_output.transpose([0, 2, 1, 3])
+            # [bsz, q_len, num_heads, head_dim] -> [bsz, q_len, num_heads * head_dim]
+            # attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+            return (attn_output, attn_weights) if output_attentions else attn_output
+
+
+class ROPELayer(nn.Layer):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+
+    def forward(
+        self,
+        query_states,
+        key_states,
+        value_states,
+        position_ids,
+        rotary_emb=None,
+        past_key_value=None,
+        kv_seq_len=None,
+    ):
+        if self.config.use_fused_rope:
+            assert past_key_value is None, "fuse rotary not support cache kv for now"
+            batch_size, seq_length, num_heads, head_dim = query_states.shape
+            _, kv_seq_len, num_key_value_heads, _ = key_states.shape
+            cos, sin = rotary_emb(value_states, seq_len=kv_seq_len)
+
+            paddle_version = float(paddle.__version__[:3])
+            if ((paddle_version != 0.0) and (paddle_version <= 2.6)) and (num_heads != num_key_value_heads):
+                query_states, _, _ = fused_rotary_position_embedding(
+                    query_states,
+                    None,
+                    None,
+                    sin=sin,
+                    cos=cos,
+                    position_ids=position_ids,
+                    use_neox_rotary_style=False,
+                )
+                key_states, _, _ = fused_rotary_position_embedding(
+                    key_states,
+                    None,
+                    None,
+                    sin=sin,
+                    cos=cos,
+                    position_ids=position_ids,
+                    use_neox_rotary_style=False,
+                )
+            else:
+                query_states, key_states, _ = fused_rotary_position_embedding(
+                    query_states,
+                    key_states,
+                    v=None,
+                    sin=sin,
+                    cos=cos,
+                    position_ids=position_ids,
+                    use_neox_rotary_style=False,
+                )
+        else:
+            cos, sin = rotary_emb(value_states, seq_len=kv_seq_len)
+            # hack here, because elementwise infer spmd not support broadcast now
+            query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+        return query_states, key_states
+
+
 class LlamaRMSNormNet(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -311,6 +469,8 @@ class LlamaAttentionNet(nn.Layer):
             self._init_rope()
 
         self.config = config
+        self.sdpa = SDPALayer(config)
+        self.rope_func = ROPELayer(config)
 
     def _init_rope(self):
         if (
@@ -372,7 +532,6 @@ class LlamaAttentionNet(nn.Layer):
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] or [seq_len / n, bs, num_head * head_dim] (if sequence_parallel)
         # enter tp region
-
         if self.fuse_attention_qkv and not enable_fuse_ffn_qkv_pass():
             target_shape = [0, 0, self.num_key_value_heads, (self.num_key_value_groups + 2) * self.head_dim]
             mix_layer = self.qkv_proj(hidden_states)
@@ -398,46 +557,15 @@ class LlamaAttentionNet(nn.Layer):
             kv_seq_len += past_key_value[0].shape[-3]
 
         if self.config.rope:
-            if self.use_fused_rope:
-                assert past_key_value is None, "fuse rotary not support cache kv for now"
-                batch_size, seq_length, num_heads, head_dim = query_states.shape
-                _, kv_seq_len, num_key_value_heads, _ = key_states.shape
-                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-
-                paddle_version = float(paddle.__version__[:3])
-                if ((paddle_version != 0.0) and (paddle_version <= 2.6)) and (num_heads != num_key_value_heads):
-                    query_states, _, _ = fused_rotary_position_embedding(
-                        query_states,
-                        None,
-                        None,
-                        sin=sin,
-                        cos=cos,
-                        position_ids=position_ids,
-                        use_neox_rotary_style=False,
-                    )
-                    key_states, _, _ = fused_rotary_position_embedding(
-                        key_states,
-                        None,
-                        None,
-                        sin=sin,
-                        cos=cos,
-                        position_ids=position_ids,
-                        use_neox_rotary_style=False,
-                    )
-                else:
-                    query_states, key_states, _ = fused_rotary_position_embedding(
-                        query_states,
-                        key_states,
-                        v=None,
-                        sin=sin,
-                        cos=cos,
-                        position_ids=position_ids,
-                        use_neox_rotary_style=False,
-                    )
-            else:
-                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-                # hack here, because elementwise infer spmd not support broadcast now
-                query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+            query_states, key_states = self.rope_func(
+                query_states,
+                key_states,
+                value_states,
+                position_ids,
+                rotary_emb=self.rotary_emb,
+                past_key_value=past_key_value,
+                kv_seq_len=kv_seq_len,
+            )
 
         # [bs, seq_len, num_head, head_dim]
         if past_key_value is not None:
@@ -467,32 +595,32 @@ class LlamaAttentionNet(nn.Layer):
             and self.recompute_granularity == "core_attn"
         ):
             outputs = recompute(
-                scaled_dot_product_attention,
+                self.sdpa,
                 query_states,
-                self.config,
                 key_states,
                 value_states,
-                attention_mask,
-                output_attentions,
-                alibi,
+                attention_mask=attention_mask,
+                output_attentions=output_attentions,
+                alibi=alibi,
                 attn_mask_startend_row_indices=attn_mask_startend_row_indices,
-                use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
-            outputs = scaled_dot_product_attention(
+            outputs = self.sdpa(
                 query_states,
-                self.config,
                 key_states,
                 value_states,
-                attention_mask,
-                output_attentions,
-                alibi,
+                attention_mask=attention_mask,
+                output_attentions=output_attentions,
+                alibi=alibi,
                 attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             )
         if output_attentions:
             attn_output, attn_weights = outputs
         else:
             attn_output = outputs
+
+        bsz, q_len, num_heads, head_dim = query_states.shape
+        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
 
         # [bs, q_len, num_head * head_dim]
         attn_output = self.o_proj(attn_output)
@@ -797,7 +925,6 @@ class LlamaModelNet(LlamaPretrainedModelNet):
         if inputs_embeds is None:
             with paddle.amp.auto_cast(False):
                 inputs_embeds = self.embed_tokens(input_ids)
-
         """
         if position_ids is None and self.config.sep_parallel_degree > 1:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
@@ -970,10 +1097,12 @@ def layer_input_parallel_row_hook(process_mesh):
         res_inputs = []
         for input in inputs:
             if not input.is_dist():
-                x = dist.shard_tensor(input, process_mesh, [dist.Shard(0), dist.Replicate()])
-                res_inputs.append(dist.reshard(x, process_mesh, [dist.Shard(0), dist.Replicate()]))
+                x = dist.shard_tensor(input, process_mesh, [dist.Shard(0), dist.Replicate(), dist.Replicate()])
+                res_inputs.append(dist.reshard(x, process_mesh, [dist.Shard(0), dist.Replicate(), dist.Replicate()]))
             else:
-                res_inputs.append(dist.reshard(input, process_mesh, [dist.Shard(0), dist.Replicate()]))
+                res_inputs.append(
+                    dist.reshard(input, process_mesh, [dist.Shard(0), dist.Replicate(), dist.Replicate()])
+                )
         return tuple(res_inputs)
 
     return hook
@@ -984,10 +1113,10 @@ def layer_input_parallel_row_and_col_hook(process_mesh):
         res_inputs = []
         for input in inputs:
             if not input.is_dist():
-                x = dist.shard_tensor(input, process_mesh, [dist.Shard(0), dist.Shard(1)])
-                res_inputs.append(dist.reshard(x, process_mesh, [dist.Shard(0), dist.Shard(1)]))
+                x = dist.shard_tensor(input, process_mesh, [dist.Shard(0), dist.Replicate(), dist.Shard(1)])
+                res_inputs.append(dist.reshard(x, process_mesh, [dist.Shard(0), dist.Replicate(), dist.Shard(1)]))
             else:
-                res_inputs.append(dist.reshard(input, process_mesh, [dist.Shard(0), dist.Shard(1)]))
+                res_inputs.append(dist.reshard(input, process_mesh, [dist.Shard(0), dist.Replicate(), dist.Shard(1)]))
         return tuple(res_inputs)
 
     return hook
@@ -998,11 +1127,66 @@ def layer_input_replicate_hook(process_mesh):
         res_inputs = []
         for input in inputs:
             if not input.is_dist():
-                x = dist.shard_tensor(input, process_mesh, [dist.Replicate(), dist.Replicate()])
-                res_inputs.append(dist.reshard(x, process_mesh, [dist.Replicate(), dist.Replicate()]))
+                x = dist.shard_tensor(input, process_mesh, [dist.Replicate(), dist.Replicate(), dist.Replicate()])
+                res_inputs.append(
+                    dist.reshard(x, process_mesh, [dist.Replicate(), dist.Replicate(), dist.Replicate()])
+                )
             else:
                 res_inputs.append(dist.reshard(input, process_mesh, [dist.Replicate(), dist.Replicate()]))
         return tuple(res_inputs)
+
+    return hook
+
+
+def layer_input_rope_hook(process_mesh):
+    def hook(layer, inputs, output=None):
+        res_inputs = []
+        batch_size = None
+        seq_length = None
+        process_mesh = None
+        placements = None
+        for index in range(len(inputs)):
+            if index == 0:
+                batch_size, seq_length, _, _ = inputs[index]._local_shape
+                process_mesh = inputs[index].process_mesh
+                placements = inputs[index].placements
+            # process position_ids
+            if index == len(inputs) - 1:
+                mesh = dist.auto_parallel.get_mesh()
+                assert "sep" in mesh.dim_names, f"mesh.dim_names:{mesh.dim_names} must contain sep"
+                group = mesh._get_group("sep")
+                chunk_size = seq_length // 2
+                chunk_num = group.nranks * 2
+                rank = group.rank
+                first_chunk_ids = paddle.arange(rank * chunk_size, (rank + 1) * chunk_size, dtype="int64")
+                second_chunk_ids = paddle.arange(
+                    (chunk_num - rank - 1) * chunk_size, (chunk_num - rank) * chunk_size, dtype="int64"
+                )
+                position_ids = paddle.concat([first_chunk_ids, second_chunk_ids]).expand((batch_size, seq_length))
+                mp_axis = process_mesh.dim_names.index("mp")
+                placements[mp_axis] = dist.Replicate()  # mp placament shard(2) -> replicate
+                position_ids = dist.auto_parallel.api.dtensor_from_local(position_ids, process_mesh, placements)
+                res_inputs.append(position_ids)
+            else:
+                res_inputs.append(inputs[index])
+        return tuple(res_inputs)
+
+    return hook
+
+
+def layer_output_rope_hook(process_mesh):
+    def hook(layer, inputs, outputs):
+        res_outputs = []
+        for output in outputs:
+            process_mesh = output.process_mesh
+            placements = output.placements
+            cp_index = process_mesh.dim_names.index("sep")  # get the axis for the split
+            cp_degree = process_mesh.shape[cp_index]
+            assert cp_degree > 1, f"cp_degree:{cp_degree} must > 1"
+            placements[cp_index] = dist.Shard(1)  # seq_dim:1
+            output = dist.reshard(output, process_mesh, placements)
+            res_outputs.append(output)
+        return tuple(res_outputs)
 
     return hook
 
@@ -1183,6 +1367,17 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
                 }
             },
             "pp_config": {"split_spec": f"{prefix}llama.layers", "global_spec": f"{prefix}llama.global_layer"},
+            "cp_config": {
+                "parallelize_plan": {
+                    f"{prefix}llama.layers.*.self_attn.rope_func": [
+                        PrepareLayerInput(layer_input_rope_hook),
+                        PrepareLayerOutput(layer_output_rope_hook),
+                    ],
+                    f"{prefix}llama.layers.*.self_attn.sdpa": dist.ContextParallel(
+                        backend="p2p" if self.config.context_parallel_degree > 1 else "all2all"
+                    ),
+                }
+            },
         }
 
         return config
