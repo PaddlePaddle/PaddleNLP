@@ -108,20 +108,24 @@ class FP8LinearFunction(paddle.autograd.PyLayer):
                 x, output_scale_transpose=True, quant_method="1x128", input_transpose=False
             )
             x = padding(x, 0)
-            _, _, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-                x, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+            x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                x, output_scale_transpose=True, quant_method="1x128", input_transpose=True, return_transpose_only=True
             )
         else:
             x_fp8, x_scale, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
                 x, output_scale_transpose=True, quant_method="1x128", input_transpose=True
             )
 
-        _, _, w_fp8, w_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            weight, output_scale_transpose=False, quant_method="128x128", input_transpose=True
+        w_fp8, w_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            weight,
+            output_scale_transpose=False,
+            quant_method="128x128",
+            input_transpose=True,
+            return_transpose_only=True,
         )
 
         out = paddle.empty([x_fp8.shape[0], w_fp8.shape[0]], dtype=x.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w_fp8, w_sacle), out, num_sms=112)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w_fp8, w_scale), out, num_sms=112)
         out = out.reshape([x_orig_shape[0], -1, weight.shape[-1]])
 
         # save for bwd
@@ -140,20 +144,24 @@ class FP8LinearFunction(paddle.autograd.PyLayer):
                 dout_2d, output_scale_transpose=True, quant_method="1x128", input_transpose=False
             )
             dout_2d = padding(dout_2d, 0)
-            _, _, dout_t_fp8, dout_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-                dout_2d, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+            dout_t_fp8, dout_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                dout_2d,
+                output_scale_transpose=True,
+                quant_method="1x128",
+                input_transpose=True,
+                return_transpose_only=True,
             )
         else:
             dout_fp8, dout_scale, dout_t_fp8, dout_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
                 dout_2d, output_scale_transpose=True, quant_method="1x128", input_transpose=True
             )
-        w_fp8, w_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        w_fp8, w_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
             weight, output_scale_transpose=False, quant_method="128x128", input_transpose=False
         )
         dx = paddle.empty([ctx.x_t_shape[1], ctx.x_t_shape[0]], dout.dtype)
         dx_orig_shape = dout.shape[:-1]
         dx_orig_shape.append(ctx.x_t_shape[0])
-        deep_gemm.gemm_fp8_fp8_bf16_nt((dout_fp8, dout_scale.T), (w_fp8, w_sacle), dx)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((dout_fp8, dout_scale.T), (w_fp8, w_scale), dx)
         dx = dx.reshape(dx_orig_shape)
 
         # ===== dw1 = deep_gemm(x_t_fp8, dout_t_fp8)
@@ -204,13 +212,17 @@ class FP8LinearKeepXFunction(paddle.autograd.PyLayer):
         x_fp8, x_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
             x, output_scale_transpose=True, quant_method="1x128", input_transpose=False
         )
-        _, _, w_fp8, w_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            weight, output_scale_transpose=False, quant_method="128x128", input_transpose=True
+        w_fp8, w_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            weight,
+            output_scale_transpose=False,
+            quant_method="128x128",
+            input_transpose=True,
+            return_transpose_only=True,
         )
 
         # compute out = mm(x, w_t)
         out = paddle.empty([x_fp8.shape[0], w_fp8.shape[0]], dtype=x.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w_fp8, w_sacle), out, num_sms=112)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w_fp8, w_scale), out, num_sms=112)
         out = out.reshape([x_orig_shape[0], -1, weight.shape[-1]])
 
         ctx.save_for_backward(x, weight)
@@ -223,11 +235,11 @@ class FP8LinearKeepXFunction(paddle.autograd.PyLayer):
 
         # padding
         x = padding(x, 0)
-        _, _, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            x, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+        x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            x, output_scale_transpose=True, quant_method="1x128", input_transpose=True, return_transpose_only=True
         )
 
-        w_fp8, w_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        w_fp8, w_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
             weight, output_scale_transpose=False, quant_method="128x128", input_transpose=False
         )
 
@@ -237,8 +249,12 @@ class FP8LinearKeepXFunction(paddle.autograd.PyLayer):
                 dout_2d, output_scale_transpose=True, quant_method="1x128", input_transpose=False
             )
             dout_2d = padding(dout_2d, 0)
-            _, _, dout_t_fp8, dout_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-                dout_2d, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+            dout_t_fp8, dout_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                dout_2d,
+                output_scale_transpose=True,
+                quant_method="1x128",
+                input_transpose=True,
+                return_transpose_only=True,
             )
         else:
             dout_fp8, dout_scale, dout_t_fp8, dout_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
@@ -246,7 +262,7 @@ class FP8LinearKeepXFunction(paddle.autograd.PyLayer):
             )
 
         dx = paddle.empty([dout_fp8.shape[0], w_fp8.shape[0]], dout.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((dout_fp8, dout_scale.T), (w_fp8, w_sacle), dx, num_sms=112)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((dout_fp8, dout_scale.T), (w_fp8, w_scale), dx, num_sms=112)
         dx = dx.reshape(dx_orig_shape)
 
         # ===== dw1 = deep_gemm(x_t_fp8, dout_t_fp8)
@@ -293,11 +309,11 @@ def fp8_mlp_fwd(x, w1, w2):
         x, output_scale_transpose=True, quant_method="1x128", input_transpose=False
     )
 
-    _, _, w1_fp8, w1_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True
+    w1_fp8, w1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True, return_transpose_only=True
     )
     o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=x.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_sacle), o1, num_sms=112)
+    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1, num_sms=112)
 
     # ===== o2 = swiglu(o1) =====
     o2 = swiglu(o1)
@@ -306,8 +322,8 @@ def fp8_mlp_fwd(x, w1, w2):
     )
 
     # ===== o3 = deep_gemm(o2_fp8, w2_t_fp8) =====
-    _, _, w2_t_fp8, w2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        w2, output_scale_transpose=False, quant_method="128x128", input_transpose=True
+    w2_t_fp8, w2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        w2, output_scale_transpose=False, quant_method="128x128", input_transpose=True, return_transpose_only=True
     )
     o3 = paddle.empty([o2_fp8.shape[0], w2_t_fp8.shape[0]], dtype=o1.dtype)
     deep_gemm.gemm_fp8_fp8_bf16_nt((o2_fp8, o2_scale.T), (w2_t_fp8, w2_t_scale), o3, num_sms=112)
@@ -333,15 +349,15 @@ def fp8_mlp_bwd(do3, x, w1, w2):
             x, output_scale_transpose=True, quant_method="1x128", input_transpose=False
         )
         x = padding(x, 0)
-        _, _, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            x, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+        x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            x, output_scale_transpose=True, quant_method="1x128", input_transpose=True, return_transpose_only=True
         )
 
-    _, _, w1_fp8, w1_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True
+    w1_fp8, w1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True, return_transpose_only=True
     )
     o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=do3.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_sacle), o1, num_sms=112)
+    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1, num_sms=112)
 
     # ===== [recompute] o2 = swiglu(o1) =====
     o2 = swiglu(o1)
@@ -352,8 +368,8 @@ def fp8_mlp_bwd(do3, x, w1, w2):
             do3, output_scale_transpose=True, quant_method="1x128", input_transpose=False
         )
         do3 = padding(do3, 0)
-        _, _, do3_t_fp8, do3_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            do3, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+        do3_t_fp8, do3_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            do3, output_scale_transpose=True, quant_method="1x128", input_transpose=True, return_transpose_only=True
         )
     else:
         do3_fp8, do3_scale, do3_t_fp8, do3_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
@@ -367,8 +383,8 @@ def fp8_mlp_bwd(do3, x, w1, w2):
 
     # ===== dw2 = deep_gemm(o2_t_fp8, do3_t_fp8)
     o2 = padding(o2, 0)
-    _, _, o2_t_fp8, o2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        o2, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+    o2_t_fp8, o2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        o2, output_scale_transpose=True, quant_method="1x128", input_transpose=True, return_transpose_only=True
     )
 
     if hasattr(w2, "main_grad"):
@@ -409,18 +425,18 @@ def fp8_mlp_bwd(do3, x, w1, w2):
             do1, output_scale_transpose=True, quant_method="1x128", input_transpose=False
         )
         do1 = padding(do1, 0)
-        _, _, do1_t_fp8, do1_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            do1, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+        do1_t_fp8, do1_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            do1, output_scale_transpose=True, quant_method="1x128", input_transpose=True, return_transpose_only=True
         )
     else:
         do1_fp8, do1_scale, do1_t_fp8, do1_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
             do1, output_scale_transpose=True, quant_method="1x128", input_transpose=True
         )
-    w1_fp8, w1_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
+    w1_fp8, w1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
         w1, output_scale_transpose=False, quant_method="128x128", input_transpose=False
     )
     dx = paddle.empty([do1_fp8.shape[0], w1_fp8.shape[0]], do1.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8, do1_scale.T), (w1_fp8, w1_sacle), dx, num_sms=112)
+    deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8, do1_scale.T), (w1_fp8, w1_scale), dx, num_sms=112)
     if len(x_orig_shape) > 2:
         dx = dx.reshape([x_orig_shape[0], -1, dx.shape[-1]])
 
@@ -469,11 +485,11 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
             x, output_scale_transpose=True, quant_method="1x128", input_transpose=False
         )
 
-        _, _, w1_fp8, w1_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True
+        w1_fp8, w1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True, return_transpose_only=True
         )
         o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=x.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_sacle), o1)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1)
 
         # ===== o2 = swiglu(o1) =====
         o2 = swiglu(o1)
@@ -482,8 +498,8 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
         )
 
         # ===== o3 = deep_gemm(o2_fp8, w2_t_fp8) =====
-        _, _, w2_t_fp8, w2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            w2, output_scale_transpose=False, quant_method="128x128", input_transpose=True
+        w2_t_fp8, w2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            w2, output_scale_transpose=False, quant_method="128x128", input_transpose=True, return_transpose_only=True
         )
         o3 = paddle.empty([o2_fp8.shape[0], w2_t_fp8.shape[0]], dtype=o1.dtype)
         deep_gemm.gemm_fp8_fp8_bf16_nt((o2_fp8, o2_scale.T), (w2_t_fp8, w2_t_scale), o3)
@@ -510,17 +526,21 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
         x_fp8, x_scale, w1, w2, x_orig_shape = ctx.saved_tensor()
         x_orig_shape = x_orig_shape.numpy()
 
-        _, _, w1_fp8, w1_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True
+        w1_fp8, w1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True, return_transpose_only=True
         )
         o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=do3.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_sacle), o1)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1)
 
         x_dequant_fp16 = paddle.incubate.nn.functional.fused_act_dequant(x_fp8, x_scale.T.contiguous())
         x_dequant_fp16 = padding(x_dequant_fp16, 0)
 
-        _, _, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            x_dequant_fp16, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+        x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            x_dequant_fp16,
+            output_scale_transpose=True,
+            quant_method="1x128",
+            input_transpose=True,
+            return_transpose_only=True,
         )
 
         # ===== [recompute] o2 = swiglu(o1) =====
@@ -532,8 +552,12 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
                 do3, output_scale_transpose=True, quant_method="1x128", input_transpose=False
             )
             do3 = padding(do3, 0)
-            _, _, do3_t_fp8, do3_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-                do3, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+            do3_t_fp8, do3_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                do3,
+                output_scale_transpose=True,
+                quant_method="1x128",
+                input_transpose=True,
+                return_transpose_only=True,
             )
         else:
             do3_fp8, do3_scale, do3_t_fp8, do3_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
@@ -547,8 +571,8 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
 
         # ===== dw2 = deep_gemm(o2_t_fp8, do3_t_fp8)
         o2 = padding(o2, 0)
-        _, _, o2_t_fp8, o2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            o2, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+        o2_t_fp8, o2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            o2, output_scale_transpose=True, quant_method="1x128", input_transpose=True, return_transpose_only=True
         )
 
         dw2 = kitchen_fp8_gemm(o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, True, True, rtn_dtype=paddle.float32)
@@ -562,18 +586,22 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
                 do1, output_scale_transpose=True, quant_method="1x128", input_transpose=False
             )
             do1 = padding(do1, 0)
-            _, _, do1_t_fp8, do1_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-                do1, output_scale_transpose=True, quant_method="1x128", input_transpose=True
+            do1_t_fp8, do1_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                do1,
+                output_scale_transpose=True,
+                quant_method="1x128",
+                input_transpose=True,
+                return_transpose_only=True,
             )
         else:
             do1_fp8, do1_scale, do1_t_fp8, do1_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
                 do1, output_scale_transpose=True, quant_method="1x128", input_transpose=True
             )
-        w1_fp8, w1_sacle = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        w1_fp8, w1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
             w1, output_scale_transpose=False, quant_method="128x128", input_transpose=False
         )
         dx = paddle.empty([do1_fp8.shape[0], w1_fp8.shape[0]], do1.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8, do1_scale.T), (w1_fp8, w1_sacle), dx)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8, do1_scale.T), (w1_fp8, w1_scale), dx)
         if len(x_orig_shape) > 2:
             dx = dx.reshape([x_orig_shape[0], -1, dx.shape[-1]])
 
@@ -739,9 +767,9 @@ class FP8GroupGemmMlpFunctionNode:
         [m_sum, k] = [m_sum, n] * [num_groups, n, k]
         """
         # concat and transpose w2
-        w2_quant, w2_sacle = paddle.incubate.nn.functional.fused_stack_transpose_quant(expert_w2, transpose=True)
+        w2_quant, w2_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(expert_w2, transpose=True)
         w2_quant = w2_quant.reshape([num_expert, -1, w2_quant.shape[-1]])
-        w2_sacle = w2_sacle.reshape([num_expert, -1, w2_sacle.shape[-1]])
+        w2_scale = w2_scale.reshape([num_expert, -1, w2_scale.shape[-1]])
 
         # quant o2
         with paddle.amp.auto_cast(False):
@@ -762,10 +790,10 @@ class FP8GroupGemmMlpFunctionNode:
             o3 = paddle.empty(o3_shape, dtype=o1.dtype)
         if numpy.prod(o2_fp8.shape) != 0:
             if self.is_split_group_gemm:
-                split_group_gemm(o2_fp8, o2_scale, w2_quant, w2_sacle, self.tokens_per_expert, o3)
+                split_group_gemm(o2_fp8, o2_scale, w2_quant, w2_scale, self.tokens_per_expert, o3)
             else:
                 deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
-                    (o2_fp8, o2_scale), (w2_quant, w2_sacle), o3, m_indices=self.m_indices, num_sms=112
+                    (o2_fp8, o2_scale), (w2_quant, w2_scale), o3, m_indices=self.m_indices, num_sms=112
                 )
         return o3, unzipped_probs
 
