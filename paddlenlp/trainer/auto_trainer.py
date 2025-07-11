@@ -261,12 +261,17 @@ class AutoTrainer(Trainer):
     def _wrap_amp_model(self, args, model):
         logger.info("Using half precision")
         self.amp_dtype = "float16" if self.args.fp16 else "bfloat16"
+        _enable_main_grad = False
+        # sharding tensor_fusion requires main_grad for in-place grad updates
+        if "enable_tensor_fusion" in self.args.sharding_parallel_config:
+            _enable_main_grad = True
         if self.args.fp16_opt_level == "O2":
             paddle.amp.decorate(
                 models=model,
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
                 master_grad=self.args.amp_master_grad,
+                main_grad=_enable_main_grad,
                 excluded_layers=QuantizationLinear,
             )
         self.enable_autocast_context_manager = True
