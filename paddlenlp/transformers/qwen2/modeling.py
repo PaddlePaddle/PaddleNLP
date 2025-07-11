@@ -18,6 +18,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Paddle Qwen2 model."""
+
 from __future__ import annotations
 
 import math
@@ -740,6 +741,7 @@ class Qwen2Attention(nn.Layer):
                 training=self.training,
                 sequence_parallel=self.sequence_parallel,
             )
+
         if output_attentions:
             attn_output, attn_weights = outputs
         else:
@@ -928,7 +930,6 @@ class Qwen2PretrainedModel(PretrainedModel):
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config: Qwen2Config, is_split=True):
-
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
         fn = split_or_merge_func(
@@ -1042,7 +1043,11 @@ class Qwen2PretrainedModel(PretrainedModel):
                     for fuse_keys in fuse_qkv_keys:
                         keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_keys])
                         final_actions[keys] = partial(
-                            fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                            fn,
+                            split_nums=3,
+                            is_qkv=True,
+                            num_heads=num_heads,
+                            num_key_value_heads=num_key_value_heads,
                         )
             if not fuse_attention_ffn:
                 for i in range(config.num_hidden_layers):
@@ -1270,7 +1275,6 @@ class Qwen2Model(Qwen2PretrainedModel):
         return_dict: Optional[bool] = None,
         attn_mask_startend_row_indices=None,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
-
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states  # fmt:skip
         use_cache = use_cache if use_cache is not None else self.config.use_cache

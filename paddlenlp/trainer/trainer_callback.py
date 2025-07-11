@@ -20,6 +20,7 @@ Callbacks to use with the Trainer class and customize the training loop.
 """
 import dataclasses
 import json
+import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 
@@ -634,11 +635,15 @@ class SPGradSyncCallback(TrainerCallback):
             if is_sequence_parallel_parameter(p):
                 logger.info(f"register bw hook for:{n}")
                 params.append(p)
+
         logger.info(f"#-sp-sync param:{len(params)}")
         self._sp_params = params
 
     def on_optimizer_begin(self, args, state, control, **kwargs):
         """on_optimizer_begin"""
         if self._sp_params:
+            now = time.time()
             mp_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
             fused_allreduce_gradients_with_group(self._sp_params, group=mp_group, scale=1.0)  # sum not mean
+            another_time = time.time()
+            logger.info(f"sync gradients takes {another_time - now} time")

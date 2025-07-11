@@ -174,6 +174,7 @@ class Qwen3MoeConfig(PretrainedConfig):
         output_router_logits=False,
         router_aux_loss_coef=0.001,
         mlp_only_layers=None,
+        moe_group=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -209,6 +210,7 @@ class Qwen3MoeConfig(PretrainedConfig):
         self.output_router_logits = output_router_logits
         self.router_aux_loss_coef = router_aux_loss_coef
         self.mlp_only_layers = [] if mlp_only_layers is None else mlp_only_layers
+        self.moe_group = moe_group
 
         super().__init__(
             tie_word_embeddings=tie_word_embeddings,
