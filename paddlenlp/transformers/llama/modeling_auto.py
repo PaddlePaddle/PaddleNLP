@@ -512,8 +512,7 @@ class LlamaAttentionAuto(nn.Layer):
                     ]
                 else:
                     target_shape = [0, 0, self.num_key_value_heads, (self.num_key_value_groups + 2) * self.head_dim]
-                    mix_layer = self.qkv_proj(hidden_states)
-                    mix_layer = paddle.reshape_(mix_layer, target_shape)
+                mix_layer = paddle.reshape_(mix_layer, target_shape)
 
             query_states, key_states, value_states = paddle.split(
                 mix_layer,
@@ -523,11 +522,10 @@ class LlamaAttentionAuto(nn.Layer):
             if self.gqa_or_mqa:
                 query_states = paddle.reshape(query_states, [0, 0, self.num_heads, self.head_dim])
         else:
-            query_states = self.q_proj(hidden_states)
-            key_states = self.k_proj(hidden_states)
-            value_states = self.v_proj(hidden_states)
-
             if self.config.sep_parallel_degree > 1:
+                query_states = self.q_proj(hidden_states)
+                key_states = self.k_proj(hidden_states)
+                value_states = self.v_proj(hidden_states)
                 if self.config.sequence_parallel:
                     raise ValueError(
                         "Sep parallel cannot be used with sequence parallel, "
@@ -550,7 +548,6 @@ class LlamaAttentionAuto(nn.Layer):
                     split_axis=2,
                     concat_axis=1,
                 )
-
                 query_states = paddle.reshape(
                     query_states, shape=[0, self.seq_length, -1, self.head_dim]
                 )  # [bs, seq_len, num_head/k, head_dim], k is sep degree
@@ -560,9 +557,9 @@ class LlamaAttentionAuto(nn.Layer):
                 target_query_shape = [0, 0, self.num_heads, self.head_dim]
                 target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
 
-                query_states = query_states.reshape(shape=target_query_shape)
-                key_states = key_states.reshape(shape=target_key_value_shape)
-                value_states = value_states.reshape(shape=target_key_value_shape)
+                query_states = self.q_proj(hidden_states).reshape(shape=target_query_shape)
+                key_states = self.k_proj(hidden_states).reshape(shape=target_key_value_shape)
+                value_states = self.v_proj(hidden_states).reshape(shape=target_key_value_shape)
 
                 if self.config.sequence_parallel:
                     # [seq_len, bs, num_head * head_dim] -> [bs, seq_len, num_head * head_dim]  (if sequence_parallel)
