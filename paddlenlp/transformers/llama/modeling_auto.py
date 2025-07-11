@@ -503,15 +503,7 @@ class LlamaAttentionAuto(nn.Layer):
                     mix_layer, [0, self.seq_length, -1, (self.num_key_value_groups + 2) * self.head_dim]
                 )  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
             else:
-                if self.config.sequence_parallel:
-                    target_shape = [
-                        -1,
-                        self.seq_length,
-                        self.num_key_value_heads,
-                        (self.num_key_value_groups + 2) * self.head_dim,
-                    ]
-                else:
-                    target_shape = [0, 0, self.num_key_value_heads, (self.num_key_value_groups + 2) * self.head_dim]
+                target_shape = [0, 0, self.num_key_value_heads, (self.num_key_value_groups + 2) * self.head_dim]
                 mix_layer = paddle.reshape_(mix_layer, target_shape)
 
             query_states, key_states, value_states = paddle.split(
@@ -521,6 +513,12 @@ class LlamaAttentionAuto(nn.Layer):
             )
             if self.gqa_or_mqa:
                 query_states = paddle.reshape(query_states, [0, 0, self.num_heads, self.head_dim])
+            if self.config.sequence_parallel and self.config.sep_parallel_degree <= 1:
+                # [seq_len, bs, num_head * head_dim] -> [bs, seq_len, num_head * head_dim]  (if sequence_parallel)
+                # FA and rope not support sequence first
+                query_states = paddle.transpose(query_states, [1, 0, 2, 3])
+                key_states = paddle.transpose(key_states, [1, 0, 2, 3])
+                value_states = paddle.transpose(value_states, [1, 0, 2, 3])
         else:
             if self.config.sep_parallel_degree > 1:
                 query_states = self.q_proj(hidden_states)
