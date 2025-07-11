@@ -414,11 +414,18 @@ class Qwen3MoePretrainedModel(PretrainedModel):
                 base_actions.pop("embed_tokens.weight")
 
             # Column Linear
-            base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
-            # if we have enough num_key_value_heads to split, then split it.
-            if config.num_key_value_heads % config.tensor_parallel_degree == 0:
-                base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
-                base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
+            if config.fuse_attention_qkv:
+                base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.qkv_proj.bias"] = partial(fn, is_column=True)
+            else:
+                base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.q_proj.bias"] = partial(fn, is_column=True)
+                # if we have enough num_key_value_heads to split, then split it.
+                if config.num_key_value_heads % config.tensor_parallel_degree == 0:
+                    base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
+                    base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
+                    base_actions["layers.0.self_attn.k_proj.bias"] = partial(fn, is_column=True)
+                    base_actions["layers.0.self_attn.v_proj.bias"] = partial(fn, is_column=True)
 
             for key, action in base_actions.items():
                 if "layers.0." in key:
@@ -427,11 +434,20 @@ class Qwen3MoePretrainedModel(PretrainedModel):
                 final_actions[key] = action
 
             # Add tp split for expert params.
-            base_actions = {
-                "layers.0.mlp.experts.0.gate_proj.weight": partial(fn, is_column=True),
-                "layers.0.mlp.experts.0.down_proj.weight": partial(fn, is_column=False),
-                "layers.0.mlp.experts.0.up_proj.weight": partial(fn, is_column=True),
-            }
+            if config.fuse_attention_ffn:
+                base_actions = {
+                    "layers.0.mlp.experts.0.gate_up_fused_proj.weight": partial(
+                        fn, is_column=True, is_naive_2fuse=True
+                    ),
+                    "layers.0.mlp.experts.0.down_proj.weight": partial(fn, is_column=False),
+                }
+            else:
+                # Add tp split for expert params.
+                base_actions = {
+                    "layers.0.mlp.experts.0.gate_proj.weight": partial(fn, is_column=True),
+                    "layers.0.mlp.experts.0.up_proj.weight": partial(fn, is_column=True),
+                    "layers.0.mlp.experts.0.down_proj.weight": partial(fn, is_column=False),
+                }
             for key, action in base_actions.items():
                 for i in range(num_layers):
                     newkey = key.replace("layers.0.", f"layers.{i}.")
@@ -471,14 +487,15 @@ class Qwen3MoePretrainedModel(PretrainedModel):
         ]
 
         fuse_gate_up_keys = (
-            "layers.0.mlp.gate_proj.weight",
-            "layers.0.mlp.up_proj.weight",
-            "layers.0.mlp.gate_up_fused_proj.weight",
+            "layers.0.mlp.experts.0.gate_proj.weight",
+            "layers.0.mlp.experts.0.up_proj.weight",
+            "layers.0.mlp.experts.0.gate_up_fused_proj.weight",
         )
         num_heads = config.num_attention_heads
         num_key_value_heads = getattr(config, "num_key_value_heads", num_heads)
         fuse_attention_qkv = getattr(config, "fuse_attention_qkv", False)
         fuse_attention_ffn = getattr(config, "fuse_attention_ffn", False)
+        num_experts = getattr(config, "num_experts", 128)
 
         final_actions = {}
         if is_fuse:
@@ -491,8 +508,10 @@ class Qwen3MoePretrainedModel(PretrainedModel):
                         )
             if fuse_attention_ffn:
                 for i in range(config.num_hidden_layers):
-                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
-                    final_actions[keys] = fn
+                    keys = [key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys]
+                    for j in range(num_experts):
+                        experts_keys = tuple([key.replace("experts.0.", f"experts.{j}.") for key in keys])
+                        final_actions[experts_keys] = fn
         else:
             if not fuse_attention_qkv:
                 for i in range(config.num_hidden_layers):
@@ -507,8 +526,10 @@ class Qwen3MoePretrainedModel(PretrainedModel):
                         )
             if not fuse_attention_ffn:
                 for i in range(config.num_hidden_layers):
-                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
-                    final_actions[keys] = partial(fn, split_nums=2)
+                    keys = [key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys]
+                    for j in range(num_experts):
+                        experts_keys = tuple([key.replace("experts.0.", f"experts.{j}.") for key in keys])
+                        final_actions[experts_keys] = partial(fn, split_nums=2)
         return final_actions
 
     def _init_weights(self, layer):
