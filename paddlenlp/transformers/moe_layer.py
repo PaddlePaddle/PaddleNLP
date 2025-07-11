@@ -592,18 +592,14 @@ class Fp8CombineNode:
         return output_combine
 
     @paddle.no_grad()
-    def backward(self, output_combine_grad, previous_event=None, async_finish=False):
+    def backward(self, output_combine_grad, previous_event=None, async_finish=False, allocate_on_comm_stream=False):
         # combine grad -> fp8
         hidden_states_out_grad = self.combine_node.backward(
             output_combine_grad,
             previous_event=previous_event,
             async_finish=async_finish,
+            allocate_on_comm_stream=allocate_on_comm_stream,
         )
-        if isinstance(output_combine_grad, tuple):
-            output_combine_grad[0]._record_stream()
-            output_combine_grad[1]._record_stream()
-        else:
-            output_combine_grad._record_stream()
         return hidden_states_out_grad
 
 
@@ -622,14 +618,13 @@ class Fp8CombineQuantNode:
         return output
 
     @paddle.no_grad()
-    def backward(self, output_grad, event_to_wait=None, ring_id=None):
+    def backward(self, output_grad, event_to_wait=None):
         # post combine grad
         if DSV3_USE_FP8_DISPATCH:
-            if event_to_wait is not None and ring_id is not None:
+            if event_to_wait is not None:
                 buffer = get_buffer(self.token_dispatcher._comm_manager.group, get_hidden_bytes(output_grad))
                 custom_stream = paddle.device.Stream(stream_base=buffer.runtime.get_comm_stream())
                 custom_stream.wait_event(event_to_wait)
-                print("event is not None")
             else:
                 custom_stream = paddle.device.current_stream()
             with paddle.device.stream_guard(custom_stream):
@@ -640,9 +635,8 @@ class Fp8CombineQuantNode:
                 )
                 output_grad._record_stream()
                 quant_event = None
-                if event_to_wait is not None and ring_id is not None:
+                if event_to_wait is not None:
                     quant_event = deep_ep.get_event_from_custom_stream(custom_stream.stream_base)
-                #     quant_event.comm_stream_wait(ring_id)
             return (output_combine_grad_fp8, output_combine_grad_scale), quant_event
         else:
             output_combine_grad = paddle.reshape(output_grad, self.output_combine_shape)

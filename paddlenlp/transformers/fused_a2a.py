@@ -343,10 +343,15 @@ class CombineNode:
 
         return combined_x
 
-    def backward(self, grad_output, previous_event=None, async_finish=False):
+    def backward(self, grad_output, previous_event=None, async_finish=False, allocate_on_comm_stream=False):
         """Backward pass of fused combine."""
         out = fused_combine_backward_func(
-            grad_output, self.group, self.handle, previous_event=previous_event, async_finish=async_finish
+            grad_output,
+            self.group,
+            self.handle,
+            previous_event=previous_event,
+            async_finish=async_finish,
+            allocate_on_comm_stream=allocate_on_comm_stream,
         )
         self.reset_statue()
         return out

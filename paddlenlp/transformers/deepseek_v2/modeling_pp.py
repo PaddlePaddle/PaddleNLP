@@ -397,10 +397,8 @@ class OverlapedScheduleChunk:
             self.nodes.append(schedule_node_class(f, b, f"OverlapedNode_{len(self.nodes)}"))
 
     def forward_backward(self, inputs, output_grad, event_to_wait=None):
-        event_to_wait = event_to_wait
         for n in self.nodes:
-            inputs, output_grad, event = n.forward_backward(inputs, output_grad, event_to_wait)
-            event_to_wait = event
+            inputs, output_grad, event_to_wait = n.forward_backward(inputs, output_grad, event_to_wait)
         return inputs, output_grad
 
 
@@ -420,7 +418,6 @@ class OverlapedScheduleNode:
 
         calc_stream_wait(self.backward_node.moe_group.id)
         attn_compute_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
-
         output_grad = self.backward_node.mlp_node.backward(output_grad)
         inputs = self.forward_node.dispatch_forward(
             inputs, previous_event=attn_compute_event, allocate_on_comm_stream=True
@@ -597,7 +594,7 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
 
         return inputs
 
-    def post_process_backward(self, output_grad, event_to_wait=None, ring_id=None):
+    def post_process_backward(self, output_grad, event_to_wait=None):
         if self.send_mtp_embed:
             (
                 inputs_embeds_mtp_grad,
@@ -614,7 +611,7 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
                 final_hidden_states_grad,
             ) = self.post_process_node.backward(output_grad)
         output_combine_grad, quant_event = self.fp8_fusion_moe_node.combine_quant_node.backward(
-            final_hidden_states_grad, event_to_wait, ring_id
+            final_hidden_states_grad, event_to_wait
         )
         if self.send_mtp_embed:
             return (
@@ -634,7 +631,7 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
                 quant_event,
             )
 
-    def combine_backward(self, output_grad, async_finish=False):
+    def combine_backward(self, output_grad, async_finish=False, allocate_on_comm_stream=False):
         if self.send_mtp_embed:
             (
                 inputs_embeds_mtp_grad,
@@ -657,6 +654,7 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
             output_combine_grad,
             async_finish=async_finish,
             previous_event=quant_event,
+            allocate_on_comm_stream=allocate_on_comm_stream,
         )
 
         if self.send_mtp_embed:
@@ -825,13 +823,11 @@ class OverlapedFUsionScheduleNode:
         paddle.base.core.nvprof_nvtx_push("forward_backward")
 
         paddle.base.core.nvprof_nvtx_push("post_process_backward")
-        output_grad = self.backward_node.post_process_backward(
-            output_grad, event_to_wait, self.backward_node.moe_group.id
-        )
+        output_grad = self.backward_node.post_process_backward(output_grad, event_to_wait)
         paddle.base.core.nvprof_nvtx_pop()
 
         paddle.base.core.nvprof_nvtx_push("combine_backward")
-        output_grad = self.backward_node.combine_backward(output_grad, async_finish=True)
+        output_grad = self.backward_node.combine_backward(output_grad, async_finish=True, allocate_on_comm_stream=True)
         # get combine event
         combine_backward_event = deep_ep.get_event_from_comm_stream(self.backward_node.moe_group.id)
         paddle.base.core.nvprof_nvtx_pop()
@@ -846,6 +842,7 @@ class OverlapedFUsionScheduleNode:
         paddle.base.core.nvprof_nvtx_push("mlp_backward_dx")
         output_grad = self.backward_node.mlp_backward(output_grad)
         paddle.base.core.nvprof_nvtx_pop()
+
         paddle.base.core.nvprof_nvtx_push("dispatch_forward")
         inputs = self.forward_node.dispatch_forward(
             inputs, previous_event=attn_compute_event, async_finish=True, allocate_on_comm_stream=True
@@ -971,7 +968,6 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
         Returns:
             _type_: _description_
         """
-        paddle.base.core.nvprof_nvtx_push("DeepseekV2EmbeddingPipe forward")
         input_ids, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
         inputs_embeds = self.embed_tokens(input_ids)
 
@@ -1028,13 +1024,11 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
             # else:
             # mtp_embeds: [B*seq_len*num_nextn_predict_layers, hidden_size]
             inputs_embeds = paddle.concat(embeds_res, axis=-1)
-            paddle.base.core.nvprof_nvtx_pop()
             return return_args(inputs_embeds, attention_mask, attn_mask_startend_row_indices, position_ids)
         else:
             if self.sequence_parallel:
                 inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[-1]])
                 inputs_embeds = ScatterOp.apply(inputs_embeds)
-            paddle.base.core.nvprof_nvtx_pop()
             return return_args(inputs_embeds, attention_mask, attn_mask_startend_row_indices, position_ids)
 
     def build_schedule_node(self):
@@ -1127,7 +1121,6 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
         return (inputs_embeds_mtp, *outputs)
 
     def attn_compute_for_fusion(self, args):
-        paddle.base.core.nvprof_nvtx_push("DeepseekV2DecoderLayerPipe attn_compute_for_fusion")
         hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
         assert attention_mask is None
         assert attn_mask_startend_row_indices is None
@@ -1145,7 +1138,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
         hidden_states, residual = self.self_attn_compute(hidden_states)
         _, _, d_model = hidden_states.shape
         probs, routing_map, l_aux, _ = self.mlp.router(hidden_states)
-        paddle.base.core.nvprof_nvtx_pop()
+
         if send_mtp_embed:
             return (
                 inputs_embeds_mtp,
