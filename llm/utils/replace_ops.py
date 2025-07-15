@@ -106,7 +106,7 @@ def parallel_cross_entropy(
             "1. soft_label=False is set for parallel computation (current value: {}) \n"
             "2. Input tensor is properly sharded (current sharding status: {}) \n".format(
                 soft_label, 
-                input_placement,
+                input.placements,
             )
         )
 

@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-param="model_item=intermediate_api_meta-llama-Llama-2-7b_pretrain_dy2st "
-param+="run_mode=Sharding32_Stage2 "
+param="model_item=meta-llama-Llama-2-13b_pretrain_dynamic_auto "
+param+="run_mode=DP1_MP1_PP4_VPP5_Sharding8_Stage1 "
 param+="device_num=N4C32 "
 param+="global_batch_size=32 "
 param+="nnodes=4 "
-param+="model_type=llama2_7b "
-param+='intermediate_api=intermediate_api_ '
-export FLAGS_use_cinn=0
+param+="model_type=llama2_13b "
+param+='dynamic_auto=_dynamic_auto '
+
+# Enable tensor fusion and sharding overlap optimization
+export FLAGS_enable_tensor_fusion=1
+export FLAGS_enable_sharding_overlap=1
 
 cd ./tests
 bash ./test_tipc/static/auto_parallel/llama2/benchmark_common/prepare.sh

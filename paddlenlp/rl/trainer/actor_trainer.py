@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import uuid
-from typing import Any, Dict, List
+from typing import List
 
 import numpy as np
 import paddle
@@ -21,6 +21,7 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy
 
+from ...datasets.rlhf_datasets.protocol import DataProto
 from ..models.ppo_model_utils import (
     RLHFPPOMixedLoss,
     create_startend_row_indices,
@@ -36,7 +37,7 @@ class ActorReferenceTrainerBase(RLTrainer):
     loss_identifier = lambda self, inputs: "actor_loss"
 
     @paddle.no_grad()
-    def compute_logprob(self, input_ids: paddle.Tensor, position_ids: paddle.Tensor = None, **kwargs) -> paddle.Tensor:
+    def compute_logprob(self, batch: DataProto, key) -> DataProto:
         """
         Computes the log probability of each token during the rollout process.
 
@@ -60,11 +61,15 @@ class ActorReferenceTrainerBase(RLTrainer):
         Raises:
             None.
         """
+        input_ids = batch.batch["input_ids"]
+        position_ids = batch.batch["position_ids"]
+        prompt = batch.batch.get("prompt", None)
         if self.args.use_fused_head_and_loss_fn:
             return self.compute_fused_logprob(
                 input_ids=input_ids,
+                key=key,
                 position_ids=position_ids,
-                **kwargs,
+                prompt=prompt,
             )
 
         log_probs_list = []
@@ -75,7 +80,7 @@ class ActorReferenceTrainerBase(RLTrainer):
         # Pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.
         startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
-        response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
+        response_start = prompt.shape[-1] - 1 if prompt is not None else 0
 
         for i in range(num_batches):
             # Calculate the start and end indices for the current batch
@@ -155,11 +160,13 @@ class ActorReferenceTrainerBase(RLTrainer):
             logits = None
             paddle.device.cuda.empty_cache()
 
-        return paddle.concat(log_probs_list, axis=0)
+        return DataProto.from_single_dict(
+            {key: paddle.concat(log_probs_list, axis=0)}, meta_info={"temperature": self.args.temperature}
+        )
 
     def compute_fused_logprob(
-        self, input_ids: paddle.Tensor, position_ids: paddle.Tensor = None, loop_chunk_size=1024, **kwargs
-    ):
+        self, input_ids: paddle.Tensor, key, position_ids: paddle.Tensor = None, prompt=None, loop_chunk_size=1024
+    ) -> DataProto:
         log_probs_list = []
         batch_size, sequence_length = input_ids.shape
         per_device_logprob_batch_size = self.args.per_device_logprob_batch_size
@@ -168,7 +175,7 @@ class ActorReferenceTrainerBase(RLTrainer):
         # Pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.
         startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
-        response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
+        response_start = (prompt.shape[-1] - 1) if prompt is not None else 0
 
         num_embeddings = self.model.config.vocab_size
         tensor_parallel_degree = self.model.config.tensor_parallel_degree
@@ -211,6 +218,7 @@ class ActorReferenceTrainerBase(RLTrainer):
                 position_ids=current_position_ids,
                 attn_mask_startend_row_indices=current_startend_row_indices,
             )
+
             self.model.training = False
 
             if self.args.use_remove_padding:
@@ -302,20 +310,22 @@ class ActorReferenceTrainerBase(RLTrainer):
             log_prob_chunks = None
             paddle.device.cuda.empty_cache()
 
-        return paddle.concat(log_probs_list, axis=0)
+        return DataProto.from_single_dict(
+            {key: paddle.concat(log_probs_list, axis=0)}, meta_info={"temperature": self.args.temperature}
+        )
 
-    def update_actor(self, rl_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
+    def update_actor(self, rl_batch: DataProto) -> DataProto:
         # inputs shared by policy and value trainer
-        input_ids = rl_batch["input_ids"].contiguous()  # length: src+tgt
-        position_ids = rl_batch["position_ids"]  # length: src+tgt
-        sequence_mask = rl_batch["eos_mask"]  # length: tgt(-1)
+        input_ids = rl_batch.batch["input_ids"].contiguous()  # length: src+tgt
+        position_ids = rl_batch.batch["position_ids"]  # length: src+tgt
+        sequence_mask = rl_batch.batch["eos_mask"]  # length: tgt(-1)
         if self.args.use_fp32_compute and sequence_mask.dtype != paddle.float32:
             sequence_mask = sequence_mask.cast(paddle.float32)
         # inputs used by policy trainer
-        old_log_probs = rl_batch["log_probs"]  # length: tgt(-1)
-        reward_advantages = rl_batch["reward_advantages"]  # length: tgt(-1)
+        old_log_probs = rl_batch.batch["log_probs"]  # length: tgt(-1)
+        reward_advantages = rl_batch.batch["reward_advantages"]  # length: tgt(-1)
 
-        response_start = rl_batch["prompt"].shape[-1] - 1
+        response_start = rl_batch.batch["prompt"].shape[-1] - 1
 
         attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
         policy_trainer_inputs = {
@@ -329,7 +339,7 @@ class ActorReferenceTrainerBase(RLTrainer):
         }
 
         if self.args.rl_algorithm == "grpo":
-            policy_trainer_inputs.update({"ref_log_probs": rl_batch["ref_log_probs"]})
+            policy_trainer_inputs.update({"ref_log_probs": rl_batch.batch["ref_log_probs"]})
         else:
             policy_trainer_inputs.update({"ref_log_probs": None})
 
@@ -337,61 +347,65 @@ class ActorReferenceTrainerBase(RLTrainer):
 
         # metric
         with paddle.no_grad():
-            rewards = rl_batch["rewards"].mean()
-            ori_rewards = rl_batch["ori_rewards"].mean()
+            rewards = rl_batch.batch["rewards"].mean()
+            ori_rewards = rl_batch.batch["ori_rewards"].mean()
             mask_cast = sequence_mask.cast(paddle.float32)
             if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]:
-                kl_rewards = (rl_batch["kl_rewards"] * mask_cast).sum() / mask_cast.sum()
-                rewards_with_kl = (rl_batch["rewards_with_kl"] * mask_cast).sum() / mask_cast.sum()
+                kl_rewards = (rl_batch.batch["kl_rewards"] * mask_cast).sum() / mask_cast.sum()
+                rewards_with_kl = (rl_batch.batch["rewards_with_kl"] * mask_cast).sum() / mask_cast.sum()
                 if self.args.rl_algorithm == "ppo":
-                    values = (rl_batch["reward_values"] * mask_cast).sum() / mask_cast.sum()
-                returns = (rl_batch["reward_returns"] * mask_cast).sum() / mask_cast.sum()
-            ref_log_probs = rl_batch["ref_log_probs"]
+                    values = (rl_batch.batch["reward_values"] * mask_cast).sum() / mask_cast.sum()
+                returns = (rl_batch.batch["reward_returns"] * mask_cast).sum() / mask_cast.sum()
+            ref_log_probs = rl_batch.batch["ref_log_probs"]
             kl_divergence = ((old_log_probs - ref_log_probs) * mask_cast).sum() / mask_cast.sum()
             mean_generated_length = mask_cast.sum(axis=-1).mean()
             max_generated_length = mask_cast.sum(axis=-1).max()
             min_generated_length = mask_cast.sum(axis=-1).min()
 
-        return {
-            # when using PipelienParallel, the loss returned is 0 when not reach
-            # accumulated step and the loss returned at accumulated step is a
-            # mixed loss.
-            "train_policy_loss": actor_loss,
-            **(
-                {
-                    "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
-                    "train_kl_loss": self.info_buffer.get("kl_loss"),
-                    "train_entropy_loss": self.info_buffer.get("entropy_loss"),
+        return DataProto(
+            meta_info={
+                "metrics": {
+                    # when using PipelienParallel, the loss returned is 0 when not reach
+                    # accumulated step and the loss returned at accumulated step is a
+                    # mixed loss.
+                    "train_policy_loss": actor_loss,
+                    **(
+                        {
+                            "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
+                            "train_kl_loss": self.info_buffer.get("kl_loss"),
+                            "train_entropy_loss": self.info_buffer.get("entropy_loss"),
+                        }
+                        if self.args.rl_algorithm == "grpo"
+                        else {}
+                    ),
+                    "train_reward": ori_rewards,  # use original reward to log
+                    **(
+                        {
+                            "train_norm_reward": rewards,
+                            "train_kl_reward": kl_rewards,
+                            "train_norm_reward_with_kl": rewards_with_kl,
+                            "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
+                            "train_entropy_loss": self.info_buffer.get("entropy_loss"),
+                            **({"train_values": values} if self.args.rl_algorithm == "ppo" else {}),
+                            "train_returns": returns,
+                        }
+                        if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
+                        else {}
+                    ),
+                    "train_kl_divergence": kl_divergence,
+                    "train_mean_generated_length": mean_generated_length,
+                    "train_max_generated_length": max_generated_length,
+                    "train_min_generated_length": min_generated_length,
                 }
-                if self.args.rl_algorithm == "grpo"
-                else {}
-            ),
-            "train_reward": ori_rewards,  # use original reward to log
-            **(
-                {
-                    "train_norm_reward": rewards,
-                    "train_kl_reward": kl_rewards,
-                    "train_norm_reward_with_kl": rewards_with_kl,
-                    "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
-                    "train_entropy_loss": self.info_buffer.get("entropy_loss"),
-                    **({"train_values": values} if self.args.rl_algorithm == "ppo" else {}),
-                    "train_returns": returns,
-                }
-                if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
-                else {}
-            ),
-            "train_kl_divergence": kl_divergence,
-            "train_mean_generated_length": mean_generated_length,
-            "train_max_generated_length": max_generated_length,
-            "train_min_generated_length": min_generated_length,
-        }
+            }
+        )
 
 
 class ActorReferenceTrainer(ActorReferenceTrainerBase):
     @paddle.no_grad()
-    def generate_sequences(self, prompt_only_batch: Dict, do_eval=False) -> List[Dict[str, Any]]:
+    def generate_sequences(self, prompt_only_batch: DataProto, do_eval=False) -> List[DataProto]:
         """Rollout a batch of experiences."""
-        input_ids = prompt_only_batch["input_ids"]
+        input_ids = prompt_only_batch.batch["input_ids"]
 
         repeat_num = 1 if do_eval else self.args.rollout_n
 
@@ -408,7 +422,7 @@ class ActorReferenceTrainer(ActorReferenceTrainerBase):
             input_ids = input_ids.repeat_interleave(repeat_num, axis=0)
 
         if self.args.use_rm_server:
-            label_ids = prompt_only_batch["label_ids"]
+            label_ids = prompt_only_batch.batch["label_ids"]
             if repeat_num > 1:
                 label_ids = label_ids.repeat_interleave(repeat_num, axis=0)
 
@@ -417,11 +431,17 @@ class ActorReferenceTrainer(ActorReferenceTrainerBase):
             sequences = sequences.transpose([1, 0, 2])
         # prompt, sequence, attention_mask
         return [
-            {
-                "prompt": input_ids,
-                "input_ids": seq,
-                **({"label_ids": label_ids[idx * len(seq) : (idx + 1) * len(seq)]} if self.args.use_rm_server else {}),
-                "index": np.array([str(uuid.uuid4())] * len(seq), dtype=object),
-            }
+            DataProto.from_single_dict(
+                {
+                    "prompt": input_ids[idx * len(seq) : (idx + 1) * len(seq)],  # src prompt
+                    "input_ids": seq,
+                    **(
+                        {"label_ids": label_ids[idx * len(seq) : (idx + 1) * len(seq)]}
+                        if self.args.use_rm_server
+                        else {}
+                    ),  # tgt response
+                    "index": np.array([str(uuid.uuid4())] * len(seq), dtype=object),
+                }
+            )
             for idx, seq in enumerate(sequences)
         ]

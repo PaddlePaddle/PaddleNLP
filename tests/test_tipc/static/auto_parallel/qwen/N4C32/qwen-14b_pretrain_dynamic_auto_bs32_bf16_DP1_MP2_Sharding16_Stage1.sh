@@ -20,7 +20,6 @@ param+="nnodes=4 "
 param+="model_type=qwen_14b "
 param+='dynamic_auto=_dynamic_auto '
 
-export FLAGS_fuse_reducescatter_in_opt=1
 export FLAGS_enable_tensor_fusion=1
 export FLAGS_enable_sharding_overlap=1
 
