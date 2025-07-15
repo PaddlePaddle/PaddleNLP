@@ -53,7 +53,7 @@ dataline=`cat $FILENAME`
 IFS=$'\n'
 lines=(${dataline})
 
-# change total iters/epochs for npu to accelaration
+# change total iters/epochs for npu to acceleration
 modelname=$(echo $FILENAME | cut -d '/' -f4)
 if  [ $modelname == "stablediffusion" ] || [ $modelname == "t5_for_conditional_generation" ] || [ $modelname == "gpt_for_sequence_classification" ] \
     || [ $modelname == "bert_for_question_answering" ] || [ $modelname == "ernie_tiny" ] || [ $modelname == "ernie3_for_sequence_classification" ]  \

@@ -198,7 +198,7 @@ class ArtistTokenizer(BertTokenizer):
                 List of IDs to which the special tokens will be added.
             token_ids_1 (List[int], optional):
                 Optional second list of IDs for sequence pairs.
-                We do'nt use sequence pairs.
+                We don't use sequence pairs.
                 Defaults to None.
 
         Returns:

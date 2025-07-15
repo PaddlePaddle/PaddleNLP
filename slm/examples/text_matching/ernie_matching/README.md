@@ -18,7 +18,7 @@
 
 ```
 ernie_matching/
-├── deply # 部署
+├── deploy # 部署
 |   └── python
 |       └── predict.py # python 预测部署示例
 ├── export_model.py # 动态图参数导出静态图参数脚本

@@ -115,8 +115,8 @@ def process_answers(answers, doc_offsets, passage_start_c, passage_start_t):
         else:
             answer_start_c = answer["answer_start"]
         answer_end_c = answer_start_c + answer_len_c - 1
-        answer_start_t = offset_to_token_idx_vecorized(doc_offsets, answer_start_c)
-        answer_end_t = offset_to_token_idx_vecorized(doc_offsets, answer_end_c)
+        answer_start_t = offset_to_token_idx_vectorized(doc_offsets, answer_start_c)
+        answer_end_t = offset_to_token_idx_vectorized(doc_offsets, answer_end_c)
 
         # TODO: Perform check that answer can be recovered from document?
         # This section converts start and end so that they are relative to the passage
@@ -190,14 +190,14 @@ def offset_to_token_idx(token_offsets, ch_idx) -> Optional[int]:
     return None
 
 
-def offset_to_token_idx_vecorized(token_offsets, ch_idx):
+def offset_to_token_idx_vectorized(token_offsets, ch_idx):
     """Returns the idx of the token at the given character idx"""
     # case ch_idx is at end of tokens
     if ch_idx >= np.max(token_offsets):
         # TODO check "+ 1" (it is needed for making end indices compliant with old offset_to_token_idx() function)
-        # check whether end token is incluse or exclusive
+        # check whether end token is inclusive or exclusive
         idx = np.argmax(token_offsets) + 1
-    # looking for the first occurence of token_offsets larger than ch_idx and taking one position to the left.
+    # looking for the first occurrence of token_offsets larger than ch_idx and taking one position to the left.
     # This is needed to overcome n special_tokens at start of sequence
     # and failsafe matching (the character start might not always coincide with a token offset, e.g. when starting at whitespace)
     else:

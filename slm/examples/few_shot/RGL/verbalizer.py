@@ -127,7 +127,7 @@ class Verbalizer(nn.Layer):
             elif atype == "first":
                 return label_words_logits[..., 0, :]
             else:
-                raise ValueError("Unsupported aggreate type {}".format(atype))
+                raise ValueError("Unsupported aggregate type {}".format(atype))
         return label_words_logits
 
     def normalize(self, logits):

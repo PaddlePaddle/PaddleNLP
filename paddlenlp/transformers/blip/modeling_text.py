@@ -908,7 +908,7 @@ class BlipTextModel(BlipTextPretrainedModel):
 
         if not return_dict:
             if pooled_output is None:
-                # note: we donot output pooled_output
+                # note: we do not output pooled_output
                 return (sequence_output,) + encoder_outputs[1:]
             else:
                 return (sequence_output, pooled_output) + encoder_outputs[1:]
@@ -1046,7 +1046,7 @@ class BlipTextLMHeadModel(BlipTextPretrainedModel):
                 lm_loss = lm_loss.reshape([prediction_scores.shape[0], -1]).sum(1)
 
         if not return_dict:
-            # note: we donot output pooler
+            # note: we do not output pooler
             if self.bert.pooler is None:
                 output = (prediction_scores,) + outputs[1:]
             else:
@@ -1089,7 +1089,7 @@ class BlipTextLMHeadModel(BlipTextPretrainedModel):
         pad_token_id: Optional[int],
         eos_token_id: Optional[int],
     ) -> paddle.Tensor:
-        # donot create 4d attention mask
+        # do not create 4d attention mask
         is_input_ids = len(inputs.shape) == 2 and inputs.dtype in [paddle.int32, paddle.int64]
         is_pad_token_in_inputs = (pad_token_id is not None) and (pad_token_id in inputs.tolist())
         is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (pad_token_id != eos_token_id)

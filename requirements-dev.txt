@@ -18,6 +18,7 @@ rouge
 tiktoken
 visualdl
 wandb
+swanlab
 tensorboard
 tensorboardX
 modelscope

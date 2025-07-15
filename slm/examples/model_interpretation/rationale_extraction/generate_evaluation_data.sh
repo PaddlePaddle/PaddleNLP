@@ -13,7 +13,7 @@
 # limitations under the License.
 
 ###
- # This script concatenates results from previous running to generate a formated result for evaluation use
+ # This script concatenates results from previous running to generate a formatted result for evaluation use
 ### 
 
 BASE_MODEL=$1

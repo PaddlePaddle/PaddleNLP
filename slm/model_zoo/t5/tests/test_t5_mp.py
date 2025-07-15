@@ -93,7 +93,7 @@ class TestT5(unittest.TestCase):
         #     )
 
     # TODO: support @ decorate for multi-gpus tests
-    @unittest.skip("Skip for reuqired multi-gpus!")
+    @unittest.skip("Skip for required multi-gpus!")
     def testPaddleTensorParallelT5(self):
         """_summary_"""
         from modeling import T5Model as AutoModel

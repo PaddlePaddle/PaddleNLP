@@ -235,7 +235,7 @@ class MultiHeadAttentionAuto(nn.Layer):
 
     def _prepare_qkv(self, query, key, value, use_cache=False, past_key_value=None):
         r"""
-        Prapares linear projected queries, keys and values for usage of subsequnt
+        Prepares linear projected queries, keys and values for usage of subsequent
         multiple parallel attention. If `cache` is not None, using cached results
         to reduce redundant calculations.
 
@@ -1268,7 +1268,7 @@ class GPTForCausalLMAuto(GPTPretrainedModelAuto):
             to ordered and not None (depending on the input arguments) fields of
             :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
 
-            Especialy, when `return_dict=use_cache=output_attentions=output_hidden_states=False`,
+            Especially, when `return_dict=use_cache=output_attentions=output_hidden_states=False`,
             returns a tensor `logits` which is the output of the gpt model.
         """
         input_type = type(input_ids) if input_ids is not None else type(inputs_embeds)

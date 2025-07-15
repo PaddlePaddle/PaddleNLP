@@ -135,7 +135,7 @@ def check_overlap(x, y):
 
 
 def get_index_tuple(matched: Tuple[int, int]):
-    """Convert start, end (inlcuding) tuple to index list
+    """Convert start, end (including) tuple to index list
 
     Args:
         matched (Tuple[int, int]): start and end position tuple
@@ -156,7 +156,7 @@ def span_to_token(text, span_to_token_strategy="space"):
         text (string): text span string
         span_to_token_strategy (str, optional): Defaults to 'space'.
             - space: split text to tokens using space
-            - list: split text to toekns as list
+            - list: split text to tokens as list
 
     Raises:
         NotImplementedError: No implemented span_to_token_strategy

@@ -17,8 +17,10 @@ from __future__ import annotations
 import inspect
 import json
 import os
+import re
 from copy import deepcopy
 from dataclasses import dataclass
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -38,7 +40,7 @@ from paddle import Tensor
 from paddle.nn import Layer
 
 from paddlenlp.utils.distributed import distributed_allgather, distributed_gather
-from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHTS_NAME, PYTORCH_WEIGHTS_NAME
+from paddlenlp.utils.env import CONFIG_NAME, PYTORCH_WEIGHTS_NAME
 from paddlenlp.utils.import_utils import (
     is_package_available,
     is_torch_available,
@@ -56,6 +58,45 @@ from ..utils import device_guard
 # the type hinting for pytorch model & layer & tensor
 Module = TypeVar("Module")
 PytorchTensor = TypeVar("PytorchTensor")
+
+
+def add_quant_mapping(name_action_mappings, quantization_config, is_optim=False):
+    mapping_keys = list(name_action_mappings.keys())
+    pattern = r"^(?:.*\.)?layers(\.[a-zA-Z0-9_]+)*\.weight$"
+    for key in mapping_keys:
+        if re.match(pattern, key):
+            quant_key = key.replace("weight", "quant_weight")
+            quant_scale_key = key.replace("weight", "quant_scale")
+            fn = name_action_mappings.pop(key)
+            if is_optim:
+                name_action_mappings[quant_key] = fn
+            else:
+                if isinstance(fn, partial):
+                    if "is_column" in fn.keywords:
+                        old_value = fn.keywords["is_column"]
+                        new_value = not old_value
+                        name_action_mappings[quant_key] = partial(
+                            fn.func, *fn.args, **{**fn.keywords, "is_column": new_value}
+                        )
+                        if quantization_config.weight_quantize_algo not in ["fp8linear"] and old_value:
+                            name_action_mappings[quant_scale_key] = partial(
+                                fn.func, *fn.args, **{**fn.keywords, "is_column": new_value}
+                            )
+                    elif "is_quant" in fn.keywords:
+                        old_value = fn.keywords["is_quant"]
+                        new_value = not old_value
+                        name_action_mappings[quant_key] = partial(
+                            fn.func, *fn.args, **{**fn.keywords, "is_quant": new_value}
+                        )
+                        if quantization_config.weight_quantize_algo not in ["fp8linear"]:
+                            name_action_mappings[quant_scale_key] = split_or_merge_func(
+                                is_split=fn.keywords["tensor_parallel_degree"],
+                                tensor_parallel_degree=fn.keywords["tensor_parallel_degree"],
+                                tensor_parallel_rank=fn.keywords["tensor_parallel_rank"],
+                                num_attention_heads=fn.keywords["num_attention_head"],
+                            )
+
+    return name_action_mappings
 
 
 def tensor_summary(tensor: Union[str, Tensor, PytorchTensor, tuple, list, ndarray]):
@@ -338,15 +379,44 @@ def naive_fuse_split_tp(
 
         return np.concatenate(splited, axis=axis)
 
-    splited = np.split(weight, fuse_tensor_parts * tensor_parallel_degree, axis=axis)
+    if isinstance(weight, paddle.Tensor):
 
-    if tensor_parallel_rank is None:
-        ret = []
-        for tensor_parallel_rank in range(tensor_parallel_degree):
-            ret.append(np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis))
-        return ret
+        def slice_concat_by_axis(weight, fuse_tensor_parts, tensor_parallel_degree, tensor_parallel_rank, axis=0):
+            total_splits = fuse_tensor_parts * tensor_parallel_degree
+            dim_size = weight.shape[axis]
+            split_size = dim_size // total_splits
 
-    return np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis)
+            slices = []
+            for idx in range(tensor_parallel_rank, total_splits, tensor_parallel_degree):
+                start = idx * split_size
+                end = (start + split_size) if (idx != total_splits - 1) else dim_size
+                slice_idx = [slice(None)] * len(weight.shape)
+                slice_idx[axis] = slice(start, end)
+                block = weight[tuple(slice_idx)]
+                slices.append(block)
+            result = paddle.concat(slices, axis=axis)
+            return result
+
+        if tensor_parallel_rank is not None:
+            return slice_concat_by_axis(
+                weight, fuse_tensor_parts, tensor_parallel_degree, tensor_parallel_rank, axis=axis
+            )
+        else:
+            splited = paddle.split(weight, fuse_tensor_parts * tensor_parallel_degree, axis=axis)
+            ret = []
+            for tensor_parallel_rank in range(tensor_parallel_degree):
+                ret.append(paddle.concat(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis))
+            return ret
+    else:
+        splited = np.split(weight, fuse_tensor_parts * tensor_parallel_degree, axis=axis)
+
+        if tensor_parallel_rank is None:
+            ret = []
+            for tensor_parallel_rank in range(tensor_parallel_degree):
+                ret.append(np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis))
+            return ret
+
+        return np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis)
 
 
 def normal_fuse_merge_tp(weight_list, is_column=True):
@@ -426,16 +496,38 @@ def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=No
     assert (
         size % tensor_parallel_degree == 0
     ), f"The chosen size {size} is not compatible with sharding on {tensor_parallel_degree} shards. for tensor shape {weight.shape}"
-
     if is_column:
-        splited_weights = np.split(weight, tensor_parallel_degree, axis=-1)
+        total_size = weight.shape[-1]
+        chunk_size = total_size // tensor_parallel_degree
+        if tensor_parallel_rank is not None:
+            start = tensor_parallel_rank * chunk_size
+            end = (tensor_parallel_rank + 1) * chunk_size
+            if isinstance(weight, paddle.Tensor):
+                splited_weights = weight[..., start:end].clone()
+            else:
+                splited_weights = weight[..., start:end]
+            return splited_weights
+        else:
+            splited_weights = [
+                weight[..., i * chunk_size : (i + 1) * chunk_size] for i in range(tensor_parallel_degree)
+            ]
+            return splited_weights
     else:
-        splited_weights = np.split(weight, tensor_parallel_degree, axis=0)
-
-    if tensor_parallel_rank is not None:
-        return splited_weights[tensor_parallel_rank]
-
-    return splited_weights
+        total_size = weight.shape[0]
+        chunk_size = total_size // tensor_parallel_degree
+        if tensor_parallel_rank is not None:
+            start = tensor_parallel_rank * chunk_size
+            end = (tensor_parallel_rank + 1) * chunk_size
+            if isinstance(weight, paddle.Tensor):
+                splited_weights = weight[start:end, ...].clone()
+            else:
+                splited_weights = weight[start:end, ...]
+            return splited_weights
+        else:
+            splited_weights = [
+                weight[i * chunk_size : (i + 1) * chunk_size, ...] for i in range(tensor_parallel_degree)
+            ]
+            return splited_weights
 
 
 """
@@ -477,13 +569,21 @@ def naive_merged_qkv_to_tensor_parallel_qkv(weight, num_attention_heads):
     """
     qkv_pairs = []
     partition_dim = -1
-    split_heads = np.split(weight, 3 * num_attention_heads, axis=partition_dim)
+    if isinstance(weight, paddle.Tensor):
+        split_heads = paddle.split(weight, 3 * num_attention_heads, axis=partition_dim)
 
-    for i in range(num_attention_heads):
-        qkv_pair = np.concatenate(split_heads[i::num_attention_heads], axis=partition_dim)
-        qkv_pairs.append(qkv_pair)
+        for i in range(num_attention_heads):
+            qkv_pair = paddle.concat(split_heads[i::num_attention_heads], axis=partition_dim)
+            qkv_pairs.append(qkv_pair)
+        return paddle.concat(qkv_pairs, axis=partition_dim)
+    else:
+        split_heads = np.split(weight, 3 * num_attention_heads, axis=partition_dim)
 
-    return np.concatenate(qkv_pairs, axis=partition_dim)
+        for i in range(num_attention_heads):
+            qkv_pair = np.concatenate(split_heads[i::num_attention_heads], axis=partition_dim)
+            qkv_pairs.append(qkv_pair)
+
+        return np.concatenate(qkv_pairs, axis=partition_dim)
 
 
 def splited_qkv_to_tensor_parallel_qkv(weight_list, num_attention_heads):
@@ -572,14 +672,14 @@ def split_param_func():
             [gate_weight, up_weight] => [gate_weight], [up_weight]
 
         Args:
-            fused_param (_type_): len(fused_param)=1, only one weight to be splitted
+            fused_param (_type_): len(fused_param)=1, only one weight to be split
             split_nums (int, optional): split_nums. Defaults to 2.
             is_qkv (bool, optional): for attention qkv weights. Defaults to False.
             num_heads (_type_, optional): query heads. Defaults to None.
             num_key_value_heads (_type_, optional): key and value heads. Defaults to None.
 
         Returns:
-            _type_: splitted weights
+            _type_: split weights
         """
         concat_fn = np.concatenate
         split_fn = np.split
@@ -648,7 +748,10 @@ def get_tensor_parallel_split_func(tensor_parallel_degree, tensor_parallel_rank,
         if x is None:
             return None
         if transpose:
-            x = np.transpose(x, [1, 0])
+            if isinstance(x, paddle.Tensor):
+                x = paddle.transpose(x, [1, 0])
+            else:
+                x = np.transpose(x, [1, 0])
         if is_old_qkv:
             assert is_column, "QKV tensor should be column parallel linear."
             assert num_attention_heads is not None, "is_old_qkv need num_attention_heads"
@@ -850,7 +953,7 @@ class LogitHooker:
         self.tensor_info_saver.add(state_dict_name, "pytorch-outputs", outputs)
 
     def register_paddle_model_hooks(self, model: Layer):
-        """regist post forward hook to save the inputs & outputs of paddle model
+        """register post forward hook to save the inputs & outputs of paddle model
 
         Args:
             model (Layer): paddle model
@@ -885,7 +988,7 @@ class LogitHooker:
             register_hook_by_name(model, mapping, self._paddle_hooks)
 
     def register_pytorch_model_hooks(self, model: Module):
-        """regist hook for pytorch model to save the inputs & outputs of pytorch model
+        """register hook for pytorch model to save the inputs & outputs of pytorch model
 
         Args:
             model (_type_): pytorch model
@@ -1134,7 +1237,7 @@ class LogitComparer:
 class ConversionMixin:
     @classmethod
     def support_conversion(cls, config: PretrainedConfig) -> bool:
-        """check wether the model support conversion"""
+        """check whether the model support conversion"""
         try:
             # try to get the name-mapping info
             _ = cls._get_name_mappings(config)
@@ -1161,7 +1264,7 @@ class ConversionMixin:
                     file for file in os.listdir(os.path.dirname(weight_file)) if file.startswith("pytorch_model-")
                 ]
             state_dict = {}
-            for file in files:
+            for file in sorted(files):
                 sub_state_dict = load_torch(os.path.join(os.path.dirname(weight_file), file))
                 state_dict.update(sub_state_dict)
         else:
@@ -1179,13 +1282,9 @@ class ConversionMixin:
                 all_layer_names.remove(name_mapping.source_name)
 
         if all_layer_names:
-            logger.warning(f"there are {len(all_layer_names)} tensors not initialized:")
-            for layer_name in all_layer_names:
-                logger.warning(f"--- {layer_name}")
+            logger.warning(f"There are {len(all_layer_names)} tensors not initialized:")
+            logger.warning(f"Keys: {all_layer_names}")
 
-        model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)
-        if not os.path.isfile(model_weight_file):
-            paddle.save(state_dict, model_weight_file)
         return state_dict
 
     @classmethod
@@ -1211,8 +1310,12 @@ class ConversionMixin:
         is_split=True,
         ignore_error=False,
         base_model_prefix=None,
+        post_quantize=False,
+        is_optim=False,
     ):
         name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=is_split)
+        if config.quantization_config.is_weight_quantize() and not post_quantize:
+            name_action_mappings = add_quant_mapping(name_action_mappings, config.quantization_config, is_optim)
         state_keys_map = cls._resolve_prefix_keys(
             name_action_mappings.keys(), loaded_state_dict_keys, ignore_error, base_model_prefix=base_model_prefix
         )
@@ -1234,6 +1337,8 @@ class ConversionMixin:
         """
 
         name_action_mappings = cls._get_tensor_parallel_mappings(config)
+        if config.quantization_config.is_weight_quantize():
+            name_action_mappings = add_quant_mapping(name_action_mappings, config.quantization_config)
         if state_dict is None:
             with device_guard("cpu"):
                 state_dict = paddle.load(weight_file, return_numpy=False)
@@ -1265,6 +1370,8 @@ class ConversionMixin:
             config (PretrainedConfig): the PretrainedConfig instance of model
         """
         name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=False)
+        if config.quantization_config.is_weight_quantize():
+            name_action_mappings = add_quant_mapping(name_action_mappings, config.quantization_config)
         state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys())
 
         for k, v in state_keys_map.items():
@@ -1553,10 +1660,7 @@ class Converter(ConversionMixin, LogitComparer):
             all_layer_names.remove(name_mapping.source_name)
 
         if all_layer_names:
-            logger.warning(f"there are {len(all_layer_names)} tensors not initialized:")
-            for layer_name in all_layer_names:
-                logger.warning(f"--- {layer_name}")
+            logger.warning(f"There are {len(all_layer_names)} tensors not initialized:")
+            logger.warning(f"Keys: {all_layer_names}")
 
-        model_weight_file = os.path.join(input_dir, PADDLE_WEIGHTS_NAME)
-        paddle.save(state_dict, model_weight_file)
         return state_dict

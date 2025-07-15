@@ -29,7 +29,7 @@ class XNLI_CN(DatasetBuilder):
     XNLI dataset for chinese.
 
     XNLI is an evaluation corpus for language transfer and cross-lingual
-    sentence classification in 15 languages. Here, XNLI only contrains
+    sentence classification in 15 languages. Here, XNLI only contains
     chinese corpus.
 
     For more information, please visit https://github.com/facebookresearch/XNLI

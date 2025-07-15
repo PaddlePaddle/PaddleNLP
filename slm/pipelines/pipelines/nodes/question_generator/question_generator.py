@@ -271,7 +271,7 @@ class QuestionGenerator(BaseComponent):
         return output
 
     def run(self, ca_pairs):
-        print("createing synthetic question-answer pairs...")
+        print("creating synthetic question-answer pairs...")
         synthetic_context_answer_question_triples = self.create_question(
             ca_pairs, None, self.num_return_sequences, None, self.batch_size
         )

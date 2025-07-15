@@ -15,10 +15,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
-
-import paddle
-
+from ...datasets.rlhf_datasets.protocol import DataProto
 from ...transformers import PretrainedTokenizer
 from ..models.ppo_model_utils import RLHFValueLoss, create_startend_row_indices
 from ..utils.comm_utils import CriticStages
@@ -35,11 +32,11 @@ class CriticTrainer(RLTrainer):
 
     def compute_value(
         self,
-        input_ids: paddle.Tensor,
-        position_ids: paddle.Tensor = None,
+        batch: DataProto,
         input_ids_tokenizer: PretrainedTokenizer = None,
-        **kwargs,
-    ) -> Dict[str, paddle.Tensor]:
+    ) -> DataProto:
+        input_ids = batch.batch["input_ids"]
+        position_ids = batch.batch["position_ids"]
         # TODO: confirm actor_tokenizer or reward_tokenizer or critic_tokenizer
         # need retokenize?
         attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
@@ -52,9 +49,9 @@ class CriticTrainer(RLTrainer):
         reward_value = reward_value.squeeze(axis=-1)
         reward_value = reward_value[:, :-1]
 
-        return reward_value
+        return DataProto.from_single_dict({"reward_value": reward_value})
 
-    def update_critic(self, rl_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
+    def update_critic(self, rl_batch: DataProto) -> DataProto:
         """
         Update the parameters of the critic (reward function).
 
@@ -70,14 +67,14 @@ class CriticTrainer(RLTrainer):
             - train_value_loss (float): Training loss of the critic (reward function).
         """
         # Inputs shared by policy and value trainer
-        input_ids = rl_batch["input_ids"].contiguous()  # length: src+tgt
-        attention_mask = rl_batch["attention_mask"]  # length: src+tgt
-        position_ids = rl_batch["position_ids"]  # length: src+tgt
-        sequence_mask = rl_batch["sequence_mask"]  # length: src+tgt(-1)
+        input_ids = rl_batch.batch["input_ids"].contiguous()  # length: src+tgt
+        attention_mask = rl_batch.batch["attention_mask"]  # length: src+tgt
+        position_ids = rl_batch.batch["position_ids"]  # length: src+tgt
+        sequence_mask = rl_batch.batch["sequence_mask"]  # length: src+tgt(-1)
 
         # Inputs used by value trainer
-        old_reward_values = rl_batch["reward_values"]  # length: src+tgt(-1)
-        reward_returns = rl_batch["reward_returns"]  # length: src+tgt(-1)
+        old_reward_values = rl_batch.batch["reward_values"]  # length: src+tgt(-1)
+        reward_returns = rl_batch.batch["reward_returns"]  # length: src+tgt(-1)
 
         value_trainer_inputs = {
             "input_ids": input_ids,
@@ -95,4 +92,4 @@ class CriticTrainer(RLTrainer):
                 with TimerScope(self.timers, CriticStages.CRITIC_TRAINING_STEP):
                     reward_critic_loss = self.full_training_step(**value_trainer_inputs)
 
-        return reward_critic_loss
+        return DataProto(meta_info={"metrics": {"train_value_loss": reward_critic_loss}})

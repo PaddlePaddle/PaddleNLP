@@ -50,7 +50,7 @@ URLS = {
 
 class DocPromptTask(Task):
     """
-    The document intelligence model, give the querys and predict the answers.
+    The document intelligence model, give the queries and predict the answers.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.

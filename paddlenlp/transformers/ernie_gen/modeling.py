@@ -484,9 +484,9 @@ class ErnieModel(ErnieGenPretrainedModel):
                 It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
 
             - `additional_info` (dict):
-                Additional middle level info, inclues all hidden stats and k/v caches.
+                Additional middle level info, includes all hidden stats and k/v caches.
         """
-        assert len(src_ids.shape) == 2, "expect src_ids.shape = [batch, sequecen], got %s" % (repr(src_ids.shape))
+        assert len(src_ids.shape) == 2, "expect src_ids.shape = [batch, sequence], got %s" % (repr(src_ids.shape))
         assert (
             attn_bias is not None if past_cache else True
         ), "if `past_cache` is specified; attn_bias should not be None"

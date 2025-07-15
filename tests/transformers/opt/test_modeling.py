@@ -93,7 +93,7 @@ class OPTModelTester:
 
         input_mask = None
         if self.use_input_mask:
-            # contruct input_mask filling with 0 and -1e4
+            # construct input_mask filling with 0 and -1e4
             # left padding: [[-1e4, -1e4, -1e4, 0, 0], [-1e4, -1e4, -1e4, 0, 0], ...]
             input_mask = []
             for _ in range(self.batch_size):

@@ -20,7 +20,7 @@ mkdir ${nlp_dir}/model_logs
 mkdir ${nlp_dir}/unittest_logs
 p0case="refactor_training_loop"
 
-# Insatll Paddle FleetY
+# Install Paddle FleetY
 install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
     python -m pip install paddlepaddle_gpu-0.0.0-cp37-cp37m-linux_x86_64.whl
