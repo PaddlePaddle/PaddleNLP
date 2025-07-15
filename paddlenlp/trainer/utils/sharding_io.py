@@ -899,6 +899,10 @@ class ShardingIO:
         sharding_meta["param_meta_keys"] = ["shape", "dtype", "is_distributed", "no_sync"]
         sharding_meta["sharding_strategy"] = sharding_strategy
         sharding_meta["enable_overlap"] = pp_overlap
+        dp_metas_list = self._all_gather_simple_object(sharding_meta, self.hcg.get_data_parallel_group())
+        for e in dp_metas_list:
+            for key in ["structure_name_mapping", "param_meta"]:
+                sharding_meta[key].update(e[key])
         suffix = self._sharding_meta_suffix()
         sharding_metas[suffix] = sharding_meta
         sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_model_parallel_group())
