@@ -19,13 +19,11 @@ set -e
 export log_path=/workspace/case_logs
 export root_path=/workspace/PaddleNLP
 
-export gpt_case_path=$root_path/slm/model_zoo/gpt-3
-export gpt_data_path=/fleetx_data
-
 export llama_case_path=$root_path/llm/auto_parallel/llama
 export deepseek_case_path=$root_path/llm/auto_parallel/deepseek-v3
 export llama_data_path=/llama_data
 export llm_gpt_case_path=$root_path/llm/auto_parallel/gpt-3
+export gpt_data_path=/fleetx_data
 
 unset CUDA_VISIBLE_DEVICES
 
@@ -4147,9 +4145,21 @@ function check_result() {
     fi
 }
 
+function export_env() {
+    export FLAGS_new_executor_micro_batching=True  # True：打开新执行器
+    export FLAGS_embedding_deterministic=1         # 1：关闭随机性
+    export FLAGS_cudnn_deterministic=1             # 1：关闭随机性
+    export FLAGS_program_topo_reorder=1            # 1: 反向对齐动手拓扑排序
+    unset CUDA_MODULE_LOADING
+    env | grep FLAGS
+    export http_proxy=${proxy}
+    export https_proxy=${proxy}
+    export no_proxy=bcebos.com
+}
+
 function before_hook_for_gpt() {
     echo -e "\033[31m ---- Set FLAGS for GPT auto cases  \033[0m"
-    cd ${gpt_case_path}
+    cd ${llm_gpt_case_path}
     export FLAGS_new_executor_micro_batching=True  # True：打开新执行器
     export FLAGS_embedding_deterministic=1         # 1：关闭随机性
     export FLAGS_cudnn_deterministic=1             # 1：关闭随机性
@@ -4159,18 +4169,11 @@ function before_hook_for_gpt() {
     export https_proxy=${proxy}
     export no_proxy=bcebos.com
     if [[ $FLAGS_install_deps == 0 ]];then
-        echo -e "\033[31m ---- Install requirements for GPT auto cases  \033[0m"
-        cp requirements.txt requirements_nlp.txt
-        sed -i '/paddlenlp/d' requirements.txt
-        python -m pip install -r requirements.txt --force-reinstall
-        sed -i '/paddlenlp/!d' requirements_nlp.txt
-        python -m pip install -r requirements_nlp.txt
+        echo -e "\033[31m ---- Install requirements for LLM GPT auto cases  \033[0m"
         python -m pip install -r $root_path/requirements.txt
         python -m pip install -r $root_path/requirements-dev.txt
-        python -m pip install --no-cache-dir https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl --force-reinstall --no-dependencies
-        python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
     else
-        echo -e "\033[31m ---- Skip install requirements for GPT auto cases  \033[0m"
+        echo -e "\033[31m ---- Skip install requirements for LLM GPT auto cases  \033[0m"
     fi
     unset http_proxy && unset https_proxy
     if [[ ! $FLAGS_download_data =~ "gpt" ]];then
@@ -4184,22 +4187,10 @@ function before_hook_for_gpt() {
             wget -q -O ${gpt_data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
             wget -q -O ${gpt_data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
         fi
-        cp -r ${gpt_data_path}/data ${gpt_case_path}/
+        cp -r ${gpt_data_path}/data ${llm_gpt_case_path}/
     else
         echo -e "\033[31m ---- Skip download gpt data \033[0m"
     fi
-}
-
-function export_env() {
-    export FLAGS_new_executor_micro_batching=True  # True：打开新执行器
-    export FLAGS_embedding_deterministic=1         # 1：关闭随机性
-    export FLAGS_cudnn_deterministic=1             # 1：关闭随机性
-    export FLAGS_program_topo_reorder=1            # 1: 反向对齐动手拓扑排序
-    unset CUDA_MODULE_LOADING
-    env | grep FLAGS
-    export http_proxy=${proxy}
-    export https_proxy=${proxy}
-    export no_proxy=bcebos.com
 }
 
 function before_hook_for_llama() {
@@ -4214,8 +4205,13 @@ function before_hook_for_llama() {
     export http_proxy=${proxy}
     export https_proxy=${proxy}
     export no_proxy=bcebos.com
-    python -m pip install -r $root_path/requirements.txt
-    python -m pip install -r $root_path/requirements-dev.txt
+    if [[ $FLAGS_install_deps == 0 ]];then
+        echo -e "\033[31m ---- Install requirements for LLM LLAMA auto cases  \033[0m"
+        python -m pip install -r $root_path/requirements.txt
+        python -m pip install -r $root_path/requirements-dev.txt
+    else
+        echo -e "\033[31m ---- Skip install requirements for LLM LLAMA auto cases  \033[0m"
+    fi
     unset http_proxy && unset https_proxy
     if [[ ! $FLAGS_download_data =~ "llama" ]];then
         echo -e "\033[31m ---- Download LLaMA data  \033[0m"
@@ -4246,7 +4242,6 @@ function before_hook_for_llama() {
     fi
 }
 
-
 function before_hook_for_deepseek() {
     echo -e "\033[31m ---- Set FLAGS for LLaMA auto cases  \033[0m"
     cd ${deepseek_case_path}
@@ -4259,8 +4254,13 @@ function before_hook_for_deepseek() {
     export http_proxy=${proxy}
     export https_proxy=${proxy}
     export no_proxy=bcebos.com
-    python -m pip install -r $root_path/requirements.txt
-    python -m pip install -r $root_path/requirements-dev.txt
+    if [[ $FLAGS_install_deps == 0 ]];then
+        echo -e "\033[31m ---- Install requirements for LLM DEEPSEEK auto cases  \033[0m"
+        python -m pip install -r $root_path/requirements.txt
+        python -m pip install -r $root_path/requirements-dev.txt
+    else
+        echo -e "\033[31m ---- Skip install requirements for LLM DEEPSEEK auto cases  \033[0m"
+    fi
     unset http_proxy && unset https_proxy
     if [[ ! $FLAGS_download_data =~ "deepseek" ]];then
         echo -e "\033[31m ---- Download LLaMA data  \033[0m"

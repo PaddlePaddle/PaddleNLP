@@ -38,6 +38,7 @@ target_lists_for_llm=(
     "tests/llm"
     "csrc"
     "scripts/regression"
+    ".github/workflows/llm.yml"
 )
 all_P0case_dic=(["msra_ner"]=15 
     ["glue"]=2 
@@ -62,9 +63,12 @@ all_P0case_dic=(["msra_ner"]=15
     ["llm"]=5)
 ####################################
 
-python -m pip config --user set global.index http://pip.baidu-int.com/search/
-python -m pip config --user set global.index-url http://pip.baidu-int.com/simple
-python -m pip config --user set global.trusted-host pip.baidu-int.com
+python -m pip config --user unset global.index
+python -m pip config --user unset global.index-url
+python -m pip config --user unset global.trusted-host
+python -m pip config --user set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+python -m pip config --user set global.trusted-host pypi.tuna.tsinghua.edu.cn
+
 # Install paddlepaddle-gpu
 install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
@@ -100,67 +104,74 @@ install_external_ops(){
 # get diff case
 cd ${nlp_dir}
 get_diff_TO_case(){
-for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
-    arr_file_name=(${file_name//// })
-    dir1=${arr_file_name[0]}
-    dir2=${arr_file_name[1]}
-    dir3=${arr_file_name[2]}
-    dir4=${arr_file_name[3]}
-    file_item=$dir1/$dir2/$dir3/$dir4
-    ext="${file_name##*.}"
-    echo "file_name:"${file_name}, "dir1:"${dir1}, "dir2:"${dir2},"dir3:"${dir3},".xx:" ${file_name##*.}
-    echo "ext: ${file_name##*.}"
-    if [ ! -f ${file_name} ];then # 针对pr删掉文件
-        continue
-    elif [[ "$ext" == "md" || "$ext" == "rst" || "$file_name" == docs/* ]]; then
-        continue
-    elif [[ "${AGILE_COMPILE_BRANCH}" == "refactor-training-loop" ]];then # 针对特定分支
-        P0case_list[${#P0case_list[*]}]=gpt
-    else
-         # 判断是否命中 target_lists_for_llm 列表-执行llm
-        for ((i=0; i<${#target_lists_for_llm[@]}; i++)); do 
-            if [[ "${file_item}" == *"${target_lists_for_llm[i]}"* ]];then
-                P0case_list[${#P0case_list[*]}]=llm
+    if [ -z "${AGILE_COMPILE_BRANCH}" ]; then
+        # 定时任务回归测试
+        P0case_list=("llm")
+        Build_list=(["paddlenlp"]="paddlenlp")
+    else        
+        for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+            arr_file_name=(${file_name//// })
+            dir1=${arr_file_name[0]}
+            dir2=${arr_file_name[1]}
+            dir3=${arr_file_name[2]}
+            dir4=${arr_file_name[3]}
+            file_item=$dir1/$dir2/$dir3/$dir4
+            ext="${file_name##*.}"
+            echo "file_name:"${file_name}, "dir1:"${dir1}, "dir2:"${dir2},"dir3:"${dir3},".xx:" ${file_name##*.}
+            echo "ext: ${file_name##*.}"
+            if [ ! -f ${file_name} ];then # 针对pr删掉文件
+                continue
+            elif [[ "$ext" == "md" || "$ext" == "rst" || "$file_name" == docs/* ]]; then
+                continue
+            elif [[ "${AGILE_COMPILE_BRANCH}" == "refactor-training-loop" ]];then # 针对特定分支
+                P0case_list[${#P0case_list[*]}]=gpt
+            else
+                # 判断是否命中 target_lists_for_llm 列表-执行llm
+                for ((i=0; i<${#target_lists_for_llm[@]}; i++)); do 
+                    if [[ "${file_item}" == *"${target_lists_for_llm[i]}"* ]];then
+                        P0case_list[${#P0case_list[*]}]=llm
+                    fi
+                done
+                # 其他 case 判断
+                if [[ ${dir1} =~ "scripts" ]];then # API 升级
+                    if [[ ${dir2} =~ "should_deploy" ]];then # 针对发版mini test
+                        P0case_list[${#P0case_list[*]}]=transformer
+                    fi  
+                elif [[ ${dir1} =~ "paddlenlp" ]];then # API 升级
+                    Build_list[${dir1}]="paddlenlp" # 影响编包
+                    if [[ ${dir2} =~ "__init__" ]];then # 针对发版mini test
+                        P0case_list[${#P0case_list[*]}]=bert
+                    elif [[ -n "${all_P0case_dic[$dir2]}" ]]; then
+                        P0case_list[${#P0case_list[*]}]=${dir2}
+                    elif [[ ${dir2} =~ "transformers" ]];then
+                        if [[ -n "${all_P0case_dic[$dir3]}" ]];then
+                            P0case_list[${#P0case_list[*]}]=${dir3}
+                        fi
+                    elif [[ ${dir2} =~ "taskflow" ]];then # ce case
+                        P0case_list[${#P0case_list[*]}]=taskflow
+                    fi
+                elif [[ "${dir1}" =~ "slm" && "${dir2}" =~ "examples" ]];then # 模型升级
+                    if [[ -n "${all_P0case_dic[$dir2]}" ]];then
+                        P0case_list[${#P0case_list[*]}]=${dir2}
+                    elif [[ -n "${all_P0case_dic[$dir3]}" ]];then
+                        P0case_list[${#P0case_list[*]}]=${dir3}
+                    fi
+                elif [[ "${dir1}" =~ "slm" && "${dir2}" =~ "model_zoo" ]];then # 模型升级
+                    if [[ -n "${all_P0case_dic[$dir2]}" ]];then
+                        P0case_list[${#P0case_list[*]}]=${dir2}
+                    fi
+                elif [[ ${dir1} =~ "csrc" ]];then # 推理改动
+                    Build_list[${dir1}]="paddlenlp_ops" # 影响推理编包
+                elif [[ ${dir1} =~ "requirements" ]];then # 依赖改动
+                    Build_list[${dir1}]="paddlenlp" # 影响paddlenlp编包
+                else
+                    continue
+                fi
             fi
         done
-        # 其他 case 判断
-        if [[ ${dir1} =~ "scripts" ]];then # API 升级
-            if [[ ${dir2} =~ "should_deploy" ]];then # 针对发版mini test
-                P0case_list[${#P0case_list[*]}]=transformer
-            fi  
-        elif [[ ${dir1} =~ "paddlenlp" ]];then # API 升级
-            Build_list[${dir1}]="paddlenlp" # 影响编包
-            if [[ ${dir2} =~ "__init__" ]];then # 针对发版mini test
-                P0case_list[${#P0case_list[*]}]=bert
-            elif [[ -n "${all_P0case_dic[$dir2]}" ]]; then
-                P0case_list[${#P0case_list[*]}]=${dir2}
-            elif [[ ${dir2} =~ "transformers" ]];then
-                if [[ -n "${all_P0case_dic[$dir3]}" ]];then
-                    P0case_list[${#P0case_list[*]}]=${dir3}
-                fi
-            elif [[ ${dir2} =~ "taskflow" ]];then # ce case
-                P0case_list[${#P0case_list[*]}]=taskflow
-            fi
-        elif [[ "${dir1}" =~ "slm" && "${dir2}" =~ "examples" ]];then # 模型升级
-            if [[ -n "${all_P0case_dic[$dir2]}" ]];then
-                P0case_list[${#P0case_list[*]}]=${dir2}
-            elif [[ -n "${all_P0case_dic[$dir3]}" ]];then
-                P0case_list[${#P0case_list[*]}]=${dir3}
-            fi
-        elif [[ "${dir1}" =~ "slm" && "${dir2}" =~ "model_zoo" ]];then # 模型升级
-            if [[ -n "${all_P0case_dic[$dir2]}" ]];then
-                P0case_list[${#P0case_list[*]}]=${dir2}
-            fi
-        elif [[ ${dir1} =~ "csrc" ]];then # 推理改动
-            Build_list[${dir1}]="paddlenlp_ops" # 影响推理编包
-        elif [[ ${dir1} =~ "requirements" ]];then # 依赖改动
-            Build_list[${dir1}]="paddlenlp" # 影响paddlenlp编包
-        else
-            continue
-        fi
     fi
-done
 }
+
 get_diff_TO_case
 P0case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${P0case_list[*]}))
 ####################################
@@ -241,12 +252,14 @@ if [[ ${#P0case_list[*]} -ne 0 ]];then
         echo -e "\033[32m ---- P0case Success \033[0m"
     fi
     ####################################
-    cd ${nlp_dir}
-    echo -e "\033[35m ---- Generate Allure Report  \033[0m"
-    unset http_proxy && unset https_proxy
-    cp scripts/regression/gen_allure_report.py ./
-    python gen_allure_report.py > /dev/null
-    echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
+    if [ -n "${AGILE_JOB_BUILD_ID}" ]; then
+        cd ${nlp_dir}
+        echo -e "\033[35m ---- Generate Allure Report  \033[0m"
+        unset http_proxy && unset https_proxy
+        cp scripts/regression/gen_allure_report.py ./
+        python gen_allure_report.py > /dev/null
+        echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
+    fi
     ####################################
     # run coverage
     # cd ${nlp_dir}/tests/
