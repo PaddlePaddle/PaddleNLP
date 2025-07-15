@@ -529,7 +529,7 @@ class GPTDecoderLayerAuto(nn.Layer):
         self.linear2 = nn.Linear(config.intermediate_size, config.hidden_size, bias_attr=True)
 
         self.linear1.weight = dist.shard_tensor(self.linear1.weight, get_mesh(ipp), [dist.Replicate(), dist.Shard(1)])
-        self.linear1.bias = dist.shard_tensor(self.linear1.bias, get_mesh(ipp), [dist.Replicate(), dist.Replicate()])
+        self.linear1.bias = dist.shard_tensor(self.linear1.bias, get_mesh(ipp), [dist.Replicate(), dist.Shard(0)])
         self.linear2.weight = dist.shard_tensor(self.linear2.weight, get_mesh(ipp), [dist.Replicate(), dist.Shard(0)])
         self.linear2.bias = dist.shard_tensor(self.linear2.bias, get_mesh(ipp), [dist.Replicate(), dist.Replicate()])
         # fix : change nn.LayerNorm(config.hidden_size, epsilon=1e-5, bias_attr=True) to GPTLayerNorm()
@@ -699,7 +699,7 @@ class GPTEmbeddingsAuto(nn.Layer):
         # The 'with' block ensures the correct seed context is used
         with seed_guard_context(current_seed):
             embeddings = self.dropout(embeddings)
-        embeddings = dist.reshard(embeddings, get_mesh(), [dist.Replicate(), dist.Replicate()])
+        embeddings = dist.reshard(embeddings, get_mesh(), [dist.Shard(0), dist.Replicate()])
         return embeddings
 
 
