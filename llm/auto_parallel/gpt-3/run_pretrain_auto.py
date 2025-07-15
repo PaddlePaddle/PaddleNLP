@@ -442,10 +442,25 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    if training_args.enable_linear_fused_grad_add:
+    do_enable_linear_fused_grad_add = training_args.enable_linear_fused_grad_add
+    do_enable_mp_async_allreduce = (
+        training_args.enable_auto_parallel
+        and training_args.tensor_parallel_degree > 1
+        and "enable_mp_async_allreduce" in training_args.tensor_parallel_config
+        and not training_args.sequence_parallel
+    )
+    do_enable_sp_async_reduce_scatter = (
+        training_args.enable_auto_parallel
+        and training_args.tensor_parallel_degree > 1
+        and training_args.sequence_parallel
+        and "enable_sp_async_reduce_scatter" in training_args.tensor_parallel_config
+    )
+    if (
+        do_enable_linear_fused_grad_add or do_enable_mp_async_allreduce or do_enable_sp_async_reduce_scatter
+    ) and not training_args.to_static:
         from llm.utils.fused_layers import mock_layers
 
-        mock_layers()
+        mock_layers(do_enable_linear_fused_grad_add, do_enable_mp_async_allreduce, do_enable_sp_async_reduce_scatter)
 
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
@@ -541,6 +556,7 @@ def main():
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
+    config.to_static = training_args.to_static
 
     if training_args.strategy.pipeline.enable and config.virtual_pp_degree > 1:
         pipeline = training_args.strategy.pipeline
@@ -550,6 +566,14 @@ def main():
     config.hidden_dropout_prob = model_args.hidden_dropout_prob
     config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
     print("Final pre-training config:", config)
+    if (
+        "replace_with_parallel_cross_entropy" in training_args.tensor_parallel_config
+        and config.tensor_parallel_degree > 1
+        and config.to_static is False
+    ):
+        from llm.utils.replace_ops import replace_cross_entropy
+
+        replace_cross_entropy()
 
     # Set the dtype for loading model
     dtype = "float32"

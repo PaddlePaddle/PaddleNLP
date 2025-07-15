@@ -19,6 +19,7 @@ param+="global_batch_size=32 "
 param+="nnodes=4 "
 param+="model_type=llama2_7b "
 param+='intermediate_api=intermediate_api_ '
+export FLAGS_use_cinn=0
 
 cd ./tests
 bash ./test_tipc/static/auto_parallel/llama2/benchmark_common/prepare.sh
