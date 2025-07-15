@@ -305,32 +305,19 @@ def fp8_mlp_fwd(x, w1, w2):
     x_orig_shape = x.shape
     x = x.reshape([-1, x_orig_shape[-1]])
 
-    # ===== o1 = deep_gemm(x_fp8, w1_t_fp8) =====
-    x_fp8, x_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        x, output_scale_transpose=True, quant_method="1x128", input_transpose=False
-    )
+    _, _, o3 = common_fp8_mlp_fwd(x, w1, w2)
 
-    w1_fp8, w1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True, return_transpose_only=True
-    )
-    o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=x.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1, num_sms=112)
-
-    # ===== o2 = swiglu(o1) =====
-    o2 = swiglu(o1)
-    o2_fp8, o2_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        o2, output_scale_transpose=True, quant_method="1x128", input_transpose=False
-    )
-
-    # ===== o3 = deep_gemm(o2_fp8, w2_t_fp8) =====
-    w2_t_fp8, w2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        w2, output_scale_transpose=False, quant_method="128x128", input_transpose=True, return_transpose_only=True
-    )
-    o3 = paddle.empty([o2_fp8.shape[0], w2_t_fp8.shape[0]], dtype=o1.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((o2_fp8, o2_scale.T), (w2_t_fp8, w2_t_scale), o3, num_sms=112)
     if len(x_orig_shape) > 2:
         o3 = o3.reshape([x_orig_shape[0], -1, o3.shape[-1]])
 
+    return o3
+
+
+def fp8_mlp_fwd_norm_rc(x, norm_w, norm_eps, w1, w2):
+    # ===== compute norm_output =====
+    norm_output, _ = fused_ln.fused_rms_norm(x, norm_w, norm_eps)
+    # ===== compute fp8_mlp_fwd =====
+    o3 = fp8_mlp_fwd(norm_output, w1, w2)
     return o3
 
 
@@ -354,6 +341,67 @@ def fp8_mlp_bwd(do3, x, w1, w2):
             x, output_scale_transpose=True, quant_method="1x128", input_transpose=True, return_transpose_only=True
         )
 
+    dx = common_fp8_mlp_bwd(do3, x_fp8, x_scale, x_t_fp8, x_t_scale, w1, w2, apply_backward_hook=True)
+
+    if len(x_orig_shape) > 2:
+        dx = dx.reshape([x_orig_shape[0], -1, dx.shape[-1]])
+
+    return dx
+
+
+def fp8_mlp_bwd_norm_rc(do3, x, norm_w, norm_eps, w1, w2):
+    # ===== recompute norm_output =====
+    norm_output, invar = fused_ln.fused_rms_norm(x, norm_w, norm_eps)
+
+    # ===== compute fp8_mlp_fwd =====
+    d_norm_output = fp8_mlp_bwd(do3, norm_output, w1, w2)
+
+    # ===== compute norm grad =====
+    dx, d_rms_norm_weight = fused_ln.fused_rms_norm_grad_func(x, norm_w, invar, d_norm_output, norm_eps)
+
+    if hasattr(norm_w, "main_grad"):
+        if norm_w.main_grad is None:
+            norm_w.main_grad = paddle.zeros(shape=norm_w.shape, dtype=paddle.float32)
+        norm_w.main_grad += d_rms_norm_weight
+    else:
+        if norm_w.grad is None:
+            norm_w.grad = paddle.zeros(shape=norm_w.shape, dtype=paddle.float32)
+        norm_w.grad += d_rms_norm_weight
+
+    if hasattr(norm_w, "_apply_backward_hook"):
+        norm_w._apply_backward_hook()
+
+    return dx
+
+
+def common_fp8_mlp_fwd(x, w1, w2):
+    # ===== o1 = deep_gemm(x_fp8, w1_t_fp8) =====
+    x_fp8, x_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        x, output_scale_transpose=True, quant_method="1x128", input_transpose=False
+    )
+
+    w1_fp8, w1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True, return_transpose_only=True
+    )
+    o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=x.dtype)
+    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1, num_sms=112)
+
+    # ===== o2 = swiglu(o1) =====
+    o2 = swiglu(o1)
+    o2_fp8, o2_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        o2, output_scale_transpose=True, quant_method="1x128", input_transpose=False
+    )
+
+    # ===== o3 = deep_gemm(o2_fp8, w2_t_fp8) =====
+    w2_t_fp8, w2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        w2, output_scale_transpose=False, quant_method="128x128", input_transpose=True, return_transpose_only=True
+    )
+    o3 = paddle.empty([o2_fp8.shape[0], w2_t_fp8.shape[0]], dtype=o1.dtype)
+    deep_gemm.gemm_fp8_fp8_bf16_nt((o2_fp8, o2_scale.T), (w2_t_fp8, w2_t_scale), o3, num_sms=112)
+    return x_fp8, x_scale, o3
+
+
+def common_fp8_mlp_bwd(do3, x_fp8, x_scale, x_t_fp8, x_t_scale, w1, w2, apply_backward_hook=False):
     w1_fp8, w1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
         w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True, return_transpose_only=True
     )
@@ -388,34 +436,37 @@ def fp8_mlp_bwd(do3, x, w1, w2):
         o2, output_scale_transpose=True, quant_method="1x128", input_transpose=True, return_transpose_only=True
     )
 
-    if hasattr(w2, "main_grad"):
-        if w2.main_grad is None:
-            w2.main_grad = paddle.zeros(shape=w2.shape, dtype=paddle.float32)
-        kitchen_fp8_gemm(
-            o2_t_fp8,
-            o2_t_scale,
-            do3_t_fp8,
-            do3_t_scale,
-            True,
-            True,
-            w2.main_grad,
-            paddle.float32,
-        )
+    if apply_backward_hook:
+        if hasattr(w2, "main_grad"):
+            if w2.main_grad is None:
+                w2.main_grad = paddle.zeros(shape=w2.shape, dtype=paddle.float32)
+            kitchen_fp8_gemm(
+                o2_t_fp8,
+                o2_t_scale,
+                do3_t_fp8,
+                do3_t_scale,
+                True,
+                True,
+                w2.main_grad,
+                paddle.float32,
+            )
+        else:
+            if w2.grad is None:
+                w2.grad = paddle.zeros(shape=w2.shape, dtype=paddle.float32)
+            kitchen_fp8_gemm(
+                o2_t_fp8,
+                o2_t_scale,
+                do3_t_fp8,
+                do3_t_scale,
+                True,
+                True,
+                w2.grad,
+                paddle.float32,
+            )
+        if hasattr(w2, "_apply_backward_hook"):
+            w2._apply_backward_hook()
     else:
-        if w2.grad is None:
-            w2.grad = paddle.zeros(shape=w2.shape, dtype=paddle.float32)
-        kitchen_fp8_gemm(
-            o2_t_fp8,
-            o2_t_scale,
-            do3_t_fp8,
-            do3_t_scale,
-            True,
-            True,
-            w2.grad,
-            paddle.float32,
-        )
-    if hasattr(w2, "_apply_backward_hook"):
-        w2._apply_backward_hook()
+        dw2 = kitchen_fp8_gemm(o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, True, True, rtn_dtype=paddle.float32)
 
     # ===== do1 = swiglu_grad(o1, None, do2) =====
     do1, _ = paddle._C_ops.swiglu_grad(o1, None, do2)
@@ -438,132 +489,45 @@ def fp8_mlp_bwd(do3, x, w1, w2):
     )
     dx = paddle.empty([do1_fp8.shape[0], w1_fp8.shape[0]], do1.dtype)
     deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8, do1_scale.T), (w1_fp8, w1_scale), dx, num_sms=112)
-    if len(x_orig_shape) > 2:
-        dx = dx.reshape([x_orig_shape[0], -1, dx.shape[-1]])
 
     # ===== dw1 = deep_gemm(x_t_fp8, do1_t_fp8)
-    if hasattr(w1, "main_grad"):
-        if w1.main_grad is None:
-            w1.main_grad = paddle.zeros(shape=w1.shape, dtype=paddle.float32)
-        kitchen_fp8_gemm(
-            x_t_fp8,
-            x_t_scale,
-            do1_t_fp8,
-            do1_t_scale,
-            True,
-            True,
-            w1.main_grad,
-            paddle.float32,
-        )
+    if apply_backward_hook:
+        if hasattr(w1, "main_grad"):
+            if w1.main_grad is None:
+                w1.main_grad = paddle.zeros(shape=w1.shape, dtype=paddle.float32)
+            kitchen_fp8_gemm(
+                x_t_fp8,
+                x_t_scale,
+                do1_t_fp8,
+                do1_t_scale,
+                True,
+                True,
+                w1.main_grad,
+                paddle.float32,
+            )
+        else:
+            if w1.grad is None:
+                w1.grad = paddle.zeros(shape=w1.shape, dtype=paddle.float32)
+            kitchen_fp8_gemm(
+                x_t_fp8,
+                x_t_scale,
+                do1_t_fp8,
+                do1_t_scale,
+                True,
+                True,
+                w1.grad,
+                paddle.float32,
+            )
+        if hasattr(w1, "_apply_backward_hook"):
+            w1._apply_backward_hook()
     else:
-        if w1.grad is None:
-            w1.grad = paddle.zeros(shape=w1.shape, dtype=paddle.float32)
-        kitchen_fp8_gemm(
-            x_t_fp8,
-            x_t_scale,
-            do1_t_fp8,
-            do1_t_scale,
-            True,
-            True,
-            w1.grad,
-            paddle.float32,
-        )
-    if hasattr(w1, "_apply_backward_hook"):
-        w1._apply_backward_hook()
+        dw1 = kitchen_fp8_gemm(x_t_fp8, x_t_scale, do1_t_fp8, do1_t_scale, True, True, rtn_dtype=paddle.float32)
 
-    return dx
-
-
-def common_fp8_mlp_fwd(x, w1, w2):
-    # ===== o1 = deep_gemm(x_fp8, w1_t_fp8) =====
-    x_fp8, x_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        x, output_scale_transpose=True, quant_method="1x128", input_transpose=False
-    )
-
-    w1_fp8, w1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True, return_transpose_only=True
-    )
-    o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=x.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1)
-
-    # ===== o2 = swiglu(o1) =====
-    o2 = swiglu(o1)
-    o2_fp8, o2_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        o2, output_scale_transpose=True, quant_method="1x128", input_transpose=False
-    )
-
-    # ===== o3 = deep_gemm(o2_fp8, w2_t_fp8) =====
-    w2_t_fp8, w2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        w2, output_scale_transpose=False, quant_method="128x128", input_transpose=True, return_transpose_only=True
-    )
-    o3 = paddle.empty([o2_fp8.shape[0], w2_t_fp8.shape[0]], dtype=o1.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((o2_fp8, o2_scale.T), (w2_t_fp8, w2_t_scale), o3)
-    return x_fp8, x_scale, o3
-
-
-def common_fp8_mlp_bwd(do3, x_fp8, x_scale, x_t_fp8, x_t_scale, w1, w2):
-    w1_fp8, w1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True, return_transpose_only=True
-    )
-    o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=do3.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1)
-
-    # ===== [recompute] o2 = swiglu(o1) =====
-    o2 = swiglu(o1)
-
-    # ===== do2 = deep_gemm(do3_fp8, w2_fp8)
-    if do3.shape[0] % 512 != 0:
-        do3_fp8, do3_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            do3, output_scale_transpose=True, quant_method="1x128", input_transpose=False
-        )
-        do3 = padding(do3, 0)
-        do3_t_fp8, do3_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            do3, output_scale_transpose=True, quant_method="1x128", input_transpose=True, return_transpose_only=True
-        )
+    if apply_backward_hook:
+        return dx
     else:
-        do3_fp8, do3_scale, do3_t_fp8, do3_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            do3, output_scale_transpose=True, quant_method="1x128", input_transpose=True
-        )
-    w2_fp8, w2_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        w2, output_scale_transpose=False, quant_method="128x128", input_transpose=False
-    )
-    do2 = paddle.empty([do3_fp8.shape[0], w2_fp8.shape[0]], do3.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((do3_fp8, do3_scale.T), (w2_fp8, w2_scale), do2)
-
-    # ===== dw2 = deep_gemm(o2_t_fp8, do3_t_fp8)
-    o2 = padding(o2, 0)
-    o2_t_fp8, o2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        o2, output_scale_transpose=True, quant_method="1x128", input_transpose=True, return_transpose_only=True
-    )
-
-    dw2 = kitchen_fp8_gemm(o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, True, True, rtn_dtype=paddle.float32)
-
-    # ===== do1 = swiglu_grad(o1, None, do2) =====
-    do1, _ = paddle._C_ops.swiglu_grad(o1, None, do2)
-
-    # ===== dx = deep_gemm(do1_fp8, w1_fp8)
-    if do1.shape[0] % 512 != 0:
-        do1_fp8, do1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            do1, output_scale_transpose=True, quant_method="1x128", input_transpose=False
-        )
-        do1 = padding(do1, 0)
-        do1_t_fp8, do1_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            do1, output_scale_transpose=True, quant_method="1x128", input_transpose=True, return_transpose_only=True
-        )
-    else:
-        do1_fp8, do1_scale, do1_t_fp8, do1_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-            do1, output_scale_transpose=True, quant_method="1x128", input_transpose=True
-        )
-    w1_fp8, w1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        w1, output_scale_transpose=False, quant_method="128x128", input_transpose=False
-    )
-    dx = paddle.empty([do1_fp8.shape[0], w1_fp8.shape[0]], do1.dtype)
-    deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8, do1_scale.T), (w1_fp8, w1_scale), dx)
-
-    # ===== dw1 = deep_gemm(x_t_fp8, do1_t_fp8)
-    dw1 = kitchen_fp8_gemm(x_t_fp8, x_t_scale, do1_t_fp8, do1_t_scale, True, True, rtn_dtype=paddle.float32)
-
-    return dx, dw1, dw2
+        assert dw1 is not None and dw2 is not None
+        return dx, dw1, dw2
 
 
 class FP8MlpFunction(paddle.autograd.PyLayer):

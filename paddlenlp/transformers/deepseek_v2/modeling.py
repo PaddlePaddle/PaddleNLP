@@ -2040,7 +2040,9 @@ class DeepseekV2DecoderLayer(nn.Layer):
         hidden_states = residual + hidden_states
 
         residual = hidden_states
-        hidden_states = self.post_attention_layernorm(hidden_states)
+
+        if not self.using_post_norm_recompute:
+            hidden_states = self.post_attention_layernorm(hidden_states)
 
         return hidden_states, residual
 
