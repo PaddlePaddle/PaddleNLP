@@ -1,0 +1,34 @@
+name: Build PR CI-Docker
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - "requirements*"
+      - "scripts/regression/requirements_ci.txt"
+      - "tests/requirements.txt"
+      - "setup.py"
+      - ".github/workflows/ci-docker-images.yml"
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [develop]
+  schedule:
+    - cron: "5 0 * * 0"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  ci-docker-images-paddlenlp:
+    name: ci-docker-images-paddlenlp
+    uses: ./.github/workflows/ci-docker-images-paddlenlp.yml
+    with:
+      upstream_event: ${{ github.event_name }}
+
+  ci-docker-images-distribute:
+    name: ci-docker-images-distribute
+    uses: ./.github/workflows/ci-docker-images-distribute.yml
+    with:
+      upstream_event: ${{ github.event_name }}

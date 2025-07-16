@@ -122,19 +122,19 @@ jobs:
 
       - name: Skip For Bug
         run: |
-          if [[ "${{ env.RUN_DOWNSTREAM }}" == "false" ]]; then
+          if [[ "$RUN_DOWNSTREAM" == "false" ]]; then
             echo "Not in a pull_request or test_build event. Skipping..."
           else
             docker exec -t $container_name /bin/bash -c '
             cd /workspace/PaddleNLP
-            git revert f2477c07272d04244cd3287d1f21c70482a4a85f  # 套件PR#10413引入bug-待修复
+            git revert f2477c07272d04244cd3287d1f21c70482a4a85f --no-edit  # 套件PR#10413引入bug-待修复
             rm -rf tests/llm/test_grpo.py tests/llm/test_reinforce_plus_plus.py  # 内网隔离导致reward服务启动失败-待调试
             '
           fi
       
       - name: Test
         run: |
-          if [[ "${{ env.RUN_DOWNSTREAM }}" == "false" ]]; then
+          if [[ "$RUN_DOWNSTREAM" == "false" ]]; then
             echo "Not in a pull_request or test_build event. Skipping..."
           else
             docker exec -t $container_name /bin/bash -c '
@@ -155,10 +155,10 @@ jobs:
           bos_file: ${{ github.workspace }}/../../../bos/BosClient.py
           allure_file: ${{ github.workspace }}/../../../allure-2.19.0/bin/allure
         run: |
-          if [[ "${{ env.RUN_DOWNSTREAM }}" == "false" ]]; then
+          if [[ "$RUN_DOWNSTREAM" == "false" ]]; then
             echo "Not in a pull_request or test_build event. Skipping..."
           else
-            docker exec -t ${{ env.container_name }} /bin/bash -c '
+            docker exec -t $container_name /bin/bash -c '
             unset http_proxy && unset https_proxy
             if [ ! -f "${{ env.bos_file }}" ]; then
               wget -q --no-proxy -O ${{ env.home_path }}/bos_new.tar.gz https://xly-devops.bj.bcebos.com/home/bos_new.tar.gz --no-check-certificate
