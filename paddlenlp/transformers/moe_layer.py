@@ -27,10 +27,15 @@ from paddle.distributed.communication.group import Group
 
 from ..utils.log import logger
 from .fp8_utils import FP8GroupGemmMlpFunctionNode
-from .fused_a2a import CombineNode, DispatchNode
+from .fused_a2a import CombineNode, DispatchNode, get_buffer, get_hidden_bytes
 from .moe_gate import PretrainedMoEGate
 from .moe_utils import UnZipNode, ZipNode
 from .token_dispatcher import MoEFlexTokenDispatcher, PreDispatchNode
+
+try:
+    import paddle.distributed.communication.deep_ep as deep_ep
+except ImportError:
+    deep_ep = None
 
 DSV3_USE_FP8_GEMM = os.getenv("DSV3_USE_FP8_GEMM", "False").lower() == "true"
 
@@ -622,12 +627,13 @@ class Fp8CombineNode:
         return output_combine
 
     @paddle.no_grad()
-    def backward(self, output_combine_grad, previous_event=None, async_finish=False):
+    def backward(self, output_combine_grad, previous_event=None, async_finish=False, allocate_on_comm_stream=False):
         # combine grad -> fp8
         hidden_states_out_grad = self.combine_node.backward(
             output_combine_grad,
             previous_event=previous_event,
             async_finish=async_finish,
+            allocate_on_comm_stream=allocate_on_comm_stream,
         )
         return hidden_states_out_grad
 
@@ -647,18 +653,29 @@ class Fp8CombineQuantNode:
         return output
 
     @paddle.no_grad()
-    def backward(self, output_grad):
+    def backward(self, output_grad, event_to_wait=None):
         # post combine grad
-        output_combine_grad = paddle.reshape(output_grad, self.output_combine_shape)
-
         if DSV3_USE_FP8_DISPATCH:
-            # output_combine_grad quant to fp8
-            output_combine_grad_fp8, output_combine_grad_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-                output_combine_grad, output_scale_transpose=False, quant_method="1x128", input_transpose=False
-            )
-            return (output_combine_grad_fp8, output_combine_grad_scale)
+            if event_to_wait is not None:
+                buffer = get_buffer(self.token_dispatcher._comm_manager.group, get_hidden_bytes(output_grad))
+                custom_stream = paddle.device.Stream(stream_base=buffer.runtime.get_comm_stream())
+                custom_stream.wait_event(event_to_wait)
+            else:
+                custom_stream = paddle.device.current_stream()
+            with paddle.device.stream_guard(custom_stream):
+                output_combine_grad = paddle.reshape(output_grad, self.output_combine_shape)
+                # output_combine_grad quant to fp8
+                output_combine_grad_fp8, output_combine_grad_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                    output_combine_grad, output_scale_transpose=False, quant_method="1x128", input_transpose=False
+                )
+                output_grad._record_stream()
+                quant_event = None
+                if event_to_wait is not None:
+                    quant_event = deep_ep.get_event_from_custom_stream(custom_stream.stream_base)
+            return (output_combine_grad_fp8, output_combine_grad_scale), quant_event
         else:
-            return output_combine_grad
+            output_combine_grad = paddle.reshape(output_grad, self.output_combine_shape)
+            return output_combine_grad, None
 
 
 class FusionMlpNode:
