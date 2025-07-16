@@ -17,7 +17,7 @@
 import numpy as np
 import paddle
 
-from .fp8_utils import dequantize_fp8_to_fp32
+from .fp8_utils import FP8LinearFunctionBase
 
 try:
     import TokenDispatcherUtils as TDU
@@ -349,7 +349,7 @@ class UnPermuteNode:
     def backward(self, out_grad, out_grad_scale):
         hidden_states_grad = paddle.gather(out_grad, self.token_permuted_indices)
 
-        output_tokens_grad = dequantize_fp8_to_fp32(out_grad, out_grad_scale)
+        output_tokens_grad = FP8LinearFunctionBase.dequantize_fp8_to_fp32(out_grad, out_grad_scale)
         permuted_tokens = self.hidden_states * self.permuted_probs.unsqueeze(-1)
         permuted_tokens = permuted_tokens.cast(self.hidden_states.dtype)
 

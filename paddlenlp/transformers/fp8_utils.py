@@ -63,7 +63,6 @@ class FP8LinearFunctionBase:
     def padding_and_quant_input(tensor):
         """Quantize input to FP8, with fallback to padded transposed version if shape not aligned."""
         if tensor.shape[0] % 512 != 0:
-            # tensor_fp8, tensor_scale = FP8LinearFunctionBase.quantize_1x128(tensor)
             tensor_fp8, tensor_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
                 tensor, output_scale_transpose=True, quant_method="1x128", input_transpose=False
             )
@@ -78,7 +77,7 @@ class FP8LinearFunctionBase:
             return tensor_fp8, tensor_scale, tensor_t_fp8, tensor_t_scale
         else:
             tensor_fp8, tensor_scale, tensor_t_fp8, tensor_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-                tensor, output_scale_transpose=True, tquant_method="1x128", input_transpose=True
+                tensor, output_scale_transpose=True, quant_method="1x128", input_transpose=True
             )
             return tensor_fp8, tensor_scale, tensor_t_fp8, tensor_t_scale
 
@@ -237,10 +236,7 @@ class FP8LinearFunctionBase:
         return result
 
     @staticmethod
-    def fp8_mlp_fwd(x, w1, w2):
-        x_orig_shape = x.shape
-        x = x.reshape([-1, x_orig_shape[-1]])
-
+    def common_fp8_mlp_fwd(x, w1, w2):
         # ===== o1 = deep_gemm(x_fp8, w1_t_fp8) =====
         o1, x_fp8, x_scale = FP8LinearFunctionBase.compute_fp8_linear(
             x, w1, weight_transpose=True, return_transpose_only=True, return_mode="with_input_quant"
@@ -252,23 +248,21 @@ class FP8LinearFunctionBase:
         # ===== o3 = deep_gemm(o2_fp8, w2_t_fp8) =====
         o3 = FP8LinearFunctionBase.compute_fp8_linear(o2, w2, weight_transpose=True, return_transpose_only=True)
 
-        if len(x_orig_shape) > 2:
-            o3 = o3.reshape([x_orig_shape[0], -1, o3.shape[-1]])
-
-        return o3, x_fp8, x_scale
+        return x_fp8, x_scale, o3
 
     @staticmethod
-    def fp8_mlp_bwd(do3, x, w1, w2):
-        do3_orig_shape = do3.shape
-        do3 = do3.reshape([-1, do3_orig_shape[-1]])
+    def common_fp8_mlp_bwd(do3, x_fp8, x_scale, x_t_fp8, x_t_scale, w1, w2, apply_backward_hook=False):
 
-        x_orig_shape = x.shape
-        x = x.reshape([-1, x_orig_shape[-1]])
+        # # ===== [recompute] o1 = deep_gemm(x_fp8, w1_t_fp8) =====
+        # o1, x_t_fp8, x_t_scale = FP8LinearFunctionBase.compute_fp8_linear(
+        #     x, w1, weight_transpose=True, return_transpose_only=True, return_mode="with_input_transpose_quant"
+        # )
 
-        # ===== [recompute] o1 = deep_gemm(x_fp8, w1_t_fp8) =====
-        o1, x_t_fp8, x_t_scale = FP8LinearFunctionBase.compute_fp8_linear(
-            x, w1, weight_transpose=True, return_transpose_only=True, return_mode="with_input_transpose_quant"
+        w1_fp8, w1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True, return_transpose_only=True
         )
+        o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=do3.dtype)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1, num_sms=112)
 
         # ===== [recompute] o2 = swiglu(o1) =====
         o2 = swiglu(o1)
@@ -283,9 +277,14 @@ class FP8LinearFunctionBase:
         o2_t_fp8, o2_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
             o2, output_scale_transpose=True, quant_method="1x128", input_transpose=True, return_transpose_only=True
         )
-        dw2 = FP8LinearFunctionBase.compute_expert_w_grad(
-            o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, True, True, rtn_dtype=paddle.float32
-        )
+        if apply_backward_hook:
+            FP8LinearFunctionBase.compute_expert_w_grad(
+                o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, True, True, w2, rtn_dtype=paddle.float32
+            )
+        else:
+            dw2 = FP8LinearFunctionBase.kitchen_fp8_gemm(
+                o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, True, True, rtn_dtype=paddle.float32
+            )
 
         # ===== do1 = swiglu_grad(o1, None, do2) =====
         do1, _ = paddle._C_ops.swiglu_grad(o1, None, do2)
@@ -295,15 +294,85 @@ class FP8LinearFunctionBase:
             do1, w1, return_mode="with_input_transpose_quant"
         )
 
+        # ===== dw1 = deep_gemm(x_t_fp8, do1_t_fp8) =====
+        if apply_backward_hook:
+            FP8LinearFunctionBase.compute_expert_w_grad(
+                x_t_fp8, x_t_scale, do1_t_fp8, do1_t_scale, True, True, w1, rtn_dtype=paddle.float32
+            )
+        else:
+            dw1 = FP8LinearFunctionBase.kitchen_fp8_gemm(
+                x_t_fp8, x_t_scale, do1_t_fp8, do1_t_scale, True, True, rtn_dtype=paddle.float32
+            )
+
+        if apply_backward_hook:
+            return dx
+        else:
+            assert dw1 is not None and dw2 is not None
+            return dx, dw1, dw2
+
+    @staticmethod
+    def fp8_mlp_fwd(x, w1, w2):
+        x_orig_shape = x.shape
+        x = x.reshape([-1, x_orig_shape[-1]])
+
+        _, _, o3 = FP8LinearFunctionBase.common_fp8_mlp_fwd(x, w1, w2)
+
+        if len(x_orig_shape) > 2:
+            o3 = o3.reshape([x_orig_shape[0], -1, o3.shape[-1]])
+
+        return o3
+
+    @staticmethod
+    def fp8_mlp_fwd_norm_rc(x, norm_w, norm_eps, w1, w2):
+        # ===== compute norm_output =====
+        norm_output, _ = fused_ln.fused_rms_norm(x, norm_w, norm_eps)
+        # ===== compute fp8_mlp_fwd =====
+        o3 = FP8LinearFunctionBase.fp8_mlp_fwd(norm_output, w1, w2)
+        return o3
+
+    @staticmethod
+    def fp8_mlp_bwd(do3, x, w1, w2):
+        do3_orig_shape = do3.shape
+        do3 = do3.reshape([-1, do3_orig_shape[-1]])
+
+        x_orig_shape = x.shape
+        x = x.reshape([-1, x_orig_shape[-1]])
+
+        x_fp8, x_scale, x_t_fp8, x_t_scale = FP8LinearFunctionBase.padding_and_quant_input(x)
+
+        dx = FP8LinearFunctionBase.common_fp8_mlp_bwd(
+            do3, x_fp8, x_scale, x_t_fp8, x_t_scale, w1, w2, apply_backward_hook=True
+        )
+
         if len(x_orig_shape) > 2:
             dx = dx.reshape([x_orig_shape[0], -1, dx.shape[-1]])
 
-        # ===== dw1 = deep_gemm(x_t_fp8, do1_t_fp8) =====
-        dw1 = FP8LinearFunctionBase.compute_expert_w_grad(
-            x_t_fp8, x_t_scale, do1_t_fp8, do1_t_scale, True, True, rtn_dtype=paddle.float32
-        )
+        return dx
 
-        return dx, dw1, dw2
+    @staticmethod
+    def fp8_mlp_bwd_norm_rc(do3, x, norm_w, norm_eps, w1, w2):
+        # ===== recompute norm_output =====
+        norm_output, invar = fused_ln.fused_rms_norm(x, norm_w, norm_eps)
+
+        # ===== compute fp8_mlp_fwd =====
+        d_norm_output = FP8LinearFunctionBase.fp8_mlp_bwd(do3, norm_output, w1, w2)
+
+        # ===== compute norm grad =====
+        dx, d_rms_norm_weight = fused_ln.fused_rms_norm_grad_func(x, norm_w, invar, d_norm_output, norm_eps)
+
+        if hasattr(norm_w, "main_grad"):
+            if norm_w.main_grad is None:
+                norm_w.main_grad = paddle.zeros(shape=norm_w.shape, dtype=paddle.float32)
+            norm_w.main_grad += d_rms_norm_weight
+        else:
+            if norm_w.grad is None:
+                norm_w.grad = paddle.zeros(shape=norm_w.shape, dtype=paddle.float32)
+            norm_w.grad += d_rms_norm_weight
+
+        if hasattr(norm_w, "_apply_backward_hook"):
+            norm_w._apply_backward_hook()
+
+        return dx
 
 
 class FP8LinearFunction(paddle.autograd.PyLayer):
@@ -322,7 +391,6 @@ class FP8LinearFunction(paddle.autograd.PyLayer):
                 weight_transpose=True,
                 return_transpose_only=True,
             )
-            out = out.reshape([x_orig_shape[0], -1, weight.shape[-1]])
             # save for bwd
             out = out.reshape([x_orig_shape[0], -1, weight.shape[-1]])
             ctx.save_for_backward(x, weight)
@@ -447,6 +515,7 @@ class FP8NormMlpRecomputeFunction(paddle.autograd.PyLayer):
 
         # ===== compute x_t_fp8, x_t_scale for dw1 =====
         norm_output = norm_output.reshape([-1, x_orig_shape[-1]])
+
         x_fp8, x_scale, x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
             norm_output, output_scale_transpose=True, quant_method="1x128", input_transpose=True
         )
@@ -472,8 +541,7 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
         x = x.reshape([-1, x_orig_shape[-1]])
 
         # ===== call func fp8_mlp_fwd =====
-        o3, x_fp8, x_scale = FP8LinearFunctionBase.fp8_mlp_fwd(x, w1, w2)
-
+        x_fp8, x_scale, o3 = FP8LinearFunctionBase.common_fp8_mlp_fwd(x, w1, w2)
         # ===== reshape to origin shape =====
         if len(x_orig_shape) > 2:
             o3 = o3.reshape([x_orig_shape[0], -1, o3.shape[-1]])
@@ -510,7 +578,7 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
         )
 
         # ===== call func common_fp8_mlp_bwd =====
-        dx, dw1, dw2 = FP8LinearFunctionBase.fp8_mlp_bwd(do3, x_fp8, x_scale, x_t_fp8, x_t_scale, w1, w2)
+        dx, dw1, dw2 = FP8LinearFunctionBase.common_fp8_mlp_bwd(do3, x_fp8, x_scale, x_t_fp8, x_t_scale, w1, w2)
 
         # ===== reshape to origin shape =====
         if len(x_orig_shape) > 2:
