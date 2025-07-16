@@ -658,10 +658,10 @@ class GPTEmbeddingsAuto(nn.Layer):
             config.hidden_size,
         )
         self.word_embeddings.weight = dist.shard_tensor(
-            self.word_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(1)]
+            self.word_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(0)]
         )
         self.position_embeddings.weight = dist.shard_tensor(
-            self.position_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(1)]
+            self.position_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Replicate()]
         )
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
@@ -1177,7 +1177,7 @@ class GPTLMHeadAuto(nn.Layer):
                 shape=[config.vocab_size, config.hidden_size],
                 dtype=paddle.get_default_dtype(),
             )
-            self.weight = dist.shard_tensor(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(1)])
+            self.weight = dist.shard_tensor(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)])
 
     def forward(self, hidden_states, tensor_parallel_output=None):
 
