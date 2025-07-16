@@ -126,6 +126,7 @@ jobs:
             ldconfig
             ln -sf $(which python${python_version}) /usr/bin/python
             pip config set global.cache-dir "/home/.cache/pip"
+            source $work_dir/../../../proxy
             set -e
             cd /workspace/PaddleNLP && git config --global --add safe.directory $PWD
             timeout 80m bash scripts/distribute/run_ci.sh ${paddle_whl}
