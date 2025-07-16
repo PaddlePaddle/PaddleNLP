@@ -661,7 +661,7 @@ class GPTEmbeddingsAuto(nn.Layer):
             self.word_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(0)]
         )
         self.position_embeddings.weight = dist.shard_tensor(
-            self.position_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Replicate()]
+            self.position_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(0)]
         )
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
