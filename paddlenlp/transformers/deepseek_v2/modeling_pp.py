@@ -569,13 +569,18 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
         ret = (inputs_embeds_mtp, *ret) if self.send_mtp_embed else ret
         return ret
 
-    def combine_forward(self, inputs, async_finish=False):
+    def combine_forward(self, inputs, async_finish=False, previous_event=None, allocate_on_comm_stream=False):
         if self.send_mtp_embed:
             (inputs_embeds_mtp, hidden_states, residual, l_aux, hidden_states_out) = inputs
         else:
             (hidden_states, residual, l_aux, hidden_states_out) = inputs
 
-        output_combine = self.fp8_fusion_moe_node.combine_node.forward(hidden_states_out, async_finish=async_finish)
+        output_combine = self.fp8_fusion_moe_node.combine_node.forward(
+            hidden_states_out,
+            async_finish=async_finish,
+            previous_event=previous_event,
+            allocate_on_comm_stream=allocate_on_comm_stream and previous_event is not None,
+        )
 
         ret = (hidden_states, residual, l_aux, output_combine)
 
@@ -652,7 +657,7 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
         ret = (inputs_embeds_mtp_grad, *ret) if self.send_mtp_embed else ret
         return ret
 
-    def dispatch_backward(self, output_grad, async_finish=False):
+    def dispatch_backward(self, output_grad, async_finish=False, previous_event=None, allocate_on_comm_stream=False):
         if self.send_mtp_embed:
             (
                 inputs_embeds_mtp_grad,
@@ -666,7 +671,11 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
             hidden_states_grad, residual_grad, l_aux_grad, hs_dispatched_grad, dispatched_probs_grad = output_grad
 
         hs_grad, token_probs_grad = self.fp8_fusion_moe_node.dispatch_node.backward(
-            hs_dispatched_grad, dispatched_probs_grad, async_finish=async_finish
+            hs_dispatched_grad,
+            dispatched_probs_grad,
+            async_finish=async_finish,
+            previous_event=previous_event,
+            allocate_on_comm_stream=allocate_on_comm_stream and previous_event is not None,
         )
 
         ret = (hidden_states_grad, residual_grad, l_aux_grad, hs_grad, token_probs_grad)
@@ -755,6 +764,8 @@ class OverlapedFUsionScheduleNode:
         output_grad = self.backward_node.mlp_backward(output_grad)
         paddle.base.core.nvprof_nvtx_pop()
 
+        output_grad_event = deep_ep.get_event_from_calc_stream(self.backward_node.moe_group.id)
+
         paddle.base.core.nvprof_nvtx_push("dispatch_forward")
         inputs = self.forward_node.dispatch_forward(
             inputs, previous_event=attn_compute_event, async_finish=True, allocate_on_comm_stream=True
@@ -763,7 +774,9 @@ class OverlapedFUsionScheduleNode:
         dispatch_forward_event = deep_ep.get_event_from_comm_stream(self.forward_node.moe_group.id)
 
         paddle.base.core.nvprof_nvtx_push("dispatch_backward")
-        output_grad = self.backward_node.dispatch_backward(output_grad, async_finish=True)
+        output_grad = self.backward_node.dispatch_backward(
+            output_grad, async_finish=True, previous_event=output_grad_event, allocate_on_comm_stream=True
+        )
         paddle.base.core.nvprof_nvtx_pop()
         # get dispatch backward event
         dispatch_backward_event = deep_ep.get_event_from_comm_stream(self.backward_node.moe_group.id)
@@ -777,8 +790,12 @@ class OverlapedFUsionScheduleNode:
         inputs = self.forward_node.mlp_forward(inputs)
         paddle.base.core.nvprof_nvtx_pop()
 
+        inputs_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
+
         paddle.base.core.nvprof_nvtx_push("combine_forward")
-        inputs = self.forward_node.combine_forward(inputs, async_finish=True)
+        inputs = self.forward_node.combine_forward(
+            inputs, async_finish=True, previous_event=inputs_event, allocate_on_comm_stream=True
+        )
         paddle.base.core.nvprof_nvtx_pop()
         combine_forward_event = deep_ep.get_event_from_comm_stream(self.forward_node.moe_group.id)
 

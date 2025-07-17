@@ -596,13 +596,21 @@ class Fp8DispatchNode:
         return hs_2d_dispatched, dispatched_indices, dispatched_probs
 
     @paddle.no_grad()
-    def backward(self, hs_dispatched_grad, dispatched_probs_grad, previous_event=None, async_finish=False):
+    def backward(
+        self,
+        hs_dispatched_grad,
+        dispatched_probs_grad,
+        previous_event=None,
+        async_finish=False,
+        allocate_on_comm_stream=False,
+    ):
         # dispatch grad
         hs_grad, _, token_probs_grad = self.dispatch_act_node.backward(
             hs_dispatched_grad,
             dispatched_probs_grad,
             previous_event=previous_event,
             async_finish=async_finish,
+            allocate_on_comm_stream=allocate_on_comm_stream,
         )
         return hs_grad, token_probs_grad
 
@@ -614,7 +622,7 @@ class Fp8CombineNode:
         self.name = name
 
     @paddle.no_grad()
-    def forward(self, hidden_states_out, previous_event=None, async_finish=False):
+    def forward(self, hidden_states_out, previous_event=None, async_finish=False, allocate_on_comm_stream=False):
         # combine
         output_combine = self.combine_node.forward(
             hidden_states_out,
@@ -622,6 +630,7 @@ class Fp8CombineNode:
             self.token_dispatcher._comm_manager.handle,
             previous_event=previous_event,
             async_finish=async_finish,
+            allocate_on_comm_stream=allocate_on_comm_stream,
         )
         output_combine.stop_gradient = False
         return output_combine
