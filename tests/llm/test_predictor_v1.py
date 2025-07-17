@@ -119,6 +119,7 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
             (
                 {
                     "append_attn": True,
+                    "return_full_hidden_states": True,
                 },
             ),
         ]

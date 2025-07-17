@@ -1481,7 +1481,7 @@ class FusedMultiTransformerBase(Layer):
         self.pre_process(**kwargs)
         kwargs["cum_offsets"] = cum_offsets
 
-        if caches is not None:
+        if caches is not None and not kwargs["kv_cache_reuse"]:
             assert len(caches) == len(self.linear_weights) or len(caches) == 2 * len(self.linear_weights)
 
         assert self.num_layers == len(self.linear_weights)
@@ -1589,7 +1589,7 @@ class FusedMultiTransformerBase(Layer):
         kwargs["input_ids"] = input_ids
 
         out = self.post_process(**kwargs)
-        return out, caches
+        return out, kwargs["multi_block_output"]
 
 
 class FusedMultiTransformerPostLayernorm(FusedMultiTransformerBase):
@@ -3172,10 +3172,16 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             k_dequant_scales = kwargs.get("k_dequant_scales", None)
             v_dequant_scales = kwargs.get("v_dequant_scales", None)
 
+            if kwargs['kv_cache_reuse']:
+                k_cache_index = 0
+                v_cache_index = 1
+            else:
+                k_cache_index = 2 * i
+                v_cache_index = 2 * i + 1
             fmha_out = paddle.incubate.nn.functional.block_multihead_attention(
                 qkv_out,
-                caches[2 * i],
-                caches[2 * i + 1],
+                caches[k_cache_index],
+                caches[v_cache_index],
                 kwargs.get("seq_lens_encoder", None),
                 kwargs.get("seq_lens_decoder", None),
                 kwargs.get("seq_lens_this_time", None),
