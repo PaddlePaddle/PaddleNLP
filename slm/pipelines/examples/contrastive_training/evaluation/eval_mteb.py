@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import argparse
 import logging
 
 import mteb
 from datasets import load_dataset
+from modelling_quant import HiddenPredictorWrapper
 from mteb import MTEB
 from mteb.abstasks.AbsTaskRetrieval import AbsTaskRetrieval, HFDataLoader
 from mteb.abstasks.TaskMetadata import TaskMetadata
@@ -108,6 +108,8 @@ def get_args():
     parser.add_argument("--padding_side", default="left", type=str)  # right, left
     parser.add_argument("--add_bos_token", default=0, type=int)
     parser.add_argument("--add_eos_token", default=1, type=int)
+    parser.add_argument("--quant_type", default="no", type=str)
+    parser.add_argument("--kv_cache_reuse", default=0, type=int)
 
     return parser.parse_args()
 
@@ -188,30 +190,46 @@ if __name__ == "__main__":
         tokenizer.add_bos_token = bool(args.add_bos_token)
         tokenizer.add_eos_token = bool(args.add_eos_token)
 
-        encode_model = BiEncoderModel(
-            model_name_or_path=args.base_model_name_or_path,
-            normalized=True,
-            sentence_pooling_method=args.pooling_method,
-            query_instruction=args.query_instruction,
-            tokenizer=tokenizer,
-            eval_batch_size=args.eval_batch_size,
-            max_seq_length=args.max_seq_length,
-            model_flag=args.model_flag,
-            dtype=args.dtype,
-        )
-
-        if args.peft_model_name_or_path:
-            lora_config = LoRAConfig.from_pretrained(args.peft_model_name_or_path)
-            lora_config.merge_weights = True
-            encode_model.config = (
-                encode_model.model_config
-            )  # for NV-Embed, this is no needed, but for repllama, this is needed
-            encode_model.config.tensor_parallel_degree = 1
-            encode_model = LoRAModel.from_pretrained(
-                encode_model, args.peft_model_name_or_path, lora_config=lora_config, dtype=lora_config.dtype
+        if args.quant_type != "no":
+            encode_model = HiddenPredictorWrapper(
+                model_name_or_path=args.base_model_name_or_path,
+                normalized=True,
+                sentence_pooling_method=args.pooling_method,
+                query_instruction=args.query_instruction,
+                tokenizer=tokenizer,
+                eval_batch_size=args.eval_batch_size,
+                max_seq_length=args.max_seq_length,
+                model_flag=args.model_flag,
+                dtype=args.dtype,
+                quant_type=args.quant_type,
+                kv_cache_reuse=args.kv_cache_reuse,
             )
 
-    encode_model.eval()
+        else:
+            encode_model = BiEncoderModel(
+                model_name_or_path=args.base_model_name_or_path,
+                normalized=True,
+                sentence_pooling_method=args.pooling_method,
+                query_instruction=args.query_instruction,
+                tokenizer=tokenizer,
+                eval_batch_size=args.eval_batch_size,
+                max_seq_length=args.max_seq_length,
+                model_flag=args.model_flag,
+                dtype=args.dtype,
+            )
+
+            if args.peft_model_name_or_path:
+                lora_config = LoRAConfig.from_pretrained(args.peft_model_name_or_path)
+                lora_config.merge_weights = True
+                encode_model.config = (
+                    encode_model.model_config
+                )  # for NV-Embed, this is no needed, but for repllama, this is needed
+                encode_model.config.tensor_parallel_degree = 1
+                encode_model = LoRAModel.from_pretrained(
+                    encode_model, args.peft_model_name_or_path, lora_config=lora_config, dtype=lora_config.dtype
+                )
+
+            encode_model.eval()
 
     logger.info("Ready to eval")
     if args.task_name == "MSMARCOTITLE":
@@ -226,7 +244,7 @@ if __name__ == "__main__":
         evaluation = MTEB(tasks=mteb.get_tasks(tasks=[args.task_name]))
         evaluation.run(
             encode_model,
-            output_folder=f"{args.output_folder}/{args.task_name}/{args.pooling_method}",
+            output_folder=f"{args.output_folder}/{args.task_name}/{args.quant_type}/{args.pooling_method}",
             score_function="dot",
             eval_splits=[args.task_split],
         )

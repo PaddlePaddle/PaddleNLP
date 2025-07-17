@@ -178,6 +178,9 @@ python -u evaluation/eval_mteb.py \
 - `padding_side`：设置 padding 的位置，可取 left 或 right
 - `add_bos_token`：是否添加起始符，0表示不添加，1表示添加
 - `add_eos_token`：是否添加结束符，0表示不添加，1表示添加
+- `quant_type`：是否使用量化加载，可选项包括 weight_only_int8，weight_only_int4，no，默认为 no，即不进行量化
+- `kv_cache_reuse`: 量化加载时，是否仅预分配首层 kv_cache 并重复利用，0 表示不复用，1 表示复用，默认为 0，此策略可降低量化加载时显存占用
+
 
 # MTEB 评估
 [MTEB](https://github.com/embeddings-benchmark/mteb)
