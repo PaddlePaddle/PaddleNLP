@@ -3172,7 +3172,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             k_dequant_scales = kwargs.get("k_dequant_scales", None)
             v_dequant_scales = kwargs.get("v_dequant_scales", None)
 
-            if kwargs['kv_cache_reuse']:
+            if kwargs["kv_cache_reuse"]:
                 k_cache_index = 0
                 v_cache_index = 1
             else:
