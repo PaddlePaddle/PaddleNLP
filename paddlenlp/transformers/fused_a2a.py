@@ -329,12 +329,12 @@ class CombineNode:
     def reset_statue(self):
         self.handle = None
 
-    def forward(self, x, group, handle, previous_event=None, async_finish=False):
+    def forward(self, x, group, handle, previous_event=None, async_finish=False, allocate_on_comm_stream=False):
         """Forward pass of fused combine."""
         states = dict()
         states["handle"] = handle
         combined_x = fused_combine_forward_func(
-            x, group, states, previous_event=previous_event, async_finish=async_finish
+            x, group, states, previous_event=previous_event, async_finish=async_finish, allocate_on_comm_stream=allocate_on_comm_stream
         )
 
         self.handle = handle
