@@ -31,6 +31,7 @@ target_lists_for_gpt=(
     "llm/auto_parallel/gpt-3"
     "paddlenlp/transformers/gpt"
     "scripts/distribute"
+    ".github/workflows/distribute.yml"
 )
 
 target_lists_for_llama=(
@@ -38,6 +39,7 @@ target_lists_for_llama=(
     "paddlenlp/trainer/auto_trainer.py"
     "paddlenlp/transformers/llama"
     "scripts/distribute"
+    ".github/workflows/distribute.yml"
 )
 
 target_lists_for_deepseek=(
@@ -49,6 +51,7 @@ target_lists_for_deepseek=(
     "paddlenlp/transformers/moe_layer_auto.py"
     "paddlenlp/transformers/moe_gate_auto.py"
     "scripts/distribute"
+    ".github/workflows/distribute.yml"
 )
 
 target_path_for_ci_scripts="scripts/distribute"
@@ -64,7 +67,6 @@ install_paddlenlp(){
     echo -e "\033[31m ---- Install paddlenlp by set PYTHONPATH  \033"
     export PYTHONPATH=${nlp_dir}:$PYTHONPATH
     # python -m pip install -r ${nlp_dir}/requirements.txt
-    sed -i -e "s/paddlenlp/#paddlenlp/g" model_zoo/gpt-3/requirements.txt
     # export http_proxy=${proxy} && export https_proxy=${proxy}
     # python -m pip uninstall paddlenlp -y
     # rm -rf build/ && rm -rf paddlenlp.egg-info/ && rm -rf dist/
@@ -98,63 +100,68 @@ IS_A100=$(is_a100)
 
 ####################################
 get_diff_TO_case(){
-    cd ${nlp_dir}
-    if [ $IS_A100 -ne 0 ];then
-        for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
-            arr_file_name=(${file_name//// })
-            dir1=${arr_file_name[0]}
-            dir2=${arr_file_name[1]}
-            dir3=${arr_file_name[2]}
-            dir4=${arr_file_name[3]}
-            file_item=$dir1/$dir2/$dir3/$dir4
-            echo "file_name:"${file_name}, "path:"${file_item}
-            if [ ! -f ${file_name} ];then # 针对pr删掉文件
-                continue
-            elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
-                continue
-            else
-                for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
-                    if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
-                        case_list[${#case_list[*]}]=gpt-3_auto
-                        case_list[${#case_list[*]}]=gpt-3_dygraph
-                    fi
-                done
-                for ((i=0; i<${#target_lists_for_llama[@]}; i++)); do
-                    if [[ ${file_item} == *${target_lists_for_llama[i]}* ]];then
-                        case_list[${#case_list[*]}]=llama_auto
-                    fi
-                done
-                for ((i=0; i<${#target_lists_for_deepseek[@]}; i++)); do
-                    if [[ ${file_item} == *${target_lists_for_deepseek[i]}* ]];then
-                        case_list[${#case_list[*]}]=deepseek_auto
-                    fi
-                done
-            fi
-        done
+    if [ -z "${AGILE_COMPILE_BRANCH}" ]; then
+        # 定时任务回归测试
+        case_list=("gpt-3_auto" "gpt-3_dygraph" "llama_auto" "deepseek_auto")
     else
-        for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
-            arr_file_name=(${file_name//// })
-            dir1=${arr_file_name[0]}
-            dir2=${arr_file_name[1]}
-            dir3=${arr_file_name[2]}
-            dir4=${arr_file_name[3]}
-            file_item=$dir1/$dir2/$dir3/$dir4
-            echo "file_name:"${file_name}, "path:"${file_item}
-            if [ ! -f ${file_name} ];then # 针对pr删掉文件
-                continue
-            elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
-                continue
-            else
-                case_list[${#case_list[*]}]=gpt-3_auto
-                case_list[${#case_list[*]}]=llama_auto
-                case_list[${#case_list[*]}]=deepseek_auto
-                for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
-                    if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
-                        case_list[${#case_list[*]}]=gpt-3_dygraph
-                    fi
-                done
-            fi
-        done
+        cd ${nlp_dir}
+        if [ $IS_A100 -ne 0 ];then
+            for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+                arr_file_name=(${file_name//// })
+                dir1=${arr_file_name[0]}
+                dir2=${arr_file_name[1]}
+                dir3=${arr_file_name[2]}
+                dir4=${arr_file_name[3]}
+                file_item=$dir1/$dir2/$dir3/$dir4
+                echo "file_name:"${file_name}, "path:"${file_item}
+                if [ ! -f ${file_name} ];then # 针对pr删掉文件
+                    continue
+                elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
+                    continue
+                else
+                    for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
+                        if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
+                            case_list[${#case_list[*]}]=gpt-3_auto
+                            case_list[${#case_list[*]}]=gpt-3_dygraph
+                        fi
+                    done
+                    for ((i=0; i<${#target_lists_for_llama[@]}; i++)); do
+                        if [[ ${file_item} == *${target_lists_for_llama[i]}* ]];then
+                            case_list[${#case_list[*]}]=llama_auto
+                        fi
+                    done
+                    for ((i=0; i<${#target_lists_for_deepseek[@]}; i++)); do
+                        if [[ ${file_item} == *${target_lists_for_deepseek[i]}* ]];then
+                            case_list[${#case_list[*]}]=deepseek_auto
+                        fi
+                    done
+                fi
+            done
+        else
+            for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+                arr_file_name=(${file_name//// })
+                dir1=${arr_file_name[0]}
+                dir2=${arr_file_name[1]}
+                dir3=${arr_file_name[2]}
+                dir4=${arr_file_name[3]}
+                file_item=$dir1/$dir2/$dir3/$dir4
+                echo "file_name:"${file_name}, "path:"${file_item}
+                if [ ! -f ${file_name} ];then # 针对pr删掉文件
+                    continue
+                elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
+                    continue
+                else
+                    case_list[${#case_list[*]}]=gpt-3_auto
+                    case_list[${#case_list[*]}]=llama_auto
+                    case_list[${#case_list[*]}]=deepseek_auto
+                    for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
+                        if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
+                            case_list[${#case_list[*]}]=gpt-3_dygraph
+                        fi
+                    done
+                fi
+            done
+        fi
     fi
 }
 ####################################
@@ -292,6 +299,7 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh
         bash  $cmd prepare_case llama_case_list_auto $FLAGS_install_deps $FLAGS_download_data
         execute_func_list $cmd llama_auto
+        export FLAGS_install_deps=1
         export FLAGS_download_data="llama ""$FLAGS_download_data"
         let case_num++
         clean_file $nlp_dir/llm/auto_parallel/llama

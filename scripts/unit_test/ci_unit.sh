@@ -26,15 +26,16 @@ if [ ! -d "unittest_logs" ];then
 fi
 
 install_requirements() {
-    python -m pip config --user set global.index http://pip.baidu-int.com/search/
-    python -m pip config --user set global.index-url http://pip.baidu-int.com/simple
-    python -m pip config --user set global.trusted-host pip.baidu-int.com
+    python -m pip config --user unset global.index
+    python -m pip config --user unset global.index-url
+    python -m pip config --user unset global.trusted-host
+    python -m pip config --user set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+    python -m pip config --user set global.trusted-host pypi.tuna.tsinghua.edu.cn
     python -m pip install -r requirements.txt
     python -m pip install -r requirements-dev.txt
     python -m pip install -r tests/requirements.txt
-    python -m pip install -r paddlenlp/experimental/autonlp/requirements.txt 
+    # python -m pip install -r paddlenlp/experimental/autonlp/requirements.txt 
     python -m pip uninstall paddlepaddle paddlepaddle_gpu -y
-    python -m pip install pillow codecov-cli allure-pytest
     python -m pip install --no-cache-dir ${paddle}
     python -c "import paddle;print('paddle');print(paddle.__version__);print(paddle.version.show())" >> ${log_path}/commit_info.txt
 
@@ -68,9 +69,11 @@ print_info() {
         tail -n 1 ${log_path}/unittest.log >> ${log_path}/unittest_FAIL.log
         echo -e "\033[31m ${log_path}/unittest_FAIL \033[0m"
         cat ${log_path}/unittest_FAIL.log
-        cp ${log_path}/unittest_FAIL.log ${PPNLP_HOME}/upload/unittest_FAIL.log.${AGILE_PIPELINE_BUILD_ID}.${AGILE_JOB_BUILD_ID}
-        cd ${PPNLP_HOME} && python upload.py ${PPNLP_HOME}/upload 'paddlenlp/PaddleNLP_CI/PaddleNLP-CI-Unittest-GPU'
-        rm -rf upload/* && cd -
+        if [ -n "${AGILE_JOB_BUILD_ID}" ]; then
+            cp ${log_path}/unittest_FAIL.log ${PPNLP_HOME}/upload/unittest_FAIL.log.${AGILE_PIPELINE_BUILD_ID}.${AGILE_JOB_BUILD_ID}
+            cd ${PPNLP_HOME} && python upload.py ${PPNLP_HOME}/upload 'paddlenlp/PaddleNLP_CI/PaddleNLP-CI-Unittest-GPU'
+            rm -rf upload/* && cd -
+        fi
         if [ $1 -eq 124 ]; then
             echo "\033[32m [failed-timeout] Test case execution was terminated after exceeding the ${running_time} min limit."
         fi
@@ -82,19 +85,25 @@ print_info() {
 
 get_diff_TO_case(){
 export FLAGS_enable_CI=false
-for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
-    ext="${file_name##*.}"
-    echo "file_name: ${file_name}, ext: ${file_name##*.}"
-    
-    if [ ! -f ${file_name} ];then # 针对pr删掉文件
-        continue
-    elif [[ "$ext" == "md" || "$ext" == "rst" || "$file_name" == docs/* ]]; then
-        continue
-    else
-        FLAGS_enable_CI=true
-    fi
-done
+if [ -z "${AGILE_COMPILE_BRANCH}" ]; then
+    # 定时任务回归测试
+    export FLAGS_enable_CI=true
+else
+    for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+        ext="${file_name##*.}"
+        echo "file_name: ${file_name}, ext: ${file_name##*.}"
+
+        if [ ! -f ${file_name} ];then # 针对pr删掉文件
+            continue
+        elif [[ "$ext" == "md" || "$ext" == "rst" || "$file_name" == docs/* ]]; then
+            continue
+        else
+            FLAGS_enable_CI=true
+        fi
+    done
+fi
 }
+
 get_diff_TO_case
 set_env
 if [[ ${FLAGS_enable_CI} == "true" ]] || [[ ${FLAGS_enable_CE} == "true" ]];then
@@ -111,12 +120,16 @@ if [[ ${FLAGS_enable_CI} == "true" ]] || [[ ${FLAGS_enable_CE} == "true" ]];then
     exit_code=$?
     print_info $exit_code unittest
 
-    cd ${nlp_dir}
-    echo -e "\033[35m ---- Generate Allure Report  \033[0m"
-    unset http_proxy && unset https_proxy
-    cp scripts/regression/gen_allure_report.py ./
-    python gen_allure_report.py > /dev/null
-    echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
+    if [ -n "${AGILE_JOB_BUILD_ID}" ]; then
+        cd ${nlp_dir}
+        echo -e "\033[35m ---- Generate Allure Report  \033[0m"
+        unset http_proxy && unset https_proxy
+        cp scripts/regression/gen_allure_report.py ./
+        python gen_allure_report.py > /dev/null
+        echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
+    else
+        echo "AGILE_JOB_BUILD_ID is empty, skip generate allure report"
+    fi
 else
     echo -e "\033[32m Changed Not CI case, Skips \033[0m"
     exit_code=0
