@@ -109,6 +109,13 @@ def get_col_major_tma_aligned_tensor(x: Tensor) -> Tensor:
     assert x.dim() in (2, 3)
     remove_dim = False
     if x.dim() == 2:
+        m, n = x.shape
+
+        aligned_m = get_tma_aligned_size(m, x.element_size())
+
+        if aligned_m == m and x.strides[0] == 1 and x.strides[1] == aligned_m:
+            return x
+
         x, remove_dim = x.unsqueeze(0), True
 
     b, m, n = x.shape

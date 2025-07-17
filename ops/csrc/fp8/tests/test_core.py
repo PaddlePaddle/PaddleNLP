@@ -114,10 +114,8 @@ def construct_grouped(
 
 def test_gemm() -> None:
     print("Testing GEMM:")
-    for m in (64,):
-        for k, n in [
-            (7168, 2112),
-        ]:
+    for m in (64, 128, 4096):
+        for k, n in [(7168, 2112), (1536, 24576), (512, 32768), (16384, 7168), (7168, 4096), (2048, 7168)]:
             x_fp8, y_fp8, out, ref_out = construct(m, k, n)
             deep_gemm.gemm_fp8_fp8_bf16_nt(x_fp8, y_fp8, out)
             diff = calc_diff(out, ref_out)
@@ -129,7 +127,7 @@ def test_gemm() -> None:
 def test_m_grouped_gemm_contiguous() -> None:
     print("Testing grouped contiguous GEMM:")
 
-    for num_groups, m, k, n in ((4, 8192, 7168, 4096),):
+    for num_groups, m, k, n in ((8, 4096, 7168, 4096), (8, 4096, 2048, 7168), (4, 8192, 2048, 7168), (4, 8192, 7168, 4096), ):
         # TODO: make a stronger test
         x_fp8, y_fp8, out, ref_out = construct_grouped(num_groups, m, k, n, is_masked=False)
         m_indices = paddle.arange(0, num_groups, dtype=paddle.int32)
@@ -144,9 +142,9 @@ def test_m_grouped_gemm_contiguous() -> None:
 
 def test_m_grouped_gemm_masked() -> None:
     print("Testing grouped masked GEMM:")
-
-    for num_groups, m in ((1, 1024),):
-        for k, n in ((7168, 4096),):
+    
+    for num_groups, m in ((1, 1024), (2, 512), (4, 256)):
+        for k, n in ((7168, 4096), (2048, 7168), ):
             # Test correctness
             masked_m_candidates = list(filter(lambda candidate: candidate <= m, (64, 128, 192, 256, 320, 384)))
             for i in range(10):
@@ -158,7 +156,7 @@ def test_m_grouped_gemm_masked() -> None:
                 masked_m_float = paddle.cast(masked_m, "float32")
                 masked_m_mean = paddle.mean(masked_m_float)
                 masked_m_mean_int = paddle.cast(masked_m_mean, "int32")
-                expected_m = min(masked_m_mean_int + 1, m)
+                expected_m = min(int(masked_m_mean_int + 1), m)
                 deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_masked(x_fp8, y_fp8, out, masked_m, expected_m)
                 for j in range(num_groups):
                     diff = calc_diff(out[j, : masked_m[j].item()], ref_out[j, : masked_m[j].item()])
