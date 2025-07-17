@@ -435,7 +435,7 @@ class OverlapedScheduleChunk:
     def forward_backward(self, inputs, output_grad, event_to_wait=None):
         for n in self.nodes:
             inputs, output_grad, event_to_wait = n.forward_backward(inputs, output_grad, event_to_wait)
-        return inputs, output_grad
+        return inputs, output_grad, None
 
 
 class OverlapedScheduleNode:
