@@ -160,6 +160,7 @@ class UnZipNode:
                 num_experts=num_experts,
                 tokens_per_expert=tokens_per_expert,
                 padding_multiplex=128,
+                fill_output=True,
             )
         else:
             with paddle.amp.auto_cast(False):
@@ -236,6 +237,7 @@ class ZipNode:
                 num_experts,
                 tokens_per_expert,
                 padding_multiplex=128,
+                fill_output=True,
             )
             return (unzipped_grad, unzipped_scale_grad)
         else:

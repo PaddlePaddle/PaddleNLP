@@ -629,7 +629,7 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
             output_combine_grad,
             async_finish=async_finish,
             previous_event=quant_event,
-            allocate_on_comm_stream=allocate_on_comm_stream,
+            allocate_on_comm_stream=allocate_on_comm_stream and quant_event is not None,
         )
 
         ret = (hidden_states_grad, residual_grad, l_aux_grad, hidden_states_out_grad)
