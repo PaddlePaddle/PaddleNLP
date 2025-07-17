@@ -63,9 +63,6 @@ all_P0case_dic=(["msra_ner"]=15
     ["llm"]=5)
 ####################################
 
-python -m pip config --user unset global.index
-python -m pip config --user unset global.index-url
-python -m pip config --user unset global.trusted-host
 python -m pip config --user set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 python -m pip config --user set global.trusted-host pypi.tuna.tsinghua.edu.cn
 
