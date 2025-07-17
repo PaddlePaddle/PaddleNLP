@@ -663,7 +663,6 @@ class Fp8CombineQuantNode:
                 event_to_wait.comm_stream_wait( self.moe_group.id)
                 buffer = get_buffer(self.token_dispatcher._comm_manager.group, get_hidden_bytes(output_grad))
                 custom_stream = paddle.device.Stream(stream_base=buffer.runtime.get_comm_stream())
-                custom_stream.wait_event(event_to_wait)
             else:
                 custom_stream = paddle.device.current_stream()
             with paddle.device.stream_guard(custom_stream):
@@ -868,7 +867,7 @@ class FusionMoeNode:
             is_split_group_gemm=is_split_group_gemm,
         )
         self.combine_node = Fp8CombineNode(self.token_dispatcher)
-        self.combine_quant_node = Fp8CombineQuantNode(self.token_dispatcher)
+        self.combine_quant_node = Fp8CombineQuantNode(self.token_dispatcher, custom_map.moe_group)
         self.name = name
 
     @paddle.no_grad()
