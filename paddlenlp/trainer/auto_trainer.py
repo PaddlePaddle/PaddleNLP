@@ -111,6 +111,9 @@ class AutoTrainer(Trainer):
         self.runtime_profiler = RuntimeProfiler(self.runtime_profiler_args)
         self.runtime_profiler.set_time_profiler(start_iter=10, end_iter=20)
         self.runtime_profiler.set_memory_profiler(max_profile_memory_iter=5)
+        
+        # @added by linguangming
+        self.input_label_mesh_list = kwargs['input_label_mesh_list']
 
     @classmethod
     def parallel_model(cls, model, training_args: AutoTrainingArguments):
@@ -170,6 +173,8 @@ class AutoTrainer(Trainer):
         return model
 
     def _get_meshes_for_loader(self):
+        return self.input_label_mesh_list        
+        
         def _get_mesh(pp_idx=0):
             return self.global_mesh.get_mesh_with_dim("pp")[pp_idx]  # [NOTE] 注意此处需要修改
 
@@ -225,12 +230,12 @@ class AutoTrainer(Trainer):
                 )
             else:
                 self.optimizer = dist.shard_optimizer(self.optimizer, None, self.args.gradient_accumulation_steps)
-            print(f'[linguangming] after shard_optimizer, the model is')  # [NOTE] 查看是否能够看出参数的拆分效果
-            print(model)
-            for name, param in model.named_parameters():
-                print(f'[linguangming] now auto_trainer.py line 230, param name: {name}')
-                print(param.shape)
-                print(param._local_shape)
+            # print(f'[linguangming] after shard_optimizer, the model is')  # [NOTE] 查看是否能够看出参数的拆分效果
+            # print(model)
+            # for name, param in model.named_parameters():
+            #     print(f'[linguangming] now auto_trainer.py line 230, param name: {name}')
+            #     print(param.shape)
+            #     print(param._local_shape)
             # print(f'[linguangming] now auto_trainer.py line 230, exit')
             # exit(0)
 

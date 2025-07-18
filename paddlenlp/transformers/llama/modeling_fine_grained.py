@@ -822,7 +822,7 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
         config: LlamaConfig
     """
 
-    def __init__(self, config: LlamaConfig, meshs:List[dist.ProcessMesh], pp_division:List[List[int]]):
+    def __init__(self, config: LlamaConfig, meshs:List[dist.ProcessMesh], pp_division:List[List[int]], redistributed_flag=None):
         super().__init__(config)
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
@@ -830,6 +830,7 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
         self.meshs = meshs
         self.pp_division = pp_division
+        self.redistributed_flag = redistributed_flag
         
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
@@ -839,7 +840,7 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
         )
 
         embedding_placements = (
-            [dist.Replicate(), dist.Shard(1)] # NOTE 这个是数据并行放在最前面，所以是正确的，这样就能保证张量并行是在相邻的,但是为什么是在hidden_size维度上进行切分？？？(好像也没什么特别的区别)
+            [dist.Replicate(), dist.Shard(1)] # NOTE 
             if self.config.tensor_parallel_degree > 1
             else [dist.Replicate(), dist.Replicate()]
         )
@@ -848,7 +849,7 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
             self.meshs[0],
             embedding_placements,
         )
-        setattr(self.embed_tokens.weight, 'zero_stage', 2)
+        # setattr(self.embed_tokens.weight, 'zero_stage', 2) #  [NOTE] add zero type
 
         def is_pipeline_stage_first_layer_func(layer_index):
             for i in range(len(self.pp_division)):
@@ -875,9 +876,7 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
         from paddlenlp.experimental.galvatron.runtime.redistributed import DummyLayer
         for i in range(config.num_hidden_layers):
             decoder_layer = LlamaDecoderLayerFineGrained(config, i not in self.no_recompute_layers, self.meshs[i + 1])
-            # 不使用dummy layer
-            decoder_layers.append(decoder_layer)
-            # 使用dummy layer
+            decoder_layers.append(decoder_layer) # 不使用dummy layer
             # if layer_stage_id(i) == rank_stage_id():
             #     decoder_layers.append(decoder_layer)
             # else:
@@ -886,9 +885,9 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
             self.is_pipeline_stage_first_layer[i] = is_pipeline_stage_first_layer_func(i)   
 
         self.layers = nn.LayerList(decoder_layers)
-        self.norm = LlamaRMSNormFineGrained(config, self.meshs[-1])
+        self.norm = LlamaRMSNormFineGrained(config, self.meshs[-2])  #  TODO 此处是使用-1嘛？好像并不是-1 此处应该是-2
 
-        self.gradient_checkpointing = False # [NOTE] 这个是干啥的 unused
+        self.gradient_checkpointing = False # [NOTE] unused
 
         self.placements = (
             [dist.Shard(1), dist.Shard(0)] if self.config.sequence_parallel else [dist.Shard(0), dist.Replicate()]
@@ -952,6 +951,8 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
         return_dict=False,
         **kwargs,
     ):
+        from paddlenlp.experimental.galvatron.runtime.redistributed import RedistributedLayer, DummyRedistributedLayer
+        
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -1025,6 +1026,12 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
         hidden_states = inputs_embeds
         hidden_states = dist.reshard(hidden_states, self.meshs[0], self.placements) # [NOTE] 此处修改
         print(f'after embedding hidden_states is {hidden_states}')
+        if not isinstance(self.redistributed_flag[0], int):
+            print(f'[linguangming] [modeling_fine_grained.py], after embedding, hidden_states need to be redistributed')
+            if dist.get_rank() in hidden_states.process_mesh.process_ids:
+                hidden_states = RedistributedLayer.apply(hidden_states, self.redistributed_flag[0])
+            else:
+                hidden_states = DummyRedistributedLayer.apply(hidden_states, self.redistributed_flag[0])
         
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
@@ -1032,7 +1039,8 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
         next_decoder_cache = () if use_cache else None
         for idx, (decoder_layer) in enumerate(self.layers):
             rank = dist.get_rank()
-                
+            print(f'[linguangming] idx {idx}, hidden_states {hidden_states}')
+            
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
             past_key_value = past_key_values[idx] if past_key_values is not None else None
@@ -1074,15 +1082,13 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
             
             # pp stage, hidden_states transfer to next stage
             if self.is_pipeline_stage_first_layer[idx]:
-                print(f'[linguangming] [modeling_fine_grained.py], rank {rank} is pipeline stage first layer {idx}, hidden_states mesh: {hidden_states.process_mesh}, decoder_layer mesh: {decoder_layer.mesh}')
                 hidden_states = dist.reshard(hidden_states, decoder_layer.mesh, self.placements)
-            
+                
             from paddlenlp.experimental.galvatron.runtime.redistributed import DummyLayer
             if isinstance(decoder_layer, DummyLayer):
                 if self.enable_recompute and idx not in self.no_recompute_layers and has_gradient and self.recompute_granularity == "full":
                     layer_outputs = recompute(decoder_layer, hidden_states)
                 else:
-                    print(f'[linguangming] [modeling_fine_grained.py], rank {rank}, running dummy layer {idx}')
                     layer_outputs = decoder_layer(hidden_states)
             else:    
                 if (
@@ -1123,26 +1129,21 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
                 
-            if idx != len(self.layers) - 1 and hidden_states.process_mesh.shape[0] != self.layers[idx + 1].mesh.shape[0] and dist.get_rank() in hidden_states.process_mesh.process_ids:
-                print(f'[linguangming] [modeling_fine_grained.py], layer{idx} -> layer{idx + 1} should call redistributed')
-                from paddlenlp.experimental.galvatron.runtime.redistributed import SpiltBatchFwdGatherBatchBwd, GatherBatchFwdSplitBatchBwd
-                if hidden_states.process_mesh.shape[0] < self.layers[idx + 1].mesh.shape[0]: # dp degree increase
-                    hidden_states = SpiltBatchFwdGatherBatchBwd.apply(hidden_states, self.layers[idx + 1].mesh)
-                elif hidden_states.process_mesh.shape[0] > self.layers[idx + 1].mesh.shape[0]: # dp degree decrease
-                    hidden_states = GatherBatchFwdSplitBatchBwd.apply(hidden_states, self.layers[idx + 1].mesh)
-                    
-            if idx != len(self.layers) - 1 and hidden_states.process_mesh.shape[0] != self.layers[idx + 1].mesh.shape[0] and dist.get_rank() not in hidden_states.process_mesh.process_ids:
-                print(f'[linguangming] skip but use apply to generate comm group')
-                from paddlenlp.experimental.galvatron.runtime.redistributed import DummyRedistributed
-                hidden_states = DummyRedistributed.apply(hidden_states, self.layers[idx + 1].mesh)
-                # from paddlenlp.experimental.galvatron.runtime.redistributed import SpiltBatchFwdGatherBatchBwd, GatherBatchFwdSplitBatchBwd
-                # if hidden_states.process_mesh.shape[0] < self.layers[idx + 1].mesh.shape[0]: # dp degree increase
-                #     hidden_states = SpiltBatchFwdGatherBatchBwd.apply(hidden_states, self.layers[idx + 1].mesh)
-                # elif hidden_states.process_mesh.shape[0] > self.layers[idx + 1].mesh.shape[0]: # dp degree decrease
-                #     hidden_states = GatherBatchFwdSplitBatchBwd.apply(hidden_states, self.layers[idx + 1].mesh)
+            if not isinstance(self.redistributed_flag[idx + 1], int): # [NOTE] 注意需要加1
+                if dist.get_rank() in hidden_states.process_mesh.process_ids:
+                    print(f'[linguangming] [modeling_fine_grained.py], layer{idx} -> layer{idx + 1} should call redistributed')
+                    hidden_states = RedistributedLayer.apply(hidden_states, self.redistributed_flag[idx + 1])
+                else:
+                    print(f'[linguangming] [modeling_fine_grained.py], layer{idx} -> layer{idx + 1} should call dummy redistributed')
+                    hidden_states = DummyRedistributedLayer.apply(hidden_states, self.redistributed_flag[idx + 1])
 
         # norm layer
         hidden_states = self.norm(hidden_states)
+        if not isinstance(self.redistributed_flag[-2], int):
+            if dist.get_rank() in hidden_states.process_mesh.process_ids:
+                hidden_states = RedistributedLayer.apply(hidden_states, self.redistributed_flag[-2])
+            else:
+                hidden_states = DummyRedistributedLayer.apply(hidden_states, self.redistributed_flag[-2])
 
         # add hidden states from the last decoder layer
         if output_hidden_states:
@@ -1177,6 +1178,73 @@ class LlamaPretrainingCriterionFineGrained(paddle.nn.Layer):
         self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
     def forward(self, prediction_scores, masked_lm_labels):
+        print(f'[linguangming] [modeling_fine_grained.py], prediction_scores mesh.shape is {prediction_scores.process_mesh.shape}')
+        print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels mesh.shape is {masked_lm_labels.process_mesh.shape}')
+        print(f'[linguangming] [modeling_fine_grained.py], prediction_scores shape is {prediction_scores.shape}')
+        print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels shape is {masked_lm_labels.shape}')
+        print(f'[linguangming] [modeling_fine_grained.py], prediction_scores local_shape is {prediction_scores._local_shape}')
+        print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels local_shape is {masked_lm_labels._local_shape}')
+        print(f'[linguangming] [modeling_fine_grained.py], prediction_scores.stop_gradient is {prediction_scores.stop_gradient}')
+        print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels.stop_gradient is {masked_lm_labels.stop_gradient}')
+        
+        # # print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels dir is  {dir(masked_lm_labels)}')
+        # # for attr in dir(masked_lm_labels):
+        # #     # 跳过内置方法（以双下划线开头）
+        # #     if not attr.startswith('__'):
+        # #         try:
+        # #             value = getattr(masked_lm_labels, attr)
+        # #             print(f"{attr}: {value}")
+        # #         except Exception as e:
+        # #             print(f"{attr}: <无法获取值，错误: {e}>")
+        # print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels.optimize_attr is {masked_lm_labels.optimize_attr}')
+        # print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels.dist_attr is {masked_lm_labels.dist_attr}')
+        # print(f'[linguangming] [modeling_fine_grained.py],  prediction_scores is {prediction_scores}')
+        # print(f'[linguangming] [modeling_fine_grained.py],  masked_lm_labels is {masked_lm_labels}')
+        
+        if masked_lm_labels.process_mesh.shape[0] != prediction_scores.process_mesh.shape[0]:
+            print(f'[linguangming] [modeling_fine_grained.py], prediction_scores and masked_lm_labels should be in the same mesh')
+            if dist.get_rank() in prediction_scores.process_mesh.process_ids:
+                from paddlenlp.experimental.galvatron.runtime.redistributed import split_batch, gather_batch
+                if masked_lm_labels.process_mesh.shape[0] < prediction_scores.process_mesh.shape[0]: # dp increase -> split batch
+                    masked_lm_labels = split_batch(masked_lm_labels, prediction_scores.process_mesh)
+                elif masked_lm_labels.process_mesh.shape[0] > prediction_scores.process_mesh.shape[0]: # dp decrease -> gather batch
+                    masked_lm_labels = gather_batch(masked_lm_labels, prediction_scores.process_mesh)
+            else:
+                from paddlenlp.experimental.galvatron.runtime.redistributed import get_dummy_dtensor
+                masked_lm_labels = get_dummy_dtensor(masked_lm_labels, prediction_scores.process_mesh)
+        
+        # if masked_lm_labels.process_mesh.shape[0] != prediction_scores.process_mesh.shape[0]:
+        #     print(f'[linguangming] [modeling_fine_grained.py], prediction_scores and masked_lm_labels should be in the same mesh')
+        #     if dist.get_rank() in prediction_scores.process_mesh.process_ids:
+        #         from paddlenlp.experimental.galvatron.runtime.redistributed import DummyRedistributedLayerWithoutSequenceParallel, RedistributedLayerWithoutSequenceParallel
+        #         prediction_scores = RedistributedLayerWithoutSequenceParallel.apply(prediction_scores, masked_lm_labels.process_mesh)
+        #     else:
+        #         from paddlenlp.experimental.galvatron.runtime.redistributed import DummyRedistributedLayerWithoutSequenceParallel, RedistributedLayerWithoutSequenceParallel
+        #         prediction_scores = DummyRedistributedLayerWithoutSequenceParallel.apply(prediction_scores, masked_lm_labels.process_mesh)        
+        print(f'[linguangming] [modeling_fine_grained.py], prediction_scores mesh.shape is {prediction_scores.process_mesh.shape}')
+        print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels mesh.shape is {masked_lm_labels.process_mesh.shape}')
+        print(f'[linguangming] [modeling_fine_grained.py], prediction_scores shape is {prediction_scores.shape}')
+        print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels shape is {masked_lm_labels.shape}')
+        print(f'[linguangming] [modeling_fine_grained.py], prediction_scores local_shape is {prediction_scores._local_shape}')
+        print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels local_shape is {masked_lm_labels._local_shape}')
+        print(f'[linguangming] [modeling_fine_grained.py], prediction_scores.stop_gradient is {prediction_scores.stop_gradient}')
+        print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels.stop_gradient is {masked_lm_labels.stop_gradient}')
+        
+        # print(f'[linguangming] [modeling_fine_grained.py],  prediction_scores is {prediction_scores}')
+        # print(f'[linguangming] [modeling_fine_grained.py],  masked_lm_labels is {masked_lm_labels}')
+        # # print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels dir is  {dir(masked_lm_labels)}')
+        # # for attr in dir(masked_lm_labels):
+        # #     # 跳过内置方法（以双下划线开头）
+        # #     if not attr.startswith('__'):
+        # #         try:
+        # #             value = getattr(masked_lm_labels, attr)
+        # #             print(f"{attr}: {value}")
+        # #         except Exception as e:
+        # #             print(f"{attr}: <无法获取值，错误: {e}>")
+        # print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels.optimize_attr is {masked_lm_labels.optimize_attr}')
+        # print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels.dist_attr is {masked_lm_labels.dist_attr}')
+        
+        
         if self.enable_parallel_cross_entropy:
             if prediction_scores.shape[-1] == self.config.vocab_size:
                 warnings.warn(
@@ -1254,12 +1322,14 @@ class LlamaLMHeadFineGrained(nn.Layer):
 class LlamaForCausalLMFineGrained(LlamaPretrainedModelFineGrained):
     enable_to_static_method = True
 
-    def __init__(self, config, meshs:List[dist.ProcessMesh], pp_division:List[List[int]]):  # 直接传递mesh 好像有点粗暴
+    def __init__(self, config, meshs:List[dist.ProcessMesh], pp_division:List[List[int]], redistributed_flag=None):  # 直接传递mesh 好像有点粗暴
         super().__init__(config)
         self.config = config
         self.meshs = meshs
+        self.pp_division = pp_division
+        self.redistributed_flag = redistributed_flag
         
-        self.llama = LlamaModelFineGrained(config, meshs, pp_division) # 这个地方传递一个策略描述器会好一些，算了，先直接写成是传递一个list[mesh]
+        self.llama = LlamaModelFineGrained(config, meshs, pp_division, redistributed_flag) # 这个地方传递一个策略描述器会好一些，算了，先直接写成是传递一个list[mesh]
         self.lm_head = LlamaLMHeadFineGrained(config, meshs[-1])
 
     def get_input_embeddings(self):
@@ -1371,7 +1441,7 @@ class LlamaForCausalLMFineGrained(LlamaPretrainedModelFineGrained):
         if self.config.sequence_parallel:
             hidden_states = dist.reshard(
                 hidden_states,
-                self.meshs[-1],
+                self.meshs[-1],   # TODO 此处是-1嘛？？
                 [dist.Shard(1), dist.Replicate()],
             )
             hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
@@ -1384,4 +1454,6 @@ class LlamaForCausalLMFineGrained(LlamaPretrainedModelFineGrained):
 
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output) # actually, tensor_parallel_output is unused
 
+        print(f'[linguangming]  logits.mesh.shape is {logits.process_mesh.shape}')
+        
         return logits

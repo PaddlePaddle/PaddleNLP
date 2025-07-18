@@ -206,7 +206,7 @@ class LlamaRMSNormAuto(nn.Layer):
         self.weight = dist.shard_tensor(
             self.weight,
             get_mesh(self.ipp),
-            [dist.Replicate(), dist.Replicate()],
+            [dist.Replicate(), dist.Replicate()], # [NOTE] 切换为ulysees时，好像是需要有三维的replicate
         )
         self.variance_epsilon = config.rms_norm_eps
         self.config = config
@@ -241,28 +241,28 @@ class LlamaMLPAuto(nn.Layer):
             self.gate_up_fused_proj.weight = dist.shard_tensor(
                 self.gate_up_fused_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements, # [NOTE] 切换为ulysees时，需要使用特定的函数
             )
         else:
             self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.gate_proj.weight = dist.shard_tensor(
                 self.gate_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements, # [NOTE] 切换为ulysees时，需要使用特定的函数
             )
 
             self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.up_proj.weight = dist.shard_tensor(
                 self.up_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements, # [NOTE] 切换为ulysees时，需要使用特定的函数
             )
 
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
         self.down_proj.weight = dist.shard_tensor(
             self.down_proj.weight,
             get_mesh(self.ipp),
-            rowise_placement,
+            rowise_placement, # [NOTE] 切换为ulysees时，需要使用特定的函数
         )
 
     def forward(self, x):
@@ -322,7 +322,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.qkv_proj.weight = dist.shard_tensor(
                 self.qkv_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements, # [NOTE] 切换为ulysees时，需要使用特定的函数
             )
 
         else:
@@ -334,7 +334,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.q_proj.weight = dist.shard_tensor(
                 self.q_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements, # [NOTE] 切换为ulysees时，需要使用特定的函数
             )
 
             self.k_proj = nn.Linear(
@@ -345,7 +345,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.k_proj.weight = dist.shard_tensor(
                 self.k_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements, # [NOTE] 切换为ulysees时，需要使用特定的函数
             )
 
             self.v_proj = nn.Linear(
@@ -356,7 +356,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.v_proj.weight = dist.shard_tensor(
                 self.v_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements, # [NOTE] 切换为ulysees时，需要使用特定的函数
             )
 
         self.o_proj = nn.Linear(
@@ -367,7 +367,7 @@ class LlamaAttentionAuto(nn.Layer):
         self.o_proj.weight = dist.shard_tensor(
             self.o_proj.weight,
             get_mesh(self.ipp),
-            rowise_placement,
+            rowise_placement, # [NOTE] 切换为ulysees时，需要使用特定的函数
         )
 
         if config.rope:
@@ -424,9 +424,10 @@ class LlamaAttentionAuto(nn.Layer):
             hidden_states = dist.reshard(
                 hidden_states,
                 get_mesh(self.ipp),
-                [dist.Shard(1), dist.Replicate()],
+                [dist.Shard(1), dist.Replicate()], # [NOTE] 切换为ulysees时，需要3维
             )
 
+        # [NOTE] 以下需要修改一堆
         if self.fuse_attention_qkv and not enable_fuse_ffn_qkv_pass():
             target_shape = [0, 0, self.num_key_value_heads, (self.num_key_value_groups + 2) * self.head_dim]
             mix_layer = self.qkv_proj(hidden_states)

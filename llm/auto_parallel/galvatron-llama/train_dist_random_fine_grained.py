@@ -423,6 +423,7 @@ def main():
         # meshs = [dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", "mp"]) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4], [5], [6], [7]], dim_names=["dp", "mp"]) for _ in range(ave_layers)]
         # meshs = [dist.ProcessMesh([[0, 1, 2, 3]], dim_names=["dp", "mp"]) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4, 5, 6, 7]], dim_names=["dp", "mp"]) for _ in range(ave_layers)]
         meshs = [dist.ProcessMesh([[0, 1], [2, 3]], dim_names=["dp", "mp"]) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4, 5], [6, 7]], dim_names=["dp", "mp"]) for _ in range(ave_layers)]
+        meshs += [dist.ProcessMesh([[4, 5],  [6, 7]], dim_names=['dp','mp']), dist.ProcessMesh([[4, 5],  [6, 7]], dim_names=['dp','mp'])]
     elif pp == 2 and tp == 1 and dp == 4:
         meshs = [dist.ProcessMesh([[0], [1], [2], [3]], dim_names=['dp', 'mp']) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4], [5], [6], [7]], dim_names=['dp', 'mp']) for _ in range(ave_layers)]
     elif pp == 2 and tp == 4 and dp == 1:
@@ -436,12 +437,42 @@ def main():
         
     # one demo
     if pp == 2 and tp == 2 and dp == 2:
+        redistributed_flag = [0] * (num_layers + 1 + 2)
         meshs[2] = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", "mp"])
+        redistributed_flag[1] = meshs[2]
+        redistributed_flag[2] = meshs[3]
+        
+        meshs[-1] = dist.ProcessMesh([[4], [5], [6], [7]], dim_names=["dp", "mp"])
+        redistributed_flag[-2] = meshs[-1]
+        
+        meshs[4] = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", "mp"])
+        redistributed_flag[3] = meshs[4]
+        redistributed_flag[4] = dist.ProcessMesh([[0, 1],  [2, 3]], dim_names=["dp", "mp"])  # 此时 变成了[0,1,2,3] 导致和后面的shape不一致了
+        
+        # meshs[5]  = dist.ProcessMesh([[4, 5, 6, 7]], dim_names=["dp", "mp"])
+        # redistributed_flag[4] =  dist.ProcessMesh([[0, 1, 2, 3]], dim_names=["dp", "mp"])  # 此时 变成了[0,1,2,3] 导致和后面的shape不一致了
+        # redistributed_flag[5] = meshs[6]
+        
+        # meshs[6] = dist.ProcessMesh([[4], [5], [6], [7]], dim_names=["dp", "mp"])
+        # redistributed_flag[5] = meshs[6]
+        # redistributed_flag[6] = meshs[7]
+        
+        
         # meshs[2] = dist.ProcessMesh([[0, 1, 2, 3]], dim_names=["dp", "mp"])
         # meshs[2] = dist.ProcessMesh([[0, 1], [2, 3]], dim_names=["dp", "mp"])
         # meshs[3] = dist.ProcessMesh([[4], [5], [6
-        pass
+        # pass
         # meshs[6] = dist.ProcessMesh([[4], [5], [6], [7]], dim_names=["dp", "mp"])
+        # if dist.get_rank() in [4, 5, 6, 7]:
+        #     redistributed_flag[5] = meshs[6]
+        #     redistributed_flag[6] = meshs[7]
+        # meshs[5] = dist.ProcessMesh([[4, 5, 6, 7]], dim_names=["dp", "mp"])
+        # if  dist.get_rank() in [4, 5, 6, 7]:
+        #     redistributed_flag[5] = meshs[6]
+        # if  dist.get_rank() in  [0, 1, 2, 3]:
+        #     redistributed_flag[4] = dist.ProcessMesh([[0, 1, 2, 3]], dim_names=["dp", "mp"])  #   此时 变成了[0,1,2,3] 导致和后面的shape不一致了
+        
+        
     elif pp == 2 and tp == 1 and dp == 4:
         # meshs[2] = dist.ProcessMesh([[0, 1, 2, 3]], dim_names=['dp', 'mp'])
         meshs[2] = dist.ProcessMesh([[0, 1], [2, 3]], dim_names=['dp', 'mp'])
@@ -450,24 +481,29 @@ def main():
     elif pp == 1 and tp == 2 and dp == 4:
         meshs[2] = dist.ProcessMesh([[0, 1, 2, 3], [4, 5, 6, 7]], dim_names=['dp', 'mp'])
     elif pp == 1 and tp == 4 and dp == 2:
+        redistributed_flag = [0] * (num_layers + 1 + 2)
         meshs[2] = dist.ProcessMesh([[0, 1], [2, 3], [4, 5], [6, 7]], dim_names=['dp', 'mp'])
+        redistributed_flag[1] = meshs[2]
+        redistributed_flag[2] = meshs[3]
         # meshs[3] = dist.ProcessMesh([[0, 1], [2, 3], [4, 5], [6, 7]], dim_names=['dp', 'mp'])
-        # meshs[6] = dist.ProcessMesh([[0], [1], [2], [3], [4], [5], [6], [7]], dim_names=['dp', 'mp']) # 第五层
+        meshs[6] = dist.ProcessMesh([[0], [1], [2], [3], [4], [5], [6], [7]], dim_names=['dp', 'mp']) # 第五层
+        redistributed_flag[5] = meshs[6]
+        redistributed_flag[6] = meshs[7]
     else:
         assert False, f"Unsupported pp={pp}, tp={tp}, dp={dp} configuration for now."
+        
+    if pp == 1:
+        input_label_mesh_list = meshs[0]
+    else:
+        input_label_mesh_list = [meshs[0], dist.ProcessMesh([[4, 5], [6, 7]], dim_names=['dp', 'mp'])] # 注意此处 不是mesg[-1], 应该修改为和meshs[0]一样shape的mesh
+        # input_label_mesh_list = [meshs[0], meshs[-1]] # 注意此处 不是mesg[-1], 应该修改为和meshs[0]一样shape的mesh
     
     print("[auto-parallel] meshs:")
     for i, mesh in enumerate(meshs):
         print(f"Layer {i}: {mesh.process_ids} with dim_names {mesh.dim_names} and mesh shape {mesh.shape}")
 
-    # from paddlenlp.experimental.galvatron.runtime.redistributed import add_comm_group
-    # add_comm_group([0, 2])
-    # add_comm_group([1, 3])
-    # add_comm_group([4, 6])
-    # add_comm_group([5, 7])
-
     with paddle.LazyGuard():
-        model = model_class.from_config(config, dtype="float32", meshs=meshs, pp_division=pp_division)
+        model = model_class.from_config(config, dtype="float32", meshs=meshs, pp_division=pp_division, redistributed_flag=redistributed_flag)
         criterion = criterion_class(config)
 
     print("[auto-parallel] Model and criterion initialized.")
@@ -518,6 +554,7 @@ def main():
         eval_dataset=None,
         optimizers=(None, lr_scheduler),
         runtime_profiler_args=runtime_profiler_args,
+        input_label_mesh_list=input_label_mesh_list,
     )
     print("[auto-parallel] PretrainingTrainer OK")    
     

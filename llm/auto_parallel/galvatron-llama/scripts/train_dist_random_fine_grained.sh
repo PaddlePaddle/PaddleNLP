@@ -68,10 +68,10 @@ CONFIG_ARGS="
 PARALLEL_ARGS=(
     --to_static 1
     --sharding_parallel_degree 2
-    --sharding "stage3"
-    --tensor_parallel_degree 4
+    --sharding "stage2"
+    --tensor_parallel_degree 2
     --sequence_parallel true
-    --pipeline_parallel_degree 1
+    --pipeline_parallel_degree 2
     --virtual_pp_degree 1
     --pipeline_schedule_mode "1F1B"
     --sep_parallel_degree 1

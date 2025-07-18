@@ -69,14 +69,14 @@ CONFIG_ARGS="
 # [dp_deg, dp_type] [tp_deg, megatron-sp] [pp_deg, 1F1B] [parallel_configs]
 PARALLEL_ARGS=(
     --to_static 1
-    --sharding_parallel_degree 1
-    --sharding "stage2"
-    --tensor_parallel_degree 8
+    --sharding_parallel_degree 2
+    --sharding "stage3"
+    --tensor_parallel_degree 1
     --sequence_parallel true
-    --pipeline_parallel_degree 1
+    --pipeline_parallel_degree 2
     --virtual_pp_degree 1
     --pipeline_schedule_mode "1F1B"
-    --sep_parallel_degree 1
+    --sep_parallel_degree 2
     --pipeline_parallel_config "enable_send_recv_overlap"
     --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate"
     --sharding_parallel_config "enable_overlap enable_release_grads"
