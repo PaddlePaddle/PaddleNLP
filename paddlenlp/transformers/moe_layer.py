@@ -906,7 +906,7 @@ class FusionMoeNode:
 
     @paddle.no_grad()
     def backward(self, output_grad, with_dw=True):
-        output_combine_grad = self.combine_quant_node.backward(output_grad)
+        output_combine_grad, _ = self.combine_quant_node.backward(output_grad)
         hidden_states_out_grad = self.combine_node.backward(output_combine_grad)
 
         hs_dispatched_grad, dispatched_probs_grad = self.mlp_node.backward(hidden_states_out_grad, with_dw=with_dw)
