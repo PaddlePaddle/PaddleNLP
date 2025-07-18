@@ -363,7 +363,7 @@ def main():
         training_args.no_recompute_layers.sort()
 
     if training_args.enable_linear_fused_grad_add:
-        from utils.fused_layers import mock_layers
+        from paddle.incubate.nn import mock_layers
 
         mock_layers()
 
