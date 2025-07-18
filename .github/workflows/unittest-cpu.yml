@@ -94,14 +94,13 @@ jobs:
           make test
           '
 
-      - name: Upload Coverage To Codecov
-        uses: codecov/codecov-action@v3
-        timeout-minutes: 2
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./PaddleNLP/coverage.xml
+      # - name: Upload Coverage To Codecov
+      #   uses: codecov/codecov-action@v3
+      #   env:
+      #     CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }}
+      #     files: ./PaddleNLP/coverage.xml
       
       - name: Terminate And Delete the Container
         if: always()
