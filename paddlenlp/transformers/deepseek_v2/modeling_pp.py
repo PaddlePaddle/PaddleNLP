@@ -475,7 +475,7 @@ class OverlapedScheduleChunk:
                 pp_stream_t = None
                       
             inputs, output_grad, event_to_wait = n.forward_backward(inputs, output_grad, combine_bw_event_to_wait=event_to_wait, pp_stream=pp_stream_t)
-        return inputs, output_grad
+        return inputs, output_grad, None
 
 
 class OverlapedScheduleNode:
