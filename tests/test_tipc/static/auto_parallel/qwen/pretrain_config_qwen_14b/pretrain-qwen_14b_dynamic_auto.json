@@ -20,6 +20,7 @@
     "fuse_attention_ffn": 1,
     "fuse_attention_qkv": 1,
     "fused_linear_param_grad_add": 1,
+    "enable_linear_fused_grad_add": true,
     "max_seq_length": 4096,
     "learning_rate": 1e-05,
     "min_learning_rate": 5e-06,

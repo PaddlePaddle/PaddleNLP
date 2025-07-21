@@ -410,12 +410,20 @@ def init_seed(seed: int = 1234, args=None):
                 order = ["pp", "dp", "sharding", "mp", "sep"]
             elif args.hybrid_parallel_topo_order == "sharding_first":
                 order = ["dp", "sharding", "pp", "mp", "sep"]
+            if args.context_parallel_degree is not None and args.context_parallel_degree > 1:
+                sep_degree = args.context_parallel_degree 
+            elif args.sep_parallel_degree is not None and args.sep_parallel_degree > 1:
+                sep_degree = args.sep_parallel_degree
+            else:
+                sep_degree = 1
+            sep_degree=args.sep_parallel_degree if args.sep_parallel_degree > 1 else args.context_parallel_degree
             topo = Topology(
                 dist.get_rank(),
                 dist.get_world_size(),
                 dp_degree=args.dataset_world_size,
                 pp_degree=args.pipeline_parallel_degree,
                 mp_degree=args.tensor_parallel_degree,
+                sep_degree=sep_degree,
                 sharding_degree=1,  # auto_parallel's sharding is not orthogonal with dp, mp and pp
                 order=order,
             )
@@ -456,16 +464,25 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+    do_enable_linear_fused_grad_add = training_args.enable_linear_fused_grad_add
+    do_enable_mp_async_allreduce = (
+        training_args.enable_auto_parallel
+        and training_args.tensor_parallel_degree > 1
+        and "enable_mp_async_allreduce" in training_args.tensor_parallel_config
+        and not training_args.sequence_parallel
+    )
     do_enable_sp_async_reduce_scatter = (
         training_args.enable_auto_parallel
         and training_args.tensor_parallel_degree > 1
         and training_args.sequence_parallel
         and "enable_sp_async_reduce_scatter" in training_args.tensor_parallel_config
     )
-    if training_args.enable_linear_fused_grad_add and not do_enable_sp_async_reduce_scatter:
+    if (
+        do_enable_linear_fused_grad_add or do_enable_mp_async_allreduce or do_enable_sp_async_reduce_scatter
+    ) and not training_args.to_static:
         from llm.utils.fused_layers import mock_layers
 
-        mock_layers()
+        mock_layers(do_enable_linear_fused_grad_add, do_enable_mp_async_allreduce, do_enable_sp_async_reduce_scatter)
 
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
@@ -553,6 +570,8 @@ def main():
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
     config.sharding_parallel_degree = training_args.sharding_parallel_degree
     config.to_static = training_args.to_static
+    config.sep_parallel_degree = training_args.sep_parallel_degree
+    config.context_parallel_degree = training_args.context_parallel_degree
 
     if training_args.strategy.pipeline.enable and config.virtual_pp_degree > 1:
         pipeline = training_args.strategy.pipeline
@@ -598,13 +617,6 @@ def main():
                 layer.enable_recompute = True
 
         model.apply(fn)
-
-    if do_enable_sp_async_reduce_scatter:
-        from llm.utils.sp_async_reduce_scatter import (
-            mock_layers_sp_async_reduce_scatter,
-        )
-
-        mock_layers_sp_async_reduce_scatter(model)
 
     # Create the learning_rate scheduler and optimizer
     if training_args.decay_steps is None:

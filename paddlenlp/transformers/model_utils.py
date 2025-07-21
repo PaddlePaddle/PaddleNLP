@@ -2934,6 +2934,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             "mp_config": None,
             "sp_config": None,
             "pp_config": None,
+            "cp_config": None,
         }
         for config in configs:
             if "mp_config" in config and config["mp_config"] is not None:
@@ -2966,10 +2967,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         final_config["pp_config"] = config["pp_config"]
                     else:
                         final_config["pp_config"]["split_spec"] += config["pp_config"]["split_spec"]
+            if "cp_config" in config and config["cp_config"] is not None:
+                if final_config["cp_config"] is None:
+                    final_config["cp_config"] = config["cp_config"]
+                else:
+                    for k, v in config["cp_config"]["parallelize_plan"].items():
+                        assert (
+                            k not in final_config["cp_config"]["parallelize_plan"].keys()
+                        ), f"sublayer cp_config should be a subset of model but got sublayer config {config['cp_config']} and model config {final_config['cp_config']}."
+                        final_config["cp_config"]["parallelize_plan"][k] = v
 
         if final_config["pp_config"] is not None and len(final_config["pp_config"]["split_spec"]) == 1:
             final_config["pp_config"]["split_spec"] = final_config["pp_config"]["split_spec"][0]
-
         return final_config
 
     def _generate_auto_dist_config(self, auto_dist_degree):
@@ -2977,6 +2986,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             "sp_config": None,
             "mp_config": None,
             "pp_config": None,
+            "cp_config": None,
         }
         for name, layer in self.named_sublayers(include_self=True):
             if hasattr(layer, "auto_dist_config"):
@@ -2990,6 +3000,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             "dp_config": None,
             "mp_config": None,
             "pp_config": None,
+            "cp_config": None,
         }
         if "tensor_parallel" in auto_dist_degree and auto_dist_degree["tensor_parallel"]:
             merged_config["mp_config"] is not None
@@ -2998,6 +3009,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if "sequence_parallel" in auto_dist_degree and auto_dist_degree["sequence_parallel"]:
             merged_config["sp_config"] is not None
             final_config["mp_config"] = merged_config["sp_config"]
+
+        if "context_parallel" in auto_dist_degree and auto_dist_degree["context_parallel"]:
+            merged_config["cp_config"] is not None
+            final_config["cp_config"] = merged_config["cp_config"]
 
         if "pipeline_parallel" in auto_dist_degree and auto_dist_degree["pipeline_parallel"]:
             merged_config["pp_config"] is not None
@@ -3020,7 +3035,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 "sharding_level": level,
                 "sharding_mesh_dim": auto_dist_degree.get("sharding_mesh_dim", None),
             }
-
         return final_config
 
 

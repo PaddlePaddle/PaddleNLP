@@ -261,7 +261,7 @@ export CUDA_DEVICE_MAX_CONNECTIONS=1
 export PARALLEL_CROSS_ENTROPY=true
 
 # cinn相关
-export FLAGS_use_cinn=1
+export FLAGS_use_cinn=${FLAGS_use_cinn:-1}
 export FLAGS_dist_prim_all=1
 export FLAGS_prim_forward_blacklist="pd_op.stack;pd_op.squeeze;pd_op.swiglu;pd_op.squared_l2_norm"
 export FLAGS_prim_backward_blacklist="swiglu_grad"
