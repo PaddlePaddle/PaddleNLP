@@ -1537,7 +1537,7 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         ) = build_overlapped_nodes(forward_chunk, backward_chunk)
         forward_inputs = forward_pre_node.forward(forward_inputs)
         backward_input_grads = backward_pre_node.backward(backward_input_grads)
-        forward_inputs, backward_input_grads = overlap_node.forward_backward(
+        forward_inputs, backward_input_grads, _ = overlap_node.forward_backward(
             forward_inputs, backward_input_grads, combine_bw_event_to_wait
         )
         forward_inputs = forward_post_node.forward(forward_inputs)

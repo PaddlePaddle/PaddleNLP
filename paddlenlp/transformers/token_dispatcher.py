@@ -258,6 +258,6 @@ class PreDispatchNode:
             True,
             True,
         )
-        probs_reshape_g = paddle._C_ops.reshape_grad(probs_grad, self.probs)
+        probs_reshape_g = paddle._C_ops.reshape_grad(self.probs, probs_grad)
         self.reset_status()
         return probs_reshape_g
