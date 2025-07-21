@@ -801,7 +801,7 @@ class OverlapedFUsionScheduleNode:
         dispatch_backward_event.calc_stream_wait(self.backward_node.moe_group.id)
         paddle.base.core.nvprof_nvtx_push("attn_backward")
         output_grad = self.backward_node.attn_backward(output_grad)
-        event_to_wait = paddle.device.current_stream().record_event()
+        event_to_wait = deep_ep.get_event_from_calc_stream(self.backward_node.moe_group.id)
         paddle.base.core.nvprof_nvtx_pop()
 
         combine_forward_event.calc_stream_wait(self.forward_node.moe_group.id)
@@ -1519,7 +1519,8 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         backward_loss_fn_node,
         backward_input_grads,
         scaler,
-        event_to_wait=None,
+        combine_bw_event_to_wait = None,
+        pp_stream=None
     ):
         if backward_loss_fn_node is not None:
             if scaler:
@@ -1537,7 +1538,7 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         forward_inputs = forward_pre_node.forward(forward_inputs)
         backward_input_grads = backward_pre_node.backward(backward_input_grads)
         forward_inputs, backward_input_grads = overlap_node.forward_backward(
-            forward_inputs, backward_input_grads, event_to_wait
+            forward_inputs, backward_input_grads, combine_bw_event_to_wait
         )
         forward_inputs = forward_post_node.forward(forward_inputs)
         backward_input_grads = backward_post_node.backward(backward_input_grads)

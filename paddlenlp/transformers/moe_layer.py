@@ -648,9 +648,10 @@ class Fp8CombineNode:
 
 
 class Fp8CombineQuantNode:
-    def __init__(self, token_dispatcher, name="fp8_combine_quant_node"):
+    def __init__(self, token_dispatcher, moe_group=None, name="fp8_combine_quant_node"):
         self.token_dispatcher = token_dispatcher
         self.name = name
+        self.moe_group = moe_group
 
     @paddle.no_grad()
     def forward(self, output_combine):
@@ -666,13 +667,14 @@ class Fp8CombineQuantNode:
         # post combine grad
         if DSV3_USE_FP8_DISPATCH:
             if event_to_wait is not None:
+                assert self.moe_group is not None
+                event_to_wait.comm_stream_wait( self.moe_group.id)
                 buffer = get_buffer(self.token_dispatcher._comm_manager.group, get_hidden_bytes(output_grad))
                 custom_stream = paddle.device.Stream(stream_base=buffer.runtime.get_comm_stream())
-                custom_stream.wait_event(event_to_wait)
             else:
                 custom_stream = paddle.device.current_stream()
             with paddle.device.stream_guard(custom_stream):
-                output_combine_grad = paddle.reshape(output_grad, self.output_combine_shape)
+                output_combine_grad = paddle.reshape(output_grad, [-1, output_grad.shape[-1]])
                 # output_combine_grad quant to fp8
                 output_combine_grad_fp8, output_combine_grad_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
                     output_combine_grad, output_scale_transpose=False, quant_method="1x128", input_transpose=False
@@ -683,7 +685,7 @@ class Fp8CombineQuantNode:
                     quant_event = deep_ep.get_event_from_custom_stream(custom_stream.stream_base)
             return (output_combine_grad_fp8, output_combine_grad_scale), quant_event
         else:
-            output_combine_grad = paddle.reshape(output_grad, self.output_combine_shape)
+            output_combine_grad = paddle.reshape(output_grad, [-1, output_grad.shape[-1]])
             return output_combine_grad, None
 
 
@@ -873,7 +875,7 @@ class FusionMoeNode:
             is_split_group_gemm=is_split_group_gemm,
         )
         self.combine_node = Fp8CombineNode(self.token_dispatcher)
-        self.combine_quant_node = Fp8CombineQuantNode(self.token_dispatcher)
+        self.combine_quant_node = Fp8CombineQuantNode(self.token_dispatcher, custom_map.moe_group)
         self.name = name
 
     @paddle.no_grad()
