@@ -742,9 +742,8 @@ class AutoTrainer(Trainer):
         """
         if self.criterion is not None:
             if "labels" in inputs:
-                # hack fix for ernie
                 labels = inputs.pop("labels")
-                if len(input_ids) == 4:
+                if len(inputs["input_ids"]) == 4:
                     input_ids, labels, _, _ = inputs["input_ids"]
             elif "start_positions" in inputs and "end_positions" in inputs:
                 labels = (inputs.pop("start_positions"), inputs.pop("end_positions"))
