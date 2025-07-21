@@ -401,12 +401,6 @@ def main():
         pipeline.vpp_degree = config.virtual_pp_degree
         pipeline.vpp_seg_method = training_args.virtual_pipeline_seg_method
 
-    # added for ulysees
-    config.use_ulysees = True # 先手动设定为True
-    config.sep_parallel_degree = 2
-    config.tensor_parallel_degree = 1
-    config.tensor_parallel_rank =  0
-
     print("[auto-parallel] Model Config:", config)
 
     # 用于构建mesh和pp_division
@@ -426,12 +420,10 @@ def main():
     
     # mesh的构建先写一个固定的 (先全部使用统一的mesh)
     if pp == 2 and tp == 2 and dp == 2:
-        tp_or_sep = 'mp' if config.sep_parallel_degree == 1 else 'sep'
-        meshs = [dist.ProcessMesh([[0, 1], [2, 3]], dim_names=["dp", tp_or_sep]) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4, 5], [6, 7]], dim_names=["dp", tp_or_sep]) for _ in range(ave_layers)]
-        meshs += [dist.ProcessMesh([[4, 5],  [6, 7]], dim_names=['dp',tp_or_sep]), dist.ProcessMesh([[4, 5],  [6, 7]], dim_names=['dp',tp_or_sep])]
-    
-        # meshs = [dist.ProcessMesh([[0, 1], [2, 3]], dim_names=["dp", "mp"]) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4, 5], [6, 7]], dim_names=["dp", "mp"]) for _ in range(ave_layers)]
-        # meshs += [dist.ProcessMesh([[4, 5],  [6, 7]], dim_names=['dp','mp']), dist.ProcessMesh([[4, 5],  [6, 7]], dim_names=['dp','mp'])]
+        # meshs = [dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", "mp"]) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4], [5], [6], [7]], dim_names=["dp", "mp"]) for _ in range(ave_layers)]
+        # meshs = [dist.ProcessMesh([[0, 1, 2, 3]], dim_names=["dp", "mp"]) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4, 5, 6, 7]], dim_names=["dp", "mp"]) for _ in range(ave_layers)]
+        meshs = [dist.ProcessMesh([[0, 1], [2, 3]], dim_names=["dp", "mp"]) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4, 5], [6, 7]], dim_names=["dp", "mp"]) for _ in range(ave_layers)]
+        meshs += [dist.ProcessMesh([[4, 5],  [6, 7]], dim_names=['dp','mp']), dist.ProcessMesh([[4, 5],  [6, 7]], dim_names=['dp','mp'])]
     elif pp == 2 and tp == 1 and dp == 4:
         meshs = [dist.ProcessMesh([[0], [1], [2], [3]], dim_names=['dp', 'mp']) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4], [5], [6], [7]], dim_names=['dp', 'mp']) for _ in range(ave_layers)]
     elif pp == 2 and tp == 4 and dp == 1:
@@ -446,16 +438,16 @@ def main():
     # one demo
     if pp == 2 and tp == 2 and dp == 2:
         redistributed_flag = [0] * (num_layers + 1 + 2)
-        # meshs[2] = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", "mp"])
-        # redistributed_flag[1] = meshs[2]
-        # redistributed_flag[2] = meshs[3]
+        meshs[2] = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", "mp"])
+        redistributed_flag[1] = meshs[2]
+        redistributed_flag[2] = meshs[3]
         
-        # meshs[-1] = dist.ProcessMesh([[4], [5], [6], [7]], dim_names=["dp", "mp"])
-        # redistributed_flag[-2] = meshs[-1]
+        meshs[-1] = dist.ProcessMesh([[4], [5], [6], [7]], dim_names=["dp", "mp"])
+        redistributed_flag[-2] = meshs[-1]
         
-        # meshs[4] = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", "mp"])
-        # redistributed_flag[3] = meshs[4]
-        # redistributed_flag[4] = dist.ProcessMesh([[0, 1],  [2, 3]], dim_names=["dp", "mp"])  # 此时 变成了[0,1,2,3] 导致和后面的shape不一致了
+        meshs[4] = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", "mp"])
+        redistributed_flag[3] = meshs[4]
+        redistributed_flag[4] = dist.ProcessMesh([[0, 1],  [2, 3]], dim_names=["dp", "mp"])  # 此时 变成了[0,1,2,3] 导致和后面的shape不一致了
         
         # meshs[5]  = dist.ProcessMesh([[4, 5, 6, 7]], dim_names=["dp", "mp"])
         # redistributed_flag[4] =  dist.ProcessMesh([[0, 1, 2, 3]], dim_names=["dp", "mp"])  # 此时 变成了[0,1,2,3] 导致和后面的shape不一致了
@@ -479,7 +471,7 @@ def main():
         #     redistributed_flag[5] = meshs[6]
         # if  dist.get_rank() in  [0, 1, 2, 3]:
         #     redistributed_flag[4] = dist.ProcessMesh([[0, 1, 2, 3]], dim_names=["dp", "mp"])  #   此时 变成了[0,1,2,3] 导致和后面的shape不一致了
-        pass
+        
         
     elif pp == 2 and tp == 1 and dp == 4:
         # meshs[2] = dist.ProcessMesh([[0, 1, 2, 3]], dim_names=['dp', 'mp'])

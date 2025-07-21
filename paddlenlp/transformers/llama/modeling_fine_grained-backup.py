@@ -154,44 +154,10 @@ def scaled_dot_product_attention(
         attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
         return (attn_output, attn_weights) if output_attentions else attn_output
 
-# TODO 将所有使用了colwise_placements和rowise_placement的地方都改成get_colwise_placements和get_rowwise_placements
-def get_colwise_placements(use_ulysees=False):
-    if use_ulysees:
-        return [dist.Replicate(), dist.Replicate()] # ['dp', 'sp']
-    else:
-        return [dist.Replicate(), dist.Shard(1)] # ['dp', 'tp']
-    
-def get_rowwise_placements(use_ulysees=False):
-    if use_ulysees:
-        return [dist.Replicate(), dist.Replicate()]  # ['dp', 'sp']
-    else:
-        return [dist.Replicate(), dist.Shard(0)] # ['dp', 'sp']
 
+colwise_placements = [dist.Replicate(), dist.Shard(1)]
+rowise_placement = [dist.Replicate(), dist.Shard(0)]
 
-# colwise_placements = [dist.Replicate(), dist.Shard(1)]
-# rowise_placement = [dist.Replicate(), dist.Shard(0)]
-
-def sep_reshard_layer(input, split_axis, concat_axis):
-    # Migrate from paddle/tests
-    # do alltoall operation to reshard input from [Shard(concat_axis)] to [Shard[split_axis]]
-    sep_axis = input.process_mesh.dim_names.index("sep")
-
-    input_placements = input.placements
-    if not isinstance(input_placements[sep_axis], dist.Shard):
-        raise ValueError(
-            f"Input placements for 'sep' axis should be Shard({split_axis}), but got {input_placements[sep_axis]}"
-        )
-
-    if input_placements[sep_axis].get_dim() != concat_axis: 
-        # Here it means that the original split axis should be the same as the axis intended for concatenation now
-        raise ValueError(
-            f"Input placements for 'sep' axis should be Shard({concat_axis}), but got {input_placements[sep_axis]}"
-        )
-
-    input_placements[sep_axis] = dist.Shard(split_axis)
-
-    out = dist.reshard(input, input.process_mesh, input_placements)
-    return out
 
 class LlamaRMSNormFineGrained(nn.Layer):
     def __init__(self, config, mesh):
@@ -236,35 +202,34 @@ class LlamaMLPFineGrained(nn.Layer):
         self.fuse_attention_ffn = config.fuse_attention_ffn
         self.mesh = mesh
         self.config = config
-        self.use_ulysees = config.use_ulysees
 
         if config.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass():
             self.gate_up_fused_proj = nn.Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
             self.gate_up_fused_proj.weight = dist.shard_tensor(
                 self.gate_up_fused_proj.weight,
                 self.mesh,
-                get_colwise_placements(self.use_ulysees),
+                colwise_placements,
             )
         else:
             self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.gate_proj.weight = dist.shard_tensor(
                 self.gate_proj.weight,
                 self.mesh,
-                get_colwise_placements(self.use_ulysees),
+                colwise_placements,
             )
 
             self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.up_proj.weight = dist.shard_tensor(
                 self.up_proj.weight,
                 self.mesh,
-                get_colwise_placements(self.use_ulysees),
+                colwise_placements,
             )
 
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
         self.down_proj.weight = dist.shard_tensor(
             self.down_proj.weight,
             self.mesh,
-            get_rowwise_placements(self.use_ulysees)
+            rowise_placement,
         )
 
     def forward(self, x):
@@ -305,7 +270,6 @@ class LlamaAttentionFineGrained(nn.Layer):
         self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
         self.mesh = mesh
-        self.use_ulysees = config.use_ulysees
 
         self.use_fused_rope = config.use_fused_rope
         if self.use_fused_rope and get_env_device() not in ["npu", "mlu", "xpu", "gcu", "intel_hpu"]:
@@ -325,7 +289,7 @@ class LlamaAttentionFineGrained(nn.Layer):
             self.qkv_proj.weight = dist.shard_tensor(
                 self.qkv_proj.weight,
                 self.mesh,
-                get_colwise_placements(self.use_ulysees),
+                colwise_placements,
             )
 
         else:
@@ -337,7 +301,7 @@ class LlamaAttentionFineGrained(nn.Layer):
             self.q_proj.weight = dist.shard_tensor(
                 self.q_proj.weight,
                 self.mesh,
-                get_colwise_placements(self.use_ulysees),
+                colwise_placements,
             )
 
             self.k_proj = nn.Linear(
@@ -348,7 +312,7 @@ class LlamaAttentionFineGrained(nn.Layer):
             self.k_proj.weight = dist.shard_tensor(
                 self.k_proj.weight,
                 self.mesh,
-                get_colwise_placements(self.use_ulysees),
+                colwise_placements,
             )
 
             self.v_proj = nn.Linear(
@@ -359,7 +323,7 @@ class LlamaAttentionFineGrained(nn.Layer):
             self.v_proj.weight = dist.shard_tensor(
                 self.v_proj.weight,
                 self.mesh,
-                get_colwise_placements(self.use_ulysees),
+                colwise_placements,
             )
 
         self.o_proj = nn.Linear(
@@ -370,17 +334,13 @@ class LlamaAttentionFineGrained(nn.Layer):
         self.o_proj.weight = dist.shard_tensor(
             self.o_proj.weight,
             self.mesh,
-            get_rowwise_placements(self.use_ulysees),
+            rowise_placement,
         )
 
         if config.rope:
             self._init_rope()
 
         self.config = config
-        
-        if self.use_ulysees:
-            assert self.num_key_value_heads % config.sep_parallel_degree == 0
-            assert self.num_heads % config.sep_parallel_degree == 0
 
     def _init_rope(self):
         if self.config.rope_scaling_type is None:
@@ -435,32 +395,9 @@ class LlamaAttentionFineGrained(nn.Layer):
             )
 
         if self.fuse_attention_qkv and not enable_fuse_ffn_qkv_pass():
+            target_shape = [0, 0, self.num_key_value_heads, (self.num_key_value_groups + 2) * self.head_dim]
             mix_layer = self.qkv_proj(hidden_states)
-            # NOTE for GQA attention fusion (compatible with MHA and MQA):
-            # The weight for qkv_proj is in shape like [hidden_size, hidden_size + 2 * num_kv_heads * head_dim].
-            # After the projection, the mix_layer is in shape like [b, s, hidden_size + 2 * num_kv_heads * head_dim].
-            # Reshape the mix_layer into a shape like [b, s, num_kv_heads, (num_groups + 2) * head_dim],
-            # where num_groups = num_q_heads // num_kv_heads.
-            # Split the mix_layer on the last axis into three sections [num_groups * head_dim, head_dim, head_dim]
-            # to represent the q, k and v respectively.
-            # The q is in the shape like [b, s, num_kv_heads, num_groups * head_dim].
-            # The k and v are in the shape like [b, s, num_kv_heads, head_dim].
-            # Under MHA, the q is ready for the following calculation since num_kv_heads == num_q_heads,
-            # But for the GQA or MQA, q should be reshaped into [b, s, num_q_heads, head_dim].
-            if self.config.sep_parallel_degree > 1:
-                if self.config.sequence_parallel:
-                    raise ValueError(
-                        "Sep parallel cannot be used with sequence parallel, "
-                        "because paddle auto parallel does not support "
-                        "reshard one dim twice."
-                    )
-                mix_layer = sep_reshard_layer(mix_layer, split_axis=2, concat_axis=1)
-                mix_layer = paddle.reshape_(
-                    mix_layer, [0, self.seq_length, -1, (self.num_key_value_groups + 2) * self.head_dim]
-                )  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
-            else:
-                target_shape = [0, 0, self.num_key_value_heads, (self.num_key_value_groups + 2) * self.head_dim]
-                mix_layer = paddle.reshape_(mix_layer, target_shape)
+            mix_layer = paddle.reshape_(mix_layer, target_shape)
             query_states, key_states, value_states = paddle.split(
                 mix_layer,
                 num_or_sections=[self.num_key_value_groups * self.head_dim, self.head_dim, self.head_dim],
@@ -468,77 +405,20 @@ class LlamaAttentionFineGrained(nn.Layer):
             )
             if self.gqa_or_mqa:
                 query_states = paddle.reshape(query_states, [0, 0, self.num_heads, self.head_dim])
-            if self.config.sequence_parallel and self.config.sep_parallel_degree <= 1:
-                # [seq_len, bs, num_head * head_dim] -> [bs, seq_len, num_head * head_dim]  (if sequence_parallel)
-                # FA and rope not support sequence first
-                query_states = paddle.transpose(query_states, [1, 0, 2, 3])
-                key_states = paddle.transpose(key_states, [1, 0, 2, 3])
-                value_states = paddle.transpose(value_states, [1, 0, 2, 3])
-            
-            
-            #  用于debug
-            print(f'[linguangming] query_states, key_states, value_state local shape is {query_states._local_shape}, {key_states._local_shape}, {value_states._local_shape}')
-            
         else:
-            if self.config.sep_parallel_degree > 1:
-                query_states = self.q_proj(hidden_states)
-                key_states = self.k_proj(hidden_states)
-                value_states = self.v_proj(hidden_states)
-                if self.config.sequence_parallel:
-                    raise ValueError(
-                        "Sep parallel cannot be used with sequence parallel, "
-                        "because paddle auto parallel does not support "
-                        "reshard one dim twice."
-                    )
+            target_query_shape = [0, 0, self.num_heads, self.head_dim]
+            target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
 
-                query_states = sep_reshard_layer(query_states, split_axis=2, concat_axis=1,)
-                key_states = sep_reshard_layer(key_states,  split_axis=2, concat_axis=1,)
-                value_states = sep_reshard_layer(value_states, split_axis=2, concat_axis=1,)
-                
-                query_states = paddle.reshape(query_states, shape=[0, self.seq_length, -1, self.head_dim])  # [bs, seq_len, num_head/k, head_dim], k is sep degree
-                key_states = paddle.reshape(query_states, shape=[0, self.seq_length, -1, self.head_dim])
-                value_states = paddle.reshape(value_states, shape=[0, self.seq_length, -1, self.head_dim])
-            else:
-                target_query_shape = [0, 0, self.num_heads, self.head_dim]
-                target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
+            query_states = self.q_proj(hidden_states).reshape(shape=target_query_shape)
+            key_states = self.k_proj(hidden_states).reshape(shape=target_key_value_shape)
+            value_states = self.v_proj(hidden_states).reshape(shape=target_key_value_shape)
 
-                query_states = self.q_proj(hidden_states).reshape(shape=target_query_shape)
-                key_states = self.k_proj(hidden_states).reshape(shape=target_key_value_shape)
-                value_states = self.v_proj(hidden_states).reshape(shape=target_key_value_shape)
-
-                if self.config.sequence_parallel:
-                    # [seq_len, bs, num_head * head_dim] -> [bs, seq_len, num_head * head_dim]  (if sequence_parallel)
-                    # FA and rope not support sequence first
-                    query_states = paddle.transpose(query_states, [1, 0, 2, 3])
-                    key_states = paddle.transpose(key_states, [1, 0, 2, 3])
-                    value_states = paddle.transpose(value_states, [1, 0, 2, 3])
-        
-        # 以下为原先的代码实现
-        # if self.fuse_attention_qkv and not enable_fuse_ffn_qkv_pass():
-        #     target_shape = [0, 0, self.num_key_value_heads, (self.num_key_value_groups + 2) * self.head_dim]
-        #     mix_layer = self.qkv_proj(hidden_states)
-        #     mix_layer = paddle.reshape_(mix_layer, target_shape)
-        #     query_states, key_states, value_states = paddle.split(
-        #         mix_layer,
-        #         num_or_sections=[self.num_key_value_groups * self.head_dim, self.head_dim, self.head_dim],
-        #         axis=-1,
-        #     )
-        #     if self.gqa_or_mqa:
-        #         query_states = paddle.reshape(query_states, [0, 0, self.num_heads, self.head_dim])
-        # else:
-        #     target_query_shape = [0, 0, self.num_heads, self.head_dim]
-        #     target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
-
-        #     query_states = self.q_proj(hidden_states).reshape(shape=target_query_shape)
-        #     key_states = self.k_proj(hidden_states).reshape(shape=target_key_value_shape)
-        #     value_states = self.v_proj(hidden_states).reshape(shape=target_key_value_shape)
-
-        # if self.config.sequence_parallel:
-        #     # [seq_len, bs, num_head * head_dim] -> [bs, seq_len, num_head * head_dim]  (if sequence_parallel)
-        #     # FA and rope not support sequence first
-        #     query_states = paddle.transpose(query_states, [1, 0, 2, 3])
-        #     key_states = paddle.transpose(key_states, [1, 0, 2, 3])
-        #     value_states = paddle.transpose(value_states, [1, 0, 2, 3])
+        if self.config.sequence_parallel:
+            # [seq_len, bs, num_head * head_dim] -> [bs, seq_len, num_head * head_dim]  (if sequence_parallel)
+            # FA and rope not support sequence first
+            query_states = paddle.transpose(query_states, [1, 0, 2, 3])
+            key_states = paddle.transpose(key_states, [1, 0, 2, 3])
+            value_states = paddle.transpose(value_states, [1, 0, 2, 3])
 
         kv_seq_len = key_states.shape[-3]
 
@@ -546,9 +426,6 @@ class LlamaAttentionFineGrained(nn.Layer):
             kv_seq_len += past_key_value[0].shape[-3]
 
         if self.config.rope:
-            if self.config.sep_parallel_degree > 1:
-                batch_size, seq_length, _, _ = query_states.shape
-                position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
                 batch_size, seq_length, num_heads, head_dim = query_states.shape
@@ -650,22 +527,11 @@ class LlamaAttentionFineGrained(nn.Layer):
         else:
             attn_output = outputs
 
-        # 用于debug
-        print(f'[linguangming] after scaled_dot_product_attention, attn_output local shape is {attn_output._local_shape}') #  TODO 注意此处是对的
-
         if self.config.sequence_parallel:
             attn_output = paddle.transpose(attn_output, [1, 0, 2])
-        
-        # SP added by linguangming
-        if self.config.use_ulysees:
-            attn_output = sep_reshard_layer(attn_output, split_axis=1, concat_axis=2) 
-            print(f'[linguangming] after sep_reshard_layer, attn_output local shape is {attn_output._local_shape}') # TODO 注意此处是对的
-        
+
         # [bs, q_len, num_head * head_dim]
         attn_output = self.o_proj(attn_output)
-        
-        # 用于debug
-        print(f'[linguangming] after o_proj, attn_output local shape is {attn_output._local_shape}')
 
         # enter sp region
         if self.config.sequence_parallel:
@@ -733,7 +599,6 @@ class LlamaDecoderLayerFineGrained(nn.Layer):
         """
         # [bs, seq_len, embed_dim] or [seq_len / n, bs, embed_dim] (if sequence_parallel)
         # print(f'[linguangming] enter decoder, hidden_states mesh is {hidden_states.process_mesh}' )
-        print(f'[linguangming] enter decoder, hidden_states.local_shape is {hidden_states._local_shape}')
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
 
@@ -778,14 +643,11 @@ class LlamaDecoderLayerFineGrained(nn.Layer):
         if use_cache:
             present_key_value = outputs[2 if output_attentions else 1]
 
-        print(f'[linguangming] before residual + atten_output, hidden_states.local_shape is {hidden_states._local_shape}')
         hidden_states = residual + hidden_states
-        print(f'[linguangming] after residual +  atten_output, hidden_states.local_shape is {hidden_states._local_shape}')
         
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        print(f'[linguangming] after post_attention_layernorm, hidden_states.local_shape is {hidden_states._local_shape}')
 
         # enter tp region
         if self.config.sequence_parallel:
@@ -795,10 +657,7 @@ class LlamaDecoderLayerFineGrained(nn.Layer):
                 [dist.Shard(1), dist.Replicate()],
             )
 
-        print(f'[linguangming] before enter mlp, the hidden_states.local_shape is {hidden_states._local_shape}')
         hidden_states = self.mlp(hidden_states)
-        
-        print(f'[linguangming] after enter mlp, the hidden_states.local_shape is {hidden_states._local_shape}')
 
         # enter sp region
         if self.config.sequence_parallel:
@@ -980,20 +839,17 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
             self.hidden_size,
         )
 
-        if self.config.sep_parallel_degree > 1:
-            embedding_placements = [dist.Replicate(), dist.Replicate()]
-        else:        
-            embedding_placements = (
-                [dist.Replicate(), dist.Shard(1)] # [NOTE] 此处是对embedding的hidden维度进行拆分(但是好像确实是没有办法，分布式张量的特性不太能让embedding层根据词的id来分配)
-                if self.config.tensor_parallel_degree > 1
-                else [dist.Replicate(), dist.Replicate()]
-            )
+        embedding_placements = (
+            [dist.Replicate(), dist.Shard(1)] # NOTE 
+            if self.config.tensor_parallel_degree > 1
+            else [dist.Replicate(), dist.Replicate()]
+        )
         self.embed_tokens.weight = dist.shard_tensor(
             self.embed_tokens.weight,
             self.meshs[0],
             embedding_placements,
         )
-        # setattr(self.embed_tokens.weight, 'zero_stage', 2) #  TODO 设置zero系列
+        # setattr(self.embed_tokens.weight, 'zero_stage', 2) #  [NOTE] add zero type
 
         def is_pipeline_stage_first_layer_func(layer_index):
             for i in range(len(self.pp_division)):
@@ -1001,23 +857,23 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
                     return True
             return False
         
-        # def rank_stage_id():
-        #     world_size = dist.get_world_size()
-        #     stage_num = len(self.pp_division)
-        #     stage_card_num = world_size // stage_num
-        #     rank = dist.get_rank()
-        #     stage_id = rank // stage_card_num
-        #     return stage_id
+        def rank_stage_id():
+            world_size = dist.get_world_size()
+            stage_num = len(self.pp_division)
+            stage_card_num = world_size // stage_num
+            rank = dist.get_rank()
+            stage_id = rank // stage_card_num
+            return stage_id
         
-        # def layer_stage_id(layer_index):
-        #     for i in range(len(self.pp_division)):
-        #         if layer_index in self.pp_division[i]:
-        #             return i
-        #     return -1
+        def layer_stage_id(layer_index):
+            for i in range(len(self.pp_division)):
+                if layer_index in self.pp_division[i]:
+                    return i
+            return -1
 
         decoder_layers = []
         self.is_pipeline_stage_first_layer = [False for _ in range(config.num_hidden_layers)]
-        # from paddlenlp.experimental.galvatron.runtime.redistributed import DummyLayer
+        from paddlenlp.experimental.galvatron.runtime.redistributed import DummyLayer
         for i in range(config.num_hidden_layers):
             decoder_layer = LlamaDecoderLayerFineGrained(config, i not in self.no_recompute_layers, self.meshs[i + 1])
             decoder_layers.append(decoder_layer) # 不使用dummy layer
@@ -1033,14 +889,9 @@ class LlamaModelFineGrained(LlamaPretrainedModelFineGrained):
 
         self.gradient_checkpointing = False # [NOTE] unused
 
-        if self.config.sep_parallel_degree > 1:
-            self.placements = [dist.Shard(0), dist.Shard(1)] #  ['dp', 'sep'], 0 means batch axis, 1 means seq axis
-        else: 
-            # ['dp', 'tp'], when use sequence_parallel, hidden_states is [seq, batch, hidden_size],  so 0 means seq axis, 1 means bacth
-            # when not use sequence_parallel, hidden_states is [batch, seq, hidden_size], so 0 means batch axis, 1 means seq axis
-            self.placements = (
-                [dist.Shard(1), dist.Shard(0)] if self.config.sequence_parallel else [dist.Shard(0), dist.Replicate()]
-            )
+        self.placements = (
+            [dist.Shard(1), dist.Shard(0)] if self.config.sequence_parallel else [dist.Shard(0), dist.Replicate()]
+        )
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1449,7 +1300,6 @@ class LlamaLMHeadFineGrained(nn.Layer):
         super(LlamaLMHeadFineGrained, self).__init__()
         self.config = config
         self.mesh = mesh
-        self.use_ulysees = config.use_ulysees
 
         vocab_size = config.vocab_size
         self.weight = self.create_parameter(
@@ -1459,7 +1309,7 @@ class LlamaLMHeadFineGrained(nn.Layer):
         self.weight = dist.shard_tensor(
             self.weight,
             self.mesh,
-            get_colwise_placements(self.use_ulysees)
+            colwise_placements,
         )
 
     def forward(self, hidden_states, tensor_parallel_output=None):

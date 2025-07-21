@@ -70,7 +70,7 @@ PARALLEL_ARGS=(
     --sharding_parallel_degree 2
     --sharding "stage2"
     --tensor_parallel_degree 2
-    --sequence_parallel true
+    --sequence_parallel false
     --pipeline_parallel_degree 2
     --virtual_pp_degree 1
     --pipeline_schedule_mode "1F1B"
