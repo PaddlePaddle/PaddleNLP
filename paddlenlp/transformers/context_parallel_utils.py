@@ -65,7 +65,7 @@ def split_inputs_sequence_dim_load_balance(inputs, rank=None, degree=None):
     return res
 
 
-def split_sequence_dim_load_balance(inputs):
+def auto_split_sequence_dim_load_balance(inputs):
     """
     for auto_parallel mode
     """

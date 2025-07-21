@@ -29,9 +29,9 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
 
-# from ..transformers.segment_parallel_utils import split_inputs_sequence_dim
-from ..transformers.context_parallel_utils import split_sequence_dim_load_balance
+from ..transformers.context_parallel_utils import auto_split_sequence_dim_load_balance
 from ..transformers.model_utils import clean_model_class_name, unwrap_model
+from ..transformers.segment_parallel_utils import auto_split_inputs_sequence_dim
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
     PREFIX_CHECKPOINT_DIR,
@@ -570,8 +570,10 @@ class AutoTrainer(Trainer):
                     if step_control % args.gradient_accumulation_steps == 0:
                         self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
                         self.timers and self.timers("forward-backward").start()
+                    if self.args.sep_parallel_degree > 1 and self.args.split_inputs_sequence_dim:
+                        inputs = auto_split_inputs_sequence_dim(inputs)
                     if self.args.context_parallel_degree > 1 and self.args.split_inputs_sequence_dim:
-                        inputs = split_sequence_dim_load_balance(inputs)
+                        inputs = auto_split_sequence_dim_load_balance(inputs)
                     tr_loss_step = self.training_step(model, inputs)
 
                     with _exec_mode_guard("dynamic"):
