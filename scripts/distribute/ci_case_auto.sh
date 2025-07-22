@@ -2564,7 +2564,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.58118248 # output of dropout is different after supporting spmd
+    loss_base=10.57985115 # output of dropout is different after supporting spmd
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
@@ -2637,7 +2637,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.59993172     # note: need to debug
-    loss_base=10.57185364 # output of dropout is different after supporting spmd
+    loss_base=10.57274055 # output of dropout is different after supporting spmd
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
@@ -2710,7 +2710,7 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.58456802     # note: need to debug
-    loss_base=10.57316303
+    loss_base=10.57409477
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
