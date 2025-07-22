@@ -3203,6 +3203,10 @@ class Trainer:
 
         if self.state.epoch is not None:
             logs["progress_or_epoch"] = round(self.state.epoch, 4)
+
+        if self.timers:
+            logs.update(self.timers.info(self.timers.timers.keys()))
+
         self.state.log_history = []
         self.control = self.callback_handler.on_log(self.args, self.state, self.control, logs, **kwargs)
 
