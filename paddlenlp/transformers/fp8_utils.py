@@ -1117,6 +1117,11 @@ class FP8GroupGemmMlpFunctionNode:
 
         self.out_grad = out_grad
 
+        # clear status for save memory
+        self.m_indices = None
+        self.unzipped_probs = None
+        self.input = None
+
         # dx
         dx = self.bwd_gate_up_input(do1, expert_w1, dx=out_grad[0] if isinstance(out_grad, tuple) else out_grad)
 

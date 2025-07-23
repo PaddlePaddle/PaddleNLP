@@ -184,6 +184,7 @@ class DeepseekV2Config(PretrainedConfig):
         using_post_norm_recompute=False,
         recompute_fwd_gate_up=False,
         is_split_group_gemm=False,
+        fakse_gate_restrict_balance=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -237,6 +238,7 @@ class DeepseekV2Config(PretrainedConfig):
         self.using_post_norm_recompute = using_post_norm_recompute
         self.recompute_fwd_gate_up = recompute_fwd_gate_up
         self.is_split_group_gemm = is_split_group_gemm
+        self.fakse_gate_restrict_balance = fakse_gate_restrict_balance
 
         super().__init__(
             pad_token_id=pad_token_id,
