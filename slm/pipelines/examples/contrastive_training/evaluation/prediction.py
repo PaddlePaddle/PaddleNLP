@@ -11,16 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-import sys
-
 import numpy as np
 import paddle
 
 from paddlenlp.data import DataCollatorWithPadding
-from paddlenlp.transformers import AutoTokenizer
-
-from paddlenlp.transformers import BiEncoderModel
+from paddlenlp.transformers import AutoTokenizer, BiEncoderModel
 
 
 class Eval_model:
@@ -45,10 +40,7 @@ class Eval_model:
         """
         if self.model_type in ["bert", "roberta", "ernie"]:
             self._model = BiEncoderModel(
-                model_name_or_path=self.model,
-                normalized=True,
-                sentence_pooling_method="cls",
-                dtype='float32'
+                model_name_or_path=self.model, normalized=True, sentence_pooling_method="cls", dtype="float32"
             )
             print(f"loading checkpoints {self.model}")
         else:

@@ -31,7 +31,7 @@ class MSMARCOTITLE(AbsTaskRetrieval):
         dataset={
             "corpus_path": "Tevatron/msmarco-passage-corpus-new",
             "path": "mteb/msmarco",
-            "revision": "c5a29a104738b98a9e76336939199e264163d4a0",            
+            "revision": "c5a29a104738b98a9e76336939199e264163d4a0",
         },
         name="MSMARCOTITLE",
         description="MS MARCO is a collection of datasets focused on deep learning in search",
@@ -53,9 +53,9 @@ class MSMARCOTITLE(AbsTaskRetrieval):
         bibtex_citation=None,
         n_samples=None,
         avg_character_length=None,
-        modalities = ["text"],
-        sample_creation = "created",
-        descriptive_stats = {}
+        modalities=["text"],
+        sample_creation="created",
+        descriptive_stats={},
     )
 
     def load_data(self, **kwargs):
