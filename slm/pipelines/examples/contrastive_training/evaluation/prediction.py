@@ -20,11 +20,10 @@ import paddle
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import AutoTokenizer
 
-sys.path.append(os.path.abspath("."))
-from models.modeling import BiEncoderModel
+from paddlenlp.transformers import BiEncoderModel
 
 
-class Eval_modle:
+class Eval_model:
     def __init__(
         self,
         model: str = None,
@@ -45,10 +44,11 @@ class Eval_modle:
         Construct the inference model for the predictor.
         """
         if self.model_type in ["bert", "roberta", "ernie"]:
-            self._model = BiEncoderModel.from_pretrained(
+            self._model = BiEncoderModel(
                 model_name_or_path=self.model,
                 normalized=True,
                 sentence_pooling_method="cls",
+                dtype='float32'
             )
             print(f"loading checkpoints {self.model}")
         else:
@@ -138,7 +138,7 @@ class Eval_modle:
         with paddle.no_grad():
             for batch_inputs in inputs["batches"]:
                 batch_inputs = self._collator(batch_inputs)
-                token_embeddings = self._model.encode(batch_inputs)
+                token_embeddings = self._model.encode(batch_inputs, self._model.model)
                 all_feats.append(token_embeddings.detach().cpu().numpy())
             return all_feats
 
