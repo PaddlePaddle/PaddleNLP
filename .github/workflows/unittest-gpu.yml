@@ -133,7 +133,6 @@ jobs:
             echo "Not in a pull_request or test_build event. Skipping..."
           else
             docker exec -t $container_name /bin/bash -c '
-            export paddle_whl=https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuSome-LinuxCentos-Gcc82-Cuda118-Cudnn86-Trt85-Py310-CINN-Compile/b8b4c240234f1244ce0a8ba017769b4cdcda02a7/paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl # Paddle#73936导致，待修复
             cd /workspace/PaddleNLP
             sed -i "s/>= 2.0.0/==3.6.0/g" requirements.txt  #报错提示安装torchcodec
             sed -i "s@[[:space:]]\+dist/p.*\.whl@ --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html@g" scripts/unit_test/ci_unit.sh            '
@@ -152,6 +151,7 @@ jobs:
             source $work_dir/../../../proxy
             set -e
             cd /workspace/PaddleNLP && git config --global --add safe.directory $PWD
+            export paddle_whl=https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuSome-LinuxCentos-Gcc82-Cuda118-Cudnn86-Trt85-Py310-CINN-Compile/b8b4c240234f1244ce0a8ba017769b4cdcda02a7/paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl # Paddle#73936导致，待修复
             timeout 50m bash scripts/unit_test/ci_unit.sh ${paddle_whl}
             '
           fi
