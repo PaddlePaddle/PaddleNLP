@@ -133,10 +133,11 @@ jobs:
             echo "Not in a pull_request or test_build event. Skipping..."
           else
             docker exec -t $container_name /bin/bash -c '
+            export paddle_whl=https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuSome-LinuxCentos-Gcc82-Cuda118-Cudnn86-Trt85-Py310-CINN-Compile/96aa35fd1be16637ef001426bb473c0132fa7a7a/paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl # 需要套件侧适配Paddle#73283
             cd /workspace/PaddleNLP
             git revert f2477c07272d04244cd3287d1f21c70482a4a85f --no-edit  # 套件PR#10413引入bug-待修复
             sed -i "s/>= 2.0.0/==3.6.0/g" requirements.txt  # 报错提示安装torchcodec
-            sed -i "s@--ignore-installed[[:space:]]\+dist/p.*\.whl@--pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html@g" scripts/regression/run_ci.sh
+            sed -i "s@--ignore-installed[[:space:]]\+dist/p.*\.whl@--pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html@g" scripts/regression/run_ci.sh # 绕过pyarrow升级为21.0.0需要编译的问题
             '
           fi
       
