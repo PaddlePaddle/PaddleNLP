@@ -30,7 +30,7 @@
     "do_eval": true,
     "device": "gpu",
     "model_type": "gpt_pp",
-    "sequence_parallel": true,
+    "sequence_parallel": false,
     "use_flash_attention": true,
     "use_fast_layer_norm": true,
     "fused_linear": true,
