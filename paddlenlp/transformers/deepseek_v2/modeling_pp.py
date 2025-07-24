@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nntplib import NNTPDataError
 import os
 from typing import OrderedDict, Tuple, Union
 
