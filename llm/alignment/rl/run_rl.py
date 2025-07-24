@@ -363,7 +363,7 @@ def main():
         paddle.device.cuda.empty_cache()
 
     def compute_metrics(eval_preds):
-        if training_args.rl_algorithm == "ppo":
+        if training_args.use_rule_reward:
             accuracy = (eval_preds.predictions == 1).astype("float32").mean().item()
         else:
             accuracy = (eval_preds.predictions == 3).astype("float32").mean().item()
