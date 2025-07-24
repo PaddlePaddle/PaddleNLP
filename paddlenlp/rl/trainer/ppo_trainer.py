@@ -1131,10 +1131,7 @@ class PPOTrainer(RLTrainerBase):
             Dict[str, float]: A dictionary containing two loss items: `rl_loss` (the policy training loss)
                 and `value_loss` (the value function training loss).
         """
-        if self.state.global_step >= -1:
-            rl_loss = self.actor_trainer.get_step_loss(loss_prefix)
-        else:
-            rl_loss = {}
+        rl_loss = self.actor_trainer.get_step_loss(loss_prefix)
         if self.args.rl_algorithm == "ppo":
             value_loss = self.critic_trainer.get_step_loss(loss_prefix)
             rl_loss.update(value_loss)
