@@ -32,13 +32,6 @@ from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import try_import
 
-try:
-    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-        mark_as_sequence_parallel_parameter,
-    )
-except:
-    pass
-
 from ...utils.converter import StateDictNameMapping
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import BaseModelOutputWithPastAndCrossAttentions
@@ -209,19 +202,19 @@ class MultiHeadAttentionAuto(nn.Layer):
         )
 
     def _fuse_prepare_qkv(self, query, use_cache=False, past_key_value=None):
-        if self.config.sequence_parallel:
-            # [bs, seq_len, num_head * head_dim] -> [bs / n, seq_len, num_head, head_dim] (n is model parallelism)
-            target_shape = [-1, self.config.seq_length, self.num_attention_heads, 3 * self.head_dim]
-        else:
-            target_shape = [0, 0, self.num_attention_heads, 3 * self.head_dim]
-
+        target_shape = [0, 0, self.num_attention_heads, 3 * self.head_dim]
         # bs, seq_len, num_head * 3*head_dim
         mix_layer = self.qkv_proj(query)
         # bs, seq_len, num_head, 3*head_dim
         mix_layer = paddle.reshape_(mix_layer, target_shape)
         # query_states, key_states, value_states => bs, seq_len, num_head, head_dim
         query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
-
+        if self.config.sequence_parallel:
+            # [seq_len, bs, num_head * head_dim] -> [bs, seq_len, num_head * head_dim]  (if sequence_parallel)
+            # FA and rope not support sequence first
+            query_states = paddle.transpose(query_states, [1, 0, 2, 3])
+            key_states = paddle.transpose(key_states, [1, 0, 2, 3])
+            value_states = paddle.transpose(value_states, [1, 0, 2, 3])
         # [bs, seq_len, num_head, head_dim]
         if past_key_value is not None:
             # reuse k, v, self_attention
@@ -326,6 +319,8 @@ class MultiHeadAttentionAuto(nn.Layer):
         Applies multi-head attention to map queries and a set of key-value pairs
         to outputs.
         """
+        if self.config.sequence_parallel:
+            query = dist.reshard(query, get_mesh(self.ipp), [dist.Shard(1), dist.Replicate()])
         key = query if key is None else key
         value = query if value is None else value
         if self.config.fuse_attention_qkv:
@@ -363,11 +358,11 @@ class MultiHeadAttentionAuto(nn.Layer):
         # else their shape are [bs, q_len, num_head * head_dim / n], n is mp parallelism.
 
         if self.config.sequence_parallel:
-            bs, seq_len, dim = out.shape
-            out = out.reshape([bs * seq_len, dim])  # [bs, seq_len, dim / n] => [bs * seq_len, dim / n]
-
+            out = paddle.transpose(out, [1, 0, 2])
         # project to output
         out = self.out_proj(out)
+        if self.config.sequence_parallel:
+            out = dist.reshard(out, get_mesh(self.ipp), [dist.Shard(1), dist.Shard(0)])
         # if sequence_parallel is true, out shape are [bs * seq_len / n, dim]
         # else their shape are [bs, seq_len, dim], n is mp parallelism.
         outs = [out]
@@ -390,9 +385,6 @@ class TransformerDecoder(nn.Layer):
         self.layers = decoder_layers
 
         self.norm = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
-        if config.sequence_parallel:
-            mark_as_sequence_parallel_parameter(self.norm.weight)
-            mark_as_sequence_parallel_parameter(self.norm.bias)
 
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
         # Enable_recompute defaults to False and is controlled by Trainer
@@ -536,11 +528,6 @@ class GPTDecoderLayerAuto(nn.Layer):
         self.norm1 = GPTLayerNorm(config, config.hidden_size, self.ipp, epsilon=1e-5, bias_attr=True)
         self.norm2 = GPTLayerNorm(config, config.hidden_size, self.ipp, epsilon=1e-5, bias_attr=True)
 
-        if config.sequence_parallel:
-            mark_as_sequence_parallel_parameter(self.norm1.weight)
-            mark_as_sequence_parallel_parameter(self.norm1.bias)
-            mark_as_sequence_parallel_parameter(self.norm2.weight)
-            mark_as_sequence_parallel_parameter(self.norm2.bias)
         if config.use_fused_dropout_add:
             self.fused_dropout_add1 = FusedDropoutAdd(config.attention_probs_dropout_prob, mode="upscale_in_train")
             self.fused_dropout_add2 = FusedDropoutAdd(config.hidden_dropout_prob, mode="upscale_in_train")
@@ -593,6 +580,12 @@ class GPTDecoderLayerAuto(nn.Layer):
 
         # Use a ternary operator for a more concise assignment of current_seed
         current_seed = "local_seed" if self.config.sequence_parallel else "global_seed"
+        if self.config.sequence_parallel:
+            hidden_states = dist.reshard(
+                hidden_states,
+                get_mesh(self.ipp),
+                [dist.Shard(1), dist.Shard(0)],
+            )
 
         # The 'with' block ensures the correct seed context is used
         with seed_guard_context(current_seed):
@@ -607,7 +600,8 @@ class GPTDecoderLayerAuto(nn.Layer):
         residual = hidden_states
         if self.config.normalize_before:
             hidden_states = self.norm2(hidden_states)
-
+        if self.config.sequence_parallel:
+            hidden_states = dist.reshard(hidden_states, get_mesh(self.ipp), [dist.Shard(1), dist.Replicate()])
         # when sequence_parallel=True:
         # hidden_states => [bs * seq_len / n, embed_dim]
         with seed_guard_context(current_seed):
@@ -615,6 +609,8 @@ class GPTDecoderLayerAuto(nn.Layer):
                 l_1 = self.linear1(hidden_states)
                 act = self.activation(l_1, approximate=True)
                 l_2 = self.linear2(act)
+                if self.config.sequence_parallel:
+                    l_2 = dist.reshard(l_2, get_mesh(self.ipp), [dist.Shard(1), dist.Shard(0)])
                 hidden_states = residual + self.dropout2(l_2)
             else:
                 hidden_states = self.fused_dropout_add2(
@@ -658,7 +654,7 @@ class GPTEmbeddingsAuto(nn.Layer):
             config.hidden_size,
         )
         self.word_embeddings.weight = dist.shard_tensor(
-            self.word_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Replicate()]
+            self.word_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(1)]
         )
         self.position_embeddings.weight = dist.shard_tensor(
             self.position_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(1)]
@@ -685,18 +681,15 @@ class GPTEmbeddingsAuto(nn.Layer):
             position_embeddings = self.position_embeddings(position_ids)
         embeddings = inputs_embeddings + position_embeddings
 
-        # exit()
-        if self.config.sequence_parallel:
-            # embeddings = dist.shard_tensor(embeddings,get_mesh(),[dist.Replicate(),dist.Replicate()])
-            bs, seq_len, hidden_size = embeddings.shape
-            # [bs, seq_len, dim] -> [bs * seq_len, dim]
-            embeddings = paddle.reshape_(embeddings, [bs * seq_len, hidden_size])
-            # [bs * seq_len / n, dim] (n is mp parallelism)
-            # embeddings = ScatterOp.apply(embeddings)
-            embeddings = dist.reshard(embeddings, get_mesh(), [dist.Replicate(), dist.Shard(0)])
         # Use a ternary operator for a more concise assignment of current_seed
         current_seed = "local_seed" if self.config.sequence_parallel else "global_seed"
         # The 'with' block ensures the correct seed context is used
+        if self.config.sequence_parallel:
+            # [B, S, H] -> [S, B, H]
+            embeddings = paddle.transpose(embeddings, [1, 0, 2])
+            embeddings = dist.reshard(embeddings, get_mesh(), [dist.Shard(1), dist.Shard(0)])
+        else:
+            embeddings = dist.reshard(embeddings, get_mesh(), [dist.Shard(0), dist.Replicate()])
         with seed_guard_context(current_seed):
             embeddings = self.dropout(embeddings)
         return embeddings
@@ -1176,13 +1169,16 @@ class GPTLMHeadAuto(nn.Layer):
                 shape=[config.vocab_size, config.hidden_size],
                 dtype=paddle.get_default_dtype(),
             )
-            self.weight = dist.shard_tensor(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)])
+            self.weight = dist.shard_tensor(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(1)])
 
     def forward(self, hidden_states, tensor_parallel_output=None):
-
         if self.config.sequence_parallel:
-            hidden_states = dist.reshard(hidden_states, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()])
-            hidden_states = paddle.reshape(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
+            hidden_states = dist.reshard(
+                hidden_states,
+                get_mesh(self.ipp),
+                [dist.Shard(1), dist.Shard(0)],
+            )
+            hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
 
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
