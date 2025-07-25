@@ -39,6 +39,7 @@ import paddle
 import paddle.amp.auto_cast as autocast
 import paddle.distributed as dist
 import paddle.nn as nn
+import psutil
 from packaging import version
 from paddle import framework
 from paddle.distributed.fleet.meta_parallel import PipelineLayer
@@ -3206,6 +3207,10 @@ class Trainer:
 
         if self.timers:
             logs.update(self.timers.info(self.timers.timers.keys()))
+
+        mem_info = psutil.virtual_memory()
+        logs["cpu_used_memory"] = round(mem_info.used / (1024**3), 2)
+        logs["cpu_available_memory"] = round(mem_info.available / (1024**3), 2)
 
         self.state.log_history = []
         self.control = self.callback_handler.on_log(self.args, self.state, self.control, logs, **kwargs)
