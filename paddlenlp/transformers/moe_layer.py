@@ -707,6 +707,8 @@ class FusionMlpNode:
 
         self.seq_length = custom_map.config.seq_length
         self.num_experts_per_tok = custom_map.config.num_experts_per_tok
+        self.adaptive_remained_O1_recompute_ratio = custom_map.config.adaptive_remained_O1_recompute_ratio
+
         self.recompute_fwd_gate_up = recompute_fwd_gate_up
         self.dispatched_indices = None
         self.dispatched_probs = None
@@ -780,7 +782,10 @@ class FusionMlpNode:
 
             # If adaptive O1 recompute is enabled, determine whether to enable recompute O1 based on the degree of imbalance
             if self.recompute_fwd_gate_up == -1:
-                if unzipped_tokens.shape[0] > self.seq_length * self.num_experts_per_tok * 2:
+                if (
+                    unzipped_tokens.shape[0]
+                    > self.seq_length * self.num_experts_per_tok * self.adaptive_remained_O1_recompute_ratio
+                ):
                     # logger.debug(f"recompute_fwd_gate_up changed to True, Because the receives {unzipped_tokens.shape[0]} Tensors greater then {self.seq_length*self.num_experts_per_tok*2}.")
                     self.set_recompute_fwd_gate_up(True)
                 else:
@@ -810,7 +815,10 @@ class FusionMlpNode:
 
             # If adaptive O1 recompute is enabled, determine whether to enable recompute O1 based on the degree of imbalance
             if self.recompute_fwd_gate_up == -1:
-                if unzipped_tokens.shape[0] > self.seq_length * self.num_experts_per_tok * 2:
+                if (
+                    unzipped_tokens.shape[0]
+                    > self.seq_length * self.num_experts_per_tok * self.adaptive_remained_O1_recompute_ratio
+                ):
                     self.set_recompute_fwd_gate_up(True)
                 else:
                     self.set_recompute_fwd_gate_up(False)

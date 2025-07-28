@@ -1195,7 +1195,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
 
                     recompute_fwd_gate_up_ = 1 if self.layer_idx in self.config.recompute_fwd_gate_up_list else 0
                     recompute_fwd_gate_up_ = (
-                        -1 if self.config.adaptive_remained_recompute_fwd_gate_up else recompute_fwd_gate_up_
+                        -1 if self.config.adaptive_remained_O1_recompute_ratio else recompute_fwd_gate_up_
                     )
 
                     fp8_fusion_moe_node = FusionMoeNode(
