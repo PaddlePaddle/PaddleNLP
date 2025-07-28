@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// The file has been adapted from DeepSeek DeepEP project
+// The file has been adapted from DeepSeek DeepGEMM project
 // Copyright (c) 2025 DeepSeek
-// Licensed under the MIT License - https://github.com/deepseek-ai/DeepEP/blob/main/LICENSE
+// Licensed under the MIT License - https://github.com/deepseek-ai/DeepGEMM/blob/main/LICENSE
 
 #pragma once
 
+#ifndef __CUDACC_RTC__
 #include <cuda.h>
+#endif
 
 #include <cute/arch/mma_sm90_gmma.hpp>
 #include <cute/arch/mma_sm90_gmma_ext.hpp>
@@ -84,12 +86,22 @@ __device__  __forceinline__ float ld_shared(const float* __restrict__ ptr) {
     return ret;
 }
 
+__device__  __forceinline__ float2 ld_shared(const float2* __restrict__ ptr) {
+    float2 ret;
+    asm volatile("ld.shared.v2.f32 {%0, %1}, [%2];" : "=f"(ret.x), "=f"(ret.y) : "l"(ptr));
+    return ret;
+}
+
 __device__ __forceinline__ void st_shared(const float* ptr, float val) {
     asm volatile("st.shared.f32 [%0], %1;" :: "l"(ptr), "f"(val));
 }
 
 __device__ __forceinline__ void st_shared(const uint32_t* ptr, uint32_t val) {
     asm volatile("st.shared.u32 [%0], %1;" :: "l"(ptr), "r"(val));
+}
+
+__device__ __forceinline__ void st_shared(const float2* ptr, float2 val) {
+    asm volatile("st.shared.v2.f32 [%0], {%1, %2};" :: "l"(ptr), "f"(val.x), "f"(val.y));
 }
 
 template <int N>
@@ -186,6 +198,7 @@ struct FP8MMASelector {
         if constexpr (N == 112) return MMA_64x112x32_F32E4M3E4M3_SS_TN();
         if constexpr (N == 120) return MMA_64x120x32_F32E4M3E4M3_SS_TN();
         if constexpr (N == 128) return MMA_64x128x32_F32E4M3E4M3_SS_TN();
+        if constexpr (N == 136) return MMA_64x136x32_F32E4M3E4M3_SS_TN();
         if constexpr (N == 144) return MMA_64x144x32_F32E4M3E4M3_SS_TN();
         if constexpr (N == 152) return MMA_64x152x32_F32E4M3E4M3_SS_TN();
         if constexpr (N == 160) return MMA_64x160x32_F32E4M3E4M3_SS_TN();
@@ -198,5 +211,20 @@ struct FP8MMASelector {
 
     using type = decltype(select_type());
 };
+
+enum class Layout {
+    RowMajor,
+    ColMajor
+};
+
+__device__ __host__ constexpr int get_num_math_warpgroups(int block_m) {
+    return block_m == 64 ? 1 : 2;
+}
+
+template <uint32_t kNumTMAThreads, uint32_t kNumMathThreadsPerGroup>
+__device__ __host__ constexpr int get_num_threads_per_sm(int block_m) {
+    DG_STATIC_ASSERT(kNumMathThreadsPerGroup == 128, "Only support 128 threads per math group");
+    return get_num_math_warpgroups(block_m) * kNumMathThreadsPerGroup + kNumTMAThreads;
+}
 
 } // namespace deep_gemm
