@@ -302,9 +302,9 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
         assert self.e_score_correction_bias is not None, "e_score_correction_bias is None"
         scores_for_choice = scores.reshape([bsz_seq_len, -1]) + self.e_score_correction_bias.unsqueeze(0)
-        group_scores = (
-            scores_for_choice.reshape([bsz_seq_len, self.n_group, -1]).topk(2, axis=-1)[0].sum(axis=-1)
-        )  # fmt:skip [n, n_group]
+        reshape_tmp_rst = scores_for_choice.reshape([bsz_seq_len, self.n_group, -1])
+        top_k = min(reshape_tmp_rst.shape[2], 2)
+        group_scores = reshape_tmp_rst.topk(top_k, axis=-1)[0].sum(axis=-1)  # fmt:skip [n, n_group]
         group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=True)[1]  # [n, top_k_group]
         group_mask = paddle.zeros_like(group_scores).put_along_axis(group_idx, paddle.ones([], dtype="float32"), axis=-1)  # fmt:skip
         score_mask = (

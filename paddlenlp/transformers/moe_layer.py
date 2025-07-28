@@ -596,13 +596,21 @@ class Fp8DispatchNode:
         return hs_2d_dispatched, dispatched_indices, dispatched_probs
 
     @paddle.no_grad()
-    def backward(self, hs_dispatched_grad, dispatched_probs_grad, previous_event=None, async_finish=False):
+    def backward(
+        self,
+        hs_dispatched_grad,
+        dispatched_probs_grad,
+        previous_event=None,
+        async_finish=False,
+        allocate_on_comm_stream=False,
+    ):
         # dispatch grad
         hs_grad, _, token_probs_grad = self.dispatch_act_node.backward(
             hs_dispatched_grad,
             dispatched_probs_grad,
             previous_event=previous_event,
             async_finish=async_finish,
+            allocate_on_comm_stream=allocate_on_comm_stream,
         )
         return hs_grad, token_probs_grad
 
@@ -614,7 +622,7 @@ class Fp8CombineNode:
         self.name = name
 
     @paddle.no_grad()
-    def forward(self, hidden_states_out, previous_event=None, async_finish=False):
+    def forward(self, hidden_states_out, previous_event=None, async_finish=False, allocate_on_comm_stream=False):
         # combine
         output_combine = self.combine_node.forward(
             hidden_states_out,
@@ -622,6 +630,7 @@ class Fp8CombineNode:
             self.token_dispatcher._comm_manager.handle,
             previous_event=previous_event,
             async_finish=async_finish,
+            allocate_on_comm_stream=allocate_on_comm_stream,
         )
         output_combine.stop_gradient = False
         return output_combine
@@ -639,9 +648,10 @@ class Fp8CombineNode:
 
 
 class Fp8CombineQuantNode:
-    def __init__(self, token_dispatcher, name="fp8_combine_quant_node"):
+    def __init__(self, token_dispatcher, moe_group=None, name="fp8_combine_quant_node"):
         self.token_dispatcher = token_dispatcher
         self.name = name
+        self.moe_group = moe_group
 
     @paddle.no_grad()
     def forward(self, output_combine):
@@ -657,13 +667,14 @@ class Fp8CombineQuantNode:
         # post combine grad
         if DSV3_USE_FP8_DISPATCH:
             if event_to_wait is not None:
+                assert self.moe_group is not None
+                event_to_wait.comm_stream_wait(self.moe_group.id)
                 buffer = get_buffer(self.token_dispatcher._comm_manager.group, get_hidden_bytes(output_grad))
                 custom_stream = paddle.device.Stream(stream_base=buffer.runtime.get_comm_stream())
-                custom_stream.wait_event(event_to_wait)
             else:
                 custom_stream = paddle.device.current_stream()
             with paddle.device.stream_guard(custom_stream):
-                output_combine_grad = paddle.reshape(output_grad, self.output_combine_shape)
+                output_combine_grad = paddle.reshape(output_grad, [-1, output_grad.shape[-1]])
                 # output_combine_grad quant to fp8
                 output_combine_grad_fp8, output_combine_grad_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
                     output_combine_grad, output_scale_transpose=False, quant_method="1x128", input_transpose=False
@@ -674,7 +685,7 @@ class Fp8CombineQuantNode:
                     quant_event = deep_ep.get_event_from_custom_stream(custom_stream.stream_base)
             return (output_combine_grad_fp8, output_combine_grad_scale), quant_event
         else:
-            output_combine_grad = paddle.reshape(output_grad, self.output_combine_shape)
+            output_combine_grad = paddle.reshape(output_grad, [-1, output_grad.shape[-1]])
             return output_combine_grad, None
 
 
@@ -686,19 +697,19 @@ class FusionMlpNode:
     def __init__(self, custom_map, max_topk, recompute_fwd_gate_up=False, is_split_group_gemm=True):
         self.token_dispatcher = custom_map.token_dispatcher
         self.experts = custom_map.experts
+        self.unzip_node = UnZipNode()
+        self.zip_node = ZipNode()
         self.experts_group_gemm_node = FP8GroupGemmMlpFunctionNode(
             custom_map,
             recompute_fwd_gate_up=recompute_fwd_gate_up,
             is_split_group_gemm=is_split_group_gemm,
         )
-        self.unzip_node = UnZipNode(self.token_dispatcher)
-        self.zip_node = ZipNode(self.token_dispatcher)
         self.dispatched_indices = None
         self.dispatched_probs = None
         self.tokens_per_expert = None
         self.router_topk = max_topk
 
-    def reset_statue(self):
+    def reset_statue(self, with_dw=False):
         """
         重置所有状态变量。
 
@@ -713,8 +724,15 @@ class FusionMlpNode:
         self.dispatched_probs = None
         self.tokens_per_expert = None
         self.router_topk = None
-        self.experts_group_gemm_node.reset_statue()
-        self.experts_group_gemm_node = None
+
+        del self.unzip_node
+        del self.zip_node
+        self.unzip_node = None
+        self.zip_node = None
+
+        if with_dw:
+            self.experts_group_gemm_node.reset_statue()
+            self.experts_group_gemm_node = None
 
     @paddle.no_grad()
     def forward(self, hs_2d_dispatched, dispatched_indices, dispatched_probs):
@@ -836,13 +854,14 @@ class FusionMlpNode:
             self.dispatched_indices,
             num_experts=len(self.tokens_per_expert),
         )
-        if with_dw:
-            self.reset_statue()
+
+        self.reset_statue(with_dw)
         return hs_dispatched_grad, dispatched_probs_grad
 
     @paddle.no_grad()
     def backward_dw(self):
         self.experts_group_gemm_node.backward_dw()
+        self.reset_statue(True)
 
 
 class FusionMoeNode:
@@ -864,7 +883,7 @@ class FusionMoeNode:
             is_split_group_gemm=is_split_group_gemm,
         )
         self.combine_node = Fp8CombineNode(self.token_dispatcher)
-        self.combine_quant_node = Fp8CombineQuantNode(self.token_dispatcher)
+        self.combine_quant_node = Fp8CombineQuantNode(self.token_dispatcher, custom_map.moe_group)
         self.name = name
 
     @paddle.no_grad()
@@ -897,7 +916,7 @@ class FusionMoeNode:
 
     @paddle.no_grad()
     def backward(self, output_grad, with_dw=True):
-        output_combine_grad = self.combine_quant_node.backward(output_grad)
+        output_combine_grad, _ = self.combine_quant_node.backward(output_grad)
         hidden_states_out_grad = self.combine_node.backward(output_combine_grad)
 
         hs_dispatched_grad, dispatched_probs_grad = self.mlp_node.backward(hidden_states_out_grad, with_dw=with_dw)

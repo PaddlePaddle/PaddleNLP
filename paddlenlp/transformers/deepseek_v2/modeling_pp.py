@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 import os
 from typing import OrderedDict, Tuple, Union
 
@@ -29,6 +30,7 @@ from paddle.distributed.fleet.meta_parallel import (
 from paddle.distributed.fleet.recompute.recompute import recompute
 from paddle.distributed.fleet.utils.sequence_parallel_utils import ScatterOp
 
+from ...utils.log import logger
 from ...utils.tools import get_env_device
 from ..model_utils import PipelinePretrainedModel
 from .modeling import (
@@ -65,7 +67,6 @@ __all__ = [
 
 
 DSV3_USE_FP8_GEMM = os.getenv("DSV3_USE_FP8_GEMM", "False").lower() == "true"
-DSV3_USE_FP8_DISPATCH = os.getenv("DSV3_USE_FP8_DISPATCH", "False").lower() == "true"
 
 
 def parse_args(args):
@@ -433,7 +434,7 @@ class OverlapedScheduleChunk:
     def forward_backward(self, inputs, output_grad, event_to_wait=None):
         for n in self.nodes:
             inputs, output_grad, event_to_wait = n.forward_backward(inputs, output_grad, event_to_wait)
-        return inputs, output_grad
+        return inputs, output_grad, None
 
 
 class OverlapedScheduleNode:
@@ -566,13 +567,18 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
         ret = (inputs_embeds_mtp, *ret) if self.send_mtp_embed else ret
         return ret
 
-    def combine_forward(self, inputs, async_finish=False):
+    def combine_forward(self, inputs, async_finish=False, previous_event=None, allocate_on_comm_stream=False):
         if self.send_mtp_embed:
             (inputs_embeds_mtp, hidden_states, residual, l_aux, hidden_states_out) = inputs
         else:
             (hidden_states, residual, l_aux, hidden_states_out) = inputs
 
-        output_combine = self.fp8_fusion_moe_node.combine_node.forward(hidden_states_out, async_finish=async_finish)
+        output_combine = self.fp8_fusion_moe_node.combine_node.forward(
+            hidden_states_out,
+            async_finish=async_finish,
+            previous_event=previous_event,
+            allocate_on_comm_stream=allocate_on_comm_stream and previous_event is not None,
+        )
 
         ret = (hidden_states, residual, l_aux, output_combine)
 
@@ -626,7 +632,7 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
             output_combine_grad,
             async_finish=async_finish,
             previous_event=quant_event,
-            allocate_on_comm_stream=allocate_on_comm_stream,
+            allocate_on_comm_stream=allocate_on_comm_stream and quant_event is not None,
         )
 
         ret = (hidden_states_grad, residual_grad, l_aux_grad, hidden_states_out_grad)
@@ -649,7 +655,7 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
         ret = (inputs_embeds_mtp_grad, *ret) if self.send_mtp_embed else ret
         return ret
 
-    def dispatch_backward(self, output_grad, async_finish=False):
+    def dispatch_backward(self, output_grad, async_finish=False, previous_event=None, allocate_on_comm_stream=False):
         if self.send_mtp_embed:
             (
                 inputs_embeds_mtp_grad,
@@ -663,7 +669,11 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
             hidden_states_grad, residual_grad, l_aux_grad, hs_dispatched_grad, dispatched_probs_grad = output_grad
 
         hs_grad, token_probs_grad = self.fp8_fusion_moe_node.dispatch_node.backward(
-            hs_dispatched_grad, dispatched_probs_grad, async_finish=async_finish
+            hs_dispatched_grad,
+            dispatched_probs_grad,
+            async_finish=async_finish,
+            previous_event=previous_event,
+            allocate_on_comm_stream=allocate_on_comm_stream and previous_event is not None,
         )
 
         ret = (hidden_states_grad, residual_grad, l_aux_grad, hs_grad, token_probs_grad)
@@ -752,6 +762,8 @@ class OverlapedFUsionScheduleNode:
         output_grad = self.backward_node.mlp_backward(output_grad)
         paddle.base.core.nvprof_nvtx_pop()
 
+        output_grad_event = deep_ep.get_event_from_calc_stream(self.backward_node.moe_group.id)
+
         paddle.base.core.nvprof_nvtx_push("dispatch_forward")
         inputs = self.forward_node.dispatch_forward(
             inputs, previous_event=attn_compute_event, async_finish=True, allocate_on_comm_stream=True
@@ -760,7 +772,9 @@ class OverlapedFUsionScheduleNode:
         dispatch_forward_event = deep_ep.get_event_from_comm_stream(self.forward_node.moe_group.id)
 
         paddle.base.core.nvprof_nvtx_push("dispatch_backward")
-        output_grad = self.backward_node.dispatch_backward(output_grad, async_finish=True)
+        output_grad = self.backward_node.dispatch_backward(
+            output_grad, async_finish=True, previous_event=output_grad_event, allocate_on_comm_stream=True
+        )
         paddle.base.core.nvprof_nvtx_pop()
         # get dispatch backward event
         dispatch_backward_event = deep_ep.get_event_from_comm_stream(self.backward_node.moe_group.id)
@@ -774,15 +788,19 @@ class OverlapedFUsionScheduleNode:
         inputs = self.forward_node.mlp_forward(inputs)
         paddle.base.core.nvprof_nvtx_pop()
 
+        inputs_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
+
         paddle.base.core.nvprof_nvtx_push("combine_forward")
-        inputs = self.forward_node.combine_forward(inputs, async_finish=True)
+        inputs = self.forward_node.combine_forward(
+            inputs, async_finish=True, previous_event=inputs_event, allocate_on_comm_stream=True
+        )
         paddle.base.core.nvprof_nvtx_pop()
         combine_forward_event = deep_ep.get_event_from_comm_stream(self.forward_node.moe_group.id)
 
         dispatch_backward_event.calc_stream_wait(self.backward_node.moe_group.id)
         paddle.base.core.nvprof_nvtx_push("attn_backward")
         output_grad = self.backward_node.attn_backward(output_grad)
-        event_to_wait = paddle.device.current_stream().record_event()
+        event_to_wait = deep_ep.get_event_from_calc_stream(self.backward_node.moe_group.id)
         paddle.base.core.nvprof_nvtx_pop()
 
         combine_forward_event.calc_stream_wait(self.forward_node.moe_group.id)
@@ -1426,6 +1444,43 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                 LayerDesc(DeepseekV2EmbeddingPipe, config=config), self._base_model.base_model_prefix
             )
 
+        def compute_recompute_fwd_gate_up_list(pp_nums, all_dl_nums, dense_dl_nums, recompute_fwd_gate_up):
+            all_layers_nums = all_dl_nums + 4  # embedding, rms, lm_head, mtp
+            segment_size = all_layers_nums // pp_nums
+            boundary = math.ceil((1 + dense_dl_nums) / segment_size) * segment_size
+            recompute_fwd_gate_up_list = [dense_dl_nums]
+            for idx in range(boundary - 1, all_dl_nums, segment_size):
+                recompute_fwd_gate_up_list.append(idx)
+
+            # If `recompute_fwd_gate_up` is a Boolean value and is True, means all O1 will be recomputed.
+            # Otherwise `recompute_fwd_gate_up` should be an integer representing how many O1 are recomputed.
+            assert isinstance(recompute_fwd_gate_up, (int, bool))
+            if type(recompute_fwd_gate_up) is bool:
+                enable_k_o1_rc = segment_size if recompute_fwd_gate_up is True else 0
+            else:
+                enable_k_o1_rc = recompute_fwd_gate_up
+
+            ret = []
+            for i in range(len(recompute_fwd_gate_up_list)):
+                for k in range(min(segment_size, enable_k_o1_rc)):
+                    ret.append(recompute_fwd_gate_up_list[i] + k)
+            return ret
+
+        pp_nums = (
+            self.config["pipeline_parallel_degree"] * 2
+            if self.config.use_dualpipev
+            else self.config["pipeline_parallel_degree"]
+        )
+        recompute_fwd_gate_up_list = compute_recompute_fwd_gate_up_list(
+            pp_nums,
+            self.config.num_hidden_layers,
+            self.config.first_k_dense_replace,
+            self.config.recompute_fwd_gate_up,
+        )
+
+        logger.info(f"recompute_fwd_gate_up_list: {recompute_fwd_gate_up_list}")
+        config.recompute_fwd_gate_up_list = recompute_fwd_gate_up_list
+
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
                 LayerDesc(
@@ -1500,7 +1555,8 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         backward_loss_fn_node,
         backward_input_grads,
         scaler,
-        event_to_wait=None,
+        combine_bw_event_to_wait=None,
+        pp_stream=None,
     ):
         if backward_loss_fn_node is not None:
             if scaler:
@@ -1517,8 +1573,8 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         ) = build_overlapped_nodes(forward_chunk, backward_chunk)
         forward_inputs = forward_pre_node.forward(forward_inputs)
         backward_input_grads = backward_pre_node.backward(backward_input_grads)
-        forward_inputs, backward_input_grads = overlap_node.forward_backward(
-            forward_inputs, backward_input_grads, event_to_wait
+        forward_inputs, backward_input_grads, _ = overlap_node.forward_backward(
+            forward_inputs, backward_input_grads, combine_bw_event_to_wait
         )
         forward_inputs = forward_post_node.forward(forward_inputs)
         backward_input_grads = backward_post_node.backward(backward_input_grads)
