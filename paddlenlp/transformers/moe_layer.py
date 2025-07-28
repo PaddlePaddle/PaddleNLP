@@ -786,10 +786,10 @@ class FusionMlpNode:
                     unzipped_tokens.shape[0]
                     > self.seq_length * self.num_experts_per_tok * self.adaptive_remained_O1_recompute_ratio
                 ):
-                    # logger.debug(f"recompute_fwd_gate_up changed to True, Because the receives {unzipped_tokens.shape[0]} Tensors greater then {self.seq_length*self.num_experts_per_tok*2}.")
+                    # logger.debug(f"recompute_fwd_gate_up changed to True, Because the receives {unzipped_tokens.shape[0]} Tensors greater then {self.seq_length*self.num_experts_per_tok*self.adaptive_remained_O1_recompute_ratio}.")
                     self.set_recompute_fwd_gate_up(True)
                 else:
-                    # logger.debug(f"recompute_fwd_gate_up changed to False, Because the receives {unzipped_tokens.shape[0]} Tensors less then {self.seq_length*self.num_experts_per_tok*2}.")
+                    # logger.debug(f"recompute_fwd_gate_up changed to False, Because the receives {unzipped_tokens.shape[0]} Tensors less then {self.seq_length*self.num_experts_per_tok*self.adaptive_remained_O1_recompute_ratio}.")
                     self.set_recompute_fwd_gate_up(False)
 
             # 2 experts
