@@ -18,6 +18,7 @@
 
 import copy
 import os
+import time
 from typing import Any, Dict
 
 from ..jit import Runtime, build, cpp_format, generate
@@ -48,6 +49,7 @@ class JITTuner:
 
         if os.getenv("DG_JIT_DEBUG", None):
             print(f"Auto-tuning JIT kernel {name} with keys {keys}")
+        start_time = time.time()
 
         assert signature not in self.tuned
         space = (dict(),) if len(space) == 0 else space
@@ -72,6 +74,10 @@ class JITTuner:
             if os.getenv("DG_JIT_DEBUG", None):
                 print(f"Tuned JIT kernel {name} with keys {keys} and tuned keys {tuned_keys} has time {elapsed_time}")
         assert best_runtime is not None, f"Failed to tune JIT kernel {name} with keys {keys}"
+        end_time = time.time()
+        period_time = end_time - start_time
+        if int(os.getenv("DG_JIT_DEBUG_TIME", 0)):
+            print(f"Tuning and Compilation of JIT kernel {name} took {period_time:.2f} seconds.")
 
         # Cache the best runtime and return
         if os.getenv("DG_JIT_DEBUG", None) or os.getenv("DG_PRINT_AUTOTUNE", None):
@@ -102,6 +108,7 @@ class JITTuner:
         # if signature in self.tuned:
         #     return self.tuned[signature]
         space = (dict(),) if len(space) == 0 else space
+        start_time = time.time()
 
         kernels = []
         for tuned_keys in space:
@@ -123,7 +130,10 @@ class JITTuner:
             if os.getenv("DG_JIT_DEBUG", None):
                 print(f"Tuned JIT kernel {name} with keys {keys} and tuned keys {tuned_keys} has time {elapsed_time}")
         assert best_runtime is not None, f"Failed to tune JIT kernel {name} with keys {keys}"
-
+        end_time = time.time()
+        period_time = end_time - start_time
+        if int(os.getenv("DG_JIT_DEBUG_TIME", 0)):
+            print(f"Tuning and Compilation of JIT kernel {name} took {period_time:.2f} seconds.")
         # Cache the best runtime and return
         if os.getenv("DG_JIT_DEBUG", None) or os.getenv("DG_PRINT_AUTOTUNE", None):
             print(f"Best JIT kernel {name} with keys {keys} has tuned keys {best_keys} and time {best_time}")
