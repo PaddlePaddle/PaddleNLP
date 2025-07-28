@@ -82,20 +82,7 @@ class FP8LinearFunctionBase:
             return tensor_fp8, tensor_scale, tensor_t_fp8, tensor_t_scale
 
     @staticmethod
-    def run_deep_gemm(a, a_scale, b, b_scale, out=None, num_sms=112, m_indices=None, is_grouped=False):
-        if out is None:
-            out = paddle.empty([a.shape[0], b.shape[0]], dtype=paddle.bfloat16)
-
-        if is_grouped:
-            deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
-                (a, a_scale), (b, b_scale), out, m_indices=m_indices, num_sms=num_sms
-            )
-        else:
-            deep_gemm.gemm_fp8_fp8_bf16_nt((a, a_scale), (b, b_scale), out, num_sms=num_sms)
-        return out
-
-    @staticmethod
-    def kitchen_fp8_gemm(
+    def kitchen_gemm(
         x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled=True, is_b_1d_scaled=True, out=None, rtn_dtype=paddle.bfloat16
     ):
         if out is not None:
@@ -182,7 +169,8 @@ class FP8LinearFunctionBase:
 
         # FP8 GEMM
         out = paddle.empty([input_fp8.shape[0], weight_fp8.shape[0]], dtype=input.dtype)
-        FP8LinearFunctionBase.run_deep_gemm(input_fp8, input_scale.T, weight_fp8, weight_scale, out=out)
+
+        deep_gemm.gemm_fp8_fp8_bf16_nt((input_fp8, input_scale.T), (weight_fp8, weight_scale), out, num_sms=112)
 
         # Return outputs
         if return_mode == "output_only":
@@ -214,7 +202,7 @@ class FP8LinearFunctionBase:
         if hasattr(weight, "main_grad"):
             if weight.main_grad is None:
                 weight.main_grad = paddle.zeros(shape=weight.shape, dtype=paddle.float32)
-            result = FP8LinearFunctionBase.kitchen_fp8_gemm(
+            result = FP8LinearFunctionBase.kitchen_gemm(
                 input_t,
                 input_t_scale,
                 dout_t,
@@ -227,7 +215,7 @@ class FP8LinearFunctionBase:
         else:
             if weight.grad is None:
                 weight.grad = paddle.zeros(shape=weight.shape, dtype=paddle.float32)
-            result = FP8LinearFunctionBase.kitchen_fp8_gemm(
+            result = FP8LinearFunctionBase.kitchen_gemm(
                 input_t, input_t_scale, dout_t, dout_t_scale, is_a_1d_scaled, is_b_1d_scaled, weight.grad, rtn_dtype
             )
 
@@ -282,7 +270,7 @@ class FP8LinearFunctionBase:
                 o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, True, True, w2, rtn_dtype=paddle.float32
             )
         else:
-            dw2 = FP8LinearFunctionBase.kitchen_fp8_gemm(
+            dw2 = FP8LinearFunctionBase.kitchen_gemm(
                 o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, True, True, rtn_dtype=paddle.float32
             )
 
@@ -300,7 +288,7 @@ class FP8LinearFunctionBase:
                 x_t_fp8, x_t_scale, do1_t_fp8, do1_t_scale, True, True, w1, rtn_dtype=paddle.float32
             )
         else:
-            dw1 = FP8LinearFunctionBase.kitchen_fp8_gemm(
+            dw1 = FP8LinearFunctionBase.kitchen_gemm(
                 x_t_fp8, x_t_scale, do1_t_fp8, do1_t_scale, True, True, rtn_dtype=paddle.float32
             )
 
@@ -377,14 +365,14 @@ class FP8LinearFunctionBase:
 
 class FP8LinearFunction(paddle.autograd.PyLayer):
     @staticmethod
-    def forward(ctx, x, custom_map, if_keep_x=False):
+    def forward(ctx, x, custom_map, keep_x=False):
         weight = custom_map.weight
         x_orig_shape = x.shape
 
         # deep_gemm only support 2D
         x = x.reshape([-1, x_orig_shape[-1]]).contiguous()
 
-        if if_keep_x:
+        if keep_x:
             out = FP8LinearFunctionBase.compute_fp8_linear(
                 x,
                 weight,
@@ -410,9 +398,9 @@ class FP8LinearFunction(paddle.autograd.PyLayer):
         x, weight = ctx.saved_tensor()
         dout_2d = dout.reshape([-1, dout.shape[-1]])
 
-        if_keep_x = not isinstance(x, tuple)
+        keep_x = not isinstance(x, tuple)
 
-        if if_keep_x:
+        if keep_x:
             # padding x and quant
             dx_orig_shape = x.shape
             x = FP8LinearFunctionBase.padding(x, 0)
@@ -456,7 +444,7 @@ class FP8Linear(paddle.nn.Layer):
         )
 
     def forward(self, x):
-        return FP8LinearFunction.apply(x, self, if_keep_x=False)
+        return FP8LinearFunction.apply(x, self, keep_x=False)
 
 
 class FP8KeepXLinear(paddle.nn.Layer):
@@ -471,7 +459,7 @@ class FP8KeepXLinear(paddle.nn.Layer):
         )
 
     def forward(self, x):
-        return FP8LinearFunction.apply(x, self, if_keep_x=True)
+        return FP8LinearFunction.apply(x, self, keep_x=True)
 
 
 class FP8NormMlpRecomputeFunction(paddle.autograd.PyLayer):
