@@ -182,7 +182,7 @@ class DeepseekV2Config(PretrainedConfig):
         use_dualpipev=False,
         send_mtp_embed=False,
         using_post_norm_recompute=False,
-        recompute_fwd_gate_up=False,
+        recompute_fwd_gate_up=0,
         is_split_group_gemm=False,
         fakse_gate_restrict_balance=False,
         **kwargs,

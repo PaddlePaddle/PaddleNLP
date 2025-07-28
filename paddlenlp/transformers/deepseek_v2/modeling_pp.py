@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 import os
 from typing import OrderedDict, Tuple, Union
 
@@ -29,6 +30,7 @@ from paddle.distributed.fleet.meta_parallel import (
 from paddle.distributed.fleet.recompute.recompute import recompute
 from paddle.distributed.fleet.utils.sequence_parallel_utils import ScatterOp
 
+from ...utils.log import logger
 from ...utils.tools import get_env_device
 from ..model_utils import PipelinePretrainedModel
 from .modeling import (
@@ -1445,6 +1447,43 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                 LayerDesc(DeepseekV2EmbeddingPipe, config=config), self._base_model.base_model_prefix
             )
 
+        def compute_recompute_fwd_gate_up_list(pp_nums, all_dl_nums, dense_dl_nums, recompute_fwd_gate_up):
+            all_layers_nums = all_dl_nums + 4  # embedding, rms, lm_head, mtp
+            segment_size = all_layers_nums // pp_nums
+            boundary = math.ceil((1 + dense_dl_nums) / segment_size) * segment_size
+            recompute_fwd_gate_up_list = [dense_dl_nums]
+            for idx in range(boundary - 1, all_dl_nums, segment_size):
+                recompute_fwd_gate_up_list.append(idx)
+
+            # If `recompute_fwd_gate_up` is a Boolean value and is True, means all O1 will be recomputed.
+            # Otherwise `recompute_fwd_gate_up` should be an integer representing how many O1 are recomputed.
+            assert isinstance(recompute_fwd_gate_up, (int, bool))
+            if type(recompute_fwd_gate_up) is bool:
+                enable_k_o1_rc = segment_size if recompute_fwd_gate_up is True else 0
+            else:
+                enable_k_o1_rc = recompute_fwd_gate_up
+
+            ret = []
+            for i in range(len(recompute_fwd_gate_up_list)):
+                for k in range(min(segment_size, enable_k_o1_rc)):
+                    ret.append(recompute_fwd_gate_up_list[i] + k)
+            return ret
+
+        pp_nums = (
+            self.config["pipeline_parallel_degree"] * 2
+            if self.config.use_dualpipev
+            else self.config["pipeline_parallel_degree"]
+        )
+        recompute_fwd_gate_up_list = compute_recompute_fwd_gate_up_list(
+            pp_nums,
+            self.config.num_hidden_layers,
+            self.config.first_k_dense_replace,
+            self.config.recompute_fwd_gate_up,
+        )
+
+        logger.info(f"recompute_fwd_gate_up_list: {recompute_fwd_gate_up_list}")
+        config.recompute_fwd_gate_up_list = recompute_fwd_gate_up_list
+
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
                 LayerDesc(
@@ -1519,8 +1558,8 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         backward_loss_fn_node,
         backward_input_grads,
         scaler,
-        combine_bw_event_to_wait = None,
-        pp_stream=None
+        combine_bw_event_to_wait=None,
+        pp_stream=None,
     ):
         if backward_loss_fn_node is not None:
             if scaler:
