@@ -125,8 +125,7 @@ def unpermute(
 
 
 class UnZipNode:
-    def __init__(self, token_dispatcher, name="unzip"):
-        self.token_dispatcher = token_dispatcher
+    def __init__(self, name="unzip"):
         self.name = name
         self.unzipped_probs = None
         self.zipped_expertwise_rowmap = None
@@ -199,8 +198,7 @@ class UnZipNode:
 
 
 class ZipNode:
-    def __init__(self, token_dispatcher, name="zip"):
-        self.token_dispatcher = token_dispatcher
+    def __init__(self, name="zip"):
         self.name = name
 
     @paddle.no_grad()

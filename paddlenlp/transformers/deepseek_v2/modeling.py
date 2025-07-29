@@ -772,9 +772,20 @@ class FusedNormGateFunc(paddle.autograd.PyLayer):
         return dx, d_rms_norm_weight, d_moe_gate_weight
 
 
+def balance_expert_assignment(n, m, k):
+    assert k * n % m == 0
+    matrix = paddle.zeros((n, m), dtype=paddle.int32)
+    for row in range(n):
+        start_col = row % m
+        for i in range(k):
+            col = (start_col + i) % m
+            matrix[row, col] = 1
+    return matrix
+
+
 class FakeGate(paddle.autograd.PyLayer):
     @staticmethod
-    def forward(ctx, hidden_states, weight):
+    def forward(ctx, hidden_states, weight, fakse_gate_restrict_balance=False, num_experts_per_tok=8):
         expert_num = weight.shape[1]
         bsz, seq, _ = hidden_states.shape
 
@@ -782,8 +793,12 @@ class FakeGate(paddle.autograd.PyLayer):
         ctx.x_dtype = hidden_states.dtype
         ctx.y_shape = weight.shape
         ctx.y_dtype = weight.dtype
-
-        return paddle.randn([bsz, seq, expert_num]).cast(weight.dtype)
+        if fakse_gate_restrict_balance:
+            return paddle.reshape(
+                balance_expert_assignment(bsz * seq, expert_num, num_experts_per_tok), [bsz, seq, expert_num]
+            )
+        else:
+            return paddle.randn([bsz, seq, expert_num]).cast(weight.dtype)
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -841,11 +856,23 @@ class MoEGate(PretrainedMoEGate):
         # compute gating score
         if self.using_post_norm_recompute:
             logits, norm_out = FusedNormGateFunc.apply(hidden_states, self.norm_weight, self.weight, self.norm_eps)
+            if hasattr(self.config, "using_fake_gate") and self.config.using_fake_gate:
+                logits = FakeGate.apply(
+                    hidden_states,
+                    self.weight,
+                    self.config.fakse_gate_restrict_balance,
+                    self.config.num_experts_per_tok,
+                )
         else:
             with paddle.amp.auto_cast(False):
                 hidden_states = hidden_states.cast(self.weight.dtype)
                 if hasattr(self.config, "using_fake_gate") and self.config.using_fake_gate:
-                    logits = FakeGate.apply(hidden_states, self.weight)
+                    logits = FakeGate.apply(
+                        hidden_states,
+                        self.weight,
+                        self.config.fakse_gate_restrict_balance,
+                        self.config.num_experts_per_tok,
+                    )
                 else:
                     logits = F.linear(hidden_states, self.weight, None)
 

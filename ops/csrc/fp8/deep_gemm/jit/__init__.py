@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# The file has been adapted from DeepSeek DeepEP project
+# The file has been adapted from DeepSeek DeepGEMM project
 # Copyright (c) 2025 DeepSeek
-# Licensed under the MIT License - https://github.com/deepseek-ai/DeepEP/blob/main/LICENSE
+# Licensed under the MIT License - https://github.com/deepseek-ai/DeepGEMM/blob/main/LICENSE
 
-from .compiler import get_nvcc_compiler, build
-from .template import cpp_format, generate
-from .runtime import Runtime
+from .compiler import NVCCCompiler, NVRTCCompiler, build, get_nvcc_compiler
+from .runtime import FP8GemmRuntime, FP8WGradGemmRuntime, Runtime
