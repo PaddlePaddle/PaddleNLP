@@ -1,17 +1,3 @@
-# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
-# 
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-# 
-#     http://www.apache.org/licenses/LICENSE-2.0
-# 
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 unset PADDLE_ELASTIC_JOB_ID
 unset PADDLE_TRAINER_ENDPOINTS
 unset DISTRIBUTED_TRAINER_ENDPOINTS
@@ -33,10 +19,10 @@ export NVSHMEM_IB_TRAFFIC_CLASS=162
 #export NVSHMEM_IB_ENABLE_IBGDA=true
 ##export NVSHMEM_DISABLE_P2P=1
 export NVSHMEM_BOOTSTRAP=UID
-export NVSHMEM_BOOTSTRAP_UID_SOCK_IFNAME==xgbe0
+export NVSHMEM_BOOTSTRAP_UID_SOCK_IFNAME==eth0
 
-START_RANK=0
-END_RANK=8
+START_RANK=55
+END_RANK=56
 
 if [[ $rank -lt $START_RANK ]]; then
     exit 0
@@ -49,11 +35,22 @@ fi
 rank=$(($rank-$START_RANK))
 nnodes=$(($END_RANK-$START_RANK))
 
-master=`cat /root/paddlejob/workspace/hostfile | head -n 1 | awk '{print $1}'`
+master=`cat /root/paddlejob/workspace/hostfile | head -n $(($START_RANK+1)) | tail -n 1 | awk '{print $1}'`
 port=36679
 export PYTHONPATH=../:$PYTHONPATH
 export PATH=/opt/nvidia/nsight-systems/2025.1.1/bin/:$PATH
 
+export DSV3_USE_FP8_GEMM=true
+export DSV3_USE_ATTEN_RECOMPUTE=true
+export FA_VERSION=3
+export CUDA_PATH=/usr/local/cuda-12.9
+export FLAGS_share_tensor_for_grad_tensor_holder=1
+export DSV3_USE_FP8_DISPATCH=False
+
+sh script/kill_process.sh 
+source /root/paddlejob/workspace/env_run/zhangbo/env_ds0702/bin/activate
+
+/opt/nvidia/nsight-systems/2025.1.1/bin/nsys profile --stats=true -t cuda,nvtx -o fp8_overlap_quant --force-overwrite true \
 python3.10 -m paddle.distributed.launch \
     --log_dir output/paddle_distributed_logs \
     --master $master:$port \
