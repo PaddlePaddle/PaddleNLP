@@ -796,11 +796,9 @@ class OverlapedFUsionScheduleNode:
         self.name = name
 
     def forward_backward(self, inputs, output_grad, combine_bw_event_to_wait=None, pp_stream=None):
-        #print("!!!!!!!!!!!!!", pp_stream)
-        #paddle.base.core.nvprof_nvtx_push("forward_backward")
+        paddle.base.core.nvprof_nvtx_push("forward_backward")
 
         combine_bwd_event = deep_ep.get_event_from_calc_stream(self.backward_node.moe_group.id)
-
 
         paddle.base.core.nvprof_nvtx_push("attn_forward")
         inputs = self.forward_node.attn_forward(inputs)
@@ -853,27 +851,26 @@ class OverlapedFUsionScheduleNode:
         paddle.base.core.nvprof_nvtx_push("mlp_forward")
         inputs = self.forward_node.mlp_forward(inputs)
         paddle.base.core.nvprof_nvtx_pop()
+        mlp_fwd_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
+
 
         inputs_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
 
         if pp_stream is not None:
             final_out = self.forward_node.post_process_node.forward_without_residual(inputs)    
 
-        mlp_fwd_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
         paddle.base.core.nvprof_nvtx_push("combine_forward")
         inputs = self.forward_node.combine_forward(inputs, previous_event= mlp_fwd_event, async_finish=True, allocate_on_comm_stream=True)
+        paddle.base.core.nvprof_nvtx_pop()
+
         combine_forward_event = deep_ep.get_event_from_comm_stream( self.forward_node.moe_group.id)
 
         combine_fwd_out = inputs[-1]
-        paddle.base.core.nvprof_nvtx_pop()
 
-        if pp_stream is not None:
-            # print("pp stream is not None !!!!!!!!!!!!!")
-            send_recv_stream = paddle.device.Stream(stream_base= pp_stream )
-            # send_recv_event = paddle.device.Event()
-            # send_recv_event.record( send_recv_stream )
+        if pp_stream is not None:            
+            send_recv_stream = paddle.device.Stream(stream_base= pp_stream )          
 
-            paddle.base.core.nvprof_nvtx_push("add here")
+            paddle.base.core.nvprof_nvtx_push("pp stream add")
 
             with paddle.device.stream_guard(send_recv_stream):
                 combine_forward_event.current_stream_wait()
@@ -902,7 +899,7 @@ class OverlapedFUsionScheduleNode:
 
             combine_fwd_out._record_stream()
         
-        # paddle.base.core.nvprof_nvtx_pop()
+        paddle.base.core.nvprof_nvtx_pop()
         return inputs, output_grad, event_to_wait
 
 
