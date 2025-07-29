@@ -1513,7 +1513,7 @@ class TrainingArguments:
                 def is_context_parallel_supported():
                     import inspect
 
-                    members = [name for (name, date) in inspect.getmembers(fleet.EPHybridCommunicateGroup)]
+                    members = [name for (name, date) in inspect.getmembers(fleet.base.topology.EPHybridCommunicateGroup)]
                     support_cp = "get_context_parallel_world_size" in members
                     if not support_cp:
                         logger.warning("context parallel is not supported!!! Ignore it.")
