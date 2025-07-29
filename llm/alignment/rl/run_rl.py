@@ -229,8 +229,7 @@ def create_critic_models(
         critic_model_config.use_sparse_head_and_loss_fn = False
         critic_model_config.num_labels = 1
         critic_model_config.classifier_dropout = 0.0
-        critic_model_config.hidden_dropout = "0"
-        critic_model_config.summary_dropout_prob = 0.0
+        critic_model_config.hidden_dropout = 0.0
         logger.info(f"Loading Critic model with config:\n\t{critic_model_config}\n")
 
         if not training_args.autotuner_benchmark:
