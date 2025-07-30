@@ -25,6 +25,8 @@ class ProfileDataParserArguments:
     
     profile_gpu_num: int = field(default=8, metadata={"help": "The number of GPUs used for profiling."})
     
+    sp_time_path: str = field(default=None, metadata={"help": "The path of the sp time data."})
+    
     def initialize(self, args_dict):
         self.time_profile_mode = args_dict.pop('--time_profile_mode', self.time_profile_mode)
         self.time_profile_data_path = args_dict.pop('--time_profile_data_path', self.time_profile_data_path)
@@ -38,6 +40,8 @@ class ProfileDataParserArguments:
         self.layernum_list = args_dict.pop('--layernum_list', self.layernum_list)
         self.seqlen_list = args_dict.pop('--seqlen_list', self.seqlen_list)
         self.profile_gpu_num = int(args_dict.pop('--profile_gpu_num', self.profile_gpu_num))
+        self.sp_time_path = args_dict.pop('--sp_time_path', self.sp_time_path)
+
     
 class ProfileDataParser:
     """
@@ -216,6 +220,44 @@ class ProfileDataParser:
                 self.p2p_coe[pp_size] = 1 / value
         print(f'\tP2P coefficient: {self.p2p_coe}')        
         
+        # parse sp time data
+        config = read_json_config(args.sp_time_path)
+        def remap_config(config, op):
+            remap_config = {}
+            for key, val in config.items():
+                if key.startswith(op):
+                    if op == "allreduce":
+                        val /= 2 # trans to all_gather / reduce_scatter time
+                    split = key.split("_")
+                    world_size, size = int(split[-3]), int(split[-2][:-2])
+                    if world_size in remap_config:
+                        remap_config[world_size][size * 1024 * 1024] = val
+                    else:
+                        remap_config[world_size] = {}
+                        remap_config[world_size][size * 1024 * 1024] = val
+            
+            for world_size, time_config in remap_config.items():
+                x_data = []
+                y_data = []
+                for size, time in time_config.items():
+                    x_data.append(size // 1024 // 1024)
+                    y_data.append(time)
+                assert len(x_data) >= 8, f"Different size in communication profile of {op} should not be lower than 8."
+            
+                def linear_func(x, m, c):
+                    return m * x + c
+                popt, pcov = curve_fit(linear_func, x_data, y_data)
+                
+                print(f"Fitted parameters of {op}", popt)
+                
+                time_config["popt"] = popt
+                
+            return remap_config
+        self.sp_allreduce = remap_config(config, "allreduce")
+        self.sp_all2all = remap_config(config, "all2all")
+        print(f'\tSP allreduce time: {self.sp_allreduce}')
+        print(f'\tSP p2p time: {self.sp_all2all}')
+        
         print("Profile hardware configs parsed successfully.")
             
     # ==================Launch Cost Model=================
@@ -275,6 +317,7 @@ class ProfileDataParser:
         timecost_per_layer = [0 for _ in range(args.num_layertype)]
         timecost_per_layer_no_comm = [0 for _ in range(args.num_layertype)]
         for i in range(args.num_layertype):
+            # global_batch_size其实是除以了累积步数的
             time_cost_model_args = TimeCostModelArguments(strategy=strategy, global_batch_size=micro_batch_size, mixed_precision_type=mixed_precision_type, seq_length=self.seqlen_list[i], hidden_size=self.hidden_size_list[i],
                                                           forward_computation_time=self.time_profiled_list[i], parameter_memory=self.param_sizes[i], dp_overlap_coe=self.overlap_coe, bct_overlap_coe=self.overlap_coe, allreduce_coe_dict=self.allreduce_coe, p2p_coe_dict=self.p2p_coe, bct_fct_coe=2)
             timecost_per_layer[i] = TimeCostModel(time_cost_model_args).gen_result()

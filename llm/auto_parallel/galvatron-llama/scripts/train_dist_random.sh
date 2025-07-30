@@ -42,7 +42,7 @@ TRAIN_ARGS="
 # [seq_length] [num_hidden_layers]
 MODEL_ARGS=(
     --model_name_or_path "llama"
-    --num_hidden_layers 8
+    --num_hidden_layers 16
     --intermediate_size 11008
     --vocab_size 32000
     --hidden_size 4096
@@ -54,7 +54,7 @@ MODEL_ARGS=(
 # [mbsz, accumulation_steps] [recompute] [amp]
 CONFIG_ARGS="
     --per_device_train_batch_size 4 \
-    --gradient_accumulation_steps 8 \
+    --gradient_accumulation_steps 4 \
     --recompute false \
     --recompute_use_reentrant true \
     --recompute_granularity full \
@@ -69,14 +69,14 @@ CONFIG_ARGS="
 # [dp_deg, dp_type] [tp_deg, megatron-sp] [pp_deg, 1F1B] [parallel_configs]
 PARALLEL_ARGS=(
     --to_static 1
-    --sharding_parallel_degree 2
+    --sharding_parallel_degree 8
     --sharding "stage3"
     --tensor_parallel_degree 1
     --sequence_parallel true
-    --pipeline_parallel_degree 2
+    --pipeline_parallel_degree 1
     --virtual_pp_degree 1
     --pipeline_schedule_mode "1F1B"
-    --sep_parallel_degree 2
+    --sep_parallel_degree 1
     --pipeline_parallel_config "enable_send_recv_overlap"
     --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate"
     --sharding_parallel_config "enable_overlap enable_release_grads"

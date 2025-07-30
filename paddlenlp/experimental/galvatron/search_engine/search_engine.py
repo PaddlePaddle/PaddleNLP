@@ -1,8 +1,11 @@
-from ..utils import Strategy
+from ..utils import Strategy, LayerWiseStrategy
 from dataclasses import dataclass, field
 from ..cost_model.profile_data_parser import ProfileDataParser, ProfileDataParserArguments
 import math
 from typing import List
+import copy
+from .utils import ensure_log_dir, get_thread_logger
+from .dynamic_programming import DpOnModel
 
 @dataclass
 class SearchEngineArguments:
@@ -16,8 +19,15 @@ class SearchEngineArguments:
     max_tp_size: int = field(default=8, metadata={"help": "The maximum tensor parallel size."})
     max_pp_size: int = field(default=8, metadata={"help": "The maximum pipeline parallel size."})
     
-    mixed_precision_type: str = field(default="bp16", metadata={"help": "The mixed precision type to use."})
+    mixed_precision_type: str = field(default="bf16", metadata={"help": "The mixed precision type to use."})
     memory_upper_limit: int = field(default=24, metadata={"help": "The upper limit of memory usage in GB"})
+    
+    sp_space: str = field(default="tp", metadata={"help": "The space for sharded parallelism, can be 'tp' or 'tp+sp'."})
+    layernum: int = field(default=16, metadata={"help":"The layer num of model"})
+    disable_sdp: int = field(default=0, metadata={"help": "Whether to disable sharded data parallelism."})
+    disable_vtp: int = field(default=0, metadata={"help": "Whether to disable vocab tensor parallelism."})
+    parallel_search: int = field(default=0, metadata={"help": "Whether to enable parallel search."})
+    log_dir: str = field(default="./search-engine-logs", metadata={"help": "The directory to save logs."})
     
     def initialize(self, args_dict):
         self.search_granularity = args_dict.get("--search_granularity", self.search_granularity)
@@ -29,18 +39,24 @@ class SearchEngineArguments:
         self.max_pp_size = int(args_dict.get("--max_pp_size", self.max_pp_size))
         self.mixed_precision_type = args_dict.get("--mixed_precision_type", self.mixed_precision_type)
         self.memory_upper_limit = int(args_dict.get("--memory_upper_limit", self.memory_upper_limit))
+        self.sp_space = args_dict.get("--sp_space", self.sp_space)
+        self.layernum = int(args_dict.get("--layernum", self.layernum))
+        self.disable_sdp = int(args_dict.get("--disable_sdp", self.disable_sdp))
+        self.disable_vtp = int(args_dict.get("--disable_vtp", self.disable_vtp))
+        self.parallel_search = int(args_dict.get("--parallel_search", self.parallel_search))
+        self.log_dir = args_dict.get("--log_dir", self.log_dir)
         
 class SearchEngine:
     def __init__(self, args_dict):
         self.args = SearchEngineArguments()
-        self.args.initialize(args_dict)
-        
+        self.args.initialize(args_dict)        
+        # 先注释掉
         parser_data_args = ProfileDataParserArguments()
         parser_data_args.initialize(args_dict)
         self.parser = ProfileDataParser(parser_data_args)
         
-        self.generate_strategies()
-        self.set_searching_bsz()
+        # self.generate_strategies()
+        # self.set_searching_bsz()
 
     def generate_strategies(self):
         args = self.args
@@ -69,6 +85,49 @@ class SearchEngine:
                         self.strategy_set.append(strategy)
                             
         print(f'SearchEngine strategt_set: {self.strategy_set}')
+    
+    def set_cost_model(self):
+        self.memory_cost_model_args_dict = {
+            'mixed_precision_type': self.args.mixed_precision_type,
+            'parameter_memory': self.parser.param_sizes[0],
+            'tp_activation_per_bsz_dict': self.parser.act_sizes[0]
+        }
+        self.other_memory_cost_model_args_dict = {
+            'world_size': self.args.world_size,
+            'mixed_precision_type': self.args.mixed_precision_type,
+            'other_memory_pp_off': self.parser.other_memory_pp_off,
+            'other_memory_pp_on': self.parser.other_memory_pp_on
+        }
+        self.time_cost_model_args_dict = {
+            'mixed_precision_type' : self.args.mixed_precision_type,
+            'seq_length': self.parser.seqlen_list[0],
+            'hidden_size': self.parser.hidden_size_list[0],
+            'forward_computation_time' : self.parser.time_profiled_list[0],
+            'parameter_memory': self.parser.param_sizes[0],
+            'dp_overlap_coe': self.parser.overlap_coe,
+            'bct_overlap_coe': self.parser.overlap_coe,
+            'allreduce_coe_dict': self.parser.allreduce_coe,
+            'p2p_coe_dict': self.parser.p2p_coe,
+            'bct_fct_coe': 2.0,
+            'all2all_dict': self.parser.sp_all2all,
+            'allreduce_dict': self.parser.sp_allreduce,
+            'sp_space': self.args.sp_space,
+        }
+        self.other_time_cost_args_dict = {
+            'world_size': self.args.world_size,
+            'hidden_size': self.parser.hidden_size_list[0],
+            'mixed_precision_type' : self.args.mixed_precision_type,
+            'sequence_length_list': [self.parser.seqlen_list[0]], #  actually [self.parser.seqlen_list[0]] == self.parser.seqlen_list
+            'other_memory_pp_off': self.parser.other_memory_pp_off,
+            'other_memory_pp_on': self.parser.other_memory_pp_on,
+            'other_time_profiled': self.parser.other_time_profiled_list[0],
+            'allreduce_coe_dict':self.parser.allreduce_coe,
+            'bct_fct_coe': 2.0,
+            'dp_overlap_coe': self.parser.overlap_coe,
+            'sp_space': self.args.sp_space,
+            'allreduce_dict': self.parser.sp_allreduce,
+        }
+        
     
     def set_searching_bsz(self):
         args = self.args
@@ -143,3 +202,250 @@ class SearchEngine:
             return results, optimal_solution
         else:
             raise NotImplementedError(f"Search granularity '{args.search_granularity}' is not implemented.")
+        
+    def generate_layerwise_strategies(self):
+        args = self.args
+        layerwise_strategy_set: List[LayerWiseStrategy] = []
+        
+        strategy_template = LayerWiseStrategy()
+        
+        i, degree_set = 1, []
+        while i <= args.world_size:
+            degree_set.append(i)
+            i *= 2
+        
+        for pp_size in degree_set:
+            if pp_size > args.max_pp_size:
+                continue
+            for tp_size in degree_set:
+                if pp_size * tp_size > args.world_size:
+                    continue
+                if tp_size > args.max_tp_size:
+                    continue
+                dp_size = args.world_size // (pp_size * tp_size)
+                sharding_stage_set = [0, 2, 3] if dp_size > 1 else [0]
+                for sharding_stage in sharding_stage_set:
+                    for recompute in [0, 1]:
+                        strategy_template.pp_size = pp_size
+                        strategy_template.tp_size = tp_size
+                        strategy_template.dp_size = dp_size
+                        strategy_template.sharding_stage = sharding_stage
+                        strategy_template.recompute = recompute
+                        layerwise_strategy_set.append(copy.deepcopy(strategy_template))
+
+        if args.sp_space == 'tp':
+            for strategy in layerwise_strategy_set:
+                strategy.use_ulysses = 0
+        elif args.sp_space == 'tp+sp':
+            for strategy in layerwise_strategy_set:
+                strategy.use_ulysses = 0
+            strategy_set_copy = copy.deepcopy(layerwise_strategy_set) 
+            for strategy in strategy_set_copy:
+                strategy.use_ulysses = 1
+                layerwise_strategy_set.append(strategy)
+        else:
+            raise NotImplementedError(f"SP space '{args.sp_space}' is not implemented.")   
+
+        self.layerwise_strategies = layerwise_strategy_set
+        print(f'[galvatron/search_engine/search_engine.py] layerwise_strategies has initialized, with {len(layerwise_strategy_set)} strategies.')
+    
+    def layerwise_parallelism_optimization(self):
+        print('='*25, 'Galvatron Search Engine Start Searching', '='*25)
+        
+        print('-----', '[Searching Memory Info]', 'Memory constraint:', self.args.memory_upper_limit * 1024, 'MB', '-----')
+
+        args = self.args
+        
+        results = dict()
+        temp_strategies = copy.deepcopy(self.layerwise_strategies)
+        max_throughput, optimal_bsz = -1, -1
+        
+        # generate total_min_tp and total_max_tp
+        total_min_tp, i = [], 1
+        while i <= args.world_size and i <= args.max_tp_size:
+            total_min_tp.append(i)
+            i *= 2
+            
+        if args.disable_vtp:
+            total_min_tp = [1]
+        
+        total_max_tp = total_min_tp.copy()
+        
+        # generate sp_search_space and total_vsp
+        if args.sp_space == 'tp':
+            total_vsp = [0]
+            sp_search_space = ['tp-only']
+        elif args.sp_space == 'tp+sp':
+            total_vsp = [0, 1]
+            sp_search_space = ['tp-only', 'sp-only', 'tp-and-sp']
+        else:
+            raise NotImplementedError(f"SP space '{args.sp_space}' is not implemented.")
+        
+        # generate total_embed_sdp
+        if args.disable_sdp:
+            total_embed_sdp = [0]
+        else:
+            total_embed_sdp = [0, 1]
+            
+        # define the search_for_chunk function # TODO 修改这个函数的命名
+        def search_for_chunk(bsz, accumulation_steps, min_tp, max_tp, vsp, embed_sdp):
+            # log_dir = self.args.log_dir + '/%s_%dnodes_%dgpus_%dGB'%(self.model_name, self.args.num_nodes, self.args.num_gpus_per_node, self.memory_constraint//1024)
+            log_dir = self.args.log_dir + '/log'
+            logger = get_thread_logger(bsz, accumulation_steps, min_tp, max_tp, vsp, embed_sdp, log_dir)
+            log_dir = ensure_log_dir(log_dir)
+            logger.info(f"Starting search for bsz={bsz}, accumulation_steps={accumulation_steps}, min_tp={min_tp}, max_tp={max_tp}, vsp={vsp}, embed_sdp={embed_sdp}")
+
+            result = dict()
+            for sp_search in sp_search_space:
+                if sp_search == 'tp-only' and vsp == 1:
+                    continue
+                if sp_search == 'sp-only' and vsp == 0:
+                    continue
+                
+                # filter 
+                strategies = [s for s in temp_strategies if min_tp <= s.tp_size <= max_tp] # tp_size belongs to [min_tp, max_tp]
+                strategies = [s for s in strategies if bsz // accumulation_steps >= args.world_size // s.pp_size // min_tp] # micro_batch_size (micro_batch_size = global_batch_size // accumulation_steps) should greater than max_dp_size(max_dp_size = world_size // pp_size // min_tp)
+                if sp_search == 'tp-only':
+                    strategies = [s for s in strategies if s.use_ulysses == 0]
+                elif sp_search == 'sp-only':
+                    strategies = [s for s in strategies if s.use_ulysses == 1]
+                if len(strategies) == 0:
+                    continue
+                
+                # get all possible pp_size and filter 
+                pp_deg_list = sorted(list(set(s.pp_size for s in strategies)))
+                pp_deg_list = [pp for pp in pp_deg_list if pp * min_tp <= args.world_size and bsz % (args.world_size // pp // min_tp) == 0]
+                if len(pp_deg_list) == 0:
+                    continue
+                strategies = [s for s in strategies if s.pp_size in pp_deg_list]
+                
+                # Calculate the micro-batch size at min_tp under different pp_deg values
+                mbsz_dict = dict()
+                for pp in pp_deg_list:
+                    mbsz_dict[pp] = (bsz // (args.world_size // pp // min_tp) + accumulation_steps - 1) // accumulation_steps
+                # strict mode: search accumulation_steps must be equal to real accumulation_steps 
+                strategies = [s for s in strategies if accumulation_steps == (bsz // (args.world_size // s.pp_size // min_tp) + mbsz_dict[s.pp_size] - 1) // mbsz_dict[s.pp_size]]
+                if len(strategies) == 0:
+                    continue
+                
+                # get pp_stage_dict
+                pp_deg_list = sorted(list(set(s.pp_size for s in strategies)))
+                pp_stage_dict = get_pp_stage(pp_deg_list, args.layernum)
+                
+                # dynamic programming solve
+                result[sp_search] = self.dynamic_programming(strategies, bsz, accumulation_steps, mbsz_dict, pp_stage_dict, min_tp, max_tp, vsp, embed_sdp, sp_search, logger)
+                result[sp_search]['pp_stage_dict'] =  copy.deepcopy(pp_stage_dict)
+            return result
+                
+        # start searching
+        if args.parallel_search: # parallel search to speed up the search # TODO 
+            pass
+        else:
+            for bsz in self.BSZs:
+                results[bsz] = dict()
+                accumulation_steps_list = range(1, bsz + 1)
+                for accumulation_steps in accumulation_steps_list:
+                    results[bsz][accumulation_steps] = dict()
+                    if bsz % accumulation_steps != 0: # skip the accumulation steps that cannot divide the batch size
+                        continue
+                    for min_tp in total_min_tp:
+                        results[bsz][accumulation_steps][min_tp] = dict()
+                        for max_tp in total_max_tp:
+                            results[bsz][accumulation_steps][min_tp][max_tp] = dict()
+                            if min_tp > max_tp:
+                                continue
+                            for vsp in total_vsp:
+                                results[bsz][accumulation_steps][min_tp][max_tp][vsp] = dict()
+                                for embed_sdp in total_embed_sdp:
+                                    print(f'Start processing: Batch Size: {bsz}, Accumulation Steps: {accumulation_steps}, Min TP: {min_tp}, Max TP: {max_tp}, VSP: {vsp}, Embed SDP: {embed_sdp}', flush=True)
+                                    results[bsz][accumulation_steps][min_tp][max_tp][vsp][embed_sdp] = search_for_chunk(bsz, accumulation_steps, min_tp, max_tp, vsp, embed_sdp)
+        
+        # store the results
+        for bsz in results:
+            for accumulation_steps in results[bsz]:
+                for min_tp in results[bsz][accumulation_steps]:
+                      for max_tp in results[bsz][accumulation_steps][min_tp]:
+                          for vsp in results[bsz][accumulation_steps][min_tp][max_tp]:
+                              for embed_sdp in results[bsz][accumulation_steps][min_tp][max_tp][vsp]:
+                                  for sp_search in results[bsz][accumulation_steps][min_tp][max_tp][vsp][embed_sdp]:
+                                        throughput = results[bsz][accumulation_steps][min_tp][max_tp][vsp][embed_sdp][sp_search]['throughput']
+                                        pp_stage_dict = results[bsz][accumulation_steps][min_tp][max_tp][vsp][embed_sdp][sp_search]['pp_stage_dict']
+                                        if throughput > max_throughput:
+                                            max_throughput = throughput
+                                            optimal_bsz = bsz
+                                            optimal_chunk = accumulation_steps
+                                            optimal_min_tp = min_tp
+                                            optimal_max_tp = max_tp
+                                            optimal_vsp = vsp
+                                            optimal_embed_sdp = embed_sdp
+                                            optimal_sp_search = sp_search
+                                            optimal_pp_stage_dict = pp_stage_dict 
+        if max_throughput > 0:
+            print('\nFinal results of max memory %d MB:'%self.args.memory_upper_limit)
+            re = results[optimal_bsz][optimal_chunk][optimal_min_tp][optimal_max_tp][optimal_vsp][optimal_embed_sdp][optimal_sp_search]
+            re['vsp'] = optimal_vsp
+            re['embed_sdp'] = optimal_embed_sdp
+            print(f"Optimal bsz = {optimal_bsz} Optimal chunk = {optimal_chunk} Optimal vocab tp = {re['vtp']} Optimal vocab sp = {optimal_vsp} Optimal embed sdp = {optimal_embed_sdp} Max throughput={re['throughput']} samples/s")
+            print(f"pp_deg={re['min_pp_deg']} Minimized timecost={re['min_cost']} Memory remaining={re['mem_remain']} Memory cost={re['mem_cost']}")
+            print(f"Min_tp={optimal_min_tp} Max_tp={optimal_max_tp} ")
+            
+            print(f'[linguangming] re[min_res_list]')
+            for item in re['min_res_list']:
+                print(item)
+            
+            # TODO 以下进行store
+            # print_strategies(re['min_res_list'])
+            
+            # self.save_results(re, optimal_bsz, optimal_chunk, optimal_pp_stage_dict)
+        else:
+            print("No valid configuration found.")
+        
+        print("-----------------------------------------")
+        print('='*25, 'Galvatron Search Engine End Searching','='*25)
+
+        return max_throughput
+                              
+    def dynamic_programming(self, strategies:List[LayerWiseStrategy], bsz, accumulation_steps, mbsz_dict, pp_stage_dict, min_tp, max_tp, vsp, embed_sdp, sp_search, logger):
+        args = self.args
+        logger.info(f'bsz={bsz} pp_stage_dict{pp_stage_dict}')
+        dp_on_model = DpOnModel(strategies_set=strategies, 
+                                world_size=args.world_size, 
+                                pp_stage_dict=pp_stage_dict, 
+                                memory_cost_model_args_dict=self.memory_cost_model_args_dict,
+                                other_memory_cost_model_args_dict=self.other_memory_cost_model_args_dict,
+                                time_cost_model_args_dict=self.time_cost_model_args_dict,
+                                other_time_cost_args_dict=self.other_time_cost_args_dict,
+                                fine_grained=True if args.search_granularity == 'fine-grained' else False,
+                                layer_num=args.layernum, 
+                                max_mem=args.memory_upper_limit * 1024, 
+                                mem_cache_flag=True, 
+                                sequence_length=self.parser.seqlen_list[0],
+                                hidden_size=self.parser.hidden_size_list[0],
+                                mixed_precision=args.mixed_precision_type,
+                                allreduce_coe_dict=self.parser.allreduce_coe,
+                                logger=logger)
+        logger.info(f"****Searching with bsz={bsz} accumulation_steps={accumulation_steps} min_tp={min_tp} max_tp={max_tp} vsp={vsp} embed_sdp={embed_sdp} sp_search={sp_search}****")
+        logger.info(f'Mbsz_dict for bsz {bsz}: {mbsz_dict}')
+        
+        min_cost, min_res_list, min_pp_deg, mem_remain, mem_cost, min_vtp = dp_on_model.fit(bsz, min_tp, max_tp, vsp, embed_sdp, sp_search, mbsz_dict = mbsz_dict)
+        throughput = bsz / min_cost
+        logger.info(f"[Optimal pp_deg={min_pp_deg}] Minimized timecost={min_cost} Memory remaining={mem_remain} Memory cost={mem_cost} Vocab tp={min_vtp}")
+        logger.info(f"Max throughput={throughput} samples/s")
+
+        result = {'min_cost': min_cost, 'min_res_list': min_res_list, 'min_pp_deg': min_pp_deg, 
+                        'mem_remain': mem_remain, 'mem_cost': mem_cost, 'throughput': throughput, "vtp": min_vtp}
+        return result
+        
+                                    
+def get_pp_stage(pp_deg_list, layernum):
+    pp_stage_dict = dict()
+    for pp_deg in pp_deg_list:
+        pp_stage_dict[pp_deg] = pp_division_even(pp_deg, layernum)
+    return pp_stage_dict
+
+def pp_division_even(pp_deg, layernum):
+    avg_layer_num = layernum // pp_deg
+    last_layer_num = layernum - avg_layer_num * (pp_deg - 1)
+    pp_division = [avg_layer_num] * (pp_deg - 1) + [last_layer_num]
+    return pp_division
+    

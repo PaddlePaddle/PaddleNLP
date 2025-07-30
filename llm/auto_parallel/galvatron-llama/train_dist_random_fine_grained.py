@@ -401,7 +401,7 @@ def main():
         pipeline.vpp_degree = config.virtual_pp_degree
         pipeline.vpp_seg_method = training_args.virtual_pipeline_seg_method
 
-    # added for ulysees
+    # added for ulysees 此处临时将模式固定切换为ulysees-sp
     config.use_ulysees = True # 先手动设定为True
     config.sep_parallel_degree = 2
     config.tensor_parallel_degree = 1
@@ -429,21 +429,41 @@ def main():
         tp_or_sep = 'mp' if config.sep_parallel_degree == 1 else 'sep'
         meshs = [dist.ProcessMesh([[0, 1], [2, 3]], dim_names=["dp", tp_or_sep]) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4, 5], [6, 7]], dim_names=["dp", tp_or_sep]) for _ in range(ave_layers)]
         meshs += [dist.ProcessMesh([[4, 5],  [6, 7]], dim_names=['dp',tp_or_sep]), dist.ProcessMesh([[4, 5],  [6, 7]], dim_names=['dp',tp_or_sep])]
-    
+        input_label_mesh_list = [meshs[0], meshs[-1]]
+        
         # meshs = [dist.ProcessMesh([[0, 1], [2, 3]], dim_names=["dp", "mp"]) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4, 5], [6, 7]], dim_names=["dp", "mp"]) for _ in range(ave_layers)]
         # meshs += [dist.ProcessMesh([[4, 5],  [6, 7]], dim_names=['dp','mp']), dist.ProcessMesh([[4, 5],  [6, 7]], dim_names=['dp','mp'])]
     elif pp == 2 and tp == 1 and dp == 4:
-        meshs = [dist.ProcessMesh([[0], [1], [2], [3]], dim_names=['dp', 'mp']) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4], [5], [6], [7]], dim_names=['dp', 'mp']) for _ in range(ave_layers)]
+        tp_or_sep = 'mp' if config.sep_parallel_degree == 1 else 'sep'
+        meshs = [dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", tp_or_sep]) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4], [5], [6], [7]], dim_names=["dp", tp_or_sep]) for _ in range(ave_layers)]
+        meshs += [dist.ProcessMesh([[4], [5], [6], [7]], dim_names=['dp',tp_or_sep]), dist.ProcessMesh([[4], [5], [6], [7]], dim_names=['dp',tp_or_sep])]
+        input_label_mesh_list = [meshs[0], meshs[-1]]
+        
+        # meshs = [dist.ProcessMesh([[0], [1], [2], [3]], dim_names=['dp', 'mp']) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4], [5], [6], [7]], dim_names=['dp', 'mp']) for _ in range(ave_layers)]
     elif pp == 2 and tp == 4 and dp == 1:
-        meshs = [dist.ProcessMesh([[0, 1, 2, 3]], dim_names=['dp', 'mp']) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4, 5, 6, 7]], dim_names=['dp', 'mp']) for _ in range(ave_layers)]
+        tp_or_sep = 'mp' if config.sep_parallel_degree == 1 else 'sep'
+        meshs = [dist.ProcessMesh([[0, 1, 2, 3]], dim_names=["dp", tp_or_sep]) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4, 5, 6, 7]], dim_names=["dp", tp_or_sep]) for _ in range(ave_layers)]
+        meshs += [dist.ProcessMesh([[4, 5, 6, 7]], dim_names=['dp',tp_or_sep]), dist.ProcessMesh([[4, 5, 6, 7]], dim_names=['dp',tp_or_sep])]
+        input_label_mesh_list = [meshs[0], meshs[-1]]
+        
+        # meshs = [dist.ProcessMesh([[0, 1, 2, 3]], dim_names=['dp', 'mp']) for _ in range(ave_layers + 1)] + [dist.ProcessMesh([[4, 5, 6, 7]], dim_names=['dp', 'mp']) for _ in range(ave_layers)]
     elif pp == 1 and tp == 2 and dp == 4:
-        meshs = [dist.ProcessMesh([[0, 1], [2, 3], [4, 5], [6, 7]], dim_names=['dp', 'mp']) for _ in range(ave_layers + 1)]
+        tp_or_sep = 'mp' if config.sep_parallel_degree == 1 else 'sep'
+        meshs = [dist.ProcessMesh([[0, 1], [2, 3], [4, 5], [6, 7]], dim_names=["dp", tp_or_sep]) for _ in range(ave_layers + 1)]
+        meshs += [dist.ProcessMesh([[0, 1], [2, 3], [4, 5], [6, 7]], dim_names=['dp',tp_or_sep]), dist.ProcessMesh([[0, 1], [2, 3], [4, 5], [6, 7]], dim_names=['dp',tp_or_sep])]
+        input_label_mesh_list = [meshs[0]]
+        # meshs = [dist.ProcessMesh([[0, 1], [2, 3], [4, 5], [6, 7]], dim_names=['dp', 'mp']) for _ in range(ave_layers + 1)]
     elif pp == 1 and tp == 4 and dp == 2:
-        meshs = [dist.ProcessMesh([[0, 1, 2, 3], [4, 5, 6, 7]], dim_names=['dp', 'mp']) for _ in range(ave_layers + 1)]
+        tp_or_sep = 'mp' if config.sep_parallel_degree == 1 else 'sep'
+        meshs = [dist.ProcessMesh([[0, 1, 2, 3], [4, 5, 6, 7]], dim_names=["dp", tp_or_sep]) for _ in range(ave_layers + 1)]
+        meshs += [dist.ProcessMesh([[0, 1, 2, 3], [4, 5, 6, 7]], dim_names=['dp',tp_or_sep]), dist.ProcessMesh([[0, 1, 2, 3], [4, 5, 6, 7]], dim_names=['dp',tp_or_sep])]
+        input_label_mesh_list = [meshs[0]]
+        # meshs = [dist.ProcessMesh([[0, 1, 2, 3], [4, 5, 6, 7]], dim_names=['dp', 'mp']) for _ in range(ave_layers + 1)]
     else:
         assert False, f"Unsupported pp={pp}, tp={tp}, dp={dp} configuration for now."
         
     # one demo
+    redistributed_flag = [0] * (num_layers + 1 + 2)
     if pp == 2 and tp == 2 and dp == 2:
         redistributed_flag = [0] * (num_layers + 1 + 2)
         # meshs[2] = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", "mp"])
@@ -482,29 +502,33 @@ def main():
         pass
         
     elif pp == 2 and tp == 1 and dp == 4:
+        pass
         # meshs[2] = dist.ProcessMesh([[0, 1, 2, 3]], dim_names=['dp', 'mp'])
-        meshs[2] = dist.ProcessMesh([[0, 1], [2, 3]], dim_names=['dp', 'mp'])
+        # meshs[2] = dist.ProcessMesh([[0, 1], [2, 3]], dim_names=['dp', 'mp'])
     elif pp == 2 and tp == 4 and dp == 1:
-        meshs[2] = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=['dp', 'mp'])
+        pass
+        # meshs[2] = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=['dp', 'mp'])
     elif pp == 1 and tp == 2 and dp == 4:
-        meshs[2] = dist.ProcessMesh([[0, 1, 2, 3], [4, 5, 6, 7]], dim_names=['dp', 'mp'])
+        pass
+        # meshs[2] = dist.ProcessMesh([[0, 1, 2, 3], [4, 5, 6, 7]], dim_names=['dp', 'mp'])
     elif pp == 1 and tp == 4 and dp == 2:
-        redistributed_flag = [0] * (num_layers + 1 + 2)
-        meshs[2] = dist.ProcessMesh([[0, 1], [2, 3], [4, 5], [6, 7]], dim_names=['dp', 'mp'])
-        redistributed_flag[1] = meshs[2]
-        redistributed_flag[2] = meshs[3]
-        # meshs[3] = dist.ProcessMesh([[0, 1], [2, 3], [4, 5], [6, 7]], dim_names=['dp', 'mp'])
-        meshs[6] = dist.ProcessMesh([[0], [1], [2], [3], [4], [5], [6], [7]], dim_names=['dp', 'mp']) # 第五层
-        redistributed_flag[5] = meshs[6]
-        redistributed_flag[6] = meshs[7]
+        pass
+        # redistributed_flag = [0] * (num_layers + 1 + 2)
+        # # meshs[2] = dist.ProcessMesh([[0, 1], [2, 3], [4, 5], [6, 7]], dim_names=['dp', 'mp'])
+        # redistributed_flag[1] = meshs[2]
+        # redistributed_flag[2] = meshs[3]
+        # # meshs[3] = dist.ProcessMesh([[0, 1], [2, 3], [4, 5], [6, 7]], dim_names=['dp', 'mp'])
+        # meshs[6] = dist.ProcessMesh([[0], [1], [2], [3], [4], [5], [6], [7]], dim_names=['dp', 'mp']) # 第五层
+        # redistributed_flag[5] = meshs[6]
+        # redistributed_flag[6] = meshs[7]
     else:
         assert False, f"Unsupported pp={pp}, tp={tp}, dp={dp} configuration for now."
         
-    if pp == 1:
-        input_label_mesh_list = meshs[0]
-    else:
-        input_label_mesh_list = [meshs[0], dist.ProcessMesh([[4, 5], [6, 7]], dim_names=['dp', 'mp'])] # 注意此处 不是mesg[-1], 应该修改为和meshs[0]一样shape的mesh
-        # input_label_mesh_list = [meshs[0], meshs[-1]] # 注意此处 不是mesg[-1], 应该修改为和meshs[0]一样shape的mesh
+    # if pp == 1:
+    #     input_label_mesh_list = meshs[0]
+    # else:
+    #     input_label_mesh_list = [meshs[0], dist.ProcessMesh([[4, 5], [6, 7]], dim_names=['dp', 'mp'])] # 注意此处 不是mesg[-1], 应该修改为和meshs[0]一样shape的mesh 由此保证batch_size一致
+    #     # input_label_mesh_list = [meshs[0], meshs[-1]] # 注意此处 不是mesg[-1], 应该修改为和meshs[0]一样shape的mesh
     
     print("[auto-parallel] meshs:")
     for i, mesh in enumerate(meshs):

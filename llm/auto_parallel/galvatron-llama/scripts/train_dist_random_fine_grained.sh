@@ -23,7 +23,7 @@ TRAIN_ARGS="
     --max_grad_norm -1.0 \
     --learning_rate 3e-05 \
     --min_learning_rate 3e-06 \
-    --max_steps 10 \
+    --max_steps 25 \
     --logging_steps 1 \
     --continue_training 0 \
     --do_train true \
@@ -41,7 +41,7 @@ TRAIN_ARGS="
 MODEL_ARGS="
     --model_type "llama_fine_grained" \
     --model_name_or_path "llama" \
-    --num_hidden_layers 8 \
+    --num_hidden_layers 16 \
     --intermediate_size 11008 \
     --vocab_size 32000 \
     --hidden_size 4096 \
@@ -52,7 +52,7 @@ MODEL_ARGS="
 # [mbsz, accumulation_steps] [recompute] [amp]
 CONFIG_ARGS="
     --per_device_train_batch_size 4 \
-    --gradient_accumulation_steps 4 \
+    --gradient_accumulation_steps 16 \
     --recompute false \
     --recompute_use_reentrant true \
     --recompute_granularity full \
@@ -68,7 +68,7 @@ CONFIG_ARGS="
 PARALLEL_ARGS=(
     --to_static 1
     --sharding_parallel_degree 2
-    --sharding "stage2"
+    --sharding "stage3"
     --tensor_parallel_degree 2
     --sequence_parallel false
     --pipeline_parallel_degree 2

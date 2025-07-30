@@ -282,6 +282,7 @@ def fusion_flash_attention(
                             enable=skip_recompute,
                         )
                 else:
+                    print(f'[linguangming] [flash-attn-check] skip attn_mask_startend_row_indices')
                     attn_output = no_recompute(
                         F.scaled_dot_product_attention,
                         query_states,

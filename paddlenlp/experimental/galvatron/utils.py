@@ -2,7 +2,7 @@ import json
 import os
 from typing import List
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 
 def read_json_config(path):
     if os.path.exists(path) == False:
@@ -67,10 +67,92 @@ class Strategy:
             self.recompute = text[4]
         else:
             raise ValueError("Unsupported type for deserialization. Supported types are str, dict, and list.")
+        
+    def __str__(self):
+        return self.serialize()
+
+@dataclass
+class LayerWiseStrategy:
+    # layer info
+    # layer_idx: int = field(default=-1, metadata={"help": "Layer index"})
+    
+    #  pipeline parallelism
+    pp_size: int = field(default=-1, metadata={"help": "The number of processes to use for parallel processing."})
+    # stage_idx: int = field(default=-1, metadata={"help": "The stage idx or pipeline parallel"})
+    
+    # tensor parallelism(with megatron-sp) or ulysses-sp
+    tp_size: int = field(default=-1, metadata={"help": "The number of threads to use for parallel processing."})
+    use_ulysses: int = field(default=-1, metadata={"help": "Whether to use Ulysses for layer-wise strategy."})
+    
+    # data parallelism
+    dp_size: int = field(default=-1, metadata={"help": "The number of data parallelism to use."})
+    sharding_stage: int = field(default=-1, metadata={"help": "The stage of sharding. 0: no sharding, 1: sharding1, 2: sharding2, 3: sharding3"})
+    
+    # recompute
+    recompute: int = field(default=-1, metadata={"help": "Whether to use recompute."})
+    
+    def serialize(self) -> str:
+        field_defs = fields(self)
+        parts = []
+        for field_def in field_defs:
+            value = getattr(self, field_def.name)
+            parts.append(f'{field_def.name}={value:<3}')
+        return ",".join(parts)
+    
+    @classmethod
+    def deserialize(cls, info):
+        if isinstance(info, str):
+            kwargs = {}
+            for pair in info.split(","):
+                pair = pair.strip()
+                if pair == "":
+                    assert False
+                key, value = pair.split("=")
+                if value.isdigit():
+                    value = int(value)
+                kwargs[key] = value
+            return cls(**kwargs)
+        elif isinstance(info, dict):
+            return cls(**info)
+        else:
+            raise ValueError("Unsupported type for deserialization. Supported types are str, dict")
     
     def __str__(self):
         return self.serialize()
+
+@dataclass
+class OptimalSolution:
+    pp_deg: int = field(default=1, metadata={"help": "The degree of pipeline parallelism."})
+    layer_wise_strategies: List[LayerWiseStrategy] = field(default_factory=list, metadata={"help": "List of layer-wise strategies."})
     
+    vocab_dp: int = field(default=1, metadata={"help": "The degree of vocab data parallelism."})
+    vocab_sharding_stage: int = field(default=0, metadata={"help": "The stage of vocab sharding."})
+    vocab_tp: int = field(default=1, metadata={"help": "The degree of vocab tensor parallelism."})
+    vocab_sp: int = field(default=1, metadata={"help": "The degree of vocab sharding parallelism."})
+
+    global_batch_size: int = field(default=1, metadata={"help": "The global batch size"})
+    accumulate_steps: int = field(default=1, metadata={"help": "The accumulate steps"})
+    
+    def store(self, config_path):
+        kwargs = {
+            'pp_deg': self.pp_deg,
+            'vocab_dp': self.vocab_dp,
+            'vocab_sharding_stage': self.vocab_sharding_stage,
+            'vocab_tp':  self.vocab_tp,
+            'vocab_sp': self.vocab_sp,
+            'global_batch_size': self.global_batch_size,
+            'accumulate_steps': self.accumulate_steps,
+            'dp_size_enc': ",".join(str(strategy.dp_size) for strategy in self.layer_wise_strategies),
+            'sharding_stage_enc': ",".join(str(strategy.sharding_stage) for strategy in self.layer_wise_strategies),
+            'tp_size_enc': ','.join(str(strategy.tp_size) for strategy in self.layer_wise_strategies),
+            'use_ulysses_enc':  ','.join(str(strategy.use_ulysses) for strategy in self.layer_wise_strategies),
+            'stage_idx_enc': ','.join(str(strategy.stage_idx) for strategy in self.layer_wise_strategies),
+            'recompute_enc': ','.join(str(strategy.recompute) for strategy in self.layer_wise_strategies),
+        }
+        with open(config_path, 'w') as f:
+            json.dump(kwargs, f, indent=4) 
+        print(f'Optimal solution has stored to {config_path}!')
+
 def get_current_all_args():
     args_dict = {}
     i = 0

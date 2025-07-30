@@ -1,10 +1,10 @@
 from dataclasses import dataclass, field
-from ..utils import Strategy
+from ..utils import Strategy,  LayerWiseStrategy
 import numpy as np
 
 @dataclass
 class MemoryCostModelArguments:
-    strategy: Strategy = field(default=None, metadata={"help": "The strategy of the model."})
+    strategy: LayerWiseStrategy = field(default=None, metadata={"help": "The strategy of the model."})
     global_batch_size: int = field(default=8, metadata={"help": "The global batch size of the model."})
     mixed_precision_type: str = field(default='fp16', metadata={"help": "The mixed precision type of the model."})
     stage_idx: int = field(default=0, metadata={"help": "The stage index of the model."})
@@ -33,8 +33,9 @@ class MemoryCostModel:
         self.pp_size = strategy.pp_size
         self.tp_size = strategy.tp_size
         self.dp_size = strategy.dp_size
-        self.sharding_stage = strategy.sharding_stage
+        self.sharding_stage = strategy.sharding_stage # 此处的sharding_stage也是需要进行修改的
         self.recompute = strategy.recompute
+        self.use_ulysses = strategy.use_ulysses
         
         self.local_batch_size = args.global_batch_size // self.dp_size
         microbatches = [t.shape[0] for t in chunk_like_torch(self.local_batch_size, args.accumulation_steps)]
@@ -60,7 +61,12 @@ class MemoryCostModel:
         
     def estimate_parameter_size(self):
         args = self.args
-        self.parameter_size = args.parameter_memory / self.tp_size
+        if self.use_ulysses:
+            # when using Ulysees, the parameter size is not divided
+            self.parameter_size = args.parameter_memory
+        else:
+            # when using tensor-parallelism, the parameter size is divided by the tensor parallel size (args.parameter_memory means the total parameter memory of one layer)
+            self.parameter_size = args.parameter_memory / self.tp_size
         
     def estimate_model_states_size(self):
         self.model_states_size = 4 * self.parameter_size
@@ -73,7 +79,7 @@ class MemoryCostModel:
         args = self.args
         if self.recompute:
             self.activation_size = args.tp_activation_per_bsz_dict['checkpoint'] * self.local_batch_size
-            # NOTE adjust for sequence parallelism(Megatron-LM SP)
+            # NOTE adjust for sequence parallelism(Megatron-LM SP or Ulysees SP)
             self.activation_size /= self.tp_size 
         else:
             self.activation_size = args.tp_activation_per_bsz_dict[self.tp_size] * self.local_batch_size
@@ -100,7 +106,8 @@ class OtherMemoryCostModelArguments:
     paddle_context_memory: float = field(default=1024, metadata={"help": "The paddle context memory of the model."})
     other_memory_pp_off:dict = field(default_factory=lambda: {'model_states': 640, 'activation': 320})
     other_memory_pp_on:dict = field(default_factory=lambda: {'first_stage':{'model_states': 640, 'activation': 320}, 'last_stage':{'model_states': 640, 'activation': 320}})
-
+    use_ulysses: bool = field(default=False, metadata={"help": "Whether to use Ulysees for memory cost estimation."})
+    
 class OtherMemoryCostModel:
     def __init__(self, args:OtherMemoryCostModelArguments):
         self.args = args
@@ -138,10 +145,15 @@ class OtherMemoryCostModel:
             tp_other_memory_cost = [0 for _ in range(args.pp_size)]
             other_layers_bsz = args.global_batch_size // dp_size // args.accumulation_steps  # already divided by accumulation steps
 
+            if args.use_ulysses:
+                model_tp = 1
+            else:
+                model_tp = tp_size
+            
             if args.pp_size == 1: # no pp -> only one stage
                 # print("other cost model states", args.other_memory_pp_off['model_states'][tp_size] * self.zero_ratio(dp_size))
                 # print("other cost model activation", args.other_memory_pp_off['activation'][tp_size] * other_layers_bsz)
-                tp_other_memory_cost[0] = args.other_memory_pp_off['model_states'][tp_size] * self.zero_ratio(dp_size) + args.other_memory_pp_off['activation'][tp_size] * other_layers_bsz
+                tp_other_memory_cost[0] = args.other_memory_pp_off['model_states'][model_tp] * self.zero_ratio(dp_size) + args.other_memory_pp_off['activation'][tp_size] * other_layers_bsz
             else: # pp -> 0:first stage, -1:last stage (here we assume accumulation_steps is greater than pp_size, which holds true in industrial practice. )
                 other_layers_bsz_first = other_layers_bsz * args.pp_size
                 other_layers_bsz_last = other_layers_bsz * 1
@@ -150,8 +162,8 @@ class OtherMemoryCostModel:
                 # print("other cost model activation first stage", args.other_memory_pp_on['first_stage']['activation'][tp_size] * other_layers_bsz_first)
                 # print("other cost model states last stage", args.other_memory_pp_on['last_stage']['model_states'][tp_size] * self.zero_ratio(dp_size))
                 # print("other cost model activation last stage", args.other_memory_pp_on['last_stage']['activation'][tp_size] * other_layers_bsz_last)
-                tp_other_memory_cost[0] = args.other_memory_pp_on['first_stage']['model_states'][tp_size] * self.zero_ratio(dp_size) + args.other_memory_pp_on['first_stage']['activation'][tp_size] * other_layers_bsz_first
-                tp_other_memory_cost[-1] = args.other_memory_pp_on['last_stage']['model_states'][tp_size] * self.zero_ratio(dp_size) + args.other_memory_pp_on['last_stage']['activation'][tp_size] * other_layers_bsz_last
+                tp_other_memory_cost[0] = args.other_memory_pp_on['first_stage']['model_states'][model_tp] * self.zero_ratio(dp_size) + args.other_memory_pp_on['first_stage']['activation'][tp_size] * other_layers_bsz_first
+                tp_other_memory_cost[-1] = args.other_memory_pp_on['last_stage']['model_states'][model_tp] * self.zero_ratio(dp_size) + args.other_memory_pp_on['last_stage']['activation'][tp_size] * other_layers_bsz_last
             
             for i in range(len(tp_other_memory_cost)):
                 tp_other_memory_cost[i] += args.paddle_context_memory

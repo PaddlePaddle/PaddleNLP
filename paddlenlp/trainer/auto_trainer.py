@@ -61,6 +61,8 @@ try:
 except:
     QuantizationLinear = None
 
+import nvtx
+
 MODEL_NAME = "model"
 OPTIMIZER_NAME = "optimizer"
 DIST_CKPT_PATH = "dist_ckpt"
@@ -113,7 +115,9 @@ class AutoTrainer(Trainer):
         self.runtime_profiler.set_memory_profiler(max_profile_memory_iter=5)
         
         # @added by linguangming
-        self.input_label_mesh_list = kwargs['input_label_mesh_list']
+        # self.input_label_mesh_list = kwargs['input_label_mesh_list']
+        from ctypes import cdll
+        self.libcudart = cdll.LoadLibrary("libcudart.so")
 
     @classmethod
     def parallel_model(cls, model, training_args: AutoTrainingArguments):
@@ -173,7 +177,7 @@ class AutoTrainer(Trainer):
         return model
 
     def _get_meshes_for_loader(self):
-        return self.input_label_mesh_list        
+        # return self.input_label_mesh_list        
         
         def _get_mesh(pp_idx=0):
             return self.global_mesh.get_mesh_with_dim("pp")[pp_idx]  # [NOTE] 注意此处需要修改
@@ -575,71 +579,139 @@ class AutoTrainer(Trainer):
                 #     paddle_profiler = Profiler(targets=[profiler.ProfilerTarget.CPU, profiler.ProfilerTarget.GPU], 
                 #                                on_trace_ready = profiler.export_chrome_tracing('./no-flash_attn'))
                 #     paddle_profiler.start()
-                for inputs in inputs_list:
-                    if step_control % args.gradient_accumulation_steps == 0:
-                        self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
-                        self.timers and self.timers("forward-backward").start()
+                if step == 6 or step == 7 or step == 8:
+                    if step == 6:
+                        print(f'[linguangming] self.libcudart.cudaProfilerStart() when step == 6')
+                        self.libcudart.cudaProfilerStart()
+                    
+                    # 以下内容原封不动copy
+                    with nvtx.annotate(f"Iteration_{step}", domain="paddleTraining"):
+                        for inputs in inputs_list:
+                            if step_control % args.gradient_accumulation_steps == 0:
+                                self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
+                                self.timers and self.timers("forward-backward").start()
 
-                    tr_loss_step = self.training_step(model, inputs)
+                            tr_loss_step = self.training_step(model, inputs)
 
-                    with _exec_mode_guard("dynamic"):
-                        tr_loss += tr_loss_step
+                            with _exec_mode_guard("dynamic"):
+                                tr_loss += tr_loss_step
 
-                    disable_accumulation = False
-                    if self.args.pipeline_parallel_degree > 1 and self.args.to_static:
-                        disable_accumulation = True
-                    if self.args.to_static and self._in_pir_mode and self.args.gradient_accumulation_steps > 1:
-                        disable_accumulation = True
-                    # disable_accumulation = self.args.to_static
+                            disable_accumulation = False
+                            if self.args.pipeline_parallel_degree > 1 and self.args.to_static:
+                                disable_accumulation = True
+                            if self.args.to_static and self._in_pir_mode and self.args.gradient_accumulation_steps > 1:
+                                disable_accumulation = True
+                            # disable_accumulation = self.args.to_static
 
-                    if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
-                        # last step in epoch but step is always smaller than gradient_accumulation_steps
-                        steps_in_epoch <= args.gradient_accumulation_steps
-                        and (step + 1) == steps_in_epoch
-                        or disable_accumulation
-                    ):
+                            if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
+                                # last step in epoch but step is always smaller than gradient_accumulation_steps
+                                steps_in_epoch <= args.gradient_accumulation_steps
+                                and (step + 1) == steps_in_epoch
+                                or disable_accumulation
+                            ):
 
-                        self.timers and self.timers("forward-backward").stop()
+                                self.timers and self.timers("forward-backward").stop()
+                                
+                                if self.runtime_profiler_args is not None:
+                                    self.runtime_profiler.profile_memory(step, stage="After Backward")
+
+                                self.timers and self.timers("optimizer-step").start()
+
+                                if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss():
+                                    tr_loss /= self.args.gradient_accumulation_steps
+
+                                # Optimizer step
+                                self.callback_handler.on_optimizer_begin(
+                                    args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                                )
+
+                                self.optimizer_step()
+                                
+                                if self.runtime_profiler_args is not None:
+                                    self.runtime_profiler.post_profile_memory(step)
+                                    self.runtime_profiler.profile_time_end(step)
+                                    
+                                self.timers and self.timers("optimizer-step").stop()
+
+                                self.callback_handler.on_optimizer_end(
+                                    args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                                )
+
+                                self.state.global_step += 1
+                                self.state.epoch = epoch + (step + 1) / steps_in_epoch
+                                self.control = self.callback_handler.on_step_end(args, self.state, self.control)
+                                self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+                                self._print_timer()
+                                step_control = 0
+                            else:
+                                self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
+                                step_control += 1
                         
-                        if self.runtime_profiler_args is not None:
-                            self.runtime_profiler.profile_memory(step, stage="After Backward")
+                    if step == 8:
+                        print(f'[linguangming] self.libcudart.cudaProfilerStop() when step == 8')
+                        self.libcudart.cudaProfilerStop()
+                else:
+                    for inputs in inputs_list:
+                        if step_control % args.gradient_accumulation_steps == 0:
+                            self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
+                            self.timers and self.timers("forward-backward").start()
 
-                        self.timers and self.timers("optimizer-step").start()
+                        tr_loss_step = self.training_step(model, inputs)
 
-                        if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss():
-                            tr_loss /= self.args.gradient_accumulation_steps
+                        with _exec_mode_guard("dynamic"):
+                            tr_loss += tr_loss_step
 
-                        # Optimizer step
-                        self.callback_handler.on_optimizer_begin(
-                            args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
-                        )
+                        disable_accumulation = False
+                        if self.args.pipeline_parallel_degree > 1 and self.args.to_static:
+                            disable_accumulation = True
+                        if self.args.to_static and self._in_pir_mode and self.args.gradient_accumulation_steps > 1:
+                            disable_accumulation = True
+                        # disable_accumulation = self.args.to_static
 
-                        self.optimizer_step()
-                        
-                        if self.runtime_profiler_args is not None:
-                            self.runtime_profiler.post_profile_memory(step)
-                            self.runtime_profiler.profile_time_end(step)
+                        if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
+                            # last step in epoch but step is always smaller than gradient_accumulation_steps
+                            steps_in_epoch <= args.gradient_accumulation_steps
+                            and (step + 1) == steps_in_epoch
+                            or disable_accumulation
+                        ):
+
+                            self.timers and self.timers("forward-backward").stop()
                             
-                        self.timers and self.timers("optimizer-step").stop()
+                            if self.runtime_profiler_args is not None:
+                                self.runtime_profiler.profile_memory(step, stage="After Backward")
 
-                        self.callback_handler.on_optimizer_end(
-                            args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
-                        )
+                            self.timers and self.timers("optimizer-step").start()
 
-                        self.state.global_step += 1
-                        self.state.epoch = epoch + (step + 1) / steps_in_epoch
-                        self.control = self.callback_handler.on_step_end(args, self.state, self.control)
-                        self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
-                        self._print_timer()
-                        step_control = 0
-                    else:
-                        self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
-                        step_control += 1
-                    # if step == 5:
-                    #     paddle_profiler.step()
-                
-                # if step == 5:
-                #     paddle_profiler.stop()
+                            if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss():
+                                tr_loss /= self.args.gradient_accumulation_steps
+
+                            # Optimizer step
+                            self.callback_handler.on_optimizer_begin(
+                                args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                            )
+
+                            self.optimizer_step()
+                            
+                            if self.runtime_profiler_args is not None:
+                                self.runtime_profiler.post_profile_memory(step)
+                                self.runtime_profiler.profile_time_end(step)
+                                
+                            self.timers and self.timers("optimizer-step").stop()
+
+                            self.callback_handler.on_optimizer_end(
+                                args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                            )
+
+                            self.state.global_step += 1
+                            self.state.epoch = epoch + (step + 1) / steps_in_epoch
+                            self.control = self.callback_handler.on_step_end(args, self.state, self.control)
+                            self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+                            self._print_timer()
+                            step_control = 0
+                        else:
+                            self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
+                            step_control += 1
+
                 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
