@@ -44,10 +44,5 @@
   "skip_profile_timer": false,
   "use_fused_rms_norm": true,
   "fuse_attention_ffn": true,
-  "use_fused_rope": true,
-  "save_sharded_model": false,
-  "load_sharded_model": false,
-  "unified_checkpoint": true,
-  "use_expert_parallel": true,
-  "unified_checkpoint_config": "skip_save_model_weight"
+  "use_fused_rope": true
 }
