@@ -854,11 +854,11 @@ class OverlapedFUsionScheduleNode:
         mlp_fwd_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
 
 
-        inputs_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
-
         if pp_stream is not None:
-            final_out = self.forward_node.post_process_node.forward_without_residual(inputs)    
-
+            final_out = self.forward_node.post_process_node.forward_without_residual(inputs) 
+        
+        final_out_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
+            
         paddle.base.core.nvprof_nvtx_push("combine_forward")
         inputs = self.forward_node.combine_forward(inputs, previous_event= mlp_fwd_event, async_finish=True, allocate_on_comm_stream=True)
         paddle.base.core.nvprof_nvtx_pop()
@@ -867,19 +867,25 @@ class OverlapedFUsionScheduleNode:
 
         combine_fwd_out = inputs[-1]
 
-        if pp_stream is not None:            
-            send_recv_stream = paddle.device.Stream(stream_base= pp_stream )          
+        if pp_stream is not None:
+            send_recv_stream = paddle.device.Stream(stream_base= pp_stream )
+
+            # combine_forward_event.custom_stream_wait( pp_stream)
+            # final_out_event.custom_stream_wait(pp_stream)
 
             paddle.base.core.nvprof_nvtx_push("pp stream add")
 
             with paddle.device.stream_guard(send_recv_stream):
                 combine_forward_event.current_stream_wait()
+                final_out_event.current_stream_wait()
 
                 inputs =  final_out + combine_fwd_out
 
-                combine_fwd_out._record_stream(send_recv_stream)
+                final_out._record_stream()
+                combine_fwd_out._record_stream()
             
             paddle.base.core.nvprof_nvtx_pop()
+
         dispatch_backward_event.calc_stream_wait(self.backward_node.moe_group.id)
         paddle.base.core.nvprof_nvtx_push("post_process_forward")
                            
@@ -888,6 +894,7 @@ class OverlapedFUsionScheduleNode:
         paddle.base.core.nvprof_nvtx_push("attn_backward")
         output_grad = self.backward_node.attn_backward(output_grad)
         event_to_wait = deep_ep.get_event_from_calc_stream(self.backward_node.moe_group.id)
+
         paddle.base.core.nvprof_nvtx_pop()
 
         # residual add
@@ -1678,3 +1685,4 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
         forward_inputs = [forward_inputs] if isinstance(forward_inputs, paddle.Tensor) else forward_inputs
         return forward_inputs, forward_loss, backward_input_grads
+
