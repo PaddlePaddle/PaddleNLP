@@ -224,21 +224,6 @@ class FP8LinearFunctionBase:
         return result
 
     @staticmethod
-    def common_fp8_mlp_fwd(x, w1, w2):
-        # ===== o1 = deep_gemm(x_fp8, w1_t_fp8) =====
-        o1, x_fp8, x_scale = FP8LinearFunctionBase.compute_fp8_linear(
-            x, w1, weight_transpose=True, return_transpose_only=True, return_mode="with_input_quant"
-        )
-
-        # ===== o2 = swiglu(o1) =====
-        o2 = swiglu(o1)
-
-        # ===== o3 = deep_gemm(o2_fp8, w2_t_fp8) =====
-        o3 = FP8LinearFunctionBase.compute_fp8_linear(o2, w2, weight_transpose=True, return_transpose_only=True)
-
-        return x_fp8, x_scale, o3
-
-    @staticmethod
     def common_fp8_mlp_bwd(do3, x_fp8, x_scale, x_t_fp8, x_t_scale, w1, w2, apply_backward_hook=False):
 
         # # ===== [recompute] o1 = deep_gemm(x_fp8, w1_t_fp8) =====
@@ -303,12 +288,21 @@ class FP8LinearFunctionBase:
         x_orig_shape = x.shape
         x = x.reshape([-1, x_orig_shape[-1]])
 
-        _, _, o3 = FP8LinearFunctionBase.common_fp8_mlp_fwd(x, w1, w2)
+        # ===== o1 = deep_gemm(x_fp8, w1_t_fp8) =====
+        o1, x_fp8, x_scale = FP8LinearFunctionBase.compute_fp8_linear(
+            x, w1, weight_transpose=True, return_transpose_only=True, return_mode="with_input_quant"
+        )
+
+        # ===== o2 = swiglu(o1) =====
+        o2 = swiglu(o1)
+
+        # ===== o3 = deep_gemm(o2_fp8, w2_t_fp8) =====
+        o3 = FP8LinearFunctionBase.compute_fp8_linear(o2, w2, weight_transpose=True, return_transpose_only=True)
 
         if len(x_orig_shape) > 2:
             o3 = o3.reshape([x_orig_shape[0], -1, o3.shape[-1]])
 
-        return o3
+        return x_fp8, x_scale, o3
 
     @staticmethod
     def fp8_mlp_fwd_norm_rc(x, norm_w, norm_eps, w1, w2):
@@ -462,7 +456,7 @@ class FP8KeepXLinear(paddle.nn.Layer):
         return FP8LinearFunction.apply(x, self, keep_x=True)
 
 
-class FP8NormMlpRecomputeFunction(paddle.autograd.PyLayer):
+class FusedNormFP8MLPFunction(paddle.autograd.PyLayer):
     @staticmethod
     def forward(ctx, x, norm_w, w1, w2, norm_eps):
         # ===== compute norm_output =====
@@ -529,7 +523,7 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
         x = x.reshape([-1, x_orig_shape[-1]])
 
         # ===== call func fp8_mlp_fwd =====
-        x_fp8, x_scale, o3 = FP8LinearFunctionBase.common_fp8_mlp_fwd(x, w1, w2)
+        x_fp8, x_scale, o3 = FP8LinearFunctionBase.fp8_mlp_fwd(x, w1, w2)
         # ===== reshape to origin shape =====
         if len(x_orig_shape) > 2:
             o3 = o3.reshape([x_orig_shape[0], -1, o3.shape[-1]])
@@ -610,7 +604,7 @@ class FP8Mlp(paddle.nn.Layer):
 
     def forward(self, x):
         if self.using_post_norm_recompute:
-            return FP8NormMlpRecomputeFunction.apply(x, self.norm_weight, self.w1, self.w2, self.norm_eps)
+            return FusedNormFP8MLPFunction.apply(x, self.norm_weight, self.w1, self.w2, self.norm_eps)
         else:
             return FP8MlpFunction.apply(x, self.w1, self.w2)
 
