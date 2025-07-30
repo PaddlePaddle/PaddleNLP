@@ -20,7 +20,6 @@ import os
 import re
 
 import datasets
-from verl.utils.hdfs_io import copy, makedirs
 
 
 def extract_solution(solution_str):
@@ -34,7 +33,6 @@ def extract_solution(solution_str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--local_dir", default="./gsm8k")
-    parser.add_argument("--hdfs_dir", default=None)
 
     args = parser.parse_args()
 
@@ -80,12 +78,6 @@ if __name__ == "__main__":
     test_dataset = test_dataset.map(function=make_map_fn("test"), with_indices=True)
 
     local_dir = args.local_dir
-    hdfs_dir = args.hdfs_dir
 
     train_dataset.to_json(os.path.join(local_dir, "train.jsonl"), orient="records", lines=True)
     test_dataset.to_json(os.path.join(local_dir, "test.jsonl"), orient="records", lines=True)
-
-    if hdfs_dir is not None:
-        makedirs(hdfs_dir)
-
-        copy(src=local_dir, dst=hdfs_dir)
