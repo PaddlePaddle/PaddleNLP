@@ -259,7 +259,7 @@ def create_critic_models(
             config.tensor_parallel_degree = -1
             config.tensor_parallel_rank = 0
         with timers_scope_runtimer("Critic eval model loading time"):
-            critic_eval_model = AutoModelForScore.from_config(config)
+            critic_eval_model = AutoModelForTokenClassification.from_config(config)
     else:
         critic_eval_model = None
 
