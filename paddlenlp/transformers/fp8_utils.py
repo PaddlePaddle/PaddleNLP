@@ -89,7 +89,7 @@ class FP8LinearFunctionBase:
             return tensor_fp8, tensor_scale, tensor_t_fp8, tensor_t_scale
 
     @staticmethod
-    def kitchen_fp8_gemm(
+    def kitchen_gemm(
         x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_scaled, out=None, rtn_dtype=paddle.bfloat16
     ):
         if USE_DS_GEMM:
