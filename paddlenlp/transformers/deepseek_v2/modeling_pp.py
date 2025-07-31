@@ -170,7 +170,7 @@ class PostProcessNode(ScheduleNode):
         with paddle.no_grad():
             if self.shared_experts is not None:
                 if self.using_post_norm_recompute:
-                    shared_expert_output = fp8_mlp_fwd_norm_rc(
+                    shared_expert_output = FP8LinearFunctionBase.fp8_mlp_fwd_norm_rc(
                         hidden_states,
                         self.shared_experts.norm_weight,
                         self.shared_experts.norm_eps,
@@ -178,7 +178,7 @@ class PostProcessNode(ScheduleNode):
                         self.shared_experts.w2,
                     )
                 else:
-                    shared_expert_output = fp8_mlp_fwd(hidden_states, self.shared_experts.w1, self.shared_experts.w2)
+                    shared_expert_output = FP8LinearFunctionBase.fp8_mlp_fwd(hidden_states, self.shared_experts.w1, self.shared_experts.w2)
                 residual = residual + shared_expert_output
 
         self.x = hidden_states
