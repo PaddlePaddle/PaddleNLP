@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+
 import numpy
 import paddle
 import paddle.nn.functional as F
@@ -26,8 +28,13 @@ except ImportError:
         return F.silu(x) * y
 
 
+USE_DS_GEMM = os.getenv("USE_DS_GEMM", "False").lower() == "true"
+
 try:
-    from paddle.incubate.fp8 import deep_gemm
+    if USE_DS_GEMM:
+        import deep_gemm
+    else:
+        from paddle.incubate.fp8 import deep_gemm
 except:
     pass
 
@@ -82,9 +89,16 @@ class FP8LinearFunctionBase:
             return tensor_fp8, tensor_scale, tensor_t_fp8, tensor_t_scale
 
     @staticmethod
-    def kitchen_gemm(
-        x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled=True, is_b_1d_scaled=True, out=None, rtn_dtype=paddle.bfloat16
+    def kitchen_fp8_gemm(
+        x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_scaled, out=None, rtn_dtype=paddle.bfloat16
     ):
+        if USE_DS_GEMM:
+            if out is None:
+                out = paddle.zeros([x_fp8.shape[0], w_fp8.shape[0]], rtn_dtype)
+            if numpy.prod(x_fp8.shape) != 0 and numpy.prod(w_fp8.shape) != 0:
+                deep_gemm.wgrad_gemm_fp8_fp8_fp32_nt((x_fp8, x_scale), (w_fp8, w_scale), out, num_sms=112)
+            return out
+
         if out is not None:
             accumulate = True
             out_dtype = out.dtype
