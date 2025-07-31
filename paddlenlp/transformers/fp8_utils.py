@@ -323,7 +323,7 @@ class FP8LinearFunctionBase:
         # ===== compute norm_output =====
         norm_output, _ = fused_ln.fused_rms_norm(x, norm_w, norm_eps)
         # ===== compute fp8_mlp_fwd =====
-        o3 = FP8LinearFunctionBase.fp8_mlp_fwd(norm_output, w1, w2)
+        _, _, o3 = FP8LinearFunctionBase.fp8_mlp_fwd(norm_output, w1, w2)
         return o3
 
     @staticmethod

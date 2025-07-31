@@ -178,7 +178,7 @@ class PostProcessNode(ScheduleNode):
                         self.shared_experts.w2,
                     )
                 else:
-                    shared_expert_output = FP8LinearFunctionBase.fp8_mlp_fwd(
+                    _, _, shared_expert_output = FP8LinearFunctionBase.fp8_mlp_fwd(
                         hidden_states, self.shared_experts.w1, self.shared_experts.w2
                     )
                 final_hidden_states = final_hidden_states + shared_expert_output
