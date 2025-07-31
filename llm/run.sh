@@ -17,7 +17,7 @@
 # wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin
 # wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx
 
-mpirun sh script/kill_process.sh 
-mpirun rm -rf output
-nohup mpirun sh script/train_gpu.sh config/deepseek-v3/pretrain_argument.json & 
+# mpirun sh script/kill_process.sh 
+# mpirun rm -rf output
+nohup bash script/train_gpu.sh config/deepseek-v3/pretrain_argument.json &
 

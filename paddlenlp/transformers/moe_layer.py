@@ -704,10 +704,19 @@ class FusionMlpNode:
             recompute_fwd_gate_up=recompute_fwd_gate_up,
             is_split_group_gemm=is_split_group_gemm,
         )
+
+        self.seq_length = custom_map.config.seq_length
+        self.num_experts_per_tok = custom_map.config.num_experts_per_tok
+        self.adaptive_remained_O1_recompute_ratio = custom_map.config.adaptive_remained_O1_recompute_ratio
+
+        self.recompute_fwd_gate_up = recompute_fwd_gate_up
         self.dispatched_indices = None
         self.dispatched_probs = None
         self.tokens_per_expert = None
         self.router_topk = max_topk
+
+    def set_recompute_fwd_gate_up(self, recompute_fwd_gate_up):
+        self.experts_group_gemm_node.recompute_fwd_gate_up = recompute_fwd_gate_up
 
     def reset_statue(self, with_dw=False):
         """
@@ -771,6 +780,18 @@ class FusionMlpNode:
             dispatched_indices._record_stream()
             dispatched_probs._record_stream()
 
+            # If adaptive O1 recompute is enabled, determine whether to enable recompute O1 based on the degree of imbalance
+            if self.recompute_fwd_gate_up == -1:
+                if (
+                    unzipped_tokens.shape[0]
+                    > self.seq_length * self.num_experts_per_tok * self.adaptive_remained_O1_recompute_ratio
+                ):
+                    # logger.debug(f"recompute_fwd_gate_up changed to True, Because the receives {unzipped_tokens.shape[0]} Tensors greater then {self.seq_length*self.num_experts_per_tok*self.adaptive_remained_O1_recompute_ratio}.")
+                    self.set_recompute_fwd_gate_up(True)
+                else:
+                    # logger.debug(f"recompute_fwd_gate_up changed to False, Because the receives {unzipped_tokens.shape[0]} Tensors less then {self.seq_length*self.num_experts_per_tok*self.adaptive_remained_O1_recompute_ratio}.")
+                    self.set_recompute_fwd_gate_up(False)
+
             # 2 experts
             padding_token_per_experts = [(x + 127) // 128 * 128 for x in self.tokens_per_expert]
             expert_out = self.experts_group_gemm_node.forward(
@@ -791,6 +812,16 @@ class FusionMlpNode:
             hs_2d_dispatched._record_stream()
             dispatched_indices._record_stream()
             dispatched_probs._record_stream()
+
+            # If adaptive O1 recompute is enabled, determine whether to enable recompute O1 based on the degree of imbalance
+            if self.recompute_fwd_gate_up == -1:
+                if (
+                    unzipped_tokens.shape[0]
+                    > self.seq_length * self.num_experts_per_tok * self.adaptive_remained_O1_recompute_ratio
+                ):
+                    self.set_recompute_fwd_gate_up(True)
+                else:
+                    self.set_recompute_fwd_gate_up(False)
 
             # 2 experts
             padding_token_per_experts = [(x + 127) // 128 * 128 for x in self.tokens_per_expert]
