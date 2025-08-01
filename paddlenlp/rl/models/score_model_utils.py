@@ -62,52 +62,51 @@ class ScoreModelMixin:
         config.bias = kwargs.pop("bias", getattr(config, "bias", False))
 
         config.score_type = kwargs.pop("score_type", getattr(config, "score_type", "reward"))
-        # if config.score_type == "reward":
-        #     self.normalize_function = "affine"
-        # elif config.score_type == "cost":
-        #     self.normalize_function = "scale"
-        # elif config.score_type == "critic":
-        #     self.normalize_function = "identity"
-        # else:
-        #     raise ValueError(
-        #         f"Invalid score type: {config.score_type}. Expected one of 'reward', 'cost', or 'critic'.",
-        #     )
+        if config.score_type == "reward":
+            self.normalize_function = "affine"
+        elif config.score_type == "cost":
+            self.normalize_function = "scale"
+        elif config.score_type == "critic":
+            self.normalize_function = "identity"
+        else:
+            raise ValueError(
+                f"Invalid score type: {config.score_type}. Expected one of 'reward', 'cost', or 'critic'.",
+            )
 
-        # config.do_normalize = kwargs.pop(
-        #     "do_normalize",
-        #     getattr(config, "do_normalize", False),
-        # )
-        # self.do_normalize = config.do_normalize
+        config.do_normalize = kwargs.pop(
+            "do_normalize",
+            getattr(config, "do_normalize", False),
+        )
+        self.do_normalize = config.do_normalize
 
-        # config.normalizer_type = kwargs.pop(
-        #     "normalizer_type",
-        #     getattr(config, "normalizer_type", None),
-        # )
-        # if config.normalizer_type not in {
-        #     "RunningMeanStd",
-        #     "ExponentialMovingAverage",
-        #     None,
-        # }:
-        #     raise ValueError(
-        #         f"Invalid norm type: {config.normalizer_type}."
-        #         "Expected one of 'RunningMeadStd', 'ExponentialMovingAverage', or None.",
-        #     )
-        # if config.normalizer_type == "ExponentialMovingAverage":
-        #     config.momentum = kwargs.pop("momentum", getattr(config, "momentum", None))
-        # momentum = getattr(config, "momentum", None)
+        config.normalizer_type = kwargs.pop(
+            "normalizer_type",
+            getattr(config, "normalizer_type", None),
+        )
+        if config.normalizer_type not in {
+            "RunningMeanStd",
+            "ExponentialMovingAverage",
+            None,
+        }:
+            raise ValueError(
+                f"Invalid norm type: {config.normalizer_type}."
+                "Expected one of 'RunningMeadStd', 'ExponentialMovingAverage', or None.",
+            )
+        if config.normalizer_type == "ExponentialMovingAverage":
+            config.momentum = kwargs.pop("momentum", getattr(config, "momentum", None))
+        momentum = getattr(config, "momentum", None)
 
-        # self.score_head = nn.Linear(hidden_size, config.score_dim, bias_attr=config.bias)
-        self.score_head = nn.Linear(hidden_size, config.score_dim)
-        # self.normalizer = Normalizer.instantiate(
-        #     normalizer_type=config.normalizer_type,
-        #     normalize_function=self.normalize_function,
-        #     shape=(config.score_dim,),
-        #     momentum=momentum,
-        # )
+        self.score_head = nn.Linear(hidden_size, config.score_dim, bias_attr=config.bias)
+        self.normalizer = Normalizer.instantiate(
+            normalizer_type=config.normalizer_type,
+            normalize_function=self.normalize_function,
+            shape=(config.score_dim,),
+            momentum=momentum,
+        )
 
-        # mean = getattr(config, "mean", None)
-        # var = getattr(config, "var", None)
-        # self.normalizer.set_mean_var(mean, var)
+        mean = getattr(config, "mean", None)
+        var = getattr(config, "var", None)
+        self.normalizer.set_mean_var(mean, var)
 
         self._initialized = True
 
@@ -124,94 +123,83 @@ class ScoreModelMixin:
         if scores.dtype != hidden_state.dtype:  # EB rm cast to float32
             scores = scores.cast(hidden_state.dtype)
 
-        # if position_ids is not None:
-        # first_pos = paddle.arange(hidden_state.shape[0]).unsqueeze(-1)
-        # # Take left padding into account, which has 0s in left and max_len
-        # # in right.
-        # left_pad_mask = position_ids == 0
-        # # position_ids = paddle.where(
-        # #     left_pad_mask, position_ids, position_ids + left_pad_mask.sum(-1, keepdim=True) - 1
-        # # )
-        # # the above limits right padding must not be 0s, the following suits
-        # # to both left and right padding with 0s
-        # left_pad_num = (
-        #     paddle.where(left_pad_mask, position_ids.shape[-1] + 100, position_ids).argmin(axis=-1, keepdim=True)
-        #     - 1
-        # )
-        # position_ids = left_pad_num + position_ids
-        # second_pos = paddle.max(position_ids, axis=-1, keepdim=True)
-        # end_pos = paddle.stack([first_pos, second_pos], axis=-1).squeeze(1)
-        # end_score = scores.gather_nd(end_pos)
+        if position_ids is not None:
+            first_pos = paddle.arange(hidden_state.shape[0]).unsqueeze(-1)
+            # Take left padding into account, which has 0s in left and max_len
+            # in right.
+            left_pad_mask = position_ids == 0
+            # position_ids = paddle.where(
+            #     left_pad_mask, position_ids, position_ids + left_pad_mask.sum(-1, keepdim=True) - 1
+            # )
+            # the above limits right padding must not be 0s, the following suits
+            # to both left and right padding with 0s
+            left_pad_num = (
+                paddle.where(left_pad_mask, position_ids.shape[-1] + 100, position_ids).argmin(axis=-1, keepdim=True)
+                - 1
+            )
+            position_ids = left_pad_num + position_ids
+            second_pos = paddle.max(position_ids, axis=-1, keepdim=True)
+            end_pos = paddle.stack([first_pos, second_pos], axis=-1).squeeze(1)
+            end_score = scores.gather_nd(end_pos)
+        else:
+            # attention_mask passed from pipeline pre-stage is shaped (bs, 1, seq_len, seq_len)
+            assert attention_mask is not None and len(attention_mask.shape) == 2
+            end_score = []
+            end_pos = []
+            for i in range(hidden_state.shape[0]):
+                end_index = attention_mask[i].nonzero()[-1].item()
+                end_pos.append((i, end_index))
+                end_score.append(scores[i, end_index])  # size = (D,)
+            end_score = paddle.stack(end_score, axis=0)  # size = (B, D)
 
-        # elif attn_mask_startend_row_indices is not None:
-        #     assert attn_mask_startend_row_indices.shape[1] == 1, "attn_mask_startend_row_indices must be with shape [B, 1]"
-        #     end_pos = attn_mask_startend_row_indices[:, 0].unsqueeze(-1)
+        if self.training and self.do_normalize:
+            if dist.is_initialized():
+                gathered_end_score_list = []
+                try:
+                    # gather among data parallel group
+                    hcg = dist.fleet.get_hybrid_communicate_group()
+                    group = hcg.get_sharding_parallel_group()
+                    dist.all_gather(gathered_end_score_list, end_score, group)
+                except:
+                    dist.all_gather(gathered_end_score_list, end_score)
+                gathered_end_score = paddle.concat(gathered_end_score_list, axis=0)
+                self.normalizer.update(gathered_end_score)
+            else:
+                self.normalizer.update(end_score)
+            self.config.mean = self.normalizer.mean.tolist()
+            self.config.var = self.normalizer.var.tolist()
 
-        #     if attn_mask_startend_row_indices.shape[1] == 2:
-        #         start_pos = attn_mask_startend_row_indices[:, 0].unsqueeze(-1)
-        #         end_pos = attn_mask_startend_row_indices[:, 1].unsqueeze(-1)
-        #         end_score = scores.gather_nd(end_pos)
-        #     else:
-        #         pass
-        # else:
-        #     # attention_mask passed from pipeline pre-stage is shaped (bs, 1, seq_len, seq_len)
-        #     assert attention_mask is not None and len(attention_mask.shape) == 2
-        #     end_score = []
-        #     end_pos = []
-        #     for i in range(hidden_state.shape[0]):
-        #         end_index = attention_mask[i].nonzero()[-1].item()
-        #         end_pos.append((i, end_index))
-        #         end_score.append(scores[i, end_index])  # size = (D,)
-        #     end_score = paddle.stack(end_score, axis=0)  # size = (B, D)
+        if self.do_normalize:
+            scores = self.normalizer.normalize(scores)
 
-        # if self.training and self.do_normalize:
-        #     if dist.is_initialized():
-        #         gathered_end_score_list = []
-        #         try:
-        #             # gather among data parallel group
-        #             hcg = dist.fleet.get_hybrid_communicate_group()
-        #             group = hcg.get_sharding_parallel_group()
-        #             dist.all_gather(gathered_end_score_list, end_score, group)
-        #         except:
-        #             dist.all_gather(gathered_end_score_list, end_score)
-        #         gathered_end_score = paddle.concat(gathered_end_score_list, axis=0)
-        #         self.normalizer.update(gathered_end_score)
-        #     else:
-        #         self.normalizer.update(end_score)
-        #     self.config.mean = self.normalizer.mean.tolist()
-        #     self.config.var = self.normalizer.var.tolist()
+        if not return_dict:
+            return scores, end_score
 
-        # if self.do_normalize:
-        #     scores = self.normalizer.normalize(scores)
-
-        # if not return_dict:
-        #     return scores, end_score
-
-        # return ScoreModelOutput(
-        #     scores=scores,  # size = (B, L, D)
-        #     end_scores=end_score,  # size = (B, D)
-        # )
+        return ScoreModelOutput(
+            scores=scores,  # size = (B, L, D)
+            end_scores=end_score,  # size = (B, D)
+        )
 
         return scores
 
-    # def set_normalize(self, mode: bool = True) -> None:
-    #     """
-    #     Set whether to normalize the input data, default is True.
-    #     If mode is True, normalize the input data; if mode is False, do not normalize the input data.
+    def set_normalize(self, mode: bool = True) -> None:
+        """
+        Set whether to normalize the input data, default is True.
+        If mode is True, normalize the input data; if mode is False, do not normalize the input data.
 
-    #     Args:
-    #         mode (bool, optional): Whether to normalize the input data, default is True. Defaults to True.
+        Args:
+            mode (bool, optional): Whether to normalize the input data, default is True. Defaults to True.
 
-    #     Returns:
-    #         None: No return value, directly modifies the instance's do_normalize attribute and the do_normalize attribute in config.
+        Returns:
+            None: No return value, directly modifies the instance's do_normalize attribute and the do_normalize attribute in config.
 
-    #     Raises:
-    #         None: No exceptions are raised.
-    #     """
-    #     if self.do_normalize == mode:
-    #         return
+        Raises:
+            None: No exceptions are raised.
+        """
+        if self.do_normalize == mode:
+            return
 
-    #     self.do_normalize = self.config.do_normalize = mode
+        self.do_normalize = self.config.do_normalize = mode
 
 
 NormalizeFunction = Literal["affine", "scale", "translate", "identity"]
