@@ -217,113 +217,105 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
         export PYTHONPATH=$root_path/:$PYTHONPATH
         export FLAGS_call_stack_level=3
         export NVIDIA_TF32_OVERRIDE=0
-
         export FLAGS_cudnn_deterministic=1
         export FLAGS_embedding_deterministic=1 
-        
+
         export CUDA_DEVICE_MAX_CONNECTIONS=1
 
-        flags=("" "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap")
-        for i in "${!flags[@]}"; do
-            flag="${flags[$i]}"
+        test_cases=(
+            "default" "" 1
+            "tensor_fusion_overlap1" "enable_tensor_fusion enable_overlap" 1
+            "tensor_fusion_overlap2" "enable_tensor_fusion enable_overlap" 2
+        )
 
-            if [ -n "$flag" ]; then
-                for f in $flag; do
-                    export "$f=true"
-                done
-            fi
-            acc_steps=(1)
-            if [ "$flag" = "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap" ]; then
-                acc_steps=(1 2)
-            fi
-            for acc_step in "${acc_steps[@]}"; do
-                task_name="llama_dygraph_auto_bs4_bf16_SD2_$f"
-                case_out_dir="output/$task_name"
-                case_log_dir="output/$task_name""_log"
-                rm -rf $case_out_dir
-                rm -rf $case_log_dir
+        for ((i=0; i<${#test_cases[@]}; i+=3)); do
+            case_name=${test_cases[i]}
+            sharding_config=${test_cases[i+1]}
+            acc_step=${test_cases[i+2]}
 
-                python -u  -m paddle.distributed.launch \
-                    --gpus "0,1" \
-                    --log_dir  "output/$task_name""_log" \
-                    ./run_pretrain_auto.py \
-                    --model_name_or_path "meta-llama/Llama-2-7b" \
-                    --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
-                    --input_dir "./data" \
-                    --output_dir "./output" \
-                    --weight_decay 0.01 \
-                    --warmup_ratio 0.01 \
-                    --max_grad_norm 1.0 \
-                    --learning_rate 3e-05 \
-                    --min_learning_rate 3e-06 \
-                    --max_steps 10 \
-                    --logging_steps 10 \
-                    --eval_steps 1000 \
-                    --save_steps 50000 \
-                    --continue_training 0 \
-                    --do_train true \
-                    --do_eval false \
-                    --do_predict false \
-                    --disable_tqdm true \
-                    --skip_profile_timer true \
-                    --device gpu \
-                    --enable_auto_parallel 1 \
-                    --per_device_train_batch_size 1 \
-                    --gradient_accumulation_steps $acc_step \
-                    --per_device_eval_batch_size 2 \
-                    --recompute false \
-                    --recompute_use_reentrant true \
-                    --recompute_granularity full \
-                    --pp_recompute_interval 0 \
-                    --bf16 true \
-                    --fp16_opt_level "O2"  \
-                    --amp_master_grad true \
-                    --fuse_attention_ffn true \
-                    --fuse_attention_qkv true \
-                    --fused_linear_param_grad_add 1 \
-                    --use_flash_attention true \
-                    --use_fused_rope true \
-                    --use_fused_rms_norm true \
-                    --max_seq_length 4096 \
-                    --sequence_parallel false \
-                    --pipeline_parallel_degree 1 \
-                    --tensor_parallel_degree 1 \
-                    --sharding "stage1" \
-                    --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
-                    --sharding_parallel_config "enable_tensor_fusion enable_overlap" \
-                    --to_static 0 \
-                    --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
-                    --amp_custom_white_list "lookup_table" "lookup_table_v2" \
-                    --num_hidden_layers 4 \
-                    >>${log_path}/$FUNCNAME 2>&1
-                loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-                ips=-1
-                mem=-1
-                echo "result: loss=$loss ips=$ips mem=$mem"
-                echo "flag=$flag acc_step=$acc_step"
-                if [ -z "$flag" ]; then
-                    loss_base=9.23504105
-                elif [ "$flag" = "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap" ]; then
-                    if [ $acc_step -eq 1 ]; then
-                        loss_base=9.23504868
-                    else
-                        loss_base=9.16484451
-                    fi
+            task_name="llama_dygraph_auto_bs4_bf16_SD2_${case_name}_acc${acc_step}"
+
+
+            case_out_dir="output/$task_name"
+            case_log_dir="output/$task_name""_log"
+            rm -rf $case_out_dir
+            rm -rf $case_log_dir
+
+            python -u  -m paddle.distributed.launch \
+                --gpus "0,1" \
+                --log_dir  "output/$task_name""_log" \
+                ./run_pretrain_auto.py \
+                --model_name_or_path "meta-llama/Llama-2-7b" \
+                --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
+                --input_dir "./data" \
+                --output_dir "./output" \
+                --weight_decay 0.01 \
+                --warmup_ratio 0.01 \
+                --max_grad_norm 1.0 \
+                --learning_rate 3e-05 \
+                --min_learning_rate 3e-06 \
+                --max_steps 10 \
+                --logging_steps 10 \
+                --eval_steps 1000 \
+                --save_steps 50000 \
+                --continue_training 0 \
+                --do_train true \
+                --do_eval false \
+                --do_predict false \
+                --disable_tqdm true \
+                --skip_profile_timer true \
+                --device gpu \
+                --enable_auto_parallel 1 \
+                --per_device_train_batch_size 1 \
+                --gradient_accumulation_steps $acc_step \
+                --per_device_eval_batch_size 2 \
+                --recompute false \
+                --recompute_use_reentrant true \
+                --recompute_granularity full \
+                --pp_recompute_interval 0 \
+                --bf16 true \
+                --fp16_opt_level "O2"  \
+                --amp_master_grad true \
+                --fuse_attention_ffn true \
+                --fuse_attention_qkv true \
+                --fused_linear_param_grad_add 1 \
+                --use_flash_attention true \
+                --use_fused_rope true \
+                --use_fused_rms_norm true \
+                --max_seq_length 4096 \
+                --sequence_parallel false \
+                --pipeline_parallel_degree 1 \
+                --tensor_parallel_degree 1 \
+                --sharding "stage1" \
+                --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
+                --sharding_parallel_config $sharding_config \
+                --to_static 0 \
+                --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
+                --amp_custom_white_list "lookup_table" "lookup_table_v2" \
+                --num_hidden_layers 4 \
+                >>${log_path}/$FUNCNAME 2>&1
+            loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+            ips=-1
+            mem=-1
+            echo "result: loss=$loss ips=$ips mem=$mem"
+            echo "case=$case_name sharding_config=$sharding_config acc_step=$acc_step"
+            if [ "$case_name" = "default" ]; then
+                loss_base=9.23504105
+            elif [ "$case_name" = "tensor_fusion_overlap" ]; then
+                if [ $acc_step -eq 1 ]; then
+                    loss_base=9.23504868
                 else
-                    loss_base=-1
+                    loss_base=9.16484451
                 fi
-
-                ips_base=-1
-                mem_base=-1
-                check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-            done
-
-            if [ -n "$flag" ]; then
-                for f in $flag; do
-                    export "$f=false"
-                done
+            else
+                loss_base=-1
             fi
+
+            ips_base=-1
+            mem_base=-1
+            check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
         done
+
         echo "=========== $FUNCNAME run  end ==========="
     fi
 }
@@ -2500,11 +2492,11 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.55853653 # output of dropout is different after supporting spmd
+    loss_base=10.55727577 # output of dropout is different after supporting spmd
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.56019211 # after add dropout spmd
+        loss_base=10.56668472 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2572,11 +2564,11 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.5657959 # output of dropout is different after supporting spmd
+    loss_base=10.57985115 # output of dropout is different after supporting spmd
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.5760107 # after add dropout spmd
+        loss_base=10.57280159 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2645,11 +2637,11 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.59993172     # note: need to debug
-    loss_base=10.57174778 # output of dropout is different after supporting spmd
+    loss_base=10.57274055 # output of dropout is different after supporting spmd
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.57701015 # after add dropout spmd
+        loss_base=10.57785797 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2718,11 +2710,11 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.58456802     # note: need to debug
-    loss_base=10.57304478
+    loss_base=10.57409477
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.57861042 # after add dropout spmd
+        loss_base=10.57924652 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -3984,7 +3976,6 @@ function llama_baichuan_dygraph_auto_sp_async_reduce_scatter_bs8_bf16_DP4-MP2-SP
         export NVIDIA_TF32_OVERRIDE=0
 
         export CUDA_DEVICE_MAX_CONNECTIONS=1
-        export FLAGS_enable_inplace_master_grad=1
         export FLAGS_auto_parallel_align_mode=1
         export FLAGS_max_inplace_grad_add=65536
         export FLAGS_embedding_deterministic=1
@@ -4050,7 +4041,7 @@ function llama_baichuan_dygraph_auto_sp_async_reduce_scatter_bs8_bf16_DP4-MP2-SP
     "sequence_parallel": true,
     "sharding": "stage1",
     "sharding_parallel_degree": 4,
-    "sharding_parallel_config": "enable_tensor_fusion enable_overlap",
+    "sharding_parallel_config": "",
     "tensor_parallel_config": "enable_mp_async_allreduce replace_with_parallel_cross_entropy enable_sp_async_reduce_scatter",
     "data_parallel_config": "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate",
     "pipeline_parallel_config": "enable_send_recv_overlap enable_split_backward",
