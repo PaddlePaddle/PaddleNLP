@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 import paddle
+import paddle.distributed as dist
 import paddle.nn as nn
 
 from ...transformers.configuration_utils import PretrainedConfig
