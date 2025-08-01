@@ -362,6 +362,10 @@ def main():
         paddle.device.cuda.empty_cache()
 
     def compute_metrics(eval_preds):
+        '''
+        If "use_rm_server" is TRUE, the score ranges from -3 to 3, with 3 being the only correct score (format + result).
+        If using the "Regularized Matching Function (use_rule_reward=True)" (currently only implemented for the gsm8k dataset), the score ranges from 0 to 1.
+        '''
         if training_args.use_rule_reward:
             accuracy = (eval_preds.predictions == 1).astype("float32").mean().item()
         else:
