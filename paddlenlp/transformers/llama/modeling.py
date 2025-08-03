@@ -97,6 +97,7 @@ try:
 except:
     flash_attention = None
 from . import fusion_ops
+from .disco_cache import DISCOCache, get_scores_with_kv_fusion
 
 rms_norm_fused = fusion_ops.rms_norm_fused
 
@@ -714,6 +715,11 @@ class LlamaAttention(nn.Layer):
 
         self.fuse_attention_qkv = config.fuse_attention_qkv
 
+        # DISCO algorithm attributes
+        self.use_disco = getattr(config, 'use_disco', False)
+        self.disco_cache = None
+        self.layer_idx = None  # Will be set by the model
+        
         self.kv_indices = None
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
         # Enable_recompute defaults to False and is controlled by Trainer
@@ -1093,15 +1099,30 @@ class LlamaAttention(nn.Layer):
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
         # [bs, seq_len, num_head, head_dim]
-        if past_key_value is not None:
-            # reuse k, v, self_attention
-            key_states = paddle.concat([past_key_value[0], key_states], axis=1)
-            value_states = paddle.concat([past_key_value[1], value_states], axis=1)
-            if self.config.immediate_clear_past_key_value:
-                past_key_value[0]._clear_data()
-                past_key_value[1]._clear_data()
+        if self.use_disco and use_cache:
+            # Use DISCO cache management
+            if self.disco_cache is not None and self.layer_idx is not None:
+                # Get attention weights for scoring (if available)
+                attention_weights = None
+                if self.config.use_disco and hasattr(self, '_last_attention_weights'):
+                    attention_weights = self._last_attention_weights
+                
+                # Update DISCO cache
+                key_states, value_states = self.disco_cache.update(
+                    key_states, value_states, self.layer_idx, attention_weights
+                )
+            past_key_value = (key_states, value_states)
+        else:
+            # Standard KV cache handling
+            if past_key_value is not None:
+                # reuse k, v, self_attention
+                key_states = paddle.concat([past_key_value[0], key_states], axis=1)
+                value_states = paddle.concat([past_key_value[1], value_states], axis=1)
+                if self.config.immediate_clear_past_key_value:
+                    past_key_value[0]._clear_data()
+                    past_key_value[1]._clear_data()
 
-        past_key_value = (key_states, value_states) if use_cache else None
+            past_key_value = (key_states, value_states) if use_cache else None
         if self.kv_indices is not None:
             key_states = paddle.index_select(key_states, self.kv_indices, axis=2)
             value_states = paddle.index_select(value_states, self.kv_indices, axis=2)
@@ -1572,6 +1593,23 @@ class LlamaModel(LlamaPretrainedModel):
         self.norm = LlamaRMSNorm(config)
 
         self.gradient_checkpointing = False
+        
+        # Initialize DISCO cache if enabled
+        self.disco_cache = None
+        if hasattr(config, 'use_disco') and config.use_disco:
+            self.disco_cache = DISCOCache(
+                num_layers=config.num_hidden_layers,
+                cache_size=config.disco_cache_size if hasattr(config, 'disco_cache_size') else 1024,
+                window_size=config.disco_window_size if hasattr(config, 'disco_window_size') else 32,
+                gamma=config.disco_gamma if hasattr(config, 'disco_gamma') else 0.1,
+                score_func_path=config.disco_score_func_path if hasattr(config, 'disco_score_func_path') else None,
+                layer_budget=config.disco_layer_budget if hasattr(config, 'disco_layer_budget') else None,
+            )
+            
+            # Set layer indices and disco_cache for each attention layer
+            for idx, layer in enumerate(self.layers):
+                layer.self_attn.layer_idx = idx
+                layer.self_attn.disco_cache = self.disco_cache
 
     def get_input_embeddings(self):
         return self.embed_tokens

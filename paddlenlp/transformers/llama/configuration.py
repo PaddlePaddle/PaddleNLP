@@ -159,6 +159,13 @@ class LlamaConfig(PretrainedConfig):
         use_last_token_for_generation=False,
         immediate_clear_past_key_value=False,
         dpo_config=None,
+        # DISCO algorithm configuration
+        use_disco=False,
+        disco_window_size=32,
+        disco_gamma=0.1,
+        disco_cache_size=1024,
+        disco_score_func_path=None,
+        disco_layer_budget=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -197,6 +204,14 @@ class LlamaConfig(PretrainedConfig):
         self.use_last_token_for_generation = use_last_token_for_generation
         self.immediate_clear_past_key_value = immediate_clear_past_key_value
         self.dpo_config = dpo_config
+
+        # DISCO algorithm parameters
+        self.use_disco = use_disco
+        self.disco_window_size = disco_window_size
+        self.disco_gamma = disco_gamma
+        self.disco_cache_size = disco_cache_size
+        self.disco_score_func_path = disco_score_func_path
+        self.disco_layer_budget = disco_layer_budget
 
         super().__init__(
             pad_token_id=pad_token_id,
