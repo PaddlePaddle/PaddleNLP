@@ -124,7 +124,13 @@ class DISCOCache:
             
         # Keep top-k tokens
         k = self.layer_budget[layer_idx]
-        _, keep_indices = paddle.topk(scores, k=k, axis=-1)
+        
+        # Flatten scores to 1D for topk operation
+        flat_scores = scores.flatten()
+        _, keep_indices = paddle.topk(flat_scores, k=min(k, flat_scores.shape[0]))
+        
+        # Ensure indices are 1D
+        keep_indices = keep_indices.flatten()
         
         # Update cache
         self.key_cache[layer_idx] = paddle.index_select(key_cache, keep_indices, axis=2)
@@ -176,12 +182,17 @@ class LayerwiseEvictionManager:
         if scores.shape[-1] > 5:
             # Simple moving average
             kernel_size = min(5, scores.shape[-1])
+            # Reshape for avg_pool1d: [batch*heads, 1, seq_len]
+            original_shape = scores.shape
+            scores_reshaped = scores.reshape([-1, 1, scores.shape[-1]])
             scores = F.avg_pool1d(
-                scores.unsqueeze(1),
+                scores_reshaped,
                 kernel_size=kernel_size,
                 stride=1,
                 padding=kernel_size // 2
-            ).squeeze(1)
+            )
+            # Reshape back
+            scores = scores.squeeze(1).reshape(original_shape)
             
         return scores
         
