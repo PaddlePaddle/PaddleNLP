@@ -377,7 +377,9 @@ class PPOTrainer(RLTrainerBase):
         self.kl_coeff = self.args.kl_coeff
         self.clip_range_score = self.args.clip_range_score
         self.gamma = 1.0
-        self.gae_lambda = 1.0
+        # [gae_lambda] value needs to be set manually. 
+        # On the gsm8k benchmark, this value is 1.0.
+        self.gae_lambda = 1.0 
 
         # for reward norm
         self.reward_mean = 0.0
