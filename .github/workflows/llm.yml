@@ -135,8 +135,6 @@ jobs:
             docker exec -t $container_name /bin/bash -c '
             cd /workspace/PaddleNLP
             git revert f2477c07272d04244cd3287d1f21c70482a4a85f --no-edit  # 套件PR#10413引入bug-待修复
-            sed -i "s/>= 2.0.0/==3.6.0/g" requirements.txt  # 报错提示安装torchcodec
-            sed -i "s@--ignore-installed[[:space:]]\+dist/p.*\.whl@--pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html@g" scripts/regression/run_ci.sh # 绕过pyarrow升级为21.0.0需要编译的问题
             '
           fi
       
@@ -153,7 +151,7 @@ jobs:
             set -e
             source $work_dir/../../../proxy
             cd /workspace/PaddleNLP && git config --global --add safe.directory $PWD
-            export paddle_whl=https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuSome-LinuxCentos-Gcc82-Cuda118-Cudnn86-Trt85-Py310-CINN-Compile/96aa35fd1be16637ef001426bb473c0132fa7a7a/paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl # 需要套件侧适配Paddle#73283
+            export paddle_whl=https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuSome-LinuxCentos-Gcc82-Cuda118-Cudnn86-Trt85-Py310-CINN-Compile/8ae7423e99b2ea96e410968a0ebb3f1795e37205/paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl # 需要套件侧适配Paddle#73283
             timeout 2h bash scripts/regression/run_ci.sh python${python_version} ${paddle_whl}
             '
           fi
