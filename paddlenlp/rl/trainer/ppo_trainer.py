@@ -313,7 +313,7 @@ class PPOTrainer(RLTrainerBase):
             self.max_steps,
             self.num_train_epochs,
             self.num_update_steps_per_epoch,
-            self.num_examples_,  # 有重名问题
+            self.num_examples_,  # There is a problem with duplicate names
             self.num_train_samples,
         ) = self.init_train_num(self.train_dataloader)
 
@@ -633,7 +633,7 @@ class PPOTrainer(RLTrainerBase):
         """Set training mode for all models."""
         if mode:
             self.training = True
-            # self.actor_model.train()
+            self.actor_model.train()
             if self.args.rl_algorithm == "ppo":
                 self.critic_model.train()
         else:
