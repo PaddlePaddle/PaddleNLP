@@ -22,7 +22,7 @@ import paddle
 
 from paddlenlp.transformers import LlamaConfig, LlamaForCausalLM, LlamaModel
 from paddlenlp.transformers.llama.disco_cache import DISCOCache, LayerwiseEvictionManager, get_scores_with_kv_fusion
-
+import paddle.nn.functional as F
 
 class DISCOCacheTest(unittest.TestCase):
     """Test cases for DISCO cache implementation."""
@@ -106,7 +106,7 @@ class DISCOCacheTest(unittest.TestCase):
         # Create dummy inputs
         key_states = paddle.randn([self.batch_size, self.num_heads, self.seq_length, self.head_dim])
         value_states = paddle.randn([self.batch_size, self.num_heads, self.seq_length, self.head_dim])
-        attention_weights = paddle.softmax(
+        attention_weights = F.softmax(
             paddle.randn([self.batch_size, self.num_heads, self.window_size, self.seq_length]),
             axis=-1
         )

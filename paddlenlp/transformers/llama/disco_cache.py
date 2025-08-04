@@ -125,12 +125,26 @@ class DISCOCache:
         # Keep top-k tokens
         k = self.layer_budget[layer_idx]
         
-        # Flatten scores to 1D for topk operation
-        flat_scores = scores.flatten()
-        _, keep_indices = paddle.topk(flat_scores, k=min(k, flat_scores.shape[0]))
+        # Get the sequence dimension
+        seq_len = key_cache.shape[2]
         
-        # Ensure indices are 1D
-        keep_indices = keep_indices.flatten()
+        # Average scores across batch and heads for token selection
+        if scores.ndim > 1:
+            # scores shape: [batch, heads, seq] or [batch, seq]
+            if scores.ndim == 3:
+                # Average across batch and heads
+                scores = scores.mean(axis=[0, 1])
+            elif scores.ndim == 2:
+                # Average across batch
+                scores = scores.mean(axis=0)
+        
+        # Now scores is 1D with shape [seq_len]
+        # Get top-k indices
+        k = min(k, seq_len)
+        _, keep_indices = paddle.topk(scores, k=k)
+        
+        # Sort indices to maintain order
+        keep_indices = paddle.sort(keep_indices)
         
         # Update cache
         self.key_cache[layer_idx] = paddle.index_select(key_cache, keep_indices, axis=2)
