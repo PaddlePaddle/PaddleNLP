@@ -1223,9 +1223,7 @@ class TrainingArguments:
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
                     self.sharding_parallel_degree = world_size // (
-                        tensor_parallel_degree
-                        * sep_parallel_degree
-                        * pipeline_parallel_degree
+                        tensor_parallel_degree * sep_parallel_degree * pipeline_parallel_degree
                     )
 
             sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
@@ -1234,10 +1232,7 @@ class TrainingArguments:
                 self.sharding = []
 
             self.data_parallel_degree = world_size // (
-                sharding_parallel_degree
-                * tensor_parallel_degree
-                * sep_parallel_degree
-                * pipeline_parallel_degree
+                sharding_parallel_degree * tensor_parallel_degree * sep_parallel_degree * pipeline_parallel_degree
             )
 
             if expert_parallel_degree > 1:
@@ -1513,7 +1508,9 @@ class TrainingArguments:
                 def is_context_parallel_supported():
                     import inspect
 
-                    members = [name for (name, date) in inspect.getmembers(fleet.base.topology.EPHybridCommunicateGroup)]
+                    members = [
+                        name for (name, date) in inspect.getmembers(fleet.base.topology.EPHybridCommunicateGroup)
+                    ]
                     support_cp = "get_context_parallel_world_size" in members
                     if not support_cp:
                         logger.warning("context parallel is not supported!!! Ignore it.")
@@ -1714,9 +1711,7 @@ class TrainingArguments:
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
                     self.sharding_parallel_degree = world_size // (
-                        self.tensor_parallel_degree
-                        * self.sep_parallel_degree
-                        * self.pipeline_parallel_degree
+                        self.tensor_parallel_degree * self.sep_parallel_degree * self.pipeline_parallel_degree
                     )
 
             self.sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
