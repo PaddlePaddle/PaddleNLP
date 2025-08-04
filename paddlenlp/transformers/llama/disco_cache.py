@@ -92,6 +92,7 @@ class DISCOCache:
         """Update cache with new key-value pairs."""
         
         if layer_idx not in self.key_cache:
+            # First update for this layer - don't evict on initialization
             self.key_cache[layer_idx] = key_states
             self.value_cache[layer_idx] = value_states
         else:
@@ -99,9 +100,9 @@ class DISCOCache:
             self.key_cache[layer_idx] = paddle.concat([self.key_cache[layer_idx], key_states], axis=2)
             self.value_cache[layer_idx] = paddle.concat([self.value_cache[layer_idx], value_states], axis=2)
             
-        # Apply eviction if needed
-        if self.key_cache[layer_idx].shape[2] > self.layer_budget[layer_idx]:
-            self._evict_tokens(layer_idx, attention_weights)
+            # Apply eviction if needed (only on subsequent updates)
+            if self.key_cache[layer_idx].shape[2] > self.layer_budget[layer_idx]:
+                self._evict_tokens(layer_idx, attention_weights)
             
         return self.key_cache[layer_idx], self.value_cache[layer_idx]
 
