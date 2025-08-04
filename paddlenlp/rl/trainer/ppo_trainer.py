@@ -459,6 +459,7 @@ class PPOTrainer(RLTrainerBase):
         value_training_args = copy.deepcopy(args)
         for attr_name in [
             "critic_learning_rate",
+            "critic_min_learning_rate",
             "critic_weight_decay",
             "critic_lr_scheduler_type",
             "critic_warmup_ratio",
