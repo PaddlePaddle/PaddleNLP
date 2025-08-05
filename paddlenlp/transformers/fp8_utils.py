@@ -917,18 +917,17 @@ class FP8GroupGemmMlpFunctionNode:
     @paddle.no_grad()
     def forward(self, hs_out, unzipped_probs, tokens_per_expert, origin_token_per_experts, output=None):
         self.origin_token_per_experts = origin_token_per_experts
+        # deal 0 size
+        dtype = paddle.bfloat16
         if hs_out is None:
             assert self.input_fp8 is not None
             assert self.input_scale is not None
             shape = self.input_fp8.shape
-            dtype = paddle.bfloat16
         else:
             if isinstance(hs_out, tuple):
                 shape = hs_out[0].shape
-                dtype = hs_out[0].dtype
             else:
                 shape = hs_out.shape
-                dtype = hs_out.dtype
 
         if shape[0] == 0:
             o3 = paddle.zeros(shape, dtype=dtype)
@@ -958,6 +957,12 @@ class FP8GroupGemmMlpFunctionNode:
 
     @paddle.no_grad()
     def backward(self, out_grad):
+        # deal 0 size
+        dtype = paddle.bfloat16
+        shape = out_grad[0].shape if isinstance(out_grad, tuple) else out_grad.shape
+        if shape[0] == 0:
+            return paddle.zeros_like(out_grad, dtype=dtype), paddle.zeros_like(self.unzipped_probs, dtype=dtype)
+
         # recompute expert_w2 and expert_w1
         expert_w1 = [x.w1 for x in self.experts if x is not None]
         expert_w2 = [x.w2 for x in self.experts if x is not None]
@@ -995,6 +1000,12 @@ class FP8GroupGemmMlpFunctionNode:
 
     @paddle.no_grad()
     def backward_dx(self, out_grad):
+        # deal 0 size
+        dtype = paddle.bfloat16
+        shape = out_grad[0].shape if isinstance(out_grad, tuple) else out_grad.shape
+        if shape[0] == 0:
+            return paddle.zeros_like(out_grad, dtype=dtype), paddle.zeros_like(self.unzipped_probs, dtype=dtype)
+
         # recompute expert_w2 and expert_w1
         expert_w1 = [x.w1 for x in self.experts if x is not None]
         expert_w2 = [x.w2 for x in self.experts if x is not None]
@@ -1027,6 +1038,9 @@ class FP8GroupGemmMlpFunctionNode:
 
     @paddle.no_grad()
     def backward_dw(self):
+        # deal 0 size
+        if self.input_fp8 is None or self.input_fp8.shape[0] == 0:
+            return
         # recompute expert_w2 and expert_w1
         expert_w1 = [x.w1 for x in self.experts if x is not None]
         expert_w2 = [x.w2 for x in self.experts if x is not None]
