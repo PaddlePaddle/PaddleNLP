@@ -58,17 +58,8 @@ if __name__ == "__main__":
             answer_raw = example.pop("answer")
             solution = extract_solution(answer_raw)
             data = {
-                "data_source": data_source,
                 "src": question,
                 "tgt": solution,
-                "ability": "math",
-                "reward_model": {"style": "rule", "ground_truth": solution},
-                "extra_info": {
-                    "split": split,
-                    "index": idx,
-                    "answer": answer_raw,
-                    "question": question_raw,
-                },
             }
             return data
 
