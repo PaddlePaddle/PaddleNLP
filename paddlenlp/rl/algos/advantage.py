@@ -32,7 +32,7 @@ def compute_gae_advantage_return(
     # Modified from https://github.com/CarperAI/trlx/blob/main/trlx/models/modeling_ppo.py
     lastgaelam = 0.0
     advantages_reversed = []
-    gen_len = rewards.shape[-1]
+    gen_len = token_level_rewards.shape[-1]
 
     values = values * sequence_mask
     token_level_rewards = token_level_rewards * sequence_mask
