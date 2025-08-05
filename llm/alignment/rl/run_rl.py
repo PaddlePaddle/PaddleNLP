@@ -60,7 +60,7 @@ def process_args(model_args: ModelArgument, data_args: DataArgument, training_ar
         if model_args.reward_server is None:
             raise ValueError("Please specify reward_server when use_rm_server is true.")
         logger.info(f"Use reward server: {model_args.reward_server} for training.")
-        if training_args.rl_algorithm == "ppo" and model_args.critic_model_name_or_path is None:
+        if training_args.rl_algorithm in ["ppo", "vapo"] and model_args.critic_model_name_or_path is None:
             raise ValueError("Please specify critic_model_name_or_path when use_rm_server is true.")
     else:
         if model_args.reward_model_name_or_path is None:
@@ -337,7 +337,7 @@ def main():
     else:
         reward_model, reward_tokenizer = model_args.reward_server, actor_tokenizer
 
-    if training_args.rl_algorithm == "ppo":
+    if training_args.rl_algorithm in ["ppo", "vapo"]:
         critic_model, critic_eval_model, critic_tokenizer = create_critic_models(
             model_args, data_args, training_args, common_config
         )
@@ -352,7 +352,7 @@ def main():
             offload_tensor_to_cpu((actor_eval_model, "freeze_model"))
         offload_tensor_to_cpu((reference_model, "freeze_model"))
 
-        if training_args.rl_algorithm == "ppo":
+        if training_args.rl_algorithm in ["ppo", "vapo"]:
             if not training_args.use_rm_server and not training_args.use_rule_reward:
                 offload_tensor_to_cpu((reward_model, "freeze_model"))
             if critic_eval_model is not None:
@@ -362,10 +362,10 @@ def main():
         paddle.device.cuda.empty_cache()
 
     def compute_metrics(eval_preds):
-        '''
+        """
         If "use_rm_server" is TRUE, the score ranges from -3 to 3, with 3 being the only correct score (format + result).
         If using the "Regularized Matching Function (use_rule_reward=True)" (currently only implemented for the gsm8k dataset), the score ranges from 0 to 1.
-        '''
+        """
         if training_args.use_rule_reward:
             accuracy = (eval_preds.predictions == 1).astype("float32").mean().item()
         else:

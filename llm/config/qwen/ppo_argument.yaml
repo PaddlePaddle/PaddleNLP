@@ -57,8 +57,8 @@ per_device_logprob_batch_size: 4 # Log probability batch size per device
 per_device_reward_batch_size: 2 # Reward batch size per device
 per_device_value_batch_size: 2 # Value batch size per device
 per_device_train_batch_size: 2 # Training micro batch size per device
-# gradient_accumulation_steps: 4 # Gradient accumulation steps (auto-calculated): global_bz * rollout_n * 
-num_train_epochs: 5 # Number of training epochs
+# gradient_accumulation_steps: 4 # Gradient accumulation steps (auto-calculated): 
+num_train_epochs: 15 # Number of training epochs
 max_length: 2048 # Maximum length for training, should be larger than max_prompt_len + max_dec_len
 adam_beta1: 0.9 # AdamW optimizer beta1
 adam_beta2: 0.999 # AdamW optimizer beta2
@@ -72,17 +72,17 @@ disable_tqdm: true # Whether to disable tqdm progress bar
 
 # actor training args
 learning_rate: 1e-6 # Learning rate for training
-min_learning_rate: 1e-6 # Minimum learning rate
-lr_scheduler_type: "constant" # Learning rate scheduler type
+min_learning_rate: 5e-7 # Minimum learning rate
+lr_scheduler_type: "cosine" # Learning rate scheduler type
 weight_decay: 1e-2 # Weight decay for the AdamW optimizer
-warmup_ratio: 0.0 # Number of warmup steps
+warmup_ratio: 0.2 # Number of warmup steps
 
 # critic training args
 critic_learning_rate: 1e-5 # Learning rate for critic model
-critic_min_learning_rate: 1e-5 # Minimum learning rate for critic model
-critic_lr_scheduler_type: "constant" # Learning rate scheduler type for critic model
+critic_min_learning_rate: 5e-6 # Minimum learning rate for critic model
+critic_lr_scheduler_type: "cosine" # Learning rate scheduler type for critic model
 critic_weight_decay: 1e-2 # Weight decay for the AdamW optimizer of critic model
-critic_warmup_ratio: 0.0 # Number of warmup steps for critic model
+critic_warmup_ratio: 0.2 # Number of warmup steps for critic model
 
 # RL args
 kl_coeff: 0.0 # KL coefficient
@@ -107,7 +107,7 @@ use_fp32_compute: true # Whether to use fp32 to compute xx_log_prob,rewards, adv
 do_eval: true # Whether to perform evaluation
 per_device_eval_batch_size: 1319 # Evaluation batch size per device
 evaluation_strategy: "steps" # Evaluation strategy, e.g., "steps"
-eval_steps: 10 # Number of steps between evaluations
+eval_steps: 32 # Number of steps between evaluations
 
 # device memory optimization args
 use_flash_attention: true # Whether to use fused attention operations

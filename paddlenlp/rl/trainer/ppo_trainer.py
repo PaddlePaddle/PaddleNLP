@@ -59,9 +59,11 @@ from ...trl import llm_utils
 from ...utils.env import PADDLE_WEIGHTS_NAME
 from ..algos.advantage import (
     add_kl_divergence_regularization,
+    compute_critic_return,
     compute_gae_advantage_return,
     compute_grpo_advantages,
     compute_reinforce_plus_plus_advantages_and_returns,
+    compute_vapo_advantage,
 )
 from ..algos.penalty import apply_overlong_penalty
 from ..models.ppo_model_utils import make_position_ids_from_input_ids
@@ -110,21 +112,21 @@ class PPOMetric:
             for name in (
                 [
                     "policy_loss",
-                    *(["value_loss"] if self.args.rl_algorithm == "ppo" else []),
+                    *(["value_loss"] if self.args.rl_algorithm in ["ppo", "vapo"] else []),
                     "reward",
                     "norm_reward",
                     "kl_reward",
                     "norm_reward_with_kl",
                     "pure_policy_loss",
                     "entropy_loss",
-                    *(["values"] if self.args.rl_algorithm == "ppo" else []),
+                    *(["values"] if self.args.rl_algorithm in ["ppo", "vapo"] else []),
                     "returns",
                     "kl_divergence",
                     "mean_generated_length",
                     "max_generated_length",
                     "min_generated_length",
                 ]
-                if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
+                if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus", "vapo"]
                 else [
                     "policy_loss",
                     "pure_policy_loss",
@@ -177,8 +179,8 @@ class PPOMetric:
             }
         )
         for name in self.metric_names:
-            # if len(metrics[name].shape) != 0:
-            #     metrics[name] = metrics[name].squeeze()
+            if name not in metrics:
+                metrics[name] = paddle.zeros([1], dtype=paddle.float32).squeeze()
             if metrics[name].dtype != paddle.float32:
                 metrics[name] = metrics[name].cast(paddle.float32)
         if self.use_stack:
@@ -342,7 +344,7 @@ class PPOTrainer(RLTrainerBase):
             **trainer_agrs,
         )
 
-        if args.rl_algorithm == "ppo":
+        if args.rl_algorithm in ["ppo", "vapo"]:
             self.critic_trainer = self.create_critic_trainer(
                 model=critic_model,
                 tokenizer=critic_tokenizer,
@@ -377,9 +379,14 @@ class PPOTrainer(RLTrainerBase):
         self.kl_coeff = self.args.kl_coeff
         self.clip_range_score = self.args.clip_range_score
         self.gamma = 1.0
-        # [gae_lambda] value needs to be set manually. 
+        # [gae_lambda] value needs to be set manually.
         # On the gsm8k benchmark, this value is 1.0.
-        self.gae_lambda = 1.0 
+        self.gae_lambda = 1.0
+        # [VAPO]: Decouple critics' lambda to default value 1.
+        self.gae_lambda_critic = 1.0
+        # [VAPO]: Decouple actor's lambda: length-adaptive lambda = 1-1/(alpha*sequence_length)
+        # alpha: Needs manual tuning based on the dataset!
+        self.alpha = 1.0
 
         # for reward norm
         self.reward_mean = 0.0
@@ -636,13 +643,13 @@ class PPOTrainer(RLTrainerBase):
         """Set training mode for all models."""
         if mode:
             self.training = True
-            self.actor_model.train()
+            # self.actor_model.train()
             if self.args.rl_algorithm == "ppo":
                 self.critic_model.train()
         else:
             self.training = False
             self.actor_model.eval()
-            if self.args.rl_algorithm == "ppo":
+            if self.args.rl_algorithm in ["ppo", "vapo"]:
                 self.critic_model.eval()
 
     def set_eval(self) -> None:
@@ -927,7 +934,7 @@ class PPOTrainer(RLTrainerBase):
                 ):
                     reload_tensor_to_gpu((self.actor_trainer.optimizer, "optimizer"))
             self.actor_trainer._save_checkpoint(model, metrics)
-        if self.args.rl_algorithm == "ppo":
+        if self.args.rl_algorithm in ["ppo", "vapo"]:
             with guard_set_args(
                 self.critic_trainer.args,
                 {"output_dir": os.path.join(self.args.output_dir, "value")},
@@ -960,7 +967,7 @@ class PPOTrainer(RLTrainerBase):
                     "policy": self.actor_trainer.state.best_model_checkpoint,
                     **(
                         {"value": self.critic_trainer.state.best_model_checkpoint}
-                        if self.args.rl_algorithm == "ppo"
+                        if self.args.rl_algorithm in ["ppo", "vapo"]
                         else {}
                     ),
                 }
@@ -988,10 +995,10 @@ class PPOTrainer(RLTrainerBase):
 
         if "train_model" in self.args.offload_level:
             reload_tensor_to_gpu((self.actor_trainer.model, "model"))
-            if self.args.rl_algorithm == "ppo":
+            if self.args.rl_algorithm in ["ppo", "vapo"]:
                 reload_tensor_to_gpu((self.critic_trainer.model, "model"))
         self.actor_trainer.save_model(os.path.join(output_dir, "policy"), merge_tensor_parallel)
-        if self.args.rl_algorithm == "ppo":
+        if self.args.rl_algorithm in ["ppo", "vapo"]:
             self.critic_trainer.save_model(os.path.join(output_dir, "value"), merge_tensor_parallel)
 
     def init_train_model_opt(
@@ -1032,7 +1039,7 @@ class PPOTrainer(RLTrainerBase):
                     else resume_from_checkpoint
                 ),
             )
-        if self.args.rl_algorithm == "ppo":
+        if self.args.rl_algorithm in ["ppo", "vapo"]:
             with guard_set_args(
                 self.critic_trainer.args,
                 {"output_dir": os.path.join(self.args.output_dir, "value")},
@@ -1075,7 +1082,9 @@ class PPOTrainer(RLTrainerBase):
         len_dataloader = None
         if not self._is_iterable_dataset(self.train_dataset):
             len_dataloader = len(train_dataloader)
-            num_train_sub_steps = self.args.global_mini_batch_size // args.per_device_train_batch_size
+            num_train_sub_steps = (
+                args.global_mini_batch_size * args.update_iters * args.rollout_n // args.per_device_train_batch_size
+            )
             num_update_steps_per_epoch = (num_train_sub_steps // args.gradient_accumulation_steps) * len_dataloader
             num_examples = len(self.train_dataset)
             if args.max_steps > 0:
@@ -1118,7 +1127,7 @@ class PPOTrainer(RLTrainerBase):
         # reach accumulation_steps, value trainer has the same step_control and
         # gradient_accumulation_steps as PPO trainer.
         # if (step_control + 1) % args.gradient_accumulation_steps == 0
-        if self.args.rl_algorithm == "ppo":
+        if self.args.rl_algorithm in ["ppo", "vapo"]:
             return self.critic_trainer.is_accumulation_step
         return self.actor_trainer.is_accumulation_step
 
@@ -1134,8 +1143,13 @@ class PPOTrainer(RLTrainerBase):
             Dict[str, float]: A dictionary containing two loss items: `rl_loss` (the policy training loss)
                 and `value_loss` (the value function training loss).
         """
-        rl_loss = self.actor_trainer.get_step_loss(loss_prefix)
-        if self.args.rl_algorithm == "ppo":
+        if self.args.rl_algorithm != "vapo":
+            rl_loss = self.actor_trainer.get_step_loss(loss_prefix)
+        elif self.state.global_step > self.args.pretrain_critic_steps:
+            rl_loss = self.actor_trainer.get_step_loss(loss_prefix)
+        else:
+            rl_loss = {}
+        if self.args.rl_algorithm in ["ppo", "vapo"]:
             value_loss = self.critic_trainer.get_step_loss(loss_prefix)
             rl_loss.update(value_loss)
         return rl_loss
@@ -1477,7 +1491,7 @@ class PPOTrainer(RLTrainerBase):
                 ):
                     with reload_and_offload_scope(
                         self,
-                        self.critic_model if self.args.rl_algorithm == "ppo" else None,
+                        self.critic_model if self.args.rl_algorithm in ["ppo", "vapo"] else None,
                         self.reward_model if not self.args.use_rm_server and not self.args.use_rule_reward else None,
                     ):
                         with TimerScope(self.timers, RolloutStages.ROLLOUT_REWARD_VALUE):
@@ -1496,7 +1510,7 @@ class PPOTrainer(RLTrainerBase):
                                 batch.batch["rewards_before_length_penalty"] = reward_tensor.clone()
                                 batch.batch["rewards"] = reward_tensor + overlong_penalty
 
-                            if self.args.rl_algorithm == "ppo":
+                            if self.args.rl_algorithm in ["ppo", "vapo"]:
                                 reward_values = self.critic_trainer.compute_value(batch)
                                 batch.union(reward_values)
 
@@ -1614,14 +1628,25 @@ class PPOTrainer(RLTrainerBase):
                             for micro_step, micro_batch in enumerate(micro_batches * self.args.update_iters):
                                 step = 0 if step == -1 else step
 
-                                with TimerScopeManualLabel(
-                                    self.timers, get_timer_label(ActorStages.MICRO_STEPS) + f"_{micro_step}"
+                                if self.args.rl_algorithm != "vapo":
+                                    with TimerScopeManualLabel(
+                                        self.timers, get_timer_label(ActorStages.MICRO_STEPS) + f"_{micro_step}"
+                                    ):
+                                        rl_info = self.actor_trainer.update_actor(micro_batch)
+                                    paddle.device.cuda.empty_cache()
+                                elif (
+                                    self.args.rl_algorithm == "vapo"
+                                    and self.state.global_step >= self.args.pretrain_critic_steps
                                 ):
-                                    rl_info = self.actor_trainer.update_actor(micro_batch)
+                                    with TimerScopeManualLabel(
+                                        self.timers, get_timer_label(ActorStages.MICRO_STEPS) + f"_{micro_step}"
+                                    ):
+                                        rl_info = self.actor_trainer.update_actor(micro_batch)
+                                    paddle.device.cuda.empty_cache()
+                                else:
+                                    rl_info = DataProto(meta_info={"metrics": {}})
 
-                                paddle.device.cuda.empty_cache()
-
-                                if self.args.rl_algorithm == "ppo":
+                                if self.args.rl_algorithm in ["ppo", "vapo"]:
                                     train_value_loss = self.critic_trainer.update_critic(micro_batch)
                                     rl_info.meta_info["metrics"].update(train_value_loss)
 
@@ -1757,8 +1782,8 @@ class PPOTrainer(RLTrainerBase):
             logs.update(tr_loss.meta_info["metrics"])
             logs["global_step"] = int(self.state.global_step)
             logs["train_actor_lr"] = float(f"{self.actor_trainer._get_learning_rate():.3e}")
-            if self.args.rl_algorithm == "ppo":
-                logs["train_reward_critic_lr"] = float(f"{self.critic_trainer._get_learning_rate():.3e}")
+            if self.args.rl_algorithm in ["ppo", "vapo"]:
+                logs["train_critic_lr"] = float(f"{self.critic_trainer._get_learning_rate():.3e}")
 
             total_train_batch_size = (
                 self.args.train_batch_size * self.args.gradient_accumulation_steps * self.args.dataset_world_size
@@ -1832,7 +1857,7 @@ class PPOTrainer(RLTrainerBase):
         if "ref_log_probs" in batch.batch:
             ref_log_probs = batch.batch["ref_log_probs"]  # length: src + tgt -1
         rewards = batch.batch["rewards"]  # length: 1
-        if self.args.rl_algorithm == "ppo":
+        if self.args.rl_algorithm in ["ppo", "vapo"]:
             old_reward_values = batch.batch["reward_values"]  # length: src + tgt -1
 
         if self.args.rl_algorithm == "grpo":
@@ -1859,6 +1884,33 @@ class PPOTrainer(RLTrainerBase):
                 eos_mask,
                 gamma=self.gamma,
                 lam=self.gae_lambda,
+            )
+        elif self.args.rl_algorithm == "vapo":
+            eos_mask = (batch.batch["input_ids"] != self.tokenizer.pad_token_id)[
+                :, batch.batch["prompt"].shape[-1] :
+            ].to(old_log_probs.dtype)
+            rewards_with_kl, kl_rewards = add_kl_divergence_regularization(
+                None,  # prompt,
+                old_log_probs,
+                ref_log_probs,
+                rewards,
+                eos_mask,
+                self.kl_coeff,
+                self.clip_range_score,
+            )
+            reward_advantages = compute_vapo_advantage(
+                rewards_with_kl,
+                old_reward_values,
+                eos_mask,
+                gamma=self.gamma,
+                alpha=self.alpha,
+            )
+            reward_returns = compute_critic_return(
+                rewards_with_kl,
+                old_reward_values,
+                eos_mask,
+                gamma=self.gamma,
+                lam=self.gae_lambda_critic,
             )
         elif self.args.rl_algorithm == "reinforce_plus_plus":
             eos_mask = batch.batch["eos_mask"]
@@ -1889,8 +1941,8 @@ class PPOTrainer(RLTrainerBase):
                 "eos_mask": eos_mask,
             }
         )
-        if self.args.rl_algorithm in ["reinforce_plus_plus", "ppo"]:
-            if self.args.rl_algorithm == "ppo":
+        if self.args.rl_algorithm in ["reinforce_plus_plus", "ppo", "vapo"]:
+            if self.args.rl_algorithm in ["ppo", "vapo"]:
                 batch.batch.update({"reward_values": old_reward_values})
 
             batch.batch.update(

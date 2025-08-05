@@ -50,6 +50,64 @@ def compute_gae_advantage_return(
 
 
 @paddle.no_grad()
+def compute_critic_return(
+    rewards: paddle.Tensor,
+    values: paddle.Tensor,
+    sequence_mask: paddle.Tensor,
+    gamma: paddle.Tensor,  # constant
+    lam: paddle.Tensor,  # critic lambda for vapo
+):
+    lastgaelam = 0.0
+    advantages_reversed = []
+    gen_len = rewards.shape[-1]
+
+    values = values * sequence_mask
+    rewards = rewards * sequence_mask
+
+    for t in reversed(range(0, gen_len)):
+        next_values = values[:, t + 1] if t < gen_len - 1 else 0.0
+        delta = rewards[:, t] + gamma * next_values - values[:, t]
+        lastgaelam = delta + gamma * lam * lastgaelam
+        advantages_reversed.append(lastgaelam)
+    advantages = paddle.stack(advantages_reversed[::-1], axis=1)
+
+    returns = advantages + values.contiguous()
+
+    return returns
+
+
+@paddle.no_grad()
+def compute_vapo_advantage(
+    rewards: paddle.Tensor,
+    values: paddle.Tensor,
+    sequence_mask: paddle.Tensor,
+    gamma: paddle.Tensor,
+    alpha: paddle.Tensor,
+) -> Tuple[paddle.Tensor, paddle.Tensor]:
+    """Compute advantages and returns using Generalized Advantage Estimation (GAE)."""
+
+    assert alpha > 0
+
+    lastgaelam = 0.0
+    advantages_reversed = []
+    gen_len = rewards.shape[-1]
+
+    values = values * sequence_mask
+    rewards = rewards * sequence_mask
+    sequence_length = sequence_mask.sum(axis=-1)
+    lam = 1 - 1 / (alpha * sequence_length)
+
+    for t in reversed(range(0, gen_len)):
+        next_values = values[:, t + 1] if t < gen_len - 1 else 0.0
+        delta = rewards[:, t] + gamma * next_values - values[:, t]
+        lastgaelam = delta + gamma * lam * lastgaelam
+        advantages_reversed.append(lastgaelam)
+    advantages = paddle.stack(advantages_reversed[::-1], axis=1)
+
+    return advantages.detach()
+
+
+@paddle.no_grad()
 def compute_grpo_advantages(
     rewards: paddle.Tensor,
     index: np.ndarray,
