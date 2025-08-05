@@ -117,6 +117,7 @@ class ScoreModelMixin:
         position_ids: paddle.Tensor | None = None,  # size = (B, L)
         attn_mask_startend_row_indices: paddle.Tensor | None = None,  # size = (B, 1), (B, 2), (B, 3) or (B, 4)
         return_dict: bool | None = None,
+        attention_mask: paddle.Tensor | None = None,  # size = (B, L)
     ) -> ScoreModelOutput:
         """Forward pass of the score model."""
         hidden_state = hidden_state.cast(paddle.float32)
