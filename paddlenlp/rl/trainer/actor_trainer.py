@@ -164,6 +164,7 @@ class ActorReferenceTrainerBase(RLTrainer):
             {key: paddle.concat(log_probs_list, axis=0)}, meta_info={"temperature": self.args.temperature}
         )
 
+    @paddle.no_grad()
     def compute_fused_logprob(
         self, input_ids: paddle.Tensor, key, position_ids: paddle.Tensor = None, prompt=None, loop_chunk_size=1024
     ) -> DataProto:
@@ -337,6 +338,8 @@ class ActorReferenceTrainerBase(RLTrainer):
             "response_start": response_start,
             "attn_mask_startend_row_indices": attn_mask_startend_row_indices,
         }
+        if self.args.rl_algorithm == "vapo":
+            policy_trainer_inputs.update({"rewards": rl_batch.batch["ori_rewards"]})
 
         if self.args.rl_algorithm == "grpo":
             policy_trainer_inputs.update({"ref_log_probs": rl_batch.batch["ref_log_probs"]})
@@ -350,10 +353,10 @@ class ActorReferenceTrainerBase(RLTrainer):
             rewards = rl_batch.batch["rewards"].mean()
             ori_rewards = rl_batch.batch["ori_rewards"].mean()
             mask_cast = sequence_mask.cast(paddle.float32)
-            if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]:
+            if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus", "vapo"]:
                 kl_rewards = (rl_batch.batch["kl_rewards"] * mask_cast).sum() / mask_cast.sum()
                 rewards_with_kl = (rl_batch.batch["rewards_with_kl"] * mask_cast).sum() / mask_cast.sum()
-                if self.args.rl_algorithm == "ppo":
+                if self.args.rl_algorithm in ["ppo", "vapo"]:
                     values = (rl_batch.batch["reward_values"] * mask_cast).sum() / mask_cast.sum()
                 returns = (rl_batch.batch["reward_returns"] * mask_cast).sum() / mask_cast.sum()
             ref_log_probs = rl_batch.batch["ref_log_probs"]
@@ -386,10 +389,10 @@ class ActorReferenceTrainerBase(RLTrainer):
                             "train_norm_reward_with_kl": rewards_with_kl,
                             "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
                             "train_entropy_loss": self.info_buffer.get("entropy_loss"),
-                            **({"train_values": values} if self.args.rl_algorithm == "ppo" else {}),
+                            **({"train_values": values} if self.args.rl_algorithm in ["ppo", "vapo"] else {}),
                             "train_returns": returns,
                         }
-                        if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
+                        if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus", "vapo"]
                         else {}
                     ),
                     "train_kl_divergence": kl_divergence,
@@ -421,7 +424,7 @@ class ActorReferenceTrainer(ActorReferenceTrainerBase):
         if repeat_num > 1:
             input_ids = input_ids.repeat_interleave(repeat_num, axis=0)
 
-        if self.args.use_rm_server:
+        if self.args.use_rm_server or self.args.use_rule_reward:
             label_ids = prompt_only_batch.batch["label_ids"]
             if repeat_num > 1:
                 label_ids = label_ids.repeat_interleave(repeat_num, axis=0)
@@ -437,7 +440,7 @@ class ActorReferenceTrainer(ActorReferenceTrainerBase):
                     "input_ids": seq,
                     **(
                         {"label_ids": label_ids[idx * len(seq) : (idx + 1) * len(seq)]}
-                        if self.args.use_rm_server
+                        if self.args.use_rm_server or self.args.use_rule_reward
                         else {}
                     ),  # tgt response
                     "index": np.array([str(uuid.uuid4())] * len(seq), dtype=object),
