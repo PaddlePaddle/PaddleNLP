@@ -22,7 +22,7 @@ from ..utils.comm_utils import masked_whiten
 
 @paddle.no_grad()
 def compute_gae_advantage_return(
-    rewards: paddle.Tensor,
+    token_level_rewards: paddle.Tensor,
     values: paddle.Tensor,
     sequence_mask: paddle.Tensor,
     gamma: paddle.Tensor,
@@ -35,11 +35,11 @@ def compute_gae_advantage_return(
     gen_len = rewards.shape[-1]
 
     values = values * sequence_mask
-    rewards = rewards * sequence_mask
+    token_level_rewards = token_level_rewards * sequence_mask
 
     for t in reversed(range(0, gen_len)):
         next_values = values[:, t + 1] if t < gen_len - 1 else 0.0
-        delta = rewards[:, t] + gamma * next_values - values[:, t]
+        delta = token_level_rewards[:, t] + gamma * next_values - values[:, t]
         lastgaelam = delta + gamma * lam * lastgaelam
         advantages_reversed.append(lastgaelam)
     advantages = paddle.stack(advantages_reversed[::-1], axis=1)
