@@ -13,7 +13,7 @@ use_rule_reward: True # The reward for gsm8k dataset. If use_rule_reward: use_rm
 logging_dir: ppo-logs # Directory for logging
 logging_steps: 1 # Number of steps between logging
 output_dir: "qwen2.5-1.5b-gsm8k-ppo/checkpoints" # Directory for output ckpts
-report_to: "visualdl" # Supported reporting options: "all", "wandb", "tensorboard", "visualdl"(default), "none"
+report_to: "wandb" # Supported reporting options: "all", "wandb", "tensorboard", "visualdl"(default), "none"
 wandb_http_proxy: "http://agent.baidu.com:8188" # HTTP proxy for wandb
 run_name: "qwen2.5-1.5b-gsm8k-ppo" # Name of the run
 

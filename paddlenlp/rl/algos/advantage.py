@@ -30,6 +30,7 @@ def compute_gae_advantage_return(
 ) -> Tuple[paddle.Tensor, paddle.Tensor]:
     """Compute advantages and returns using Generalized Advantage Estimation (GAE)."""
     # Modified from https://github.com/CarperAI/trlx/blob/main/trlx/models/modeling_ppo.py
+
     lastgaelam = 0.0
     advantages_reversed = []
     gen_len = token_level_rewards.shape[-1]
