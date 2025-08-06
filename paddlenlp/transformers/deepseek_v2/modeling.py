@@ -79,8 +79,9 @@ from . import fp8_linear as linear_utils
 from .configuration import DeepseekV2Config
 
 FA_VERSION = int(os.getenv("FA_VERSION", 2))
+from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import WeightGradStore
 
-from ..fp8_utils import FP8KeepXLinear, FP8Linear, FP8Mlp
+from ..fp8_utils import FP8KeepXLinear, FP8Linear, FP8Mlp, kitchen_fp8_gemm
 from .fp8_linear import Linear
 
 DSV3_USE_FP8_GEMM = os.getenv("DSV3_USE_FP8_GEMM", "False").lower() == "true"
@@ -1390,8 +1391,47 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
 
         paddle.base.core._set_has_grad(False)
 
-        # call up proj
-        d_kv_ln_t, d_kv_up_weight = _C_ops.matmul_grad(kv_ln_t, kv_up_weight, d_kv, False, False)
+        # call up proj        
+        if hasattr(kv_up_weight, "main_grad"):
+            d_kv_ln_t = paddle.matmul(d_kv, kv_up_weight, transpose_y=True)
+
+            def kv_up_weight_grad(kv_ln_t, d_kv, kv_up_weight):
+                kv_ln_t_fp8, kv_ln_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                    kv_ln_t.reshape([-1, kv_ln_t.shape[-1]]),
+                    output_scale_transpose=True,
+                    quant_method="1x128",
+                    input_transpose=True,
+                    return_transpose_only=True,
+                )
+
+                d_kv_fp8, d_kv_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                    d_kv.reshape([-1, d_kv.shape[-1]]),
+                    output_scale_transpose=True,
+                    quant_method="1x128",
+                    input_transpose=True,
+                    return_transpose_only=True,
+                )
+
+                kitchen_fp8_gemm(
+                    kv_ln_t_fp8,
+                    kv_ln_t_scale,
+                    d_kv_fp8,
+                    d_kv_scale,
+                    True,
+                    True,
+                    kv_up_weight.main_grad,
+                    rtn_dtype=paddle.float32,
+                )
+
+            if WeightGradStore.enabled:
+                WeightGradStore.put(partial(kv_up_weight_grad, kv_ln_t, d_kv, kv_up_weight))
+            else:
+                kv_up_weight_grad(kv_ln_t, d_kv, kv_up_weight)
+
+            d_kv_up_weight = None
+
+        else:
+            d_kv_ln_t, d_kv_up_weight = _C_ops.matmul_grad(kv_ln_t, kv_up_weight, d_kv, False, False)
 
         d_compressed_kv, d_kv_ln_weight = fused_ln.fused_rms_norm_grad_func(
             compressed_kv, kv_ln_weight, kv_ln_invar, d_kv_ln_t, eps
@@ -1399,7 +1439,45 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
 
         d_kv_init = paddle.concat([d_compressed_kv, d_k_pe], axis=-1)
 
-        d_q_ln_t, d_q_up_weight = _C_ops.matmul_grad(q_ln_t, q_up_weight, d_q, False, False)
+        if hasattr(q_up_weight, "main_grad"):
+            d_q_ln_t = paddle.matmul(d_q, q_up_weight, transpose_y=True)
+            def q_up_weight_grad(q_ln_t, d_q, q_up_weight):
+                q_ln_t_fp8, q_ln_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                    q_ln_t.reshape([-1, q_ln_t.shape[-1]]),
+                    output_scale_transpose=True,
+                    quant_method="1x128",
+                    input_transpose=True,
+                    return_transpose_only=True,
+                )
+
+                d_q_fp8, d_q_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                    d_q.reshape([-1, d_q.shape[-1]]),
+                    output_scale_transpose=True,
+                    quant_method="1x128",
+                    input_transpose=True,
+                    return_transpose_only=True,
+                )
+
+                kitchen_fp8_gemm(
+                    q_ln_t_fp8,
+                    q_ln_t_scale,
+                    d_q_fp8,
+                    d_q_scale,
+                    True,
+                    True,
+                    q_up_weight.main_grad,
+                    rtn_dtype=paddle.float32,
+                )
+
+            if WeightGradStore.enabled:
+                WeightGradStore.put(partial(q_up_weight_grad, q_ln_t, d_q, q_up_weight))
+            else:
+                q_up_weight_grad(q_ln_t, d_q, q_up_weight)
+
+            d_q_up_weight = None
+
+        else:            
+            d_q_ln_t, d_q_up_weight = _C_ops.matmul_grad(q_ln_t, q_up_weight, d_q, False, False)
         d_q_init, d_q_ln_weight = fused_ln.fused_rms_norm_grad_func(q_init, q_ln_weight, q_ln_invar, d_q_ln_t, eps)
 
         return d_q_init, d_kv_init, d_q_ln_weight, d_kv_ln_weight, d_q_up_weight, d_kv_up_weight

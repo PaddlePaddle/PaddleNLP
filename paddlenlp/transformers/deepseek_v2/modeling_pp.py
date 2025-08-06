@@ -27,6 +27,10 @@ from paddle.distributed.fleet.meta_parallel import (
     ScheduleNode,
     SharedLayerDesc,
 )
+from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import (
+    EventStore,
+    WeightGradStore,
+)
 from paddle.distributed.fleet.recompute.recompute import recompute
 from paddle.distributed.fleet.utils.sequence_parallel_utils import ScatterOp
 
@@ -699,7 +703,10 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
         return ret
 
     def mlp_backward_dw(self):
-        self.fp8_fusion_moe_node.mlp_node.backward_dw()
+        if WeightGradStore.enabled:
+            WeightGradStore.put(self.fp8_fusion_moe_node.mlp_node.backward_dw)
+        else:
+            self.fp8_fusion_moe_node.mlp_node.backward_dw()
 
     def mlp_backward(self, output_grad):
         if self.send_mtp_embed:
@@ -896,8 +903,16 @@ class OverlapedFUsionScheduleNode:
 
         paddle.base.core.nvprof_nvtx_pop()
         paddle.base.core.nvprof_nvtx_push("attn_backward")
+        assert WeightGradStore.funcs_queue.empty()
+        WeightGradStore.enabled = True
         output_grad = self.backward_node.attn_backward(output_grad)
         event_to_wait = deep_ep.get_event_from_calc_stream(self.backward_node.moe_group.id)
+        EventStore.set(event_to_wait)
+
+        WeightGradStore.enabled = False
+        WeightGradStore.flush()
+        WeightGradStore.pop()
+        assert WeightGradStore.funcs_queue.empty()
 
         paddle.base.core.nvprof_nvtx_pop()
 

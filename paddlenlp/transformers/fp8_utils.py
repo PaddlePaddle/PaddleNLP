@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-
+from functools import partial
 import numpy
 import paddle
 import paddle.nn.functional as F
@@ -27,6 +27,7 @@ except ImportError:
             x, y = paddle.chunk(x, chunks=2, axis=-1)
         return F.silu(x) * y
 
+from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import WeightGradStore
 
 USE_DS_GEMM = os.getenv("USE_DS_GEMM", "False").lower() == "true"
 
