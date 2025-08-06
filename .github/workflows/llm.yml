@@ -43,7 +43,7 @@ defaults:
 jobs:
   llm-ci:
     name: llm-ci
-    runs-on: [self-hosted, ernie-8gpu]
+    runs-on: [self-hosted, ernie-8gpu-1]
     steps:
       - name: Determine Image Name
         env:
@@ -152,7 +152,6 @@ jobs:
             source $work_dir/../../../proxy
             cd /workspace/PaddleNLP && git config --global --add safe.directory $PWD
             export paddle_whl=https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuSome-LinuxCentos-Gcc82-Cuda118-Cudnn86-Trt85-Py310-CINN-Compile/8ae7423e99b2ea96e410968a0ebb3f1795e37205/paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl # 需要套件侧适配Paddle#73283
-            sleep 1d
             timeout 2h bash scripts/regression/run_ci.sh python${python_version} ${paddle_whl}
             '
           fi
