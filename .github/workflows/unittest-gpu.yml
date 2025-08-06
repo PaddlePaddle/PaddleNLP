@@ -172,7 +172,7 @@ jobs:
             fi
             if [ ! -f "${{ env.allure_file }}" ]; then
               wget -q --no-proxy -O ${{ env.home_path }}/allure-2.19.0.zip https://xly-devops.bj.bcebos.com/tools/allure-2.19.0.zip --no-check-certificate
-              unzip -q ${{ env.home_path }}/allure-2.19.0.zip
+              unzip -q ${{ env.home_path }}/allure-2.19.0.zip -d ${{ env.home_path }}/
             fi
             if [[ "${{ env.RUN_DOWNSTREAM }}" == "" && -n "${PR_ID}" ]]; then
               bos_prefix="${PR_ID}/${COMMIT_ID}"
