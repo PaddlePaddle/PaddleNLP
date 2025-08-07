@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+from functools import partial
 
 import numpy
 import paddle
@@ -26,6 +27,8 @@ except ImportError:
         if y is None:
             x, y = paddle.chunk(x, chunks=2, axis=-1)
         return F.silu(x) * y
+
+from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import WeightGradStore
 
 
 USE_DS_GEMM = os.getenv("USE_DS_GEMM", "False").lower() == "true"
@@ -216,16 +219,31 @@ class FP8LinearFunctionBase:
         if hasattr(weight, "main_grad"):
             if weight.main_grad is None:
                 weight.main_grad = paddle.zeros(shape=weight.shape, dtype=paddle.float32)
-            result = FP8LinearFunctionBase.kitchen_gemm(
-                input_t,
-                input_t_scale,
-                dout_t,
-                dout_t_scale,
-                is_a_1d_scaled,
-                is_b_1d_scaled,
-                weight.main_grad,
-                rtn_dtype,
-            )
+            if WeightGradStore.enabled:
+                WeightGradStore.put(
+                    partial(FP8LinearFunctionBase.kitchen_gemm,
+                    input_t,
+                    input_t_scale,
+                    dout_t,
+                    dout_t_scale,
+                    is_a_1d_scaled,
+                    is_b_1d_scaled,
+                    weight.main_grad,
+                    rtn_dtype, )
+                )
+                result = None
+
+            else:
+                result = FP8LinearFunctionBase.kitchen_gemm(
+                    input_t,
+                    input_t_scale,
+                    dout_t,
+                    dout_t_scale,
+                    is_a_1d_scaled,
+                    is_b_1d_scaled,
+                    weight.main_grad,
+                    rtn_dtype,
+                )
         else:
             if weight.grad is None:
                 weight.grad = paddle.zeros(shape=weight.shape, dtype=paddle.float32)
@@ -265,9 +283,17 @@ class FP8LinearFunctionBase:
             o2, output_scale_transpose=True, quant_method="1x128", input_transpose=True, return_transpose_only=True
         )
         if apply_backward_hook:
-            FP8LinearFunctionBase.compute_expert_w_grad(
-                o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, True, True, w2, rtn_dtype=paddle.float32
-            )
+            if WeightGradStore.enabled:
+                WeightGradStore.put(
+                    partial(
+                        FP8LinearFunctionBase.compute_expert_w_grad,
+                    o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, True, True, w2, rtn_dtype=paddle.float32 )
+                )
+            else:
+
+                FP8LinearFunctionBase.compute_expert_w_grad(
+                    o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, True, True, w2, rtn_dtype=paddle.float32
+                )
         else:
             dw2 = FP8LinearFunctionBase.kitchen_gemm(
                 o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, True, True, rtn_dtype=paddle.float32
@@ -283,9 +309,17 @@ class FP8LinearFunctionBase:
 
         # ===== dw1 = deep_gemm(x_t_fp8, do1_t_fp8) =====
         if apply_backward_hook:
-            FP8LinearFunctionBase.compute_expert_w_grad(
-                x_t_fp8, x_t_scale, do1_t_fp8, do1_t_scale, True, True, w1, rtn_dtype=paddle.float32
-            )
+            if WeightGradStore.enabled:
+                WeightGradStore.put(
+                    partial(
+                        FP8LinearFunctionBase.compute_expert_w_grad,
+                    x_t_fp8, x_t_scale, do1_t_fp8, do1_t_scale, True, True, w1, rtn_dtype=paddle.float32)
+                )
+            
+            else:
+                FP8LinearFunctionBase.compute_expert_w_grad(
+                    x_t_fp8, x_t_scale, do1_t_fp8, do1_t_scale, True, True, w1, rtn_dtype=paddle.float32
+                )
         else:
             dw1 = FP8LinearFunctionBase.kitchen_gemm(
                 x_t_fp8, x_t_scale, do1_t_fp8, do1_t_scale, True, True, rtn_dtype=paddle.float32

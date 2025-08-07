@@ -80,6 +80,8 @@ from .configuration import DeepseekV2Config
 
 FA_VERSION = int(os.getenv("FA_VERSION", 2))
 
+from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import WeightGradStore
+
 from ..fp8_utils import FP8KeepXLinear, FP8Linear, FP8Mlp
 from .fp8_linear import Linear
 
@@ -1041,7 +1043,9 @@ def qkv_pre_process(
     target_key_value_shape = [0, 0, num_heads, qk_nope_head_dim + v_head_dim]
 
     q = q.reshape(shape=target_query_shape)
-    q_nope, q_pe = paddle.split(q, [qk_nope_head_dim, qk_rope_head_dim], axis=-1)
+    q_nope = q[..., :qk_nope_head_dim]
+    q_pe = q[..., qk_nope_head_dim:]
+    #q_nope, q_pe = paddle.split(q, [qk_nope_head_dim, qk_rope_head_dim], axis=-1)
 
     # DeepSeekV2 kv_lora_rank+qk_rope_head_dim=512+64
 
@@ -1051,8 +1055,10 @@ def qkv_pre_process(
 
     # self.q_head_dim = config.qk_nope_head_dim + config.qk_rope_head_dim = 128+64
     # self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim) = config.qk_nope_head_dim + self.v_head_dim = 128+128
+    k_nope = kv[..., :qk_nope_head_dim]
+    value_states = kv[..., qk_nope_head_dim:]
 
-    k_nope, value_states = paddle.split(kv, [qk_nope_head_dim, v_head_dim], axis=-1)
+    # k_nope, value_states = paddle.split(kv, [qk_nope_head_dim, v_head_dim], axis=-1)
     kv_seq_len = value_states.shape[1]
 
     cos, sin = rotary_emb(value_states, seq_len=kv_seq_len)
@@ -1391,7 +1397,32 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
         paddle.base.core._set_has_grad(False)
 
         # call up proj
-        d_kv_ln_t, d_kv_up_weight = _C_ops.matmul_grad(kv_ln_t, kv_up_weight, d_kv, False, False)
+        if hasattr(kv_up_weight, "main_grad"):
+            #if False:
+            d_kv_ln_t = paddle.matmul(d_kv, kv_up_weight, transpose_y=True)
+
+            # paddle._C_ops.fused_linear_param_grad_add(
+            #     kv_ln_t, d_kv, kv_up_weight.main_grad, None, True, False
+            # )
+
+            def kv_up_weight_grad(kv_ln_t, d_kv, kv_up_weight):
+               
+                with paddle.no_grad():
+                    w_grad_t = paddle.matmul( kv_ln_t.reshape([-1, kv_ln_t.shape[-1]]), d_kv.reshape([-1, d_kv.shape[-1]]), transpose_x=True)
+
+                    kv_up_weight.main_grad.add_( w_grad_t )
+
+            if WeightGradStore.enabled:
+            
+                WeightGradStore.put(partial(kv_up_weight_grad, kv_ln_t, d_kv, kv_up_weight))
+            else:
+                kv_up_weight_grad(kv_ln_t, d_kv, kv_up_weight)
+
+            d_kv_up_weight = None
+
+        else:
+            d_kv_ln_t, d_kv_up_weight = _C_ops.matmul_grad(kv_ln_t, kv_up_weight, d_kv, False, False)
+
 
         d_compressed_kv, d_kv_ln_weight = fused_ln.fused_rms_norm_grad_func(
             compressed_kv, kv_ln_weight, kv_ln_invar, d_kv_ln_t, eps
@@ -1399,7 +1430,27 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
 
         d_kv_init = paddle.concat([d_compressed_kv, d_k_pe], axis=-1)
 
-        d_q_ln_t, d_q_up_weight = _C_ops.matmul_grad(q_ln_t, q_up_weight, d_q, False, False)
+        if hasattr(q_up_weight, "main_grad"):
+            # if False:
+
+            d_q_ln_t = paddle.matmul(d_q, q_up_weight, transpose_y=True)
+
+            def q_up_weight_grad(q_ln_t, d_q, q_up_weight):                
+
+                with paddle.no_grad():
+                    w_grad_t = paddle.matmul( q_ln_t.reshape([-1, q_ln_t.shape[-1]]), d_q.reshape([-1, d_q.shape[-1]]), transpose_x=True)
+                    q_up_weight.main_grad.add_( w_grad_t )
+
+            if WeightGradStore.enabled:            
+                WeightGradStore.put(partial(q_up_weight_grad, q_ln_t, d_q, q_up_weight))
+            else:
+                q_up_weight_grad(q_ln_t, d_q, q_up_weight)
+
+            d_q_up_weight = None
+
+        else:
+            d_q_ln_t, d_q_up_weight = _C_ops.matmul_grad(q_ln_t, q_up_weight, d_q, False, False)
+
         d_q_init, d_q_ln_weight = fused_ln.fused_rms_norm_grad_func(q_init, q_ln_weight, q_ln_invar, d_q_ln_t, eps)
 
         return d_q_init, d_kv_init, d_q_ln_weight, d_kv_ln_weight, d_q_up_weight, d_kv_up_weight
