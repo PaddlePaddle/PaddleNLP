@@ -511,6 +511,7 @@ class FusedNormFP8MLPFunction(paddle.autograd.PyLayer):
 
         # ===== call func fp8_mlp_fwd =====
         _, _, o3 = FP8LinearFunctionBase.fp8_mlp_fwd(norm_output, w1, w2)
+
         # ===== reshape to origin shape =====
         if len(x_orig_shape) > 2:
             o3 = o3.reshape([x_orig_shape[0], -1, o3.shape[-1]])
@@ -528,19 +529,29 @@ class FusedNormFP8MLPFunction(paddle.autograd.PyLayer):
 
     @staticmethod
     def backward(ctx, do3):
+        # ===== reshape for deep_gemm, since deep_gemm only support 2D =====
+        do3_orig_shape = do3.shape
+        do3 = do3.reshape([-1, do3_orig_shape[-1]])
         # ===== recive saved tensors =====
-        x, norm_w, w1, w2, norm_eps, x_orig_shape = ctx.saved_tensor()
-
-        # ===== recompute norm =====
-        norm_output, invar = fused_ln.fused_rms_norm(x, norm_w, norm_eps)
+        x_fp8, x_scale, w1, w2, x_orig_shape = ctx.saved_tensor()
+        # ===== compute x_t_fp8, x_t_scale for dw1 =====
+        x_dequant_fp16 = paddle.incubate.nn.functional.fused_act_dequant(x_fp8, x_scale.T.contiguous())
+        x_dequant_fp16 = FP8LinearFunctionBase.padding(x_dequant_fp16, 0)
+        x_t_fp8, x_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            x_dequant_fp16,
+            output_scale_transpose=True,
+            quant_method="1x128",
+            input_transpose=True,
+            return_transpose_only=True,
+        )
 
         # ===== call func common_fp8_mlp_bwd =====
-        d_norm_output, dw1, dw2 = FP8LinearFunctionBase.fp8_mlp_bwd(do3, norm_output, w1, w2, False)
+        dx, dw1, dw2 = FP8LinearFunctionBase.common_fp8_mlp_bwd(do3, x_fp8, x_scale, x_t_fp8, x_t_scale, w1, w2, False)
 
-        # ===== compute norm grad =====
-        dx, d_rms_norm_weight = fused_ln.fused_rms_norm_grad_func(x, norm_w, invar, d_norm_output, norm_eps)
-
-        return dx, d_rms_norm_weight, dw1, dw2
+        # ===== reshape to origin shape =====
+        if len(x_orig_shape) > 2:
+            dx = dx.reshape([x_orig_shape[0], -1, dx.shape[-1]])
+        return dx, dw1, dw2
 
 
 class FP8MlpFunction(paddle.autograd.PyLayer):
@@ -588,7 +599,7 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
         )
 
         # ===== call func common_fp8_mlp_bwd =====
-        dx, dw1, dw2 = FP8LinearFunctionBase.common_fp8_mlp_bwd(do3, x_fp8, x_scale, x_t_fp8, x_t_scale, w1, w2)
+        dx, dw1, dw2 = FP8LinearFunctionBase.common_fp8_mlp_bwd(do3, x_fp8, x_scale, x_t_fp8, x_t_scale, w1, w2, False)
 
         # ===== reshape to origin shape =====
         if len(x_orig_shape) > 2:

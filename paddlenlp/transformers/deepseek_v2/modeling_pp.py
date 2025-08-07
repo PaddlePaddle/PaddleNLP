@@ -192,6 +192,7 @@ class PostProcessNode(ScheduleNode):
 
         if self.send_mtp_embed:
             hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp], axis=-1)
+            self.mtp_embed_shape = inputs_embeds_mtp.shape  # 保存mtp_embed的shape用于反向传播
 
         return return_args(hidden_states)
 
@@ -227,6 +228,7 @@ class PostProcessNode(ScheduleNode):
 
         if self.send_mtp_embed:
             hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp], axis=-1)
+            self.mtp_embed_shape = inputs_embeds_mtp.shape  # 保存mtp_embed的shape用于反向传播
 
         return return_args(hidden_states)
 
@@ -234,10 +236,18 @@ class PostProcessNode(ScheduleNode):
     def backward(self, output_grad):
         (do3,) = output_grad
 
-        assert not self.send_mtp_embed, "not support have mtp have yet"
+        if self.send_mtp_embed:
+            # 分割梯度：do3的前部分对应hidden_states，后部分对应inputs_embeds_mtp
+            hidden_size = do3.shape[-1] - self.mtp_embed_shape[-1]
+            hidden_states_grad = do3[..., :hidden_size]
+            inputs_embeds_mtp_grad = do3[..., hidden_size:]
+        else:
+            hidden_states_grad = do3
+            inputs_embeds_mtp_grad = None
+
         if self.using_post_norm_recompute:
             dx = FP8LinearFunctionBase.fp8_mlp_bwd_norm_rc(
-                do3,
+                hidden_states_grad,
                 self.x,
                 self.shared_experts.norm_weight,
                 self.shared_experts.norm_eps,
@@ -245,19 +255,20 @@ class PostProcessNode(ScheduleNode):
                 self.shared_experts.w2,
             )
         else:
-            dx = FP8LinearFunctionBase.fp8_mlp_bwd(do3, self.x, self.shared_experts.w1, self.shared_experts.w2, True)
+            dx = FP8LinearFunctionBase.fp8_mlp_bwd(
+                hidden_states_grad, self.x, self.shared_experts.w1, self.shared_experts.w2, True
+            )
 
         self.x = None
 
-        residual_grad = do3
-
-        hidden_states_grad = dx
-
+        residual_grad = hidden_states_grad
         l_aux_grad = paddle.ones(1, dtype=self.l_aux.dtype) * self.alpha
+        final_hidden_states_grad = hidden_states_grad
 
-        final_hidden_states_grad = do3
-
-        return (hidden_states_grad, residual_grad, l_aux_grad, final_hidden_states_grad)
+        if self.send_mtp_embed:
+            return (inputs_embeds_mtp_grad, dx, residual_grad, l_aux_grad, final_hidden_states_grad)
+        else:
+            return (dx, residual_grad, l_aux_grad, final_hidden_states_grad)
 
 
 class DecoderLayerNode(ScheduleNode):
@@ -749,6 +760,9 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
                 hs_grad,
                 token_probs_grad,
             ) = output_grad
+            inputs_embeds_mtp_grad_shape = hidden_states_grad.shape
+            inputs_embeds_mtp_grad_shape[-1] = -1
+            inputs_embeds_mtp_grad = inputs_embeds_mtp_grad.view(inputs_embeds_mtp_grad_shape)
         else:
             hidden_states_grad, residual_grad, l_aux_grad, hs_grad, token_probs_grad = output_grad
 
@@ -906,8 +920,11 @@ class OverlapedFUsionScheduleNode:
             combine_forward_event.calc_stream_wait(self.forward_node.moe_group.id)
 
             final_out = self.forward_node.post_process_node.forward_without_residual(inputs)
-            inputs = final_out + combine_fwd_out
-
+            if final_out.shape[-1] != combine_fwd_out.shape[-1]:
+                final_out[:, :, : combine_fwd_out.shape[-1]] += combine_fwd_out  # 直接广播并相加
+            else:
+                final_out += combine_fwd_out
+            inputs = final_out
             combine_fwd_out._record_stream()
 
         paddle.base.core.nvprof_nvtx_pop()
@@ -1072,7 +1089,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
         if self.config.send_mtp_embed:
             batch_size, _, hidden_size = hidden_states.shape
             batch_size_mtp = hidden_size // (self.config.num_nextn_predict_layers + 1)
-            inputs_embeds_mtp = hidden_states[..., -batch_size_mtp:]
+            inputs_embeds_mtp = hidden_states[..., batch_size_mtp:]
             hidden_states = hidden_states[..., :batch_size_mtp]
 
         has_gradient = not hidden_states.stop_gradient
@@ -1129,7 +1146,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
 
         batch_size, _, hidden_size = hidden_states.shape
         batch_size_mtp = hidden_size // (self.config.num_nextn_predict_layers + 1)
-        inputs_embeds_mtp = hidden_states[..., -batch_size_mtp:]
+        inputs_embeds_mtp = hidden_states[..., batch_size_mtp:]
         hidden_states = hidden_states[..., :batch_size_mtp]
 
         def attn_compute_func(hidden_states):
@@ -1162,7 +1179,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
             # slice from holy tensor
             batch_size, _, hidden_size = hidden_states.shape
             batch_size_mtp = hidden_size // (self.config.num_nextn_predict_layers + 1)
-            inputs_embeds_mtp = hidden_states[..., -batch_size_mtp:]
+            inputs_embeds_mtp = hidden_states[..., batch_size_mtp:]
             hidden_states = hidden_states[..., :batch_size_mtp]
 
         hidden_states, residual = self.self_attn_compute(hidden_states)
