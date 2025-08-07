@@ -245,7 +245,7 @@ class PostProcessNode(ScheduleNode):
                 self.shared_experts.w2,
             )
         else:
-            dx = FP8LinearFunctionBase.fp8_mlp_bwd(do3, self.x, self.shared_experts.w1, self.shared_experts.w2)
+            dx = FP8LinearFunctionBase.fp8_mlp_bwd(do3, self.x, self.shared_experts.w1, self.shared_experts.w2, True)
 
         self.x = None
 
