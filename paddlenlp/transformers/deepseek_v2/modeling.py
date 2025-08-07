@@ -1045,7 +1045,6 @@ def qkv_pre_process(
     q = q.reshape(shape=target_query_shape)
     q_nope = q[..., :qk_nope_head_dim]
     q_pe = q[..., qk_nope_head_dim:]
-    #q_nope, q_pe = paddle.split(q, [qk_nope_head_dim, qk_rope_head_dim], axis=-1)
 
     # DeepSeekV2 kv_lora_rank+qk_rope_head_dim=512+64
 
@@ -1058,7 +1057,6 @@ def qkv_pre_process(
     k_nope = kv[..., :qk_nope_head_dim]
     value_states = kv[..., qk_nope_head_dim:]
 
-    # k_nope, value_states = paddle.split(kv, [qk_nope_head_dim, v_head_dim], axis=-1)
     kv_seq_len = value_states.shape[1]
 
     cos, sin = rotary_emb(value_states, seq_len=kv_seq_len)
@@ -1398,12 +1396,7 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
 
         # call up proj
         if hasattr(kv_up_weight, "main_grad"):
-            #if False:
             d_kv_ln_t = paddle.matmul(d_kv, kv_up_weight, transpose_y=True)
-
-            # paddle._C_ops.fused_linear_param_grad_add(
-            #     kv_ln_t, d_kv, kv_up_weight.main_grad, None, True, False
-            # )
 
             def kv_up_weight_grad(kv_ln_t, d_kv, kv_up_weight):
                
@@ -1431,8 +1424,6 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
         d_kv_init = paddle.concat([d_compressed_kv, d_k_pe], axis=-1)
 
         if hasattr(q_up_weight, "main_grad"):
-            # if False:
-
             d_q_ln_t = paddle.matmul(d_q, q_up_weight, transpose_y=True)
 
             def q_up_weight_grad(q_ln_t, d_q, q_up_weight):                
