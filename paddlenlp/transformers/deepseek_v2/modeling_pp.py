@@ -28,8 +28,13 @@ from paddle.distributed.fleet.meta_parallel import (
     SharedLayerDesc,
 )
 from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import (
-    WeightGradStore, EventStore
+    WeightGradStore
 )
+
+try:
+    from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import EventStore
+except ImportError:
+    EventStore = None
 from paddle.distributed.fleet.recompute.recompute import recompute
 from paddle.distributed.fleet.utils.sequence_parallel_utils import ScatterOp
 
@@ -920,7 +925,9 @@ class OverlapedFUsionScheduleNode:
         WeightGradStore.enabled = True
         output_grad = self.backward_node.attn_backward(output_grad)
         event_to_wait = deep_ep.get_event_from_calc_stream(self.backward_node.moe_group.id)
-        EventStore.set(event_to_wait)
+        
+        if EventStore is not None:
+            EventStore.set(event_to_wait)
 
         WeightGradStore.enabled = False
         WeightGradStore.flush()
