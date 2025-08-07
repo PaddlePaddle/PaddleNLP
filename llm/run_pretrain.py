@@ -27,6 +27,7 @@ from paddlenlp.data.causal_dataset import (
     print_rank_0,
 )
 from paddlenlp.trainer import (
+    FP8QuantWeightCallback,
     PdArgumentParser,
     StepFlexToken,
     Trainer,
@@ -568,7 +569,7 @@ def main():
         * data_args.max_seq_length
     )
 
-    callbacks = [StepFlexToken()]
+    callbacks = [StepFlexToken(), FP8QuantWeightCallback()]
 
     trainer = PretrainingTrainer(
         model=model,

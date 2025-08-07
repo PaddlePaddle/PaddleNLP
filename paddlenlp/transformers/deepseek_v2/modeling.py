@@ -981,6 +981,49 @@ class DeepseekV2MoE(MoELayer):
                     config=config, intermediate_size=intermediate_size, is_moe=False
                 )
 
+    def fp8_quant_weight(self, batch_mode=False):
+        """Quantize weights in FP8 format.
+
+        Args:
+            batch_mode: If True, quantize all weights in batch mode using the first expert's weights.
+                    If False, quantize each expert's weights individually.
+        """
+
+        def quantize_weights(weight_list, weight_obj=None):
+            """Helper function to quantize a list of weights."""
+            if weight_obj is None:
+                weight_obj = weight_list[0]
+
+            # Quantize without transpose
+            fp8_weight, fp8_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(
+                weight_list, transpose=False
+            )
+            setattr(weight_obj, "fp8_weight_stacked", fp8_weight)
+            setattr(weight_obj, "fp8_scale_stacked", fp8_scale)
+
+            # Quantize with transpose
+            fp8_weight_t, fp8_scale_t = paddle.incubate.nn.functional.fused_stack_transpose_quant(
+                weight_list, transpose=True
+            )
+            setattr(weight_obj, "fp8_weight_stacked_transpose", fp8_weight_t)
+            setattr(weight_obj, "fp8_scale_stacked_transpose", fp8_scale_t)
+
+        if batch_mode:
+            # Batch mode: process all experts' weights together
+            expert_w1_list = [expert.w1 for expert in self.experts if expert is not None]
+            expert_w2_list = [expert.w2 for expert in self.experts if expert is not None]
+
+            if expert_w1_list:
+                quantize_weights(expert_w1_list, expert_w1_list[0])
+            if expert_w2_list:
+                quantize_weights(expert_w2_list, expert_w2_list[0])
+        else:
+            # Individual mode: process each expert's weights separately
+            for expert in self.experts:
+                if expert is not None:
+                    quantize_weights([expert.w1])
+                    quantize_weights([expert.w1])
+
     def forward(self, hidden_states):
         if self.using_post_norm_recompute:
             super().update_flex_token()
@@ -1927,6 +1970,12 @@ class DeepseekV2DecoderLayer(nn.Layer):
             )
         else:
             self.mlp = DeepseekV2MLPClass(config)
+
+    def fp8_quant_weight(self, batch_mode=False):
+        """fp8_quant_weight"""
+        if isinstance(self.mlp, DeepseekV2MoE):
+            logger.info(f"fp8 quant weight for mlp {type(self.mlp)}")
+            self.mlp.fp8_quant_weight(batch_mode)
 
     def forward(
         self,

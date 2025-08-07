@@ -1652,6 +1652,19 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         # DON'T init PipelinePretrainedModel
         # PipelinePretrainedModel.__init__(self.super(), config=config)
 
+    def fp8_quant_weight(self, batch_mode=False):
+        """fp8_quant_weight"""
+        with paddle.no_grad():
+            for i, layer in self._sub_layers.items():
+                if isinstance(
+                    layer, paddle.distributed.fleet.meta_parallel.parallel_layers.pp_layers.PipelineLayerChunk
+                ):
+                    for i, sub_layer in layer.named_sublayers():
+                        if isinstance(sub_layer, DeepseekV2DecoderLayer) and hasattr(sub_layer, "fp8_quant_weight"):
+                            sub_layer.fp8_quant_weight(batch_mode)
+                if isinstance(layer, DeepseekV2DecoderLayer) and hasattr(layer, "fp8_quant_weight"):
+                    layer.fp8_quant_weight(batch_mode)
+
     def get_loss_fn(self, config):
         return DeepseekV2PretrainingCriterionPipe(config)
 

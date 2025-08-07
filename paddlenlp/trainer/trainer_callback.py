@@ -20,6 +20,7 @@ Callbacks to use with the Trainer class and customize the training loop.
 """
 import dataclasses
 import json
+import os
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 
@@ -41,6 +42,7 @@ __all__ = [
     "PrinterCallback",
     "EarlyStoppingCallback",
     "StepFlexToken",
+    "FP8QuantWeightCallback",
 ]
 
 
@@ -615,3 +617,34 @@ class StepFlexToken(TrainerCallback):
         model = kwargs.pop("model")
         if hasattr(model, "step_flex_token"):
             model.step_flex_token(state.global_step)
+
+
+g_shard_bypass_dygraph_optimizer = int(os.environ.get("FLAGS_shard_bypass_dygraph_optimizer", 0))
+
+
+def enable_in_dict_config(config, key):
+    """enable_in_dict_config"""
+    return key in config and config[key]
+
+
+skip_count = 0
+
+
+class FP8QuantWeightCallback(TrainerCallback):
+    """
+    FP8QuantWeightCallback
+    """
+
+    def on_step_begin(self, args, state, control, **kwargs):
+        """
+        每个step开始前把专家参数quant成fp8q
+        """
+        model = kwargs["model"]
+        optimizer = kwargs["optimizer"]
+        global skip_count
+
+        if not g_shard_bypass_dygraph_optimizer or skip_count == 0:
+            model.fp8_quant_weight(True)
+            optimizer.clear_param_storage("moe_expert")
+
+        skip_count += 1
