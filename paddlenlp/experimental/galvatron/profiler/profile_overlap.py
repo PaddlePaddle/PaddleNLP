@@ -79,7 +79,7 @@ def profile(args):
             for event in traceEvents:
                 if "name" in event:
                     event_name = event["name"]
-                    if "ncclKernel_AllReduce" in event_name:
+                    if "Kernel_AllReduce" in event_name: # when use develop branch, the name is ncclDevKernel_AllReduce, so we modify it to Kernel_AllReduce
                         start_time = timestr2timenum(event["args"]["start_time"])
                         end_time = timestr2timenum(event["args"]["end_time"])
                         local_comm_time_list.append(end_time - start_time)

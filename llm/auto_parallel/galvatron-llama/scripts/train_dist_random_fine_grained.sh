@@ -52,7 +52,7 @@ MODEL_ARGS="
 # [mbsz, accumulation_steps] [recompute] [amp]
 CONFIG_ARGS="
     --per_device_train_batch_size 4 \
-    --gradient_accumulation_steps 16 \
+    --gradient_accumulation_steps 4 \
     --recompute false \
     --recompute_use_reentrant true \
     --recompute_granularity full \
@@ -67,11 +67,11 @@ CONFIG_ARGS="
 # [dp_deg, dp_type] [tp_deg, megatron-sp] [pp_deg, 1F1B] [parallel_configs]
 PARALLEL_ARGS=(
     --to_static 1
-    --sharding_parallel_degree 2
-    --sharding "stage3"
+    --sharding_parallel_degree 4
+    --sharding "stage2"
     --tensor_parallel_degree 2
     --sequence_parallel false
-    --pipeline_parallel_degree 2
+    --pipeline_parallel_degree 1
     --virtual_pp_degree 1
     --pipeline_schedule_mode "1F1B"
     --sep_parallel_degree 1
@@ -89,7 +89,7 @@ DEFAULT_OPTIMIZER_ARGS="
     --fuse_sequence_parallel_allreduce false \
     --use_flash_attention true \
     --use_fused_rope true \
-    --use_fused_rms_norm true \
+    --use_fused_rms_norm false \
 "
 
 # [data]

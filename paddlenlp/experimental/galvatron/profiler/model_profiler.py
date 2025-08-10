@@ -258,12 +258,13 @@ class ModelProfiler:
                     layernum_key_1 = layernum_lists_other[i]
                     
                     # Calculate parameter memory per layer
+                    model_states_divide_param = 9 # when use dynamic and O2 and zero3 and accumulation_steps is 1, model_states = param * 9
                     param_per_layer = (
                                         (re[self.key_format(layernum_key_1, bsz, seq_tuple[0], 'first', 'ms')] 
                                         - re[self.key_format(layernum_key_0, bsz, seq_tuple[0], 'first', 'ms')]) 
                                         / layernum_diff
                                         * fixed_pp_deg # this is unnessary
-                                        / 4 # because model states size = 4 * param size
+                                        / model_states_divide_param 
                                     )
                     param_per_layer *= dp_deg # when memory profile, we use zero-3. Now we restore the influence.
             
@@ -339,7 +340,8 @@ class ModelProfiler:
                     layernum = pp_deg if pp_deg > 1 else layernum_list_base[0]
                     layernum_list = [layernum] * args.num_layertype
                     
-                    ms_cost = [param_result_list[l][tp_deg] * 4 for l in range(args.num_layertype)]
+                    model_states_divide_param = 9  # when use dynamic and O2 and zero3 and accumulation_steps is 1, model_states = param * 9
+                    ms_cost = [param_result_list[l][tp_deg] * model_states_divide_param for l in range(args.num_layertype)]
                     act_cost = [act_result_list[l][tp_deg] for l in range(args.num_layertype)]
 
                     # Calculate total memory costs for first and last pipeline stages

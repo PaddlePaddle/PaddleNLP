@@ -60,7 +60,7 @@ CONFIG_ARGS="
     --recompute_granularity full \
     --pp_recompute_interval 0 \
     --bf16 true \
-    --fp16_opt_level "O1" \
+    --fp16_opt_level "O2" \
     --amp_master_grad true \
     --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
     --amp_custom_white_list "lookup_table" "lookup_table_v2" \
@@ -91,7 +91,7 @@ DEFAULT_OPTIMIZER_ARGS="
     --fuse_sequence_parallel_allreduce false \
     --use_flash_attention true \
     --use_fused_rope true \
-    --use_fused_rms_norm true \
+    --use_fused_rms_norm false \
 "
 
 # [data]

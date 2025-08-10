@@ -1,0 +1,10 @@
+{
+    "bsz": 128,
+    "accumulation_steps": 4,
+    "strategy": "pp1_tp2_dp4_stage2_recompute0",
+    "memory_cost": [
+        32967.3158100586
+    ],
+    "time_cost": 2.0981547411655526,
+    "throughput": 61.00598658843166
+}

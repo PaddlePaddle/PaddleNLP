@@ -630,6 +630,7 @@ class LlamaDecoderLayerAuto(nn.Layer):
                 (see `cache`).
             cache (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
         """
+        print(f'[linguangming] enter decoder hidden_states.shape: {hidden_states.shape}, hidden_states.dtype:  {hidden_states.dtype}, hidden_states.local_shape: {hidden_states._local_shape}')
         # [bs, seq_len, embed_dim] or [seq_len / n, bs, embed_dim] (if sequence_parallel)
         residual = hidden_states
 
@@ -878,6 +879,11 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             get_mesh(),
             embedding_placements,
         )
+        
+        # print(f'[linguangming] dummy set use zero3')
+        # self.embed_tokens.weight.use_zero3 = True 
+        # self.embed_tokens.weight.use_zero2 = True    
+        # self.embed_tokens.weight.real_use_zero3 = True   
 
         def get_layer_pp_info(layer_index):
             mesh = fleet.auto.get_mesh()
@@ -994,6 +1000,8 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         if inputs_embeds is None:
             with paddle.amp.auto_cast(False):
                 inputs_embeds = self.embed_tokens(input_ids)
+                
+        print(f'[linguangmgng] inputs_embeds.shape: {inputs_embeds.shape}, inputs_embeds.dtype: {inputs_embeds.dtype}, inputs_embeds.local_shape: {inputs_embeds._local_shape}')
 
         if self.config.sequence_parallel:
             # [B, S, H] -> [S, B, H]

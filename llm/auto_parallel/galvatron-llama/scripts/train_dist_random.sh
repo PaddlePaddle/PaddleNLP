@@ -5,9 +5,10 @@ unset CUDA_VISIBLE_DEVICES
 # task_name="zero2-modify"
 # task_name="flash-attn"
 # task_name="recompute"
-task_name="train_dist_random"
-rm -rf output/$task_name/
-rm -rf "output/$task_name""_log"
+task_name="zero2-zeor3"
+
+rm -rf output/footprint/$task_name/
+rm -rf "output/footprint/$task_name""_log"
 
 export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
@@ -16,7 +17,7 @@ export CUDA_MODULE_LOADING=EAGER # For 4090 cluster
 TRAINER="./train_dist_random.py"
 LAUNCHER="python -u -m paddle.distributed.launch"
 LAUNCHER="${LAUNCHER} --gpus 0,1,2,3,4,5,6,7"  # 设置需要使用的GPU
-LAUNCHER="${LAUNCHER} --log_dir output/$task_name""_log ${TRAINER} --output_dir "./output""
+LAUNCHER="${LAUNCHER} --log_dir output/footprint/$task_name""_log ${TRAINER} --output_dir "./output""
 
 # [max_steps] [logging_steps] [enable_auto_parallel]
 TRAIN_ARGS="
@@ -42,7 +43,7 @@ TRAIN_ARGS="
 # [seq_length] [num_hidden_layers]
 MODEL_ARGS=(
     --model_name_or_path "llama"
-    --num_hidden_layers 16
+    --num_hidden_layers 32
     --intermediate_size 11008
     --vocab_size 32000
     --hidden_size 4096
@@ -53,15 +54,15 @@ MODEL_ARGS=(
 
 # [mbsz, accumulation_steps] [recompute] [amp]
 CONFIG_ARGS="
-    --per_device_train_batch_size 4 \
-    --gradient_accumulation_steps 4 \
+    --per_device_train_batch_size 8 \
+    --gradient_accumulation_steps 2 \
     --recompute false \
     --recompute_use_reentrant true \
     --recompute_granularity full \
     --pp_recompute_interval 0 \
     --bf16 true \
-    --fp16_opt_level "O1" \
-    --amp_master_grad false \
+    --fp16_opt_level "O2" \
+    --amp_master_grad true \
     --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
     --amp_custom_white_list "lookup_table" "lookup_table_v2" \
 "
@@ -69,11 +70,11 @@ CONFIG_ARGS="
 # [dp_deg, dp_type] [tp_deg, megatron-sp] [pp_deg, 1F1B] [parallel_configs]
 PARALLEL_ARGS=(
     --to_static 1
-    --sharding_parallel_degree 8
-    --sharding "stage3"
-    --tensor_parallel_degree 1
+    --sharding_parallel_degree 2
+    --sharding "stage2"
+    --tensor_parallel_degree 2
     --sequence_parallel true
-    --pipeline_parallel_degree 1
+    --pipeline_parallel_degree 2
     --virtual_pp_degree 1
     --pipeline_schedule_mode "1F1B"
     --sep_parallel_degree 1
@@ -91,7 +92,7 @@ DEFAULT_OPTIMIZER_ARGS="
     --fuse_sequence_parallel_allreduce true \
     --use_flash_attention true \
     --use_fused_rope true \
-    --use_fused_rms_norm true \
+    --use_fused_rms_norm false \
 "
 
 # [data]

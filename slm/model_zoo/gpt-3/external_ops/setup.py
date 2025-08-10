@@ -34,45 +34,6 @@ def change_pwd():
     if path:
         os.chdir(path)
 
-
-def setup_fast_ln():
-    from paddle.utils.cpp_extension import CUDAExtension, setup
-    from paddle.device import is_compiled_with_rocm
-
-    if(is_compiled_with_rocm()):
-        print("The 'fasl_ln' feature  is temporarily not supported on the ROCm platform !!!")
-    else:
-        gencode_flags = get_gencode_flags()
-        change_pwd()
-        setup(
-            name="fast_ln",
-            ext_modules=CUDAExtension(
-                sources=[
-                    "fast_ln/ln_api.cpp",
-                    "fast_ln/ln_bwd_semi_cuda_kernel.cu",
-                    "fast_ln/ln_fwd_cuda_kernel.cu",
-                ],
-                extra_compile_args={
-                    "cxx": ["-O3"],
-                    "nvcc": [
-                        "-O3",
-                        "-U__CUDA_NO_HALF_OPERATORS__",
-                        "-U__CUDA_NO_HALF_CONVERSIONS__",
-                        "-U__CUDA_NO_BFLOAT16_OPERATORS__",
-                        "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                        "-U__CUDA_NO_BFLOAT162_OPERATORS__",
-                        "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
-                        "-I./apex/contrib/csrc/layer_norm/",
-                        "--expt-relaxed-constexpr",
-                        "--expt-extended-lambda",
-                        "--use_fast_math",
-                    ]
-                    + gencode_flags,
-                },
-            ),
-        )
-
-
 def setup_fused_ln():
     from paddle.utils.cpp_extension import CUDAExtension, setup
     from paddle.device import is_compiled_with_rocm
@@ -130,5 +91,4 @@ def setup_fused_ln():
         )
 
 
-run(setup_fast_ln)
 run(setup_fused_ln)

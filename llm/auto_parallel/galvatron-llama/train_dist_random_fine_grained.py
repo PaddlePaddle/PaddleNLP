@@ -465,7 +465,7 @@ def main():
     # one demo
     redistributed_flag = [0] * (num_layers + 1 + 2)
     if pp == 2 and tp == 2 and dp == 2:
-        redistributed_flag = [0] * (num_layers + 1 + 2)
+        # redistributed_flag = [0] * (num_layers + 1 + 2)
         # meshs[2] = dist.ProcessMesh([[0], [1], [2], [3]], dim_names=["dp", "mp"])
         # redistributed_flag[1] = meshs[2]
         # redistributed_flag[2] = meshs[3]

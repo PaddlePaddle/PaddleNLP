@@ -234,14 +234,16 @@ class AutoTrainer(Trainer):
                 )
             else:
                 self.optimizer = dist.shard_optimizer(self.optimizer, None, self.args.gradient_accumulation_steps)
-            # print(f'[linguangming] after shard_optimizer, the model is')  # [NOTE] 查看是否能够看出参数的拆分效果
-            # print(model)
-            # for name, param in model.named_parameters():
-            #     print(f'[linguangming] now auto_trainer.py line 230, param name: {name}')
-            #     print(param.shape)
-            #     print(param._local_shape)
-            # print(f'[linguangming] now auto_trainer.py line 230, exit')
-            # exit(0)
+
+            import math
+            param_total_size,  param_local_size = 0, 0
+            for name, param in model.named_parameters():
+                total_size = math.prod(param.shape)
+                local_size = math.prod(param._local_shape)
+                param_total_size += total_size
+                param_local_size += local_size
+                print(f'[linguangming] auto_trainer.py, param name: {name}, shape: {param.shape}, local_shape: {param._local_shape}, total_size: {total_size}, local_size: {local_size}')
+            print(f'[linguangming] auto_trainer.py, param_total_size: {param_total_size}, param_local_size: {param_local_size}')
 
         if self.args.to_static:
             unified_strategy = dist.Strategy()
@@ -259,6 +261,23 @@ class AutoTrainer(Trainer):
             # constructed here to avoid side effects on the dataloader used for actual training.
             temp_loader = self._wrap_for_dist_loader(self.get_train_dataloader())
             model = dist.to_static(model, temp_loader, self.criterion, self.optimizer, strategy=unified_strategy)
+
+        print(f'[linguangming] After dist.to_static, the model memory footprint ')
+        from paddle import framework, core
+        current_device = framework._current_expected_place_()
+        max_memory_allocated = core.device_memory_stat_peak_value("Allocated", current_device.get_device_id()) / 2**20
+        current_memory_allocated = core.device_memory_stat_current_value("Allocated", current_device.get_device_id()) / 2**20
+        print(f"Max memory allocated: {max_memory_allocated} MB")
+        print(f"Current memory allocated: {current_memory_allocated} MB")
+        
+        # for name, param in model.named_parameters():
+        #     if param.grad is not None:
+        #         print(f'[linguangming] now auto_trainer.py line 261, param name: {name}, dtype {param.grad.dtype}')
+            # print(f'[linguangming] now auto_trainer.py line 261, param name: {name}')
+            # print(param.shape)
+            # print(param._local_shape)
+            # print(f'[linguangming] now auto_trainer.py line 263, exit')
+            # # exit(0)
 
         self.model_wrapped = model
         return model, dist_loader

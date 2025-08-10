@@ -90,7 +90,7 @@ DEFAULT_OPTIMIZER="
     --fuse_sequence_parallel_allreduce false \
     --use_flash_attention true \
     --use_fused_rope true \
-    --use_fused_rms_norm true \
+    --use_fused_rms_norm false \
 "
 
 # [data]

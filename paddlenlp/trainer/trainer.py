@@ -1952,15 +1952,18 @@ class Trainer:
                     return x in decay_parameters
 
             optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
+            # 只有当fp16_opt_level设置为O2时，才会创建主权重
             if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
                 optimizer_kwargs["multi_precision"] = True
+                print('[linguangming] set multi_precision=True for optimizer')
 
             self.optimizer = optimizer_cls(
                 learning_rate=self.lr_scheduler if lr_scheduler is None else lr_scheduler,
                 apply_decay_param_fun=apply_decay_param_fun,
                 parameters=params,
                 weight_decay=self.args.weight_decay,
-                grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm) if self.args.max_grad_norm > 0 else None,  # NOTE 此处手动设置了grad_clip 这个地方应该需要重新手写一个梯度裁切
+                # grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm) if self.args.max_grad_norm > 0 else None,  # NOTE 此处手动设置了grad_clip 这个地方应该需要重新手写一个梯度裁切
+                grad_clip=None,
                 **optimizer_kwargs,
             )
 
