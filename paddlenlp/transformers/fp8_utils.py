@@ -202,9 +202,7 @@ class FP8LinearFunctionBase:
             RuntimeError: 如果 return_mode 不支持。
         """
         # check input
-        # print( "input", type(input))
         is_input_quantized = isinstance(input, (tuple, list)) and len(input) == 2
-        # print("is is_input_quantized", is_input_quantized)
 
         if is_input_quantized:
             input_fp8, input_scale = input
@@ -230,7 +228,6 @@ class FP8LinearFunctionBase:
         # quant weight
         weight_fp8, weight_scale = weight_quant(weight, weight_transpose)
        
-
         # FP8 GEMM
         if out is None:
             out = paddle.empty([input_fp8.shape[0], weight_fp8.shape[0]], dtype=weight.dtype)
@@ -311,10 +308,7 @@ class FP8LinearFunctionBase:
         #     x, w1, weight_transpose=True, return_transpose_only=True, return_mode="with_input_transpose_quant"
         # )
 
-        # w1_fp8, w1_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        #     w1, output_scale_transpose=False, quant_method="128x128", input_transpose=True, return_transpose_only=True
-        # )
-
+    
         w1_fp8, w1_scale = weight_quant(w1, True)
         o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=do3.dtype)
         deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1, num_sms=118)

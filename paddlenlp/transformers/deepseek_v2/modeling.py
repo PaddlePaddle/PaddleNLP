@@ -1138,15 +1138,13 @@ def manul_fwd(
 ):
 
     q_ln_t, q_ln_invar = fused_ln.fused_rms_norm(q_init, q_ln_weight, eps)
-    #q = paddle.matmul(q_ln_t, q_up_weight)
-    q = FP8LinearFunctionBase.compute_fp8_linear(q_ln_t, q_up_weight, weight_transpose=True, return_transpose_only=True)
+    q = paddle.matmul(q_ln_t, q_up_weight)
 
     compressed_kv, k_pe = paddle.split(kv_init, [kv_lora_rank, qk_rope_head_dim], axis=-1)
 
     kv_ln_t, kv_ln_invar = fused_ln.fused_rms_norm(compressed_kv, kv_ln_weight, eps)
 
-    #kv = paddle.matmul(kv_ln_t, kv_up_weight)
-    kv = FP8LinearFunctionBase.compute_fp8_linear(kv_ln_t, kv_up_weight, weight_transpose=True, return_transpose_only=True)
+    kv = paddle.matmul(kv_ln_t, kv_up_weight)
 
     query_states, key_states, value_states = qkv_pre_process(
         q, kv, k_pe, rotary_emb, num_heads, q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, position_ids
@@ -1644,8 +1642,6 @@ class FusedRMSLinearFunc(paddle.autograd.PyLayer):
 
         hidden_states, invar = fused_ln.fused_rms_norm(x, rms_norm_weight, eps)
         
-        # q = paddle.matmul(hidden_states, q_down_weight)
-
         h_fp8, h_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
             hidden_states.reshape([-1, hidden_states.shape[-1]]), output_scale_transpose=True, 
             quant_method="1x128" )
@@ -1677,9 +1673,7 @@ class FusedRMSLinearFunc(paddle.autograd.PyLayer):
             d_q_fp8, d_q_scale, d_q_t_fp8, d_q_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
                     d_q.reshape([-1, d_q.shape[-1]]), output_scale_transpose=True, 
                     quant_method="1x128", input_transpose=True )        
-            #h_grad_0 = 
             FP8LinearFunctionBase.compute_fp8_linear((d_q_fp8, d_q_scale), q_down_weight, weight_transpose=False, out=h_grad.view( [-1, h_grad.shape[-1]]))
-            #h_grad_0 = h_grad_0.reshape( d_q.shape[:-1] + [q_down_weight.shape[0]])
 
 
             def q_down_weight_grad(h_t_fp8, h_t_scale, d_q_t_fp8, d_q_t_scale, q_down_weight): 
@@ -1692,10 +1686,7 @@ class FusedRMSLinearFunc(paddle.autograd.PyLayer):
                     True,
                     q_down_weight.main_grad,
                     paddle.float32 )
-                # with paddle.no_grad():
-                #     w_grad_t = paddle.matmul( q_ln_t.reshape([-1, q_ln_t.shape[-1]]), d_q.reshape([-1, d_q.shape[-1]]), transpose_x=True)
-                #     q_up_weight.main_grad.add_( w_grad_t )
-
+            
             if WeightGradStore.enabled:            
                 WeightGradStore.put(partial(q_down_weight_grad, h_t_fp8, h_t_scale, d_q_t_fp8, d_q_t_scale, q_down_weight))
             else:
@@ -1706,12 +1697,6 @@ class FusedRMSLinearFunc(paddle.autograd.PyLayer):
         else:
             h_grad_0, d_q_down_weight = _C_ops.matmul_grad(hidden_states, q_down_weight, d_q, False, False)
             h_grad = h_grad + h_grad_0
-
-        
-        #if hasattr(kv_down_weight, "main_grad"):
-        
-        
-
 
         dx, d_rms_norm_weight = fused_ln.fused_rms_norm_grad_func(x, rms_norm_weight, invar, h_grad, eps)
 
@@ -2008,7 +1993,6 @@ class DeepseekV2Attention(nn.Layer):
                 target_key_value_shape = [0, 0, self.num_heads, self.qk_nope_head_dim + self.v_head_dim]
 
             q = q.reshape(shape=target_query_shape)
-            # q.register_hook( print_grad)
             q_nope, q_pe = paddle.split(q, [self.qk_nope_head_dim, self.qk_rope_head_dim], axis=-1)
 
             # DeepSeekV2 kv_lora_rank+qk_rope_head_dim=512+64
