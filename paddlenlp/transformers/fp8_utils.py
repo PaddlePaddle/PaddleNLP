@@ -729,6 +729,10 @@ class FP8Mlp(paddle.nn.Layer):
             dtype="bfloat16",
             is_bias=False,
         )
+    
+    def fp8_quant_weight(self):
+        cache_fp8_weight( self.w1)
+        cache_fp8_weight( self.w2)
 
     def forward(self, x):
         if self.using_post_norm_recompute:

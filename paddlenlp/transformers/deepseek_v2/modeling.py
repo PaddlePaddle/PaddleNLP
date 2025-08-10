@@ -1027,6 +1027,9 @@ class DeepseekV2MoE(MoELayer):
                 if expert is not None:
                     quantize_weights([expert.w1])
                     quantize_weights([expert.w1])
+        
+        if self.config.n_shared_experts is not None:
+            self.shared_experts.fp8_quant_weight()
 
     def forward(self, hidden_states):
         if self.using_post_norm_recompute:
