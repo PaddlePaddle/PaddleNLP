@@ -82,7 +82,7 @@ FA_VERSION = int(os.getenv("FA_VERSION", 2))
 
 from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import WeightGradStore
 
-from ..fp8_utils import FP8KeepXLinear, FP8Linear, FP8Mlp
+from ..fp8_utils import FP8KeepXLinear, FP8Linear, FP8Mlp, FP8LinearFunctionBase, cache_fp8_weight
 from .fp8_linear import Linear
 
 DSV3_USE_FP8_GEMM = os.getenv("DSV3_USE_FP8_GEMM", "False").lower() == "true"
@@ -961,9 +961,9 @@ class DeepseekV2MoE(MoELayer):
             using_post_norm_recompute=self.using_post_norm_recompute,
         )
 
-        moe_grad_group = fleet.get_hybrid_communicate_group().expert_grad_comm_group
-        for p in self.experts.parameters():
-            setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
+        # moe_grad_group = fleet.get_hybrid_communicate_group().expert_grad_comm_group
+        # for p in self.experts.parameters():
+        #     setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
 
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
@@ -995,6 +995,8 @@ class DeepseekV2MoE(MoELayer):
             """Helper function to quantize a list of weights."""
             if weight_obj is None:
                 weight_obj = weight_list[0]
+            if hasattr( weight_obj, "fp8_weight_stacked"):
+                return
 
             # Quantize without transpose
             fp8_weight, fp8_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(
@@ -1133,13 +1135,15 @@ def manul_fwd(
 ):
 
     q_ln_t, q_ln_invar = fused_ln.fused_rms_norm(q_init, q_ln_weight, eps)
-    q = paddle.matmul(q_ln_t, q_up_weight)
+    #q = paddle.matmul(q_ln_t, q_up_weight)
+    q = FP8LinearFunctionBase.compute_fp8_linear(q_ln_t, q_up_weight, weight_transpose=True, return_transpose_only=True)
 
     compressed_kv, k_pe = paddle.split(kv_init, [kv_lora_rank, qk_rope_head_dim], axis=-1)
 
     kv_ln_t, kv_ln_invar = fused_ln.fused_rms_norm(compressed_kv, kv_ln_weight, eps)
 
-    kv = paddle.matmul(kv_ln_t, kv_up_weight)
+    #kv = paddle.matmul(kv_ln_t, kv_up_weight)
+    kv = FP8LinearFunctionBase.compute_fp8_linear(kv_ln_t, kv_up_weight, weight_transpose=True, return_transpose_only=True)
 
     query_states, key_states, value_states = qkv_pre_process(
         q, kv, k_pe, rotary_emb, num_heads, q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, position_ids
@@ -1189,12 +1193,18 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
 
         bsz = q_init.shape[0]
         q_ln_t, q_ln_invar = fused_ln.fused_rms_norm(q_init, q_ln_weight, eps)
-        q = paddle.matmul(q_ln_t, q_up_weight)
+        #q = paddle.matmul(q_ln_t, q_up_weight)
+        q_orig_shape = q_ln_t.shape
+        q = FP8LinearFunctionBase.compute_fp8_linear(q_ln_t.reshape([-1, q_orig_shape[-1]]), q_up_weight, weight_transpose=True, return_transpose_only=True)
+        q = q.reshape( q_orig_shape[:-1] + [q_up_weight.shape[-1]])
 
         compressed_kv, k_pe = paddle.split(kv_init, [kv_lora_rank, qk_rope_head_dim], axis=-1)
 
         kv_ln_t, kv_ln_invar = fused_ln.fused_rms_norm(compressed_kv, kv_ln_weight, eps)
-        kv = paddle.matmul(kv_ln_t, kv_up_weight)
+        #kv = paddle.matmul(kv_ln_t, kv_up_weight)
+        kv_orig_shape = kv_ln_t.shape
+        kv = FP8LinearFunctionBase.compute_fp8_linear(kv_ln_t.reshape([-1, kv_orig_shape[-1]]), kv_up_weight, weight_transpose=True, return_transpose_only=True)
+        kv = kv.reshape( kv_orig_shape[:-1] + [kv_up_weight.shape[-1]])
 
         query_states, key_states, value_states = qkv_pre_process(
             q,
@@ -1354,12 +1364,26 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
             assert False, f"invalid {FA_VERSION=}"
 
         q_ln_t, q_ln_invar = fused_ln.fused_rms_norm(q_init, q_ln_weight, eps)
-        q = paddle.matmul(q_ln_t, q_up_weight)
+
+
+        q_ln_fp8, q_ln_scale, q_ln_trans_fp8, q_ln_trans_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                q_ln_t.reshape([-1, q_ln_t.shape[-1]]), output_scale_transpose=True, 
+                quant_method="1x128", input_transpose=True )
+        
+        q_orig_shape = q_ln_t.shape
+        q = FP8LinearFunctionBase.compute_fp8_linear((q_ln_fp8, q_ln_scale), q_up_weight, weight_transpose=True, return_transpose_only=True)
+        q = q.reshape( q_orig_shape[:-1] + [q_up_weight.shape[-1]])
 
         compressed_kv, k_pe = paddle.split(kv_init, [kv_lora_rank, qk_rope_head_dim], axis=-1)
 
         kv_ln_t, kv_ln_invar = fused_ln.fused_rms_norm(compressed_kv, kv_ln_weight, eps)
-        kv = paddle.matmul(kv_ln_t, kv_up_weight)
+        
+        kv_ln_fp8, kv_ln_scale, kv_ln_trans_fp8, kv_ln_trans_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                     kv_ln_t.reshape([-1, kv_ln_t.shape[-1]]), output_scale_transpose=True, 
+                     quant_method="1x128", input_transpose=True )
+        kv_orig_shape = kv_ln_t.shape
+        kv = FP8LinearFunctionBase.compute_fp8_linear((kv_ln_fp8, kv_ln_scale), kv_up_weight, weight_transpose=True, return_transpose_only=True)
+        kv = kv.reshape( kv_orig_shape[:-1] + [kv_up_weight.shape[-1]])
 
         paddle.base.core._set_has_grad(True)
         q.stop_gradient = False
@@ -1439,20 +1463,29 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
 
         # call up proj
         if hasattr(kv_up_weight, "main_grad"):
-            d_kv_ln_t = paddle.matmul(d_kv, kv_up_weight, transpose_y=True)
+            d_kv_fp8, d_kv_scale, d_kv_t_fp8, d_kv_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                     d_kv.reshape([-1, d_kv.shape[-1]]), output_scale_transpose=True, 
+                     quant_method="1x128", input_transpose=True )
 
-            def kv_up_weight_grad(kv_ln_t, d_kv, kv_up_weight):
-               
-                with paddle.no_grad():
-                    w_grad_t = paddle.matmul( kv_ln_t.reshape([-1, kv_ln_t.shape[-1]]), d_kv.reshape([-1, d_kv.shape[-1]]), transpose_x=True)
+            d_kv_ln_t = FP8LinearFunctionBase.compute_fp8_linear((d_kv_fp8, d_kv_scale), kv_up_weight, weight_transpose=False)
+            d_kv_ln_t = d_kv_ln_t.reshape( d_kv.shape[:-1] + [kv_up_weight.shape[0]])
 
-                    kv_up_weight.main_grad.add_( w_grad_t )
-
+            def kv_up_weight_grad(kv_ln_trans_fp8, kv_ln_trans_scale, d_kv_t_fp8, d_kv_t_scale, kv_up_weight):
+                FP8LinearFunctionBase.kitchen_gemm(
+                    kv_ln_trans_fp8,
+                    kv_ln_trans_scale,
+                    d_kv_t_fp8,
+                    d_kv_t_scale,
+                    True,
+                    True,
+                    kv_up_weight.main_grad,
+                    paddle.float32 )
+              
             if WeightGradStore.enabled:
             
-                WeightGradStore.put(partial(kv_up_weight_grad, kv_ln_t, d_kv, kv_up_weight))
+                WeightGradStore.put(partial(kv_up_weight_grad, kv_ln_trans_fp8, kv_ln_trans_scale, d_kv_t_fp8, d_kv_t_scale, kv_up_weight))
             else:
-                kv_up_weight_grad(kv_ln_t, d_kv, kv_up_weight)
+                kv_up_weight_grad(kv_ln_trans_fp8, kv_ln_trans_scale, d_kv_t_fp8, d_kv_t_scale, kv_up_weight)
 
             d_kv_up_weight = None
 
@@ -1467,18 +1500,32 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
         d_kv_init = paddle.concat([d_compressed_kv, d_k_pe], axis=-1)
 
         if hasattr(q_up_weight, "main_grad"):
-            d_q_ln_t = paddle.matmul(d_q, q_up_weight, transpose_y=True)
 
-            def q_up_weight_grad(q_ln_t, d_q, q_up_weight):                
+            d_q_fp8, d_q_scale, d_q_t_fp8, d_q_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                    d_q.reshape([-1, d_q.shape[-1]]), output_scale_transpose=True, 
+                    quant_method="1x128", input_transpose=True )
+            #d_q_ln_t = paddle.matmul(d_q, q_up_weight, transpose_y=True)
 
-                with paddle.no_grad():
-                    w_grad_t = paddle.matmul( q_ln_t.reshape([-1, q_ln_t.shape[-1]]), d_q.reshape([-1, d_q.shape[-1]]), transpose_x=True)
-                    q_up_weight.main_grad.add_( w_grad_t )
+            d_q_ln_t = FP8LinearFunctionBase.compute_fp8_linear((d_q_fp8, d_q_scale), q_up_weight, weight_transpose=False)
+            d_q_ln_t = d_q_ln_t.reshape( d_q.shape[:-1] + [q_up_weight.shape[0]])
+
+            
+            def q_up_weight_grad(q_ln_trans_fp8, q_ln_trans_scale, d_q_t_fp8, d_q_t_scale, q_up_weight): 
+                FP8LinearFunctionBase.kitchen_gemm(
+                    q_ln_trans_fp8,
+                    q_ln_trans_scale,
+                    d_q_t_fp8,
+                    d_q_t_scale,
+                    True,
+                    True,
+                    q_up_weight.main_grad,
+                    paddle.float32 )
+           
 
             if WeightGradStore.enabled:            
-                WeightGradStore.put(partial(q_up_weight_grad, q_ln_t, d_q, q_up_weight))
+                WeightGradStore.put(partial(q_up_weight_grad, q_ln_trans_fp8, q_ln_trans_scale, d_q_t_fp8, d_q_t_scale, q_up_weight))
             else:
-                q_up_weight_grad(q_ln_t, d_q, q_up_weight)
+                q_up_weight_grad(q_ln_trans_fp8, q_ln_trans_scale, d_q_t_fp8, d_q_t_scale, q_up_weight)
 
             d_q_up_weight = None
 
@@ -1556,7 +1603,17 @@ class MemroyRecomputeAttn(paddle.nn.Layer):
             softmax_scale,
         )
 
+    def fp8_quant_weight(self):
+        cache_fp8_weight( self.q_up_weight)
+        cache_fp8_weight( self.kv_up_weight)
+
     def forward(self, q_init, kv_init, position_ids):
+        
+        seq_len = q_init.shape[1]
+
+        if self.rotary_emb.max_seq_len_cached is None or seq_len > self.rotary_emb.max_seq_len_cached:
+            self.rotary_emb._set_cos_sin_cache(seq_len)
+
 
         return MemroyRecomputeAttnFunc.apply(
             q_init,
@@ -1583,10 +1640,20 @@ class FusedRMSLinearFunc(paddle.autograd.PyLayer):
     def forward(ctx, x, rms_norm_weight, q_down_weight, kv_down_weight, eps):
 
         hidden_states, invar = fused_ln.fused_rms_norm(x, rms_norm_weight, eps)
-        q = paddle.matmul(hidden_states, q_down_weight)
+        
+        # q = paddle.matmul(hidden_states, q_down_weight)
+
+        h_fp8, h_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            hidden_states.reshape([-1, hidden_states.shape[-1]]), output_scale_transpose=True, 
+            quant_method="1x128" )
+
+        h_orig_shape = hidden_states.shape
+        q = FP8LinearFunctionBase.compute_fp8_linear((h_fp8, h_scale), q_down_weight, weight_transpose=True, return_transpose_only=True)
+        q = q.reshape( h_orig_shape[:-1] + [q_down_weight.shape[-1]])
+
 
         kv = paddle.matmul(hidden_states, kv_down_weight)
-
+    
         ctx.save_for_backward(x, rms_norm_weight, q_down_weight, kv_down_weight)
         ctx.eps = eps
         return q, kv
@@ -1596,11 +1663,52 @@ class FusedRMSLinearFunc(paddle.autograd.PyLayer):
         x, rms_norm_weight, q_down_weight, kv_down_weight = ctx.saved_tensor()
         eps = ctx.eps
         hidden_states, invar = fused_ln.fused_rms_norm(x, rms_norm_weight, eps)
+        
+        h_t_fp8, h_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                hidden_states.reshape([-1, hidden_states.shape[-1]]), output_scale_transpose=True, 
+                quant_method="1x128", input_transpose=True, return_transpose_only=True )
 
-        h_grad_0, d_q_down_weight = _C_ops.matmul_grad(hidden_states, q_down_weight, d_q, False, False)
-        h_grad_1, d_kv_down_weight = _C_ops.matmul_grad(hidden_states, kv_down_weight, d_kv, False, False)
+        h_grad, d_kv_down_weight = _C_ops.matmul_grad(hidden_states, kv_down_weight, d_kv, False, False)
 
-        h_grad = h_grad_0 + h_grad_1
+        if hasattr(q_down_weight, "main_grad"):
+            d_q_fp8, d_q_scale, d_q_t_fp8, d_q_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+                    d_q.reshape([-1, d_q.shape[-1]]), output_scale_transpose=True, 
+                    quant_method="1x128", input_transpose=True )        
+            #h_grad_0 = 
+            FP8LinearFunctionBase.compute_fp8_linear((d_q_fp8, d_q_scale), q_down_weight, weight_transpose=False, out=h_grad.view( [-1, h_grad.shape[-1]]))
+            #h_grad_0 = h_grad_0.reshape( d_q.shape[:-1] + [q_down_weight.shape[0]])
+
+
+            def q_down_weight_grad(h_t_fp8, h_t_scale, d_q_t_fp8, d_q_t_scale, q_down_weight): 
+                FP8LinearFunctionBase.kitchen_gemm(
+                    h_t_fp8,
+                    h_t_scale,
+                    d_q_t_fp8,
+                    d_q_t_scale,
+                    True,
+                    True,
+                    q_down_weight.main_grad,
+                    paddle.float32 )
+                # with paddle.no_grad():
+                #     w_grad_t = paddle.matmul( q_ln_t.reshape([-1, q_ln_t.shape[-1]]), d_q.reshape([-1, d_q.shape[-1]]), transpose_x=True)
+                #     q_up_weight.main_grad.add_( w_grad_t )
+
+            if WeightGradStore.enabled:            
+                WeightGradStore.put(partial(q_down_weight_grad, h_t_fp8, h_t_scale, d_q_t_fp8, d_q_t_scale, q_down_weight))
+            else:
+                q_down_weight_grad( h_t_fp8, h_t_scale, d_q_t_fp8, d_q_t_scale, q_down_weight)
+
+            d_q_down_weight = None
+
+        else:
+            h_grad_0, d_q_down_weight = _C_ops.matmul_grad(hidden_states, q_down_weight, d_q, False, False)
+            h_grad = h_grad + h_grad_0
+
+        
+        #if hasattr(kv_down_weight, "main_grad"):
+        
+        
+
 
         dx, d_rms_norm_weight = fused_ln.fused_rms_norm_grad_func(x, rms_norm_weight, invar, h_grad, eps)
 
@@ -1630,6 +1738,10 @@ class FusedRMSLinear(paddle.nn.Layer):
             is_bias=False,
         )
         self.eps = eps
+    
+    def fp8_quant_weight(self):      
+        cache_fp8_weight( self.q_down_weight)
+        
 
     def forward(self, x):
 
@@ -1790,6 +1902,15 @@ class DeepseekV2Attention(nn.Layer):
                 self.softmax_scale = self.softmax_scale * mscale * mscale
 
         self.attn_func = scaled_dot_product_attention
+
+    def fp8_quant_weight(self):
+
+        if DSV3_USE_ATTEN_RECOMPUTE:
+            self.o_proj.fp8_quant_weight()
+            self.memory_recompute_att.fp8_quant_weight()
+            self.fused_rms_norm_linear.fp8_quant_weight()
+
+
 
     def _init_rope(self):
         if self.config.rope_scaling is None:
@@ -2016,8 +2137,9 @@ class DeepseekV2DecoderLayer(nn.Layer):
     def fp8_quant_weight(self, batch_mode=False):
         """fp8_quant_weight"""
         if isinstance(self.mlp, DeepseekV2MoE):
-            logger.info(f"fp8 quant weight for mlp {type(self.mlp)}")
+            # logger.info(f"fp8 quant weight for mlp {type(self.mlp)}")
             self.mlp.fp8_quant_weight(batch_mode)
+            self.self_attn.fp8_quant_weight()
 
     def forward(
         self,

@@ -887,7 +887,11 @@ class OverlapedFUsionScheduleNode:
         mlp_fwd_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
 
         if pp_stream is not None:
+            paddle.base.core.nvprof_nvtx_push("post_process_forward")
+
             final_out = self.forward_node.post_process_node.forward_without_residual(inputs)
+            paddle.base.core.nvprof_nvtx_pop()
+
 
         final_out_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
 
@@ -921,9 +925,7 @@ class OverlapedFUsionScheduleNode:
             paddle.base.core.nvprof_nvtx_pop()
 
         dispatch_backward_event.calc_stream_wait(self.backward_node.moe_group.id)
-        paddle.base.core.nvprof_nvtx_push("post_process_forward")
-
-        paddle.base.core.nvprof_nvtx_pop()
+        
         paddle.base.core.nvprof_nvtx_push("attn_backward")
         assert WeightGradStore.funcs_queue.empty()
         WeightGradStore.enabled = True
@@ -938,12 +940,16 @@ class OverlapedFUsionScheduleNode:
         WeightGradStore.pop()
         assert WeightGradStore.funcs_queue.empty()
 
+        WeightGradStore.enabled = False
+        WeightGradStore.flush()
+        WeightGradStore.pop()
+        assert WeightGradStore.funcs_queue.empty()
         paddle.base.core.nvprof_nvtx_pop()
 
         # residual add
         if pp_stream is None:
             combine_forward_event.calc_stream_wait(self.forward_node.moe_group.id)
-
+            
             final_out = self.forward_node.post_process_node.forward_without_residual(inputs)
             if final_out.shape[-1] != combine_fwd_out.shape[-1]:
                 final_out[:, :, : combine_fwd_out.shape[-1]] += combine_fwd_out  # 直接广播并相加
