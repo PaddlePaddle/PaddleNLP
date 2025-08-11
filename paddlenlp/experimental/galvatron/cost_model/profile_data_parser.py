@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from scipy.optimize import curve_fit
-from ..utils import num2str, read_json_config, Strategy
+from ..utils import num2str, read_json_config, Strategy, LayerWiseStrategy
 from .memory_cost_model import MemoryCostModel, MemoryCostModelArguments, OtherMemoryCostModelArguments, OtherMemoryCostModel
 from .time_cost_model import TimeCostModel, TimeCostModelArguments, OtherTimeCostModel, OtherTimeCostModelArguments
 from typing import List
@@ -50,9 +50,9 @@ class ProfileDataParser:
     def __init__(self, args:ProfileDataParserArguments):
         self.args = args
         self.validate_args()
-        self.parse_profile_computation_configs()
+        # self.parse_profile_computation_configs()
         self.parse_profile_memory_configs()
-        self.parse_profile_hardware_configs()
+        # self.parse_profile_hardware_configs()
         
     def validate_args(self):
         args = self.args
@@ -261,7 +261,7 @@ class ProfileDataParser:
         print("Profile hardware configs parsed successfully.")
             
     # ==================Launch Cost Model=================
-    def get_memory_cost_for_specific_strategy(self, strategy:Strategy, global_batch_size:int, mixed_precision_type:str, accumulation_steps:int) -> List[float]:
+    def get_memory_cost_for_specific_strategy(self, strategy:LayerWiseStrategy, global_batch_size:int, mixed_precision_type:str, accumulation_steps:int) -> List[float]:
         args = self.args
         
         # get some basic information
@@ -276,19 +276,39 @@ class ProfileDataParser:
                 memory_cost_model_args = MemoryCostModelArguments(strategy=strategy, global_batch_size=global_batch_size, mixed_precision_type=mixed_precision_type, stage_idx=stage_idx, accumulation_steps=accumulation_steps, parameter_memory=self.param_sizes[i], tp_activation_per_bsz_dict=self.act_sizes[i])
                 re = MemoryCostModel(memory_cost_model_args).get_memory_cost()
                 memory_per_layer_each_stage[i][stage_idx] = re['enc_total']
-        # print(f'\tMemory cost for each layer type at each stage: {memory_per_layer_each_stage}')
+        print(f'\tMemory cost for each layer type at each stage: {memory_per_layer_each_stage}')
         
         # Calculate other layer memory costs
         other_memory_cost_model_args = OtherMemoryCostModelArguments(min_tp_size=strategy.tp_size, max_tp_size=strategy.tp_size, world_size=world_size, pp_size=pp_size, sharding_stage=sharding_stage, global_batch_size=global_batch_size, accumulation_steps=accumulation_steps, other_memory_pp_off=self.other_memory_pp_off, other_memory_pp_on=self.other_memory_pp_on)
         memory_other = OtherMemoryCostModel(other_memory_cost_model_args).get_other_memory_cost()
-        # print(f'\tMemory cost for other layers: {memory_other}')
+        print(f'\tMemory cost for other layers: {memory_other}')
         
+        # if use recompute, calculate not use recompute
+        if strategy.recompute != 0:
+            import copy
+            strategy_no_recompute = copy.deepcopy(strategy)
+            strategy_no_recompute.recompute = 0
+            print("strategy_no_recompute is ", strategy_no_recompute)
+            memory_per_layer_each_stage_no_recompute = [dict() for _ in range(args.num_layertype)] 
+            for i in range(args.num_layertype):
+                for stage_idx in range(pp_size):
+                    mbsz = global_batch_size // accumulation_steps // strategy.dp_size 
+                    add_activation = self.act_sizes[i][strategy.tp_size] * mbsz
+                    memory_per_layer_each_stage_no_recompute[i][stage_idx] = add_activation
+                    # memory_cost_model_args = MemoryCostModelArguments(strategy=strategy_no_recompute, global_batch_size=global_batch_size, mixed_precision_type=mixed_precision_type, stage_idx=stage_idx, accumulation_steps=accumulation_steps, parameter_memory=self.param_sizes[i], tp_activation_per_bsz_dict=self.act_sizes[i])
+                    # re = MemoryCostModel(memory_cost_model_args).get_memory_cost()
+                    # memory_per_layer_each_stage_no_recompute[i][stage_idx] = re['enc_total']
+        print(f'\tMemory cost for each layer type at each stage (no recompute): {memory_per_layer_each_stage_no_recompute}')
+
         # compose the memory cost of each stage
         if pp_size == 1:
             memory_cost_per_stage = [0]
             memory_cost_per_stage[0] += memory_other[strategy.tp_size][0]
             for i in range(args.num_layertype):
                 memory_cost_per_stage[0] += memory_per_layer_each_stage[i][0] * self.layernum_list[i]
+            for i in range(args.num_layertype):
+                if strategy.recompute != 0:
+                    memory_cost_per_stage[0] += memory_per_layer_each_stage_no_recompute[i][0]
         else:
             memory_cost_per_stage = [0 for _ in range(pp_size)]
             memory_cost_per_stage[0] += memory_other[strategy.tp_size][0]
@@ -305,6 +325,11 @@ class ProfileDataParser:
             for stage_idx in range(pp_size):
                 for layer_type in stage_layers[stage_idx]:
                     memory_cost_per_stage[stage_idx] += memory_per_layer_each_stage[layer_type][stage_idx]
+            if strategy.recompute != 0:
+                for stage_idx in range(pp_size):
+                    if stage_idx == pp_size - 1:
+                        continue
+                    memory_cost_per_stage[stage_idx] += memory_per_layer_each_stage_no_recompute[0][stage_idx]
         return memory_cost_per_stage    
     
     def get_time_cost_for_specific_strategy(self, strategy:Strategy, global_batch_size:int, mixed_precision_type:str, accumulation_steps:int):

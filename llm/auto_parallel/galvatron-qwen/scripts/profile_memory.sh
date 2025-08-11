@@ -1,18 +1,21 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-task_name="test"
-
-rm -rf output/metric/single/$task_name/
-rm -rf "output/metric/single/$task_name""_log"
+task_name="qwen_profile_memory"
+dir_name="profile_memory"
+rm -rf output/$dir_name/$task_name/
+rm -rf "output/$dir_name/$task_name""_log"
 
 export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
 
 TRAINER="./train_qwen.py"
-LAUNCHER="python -u -m paddle.distributed.launch --log_level DEBUG"
-LAUNCHER="${LAUNCHER} --gpus 0,1,2,3,4,5,6,7" 
-LAUNCHER="${LAUNCHER} --log_dir output/metric/single/$task_name""_log ${TRAINER} --output_dir "./output""
+LAUNCHER="/apdcephfs_fsgm/share_303760348/anaconda3/envs/lgm-paddle/bin/python -u -m paddle.distributed.launch"
+LAUNCHER="${LAUNCHER} --gpus 0,1,2,3,4,5,6,7"  # 设置需要使用的GPU
+LAUNCHER="${LAUNCHER} --log_dir output/$dir_name/$task_name""_log ${TRAINER} --output_dir "./output""
+
+export LAUNCHER=$LAUNCHER
+export PROFILE_WORLD_SIZE=8
 
 # [max_steps] [logging_steps] [enable_auto_parallel]
 TRAIN_ARGS="
@@ -25,6 +28,8 @@ TRAIN_ARGS="
     --logging_steps 1 \
     --continue_training 0 \
     --do_train true \
+    --do_eval false \
+    --do_predict false \
     --disable_tqdm true \
     --skip_profile_timer false \
     --skip_memory_metrics 0 \
@@ -36,24 +41,23 @@ TRAIN_ARGS="
 "
 
 # [seq_length] [num_hidden_layers]
-# still need to use llama as model_type
-MODEL_ARGS=(
-    --model_type "llama"
-    --num_hidden_layers 4
-    --intermediate_size 49152
-    --vocab_size 32000
-    --hidden_size 8192
-    --seq_length 8192
-    --num_attention_heads 64
-    --num_key_value_heads 8
-)
+MODEL_ARGS="
+    --model_name_or_path "llama" \
+    --tokenizer_name_or_path "llama" \
+    --num_hidden_layers 16 \
+    --intermediate_size 49152 \
+    --vocab_size 32000 \
+    --hidden_size 8192 \
+    --seq_length 1024 \
+    --num_attention_heads 64 \
+    --num_key_value_heads 8 \
+"
 
-# "max_position_embeddings": 32768,
 # [mbsz, accumulation_steps] [recompute] [amp]
 CONFIG_ARGS="
-    --per_device_train_batch_size 4 \
-    --gradient_accumulation_steps 4 \
-    --recompute true \
+    --per_device_train_batch_size 8 \
+    --gradient_accumulation_steps 1 \
+    --recompute false \
     --recompute_use_reentrant true \
     --recompute_granularity full \
     --pp_recompute_interval 0 \
@@ -66,61 +70,64 @@ CONFIG_ARGS="
 
 # [dp_deg, dp_type] [tp_deg, megatron-sp] [pp_deg, 1F1B] [parallel_configs]
 PARALLEL_ARGS=(
-    --to_static 1
-    --sharding_parallel_degree 2
+    --to_static 0
+    --sharding_parallel_degree 1
     --sharding "stage2"
     --tensor_parallel_degree 2
     --sequence_parallel true
     --pipeline_parallel_degree 2
     --virtual_pp_degree 1
     --pipeline_schedule_mode "1F1B"
-    --sep_parallel_degree 1
+    --sep_parallel_degree 1 
     --pipeline_parallel_config "enable_send_recv_overlap"
     --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate"
-    --sharding_parallel_config "enable_overlap enable_release_grads"
-    --tensor_parallel_config "enable_mp_async_allreduce replace_with_parallel_cross_entropy"
+    --sharding_parallel_config "enable_overlap"
+    --tensor_parallel_config "enable_mp_async_allreduce"
 )
-#     --sharding_parallel_config "enable_overlap enable_release_grads enable_tensor_fusion"
-
 
 # [fused] [flash_attention]
 DEFAULT_OPTIMIZER_ARGS="
     --fuse_attention_ffn true \
     --fuse_attention_qkv true \
     --fused_linear_param_grad_add 1 \
-    --fuse_sequence_parallel_allreduce true \
+    --fuse_sequence_parallel_allreduce false \
     --use_flash_attention true \
     --use_fused_rope true \
-    --use_fused_rms_norm false \
+    --use_fused_rms_norm false 
     --enable_linear_fused_grad_add true \
 "
 
-# [data] max_seq_length equal config.max_position_embeddings
+# [data]
 DATA_ARGS="
     --input_dir ./data \
     --split 949,50,1 \
     --max_seq_length 32768"
 
-# [runtime_profile]
+# [runtime profiler]
 RUNTIME_PROFILE_ARGS="
-    --profile_time_flag 1 \
     --profile_memory_flag 1 \
-    --profile_forward_only 0 \
-    --save_time_flag 0 \
-    --save_memory_flag 0 \
+    --save_memory_flag 1 \
 "
 
-# [debug] 
-DEBUG_ARGS="
-    --job_schedule_profiler_start 1 \
-    --job_schedule_profiler_end 5 \
-"   
+# [model profiler]
+MODEL_PROFILER_ARGS="
+    --profile_type memory \
+    --profile_mode static \
+    --profile_fixed_batch_size 8 \
+    --layernum_min 1 \
+    --layernum_max 2 \
+    --profile_fixed_seq_length_list 8192 \
+    --num_layertype 1 \
+    --max_tp_deg 8 \
+"
 
-$LAUNCHER \
-    "${MODEL_ARGS[@]}" \
+/apdcephfs_fsgm/share_303760348/anaconda3/envs/lgm-paddle/bin/python ./profile.py \
+    $MODEL_ARGS \
     $TRAIN_ARGS \
     $CONFIG_ARGS \
     "${PARALLEL_ARGS[@]}" \
     $DEFAULT_OPTIMIZER_ARGS \
     $DATA_ARGS \
     $RUNTIME_PROFILE_ARGS \
+    $MODEL_PROFILER_ARGS
+    

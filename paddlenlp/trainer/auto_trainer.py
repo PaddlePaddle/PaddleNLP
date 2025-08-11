@@ -119,6 +119,11 @@ class AutoTrainer(Trainer):
         from ctypes import cdll
         self.libcudart = cdll.LoadLibrary("libcudart.so")
 
+        # @added by linguangming
+        self.input_label_mesh_list = None
+        if 'input_label_mesh_list' in kwargs:
+            self.input_label_mesh_list = kwargs['input_label_mesh_list']
+
     @classmethod
     def parallel_model(cls, model, training_args: AutoTrainingArguments):
         """
@@ -177,7 +182,8 @@ class AutoTrainer(Trainer):
         return model
 
     def _get_meshes_for_loader(self):
-        # return self.input_label_mesh_list        
+        if self.input_label_mesh_list is not None:
+            return self.input_label_mesh_list
         
         def _get_mesh(pp_idx=0):
             return self.global_mesh.get_mesh_with_dim("pp")[pp_idx]  # [NOTE] 注意此处需要修改
@@ -235,6 +241,7 @@ class AutoTrainer(Trainer):
             else:
                 self.optimizer = dist.shard_optimizer(self.optimizer, None, self.args.gradient_accumulation_steps)
 
+            print('After dist_optimizer')
             import math
             param_total_size,  param_local_size = 0, 0
             for name, param in model.named_parameters():
@@ -270,14 +277,16 @@ class AutoTrainer(Trainer):
         print(f"Max memory allocated: {max_memory_allocated} MB")
         print(f"Current memory allocated: {current_memory_allocated} MB")
         
-        # for name, param in model.named_parameters():
-        #     if param.grad is not None:
-        #         print(f'[linguangming] now auto_trainer.py line 261, param name: {name}, dtype {param.grad.dtype}')
-            # print(f'[linguangming] now auto_trainer.py line 261, param name: {name}')
-            # print(param.shape)
-            # print(param._local_shape)
-            # print(f'[linguangming] now auto_trainer.py line 263, exit')
-            # # exit(0)
+        if self.args.to_static == False:
+            import math
+            param_total_size,  param_local_size = 0, 0
+            for name, param in model.named_parameters():
+                total_size = math.prod(param.shape)
+                local_size = math.prod(param._local_shape)
+                param_total_size += total_size
+                param_local_size += local_size
+                print(f'[linguangming] auto_trainer.py, param name: {name}, shape: {param.shape}, local_shape: {param._local_shape}, total_size: {total_size}, local_size: {local_size}')
+            print(f'[linguangming] auto_trainer.py, param_total_size: {param_total_size}, param_local_size: {param_local_size}')
 
         self.model_wrapped = model
         return model, dist_loader

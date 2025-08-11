@@ -1,0 +1,13 @@
+Parsing profile memory configs...
+	parameter sizes: [2595.8083767361113]
+	activation sizes: [{1: 4258.0625, 2: 2257.03125, 4: 1256.515625, 8: 756.2578125, 'checkpoint': 128.0}]
+	other memory pp off: {'model_states': {1: 9003.169921875, 2: 4503.1552734375, 4: 2253.14794921875, 8: 1128.144287109375}, 'activation': {1: 1768.164306640625, 2: 1448.1485595703125, 4: 1288.1406860351562, 8: 1208.1367492675781}}
+	other memory pp on: {'first_stage': {'model_states': {1: 4502.517578125, 2: 2252.5087890625, 4: 1127.50439453125, 8: 563.752197265625}, 'activation': {1: 1984.0, 2: 864.0, 4: 392.0, 8: 196.0}}, 'last_stage': {'model_states': {1: 4502.6611328125, 2: 2252.65087890625, 4: 1127.645751953125, 8: 563.8228759765625}, 'activation': {1: 3268.1248779296875, 2: 3198.1093139648438, 4: 2663.1015014648438, 8: 1331.5507507324219}}}
+Profile memory configs parsed successfully.
+profile_data_parser constructed.
+current strategy: pp_size=2  ,tp_size=2  ,use_ulysses=0  ,dp_size=2  ,sharding_stage=2  ,recompute=0  
+
+memory cost calculating...
+======== memory cost result ========
+stage 0: 61125.02278645833 MB, 59.69240506490071 GB
+stage 1: 48949.3047688802 MB, 47.802055438359574 GB

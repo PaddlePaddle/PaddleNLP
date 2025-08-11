@@ -1,10 +1,11 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-task_name="test"
+task_name="test_1_2_4"
+dir_name="cost_model"
 
-rm -rf output/metric/single/$task_name/
-rm -rf "output/metric/single/$task_name""_log"
+rm -rf output/$dir_name/$task_name/
+rm -rf "output/$dir_name/$task_name""_log"
 
 export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
@@ -12,7 +13,7 @@ export PYTHONPATH=../../../:$PYTHONPATH
 TRAINER="./train_qwen.py"
 LAUNCHER="python -u -m paddle.distributed.launch --log_level DEBUG"
 LAUNCHER="${LAUNCHER} --gpus 0,1,2,3,4,5,6,7" 
-LAUNCHER="${LAUNCHER} --log_dir output/metric/single/$task_name""_log ${TRAINER} --output_dir "./output""
+LAUNCHER="${LAUNCHER} --log_dir output/$dir_name/$task_name""_log ${TRAINER} --output_dir "./output""
 
 # [max_steps] [logging_steps] [enable_auto_parallel]
 TRAIN_ARGS="
@@ -51,8 +52,8 @@ MODEL_ARGS=(
 # "max_position_embeddings": 32768,
 # [mbsz, accumulation_steps] [recompute] [amp]
 CONFIG_ARGS="
-    --per_device_train_batch_size 4 \
-    --gradient_accumulation_steps 4 \
+    --per_device_train_batch_size 2 \
+    --gradient_accumulation_steps 8 \
     --recompute true \
     --recompute_use_reentrant true \
     --recompute_granularity full \
@@ -69,9 +70,9 @@ PARALLEL_ARGS=(
     --to_static 1
     --sharding_parallel_degree 2
     --sharding "stage2"
-    --tensor_parallel_degree 2
+    --tensor_parallel_degree 1
     --sequence_parallel true
-    --pipeline_parallel_degree 2
+    --pipeline_parallel_degree 4
     --virtual_pp_degree 1
     --pipeline_schedule_mode "1F1B"
     --sep_parallel_degree 1

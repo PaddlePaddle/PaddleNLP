@@ -1,18 +1,19 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-task_name="test"
+task_name="fine_grained"
+dir_name="fine_grained_test"
 
-rm -rf output/metric/single/$task_name/
-rm -rf "output/metric/single/$task_name""_log"
+rm -rf output/$dir_name/$task_name/
+rm -rf "output/$dir_name/$task_name""_log"
 
 export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
 
-TRAINER="./train_qwen.py"
+TRAINER="./train_qwen_fine_graine.py"
 LAUNCHER="python -u -m paddle.distributed.launch --log_level DEBUG"
 LAUNCHER="${LAUNCHER} --gpus 0,1,2,3,4,5,6,7" 
-LAUNCHER="${LAUNCHER} --log_dir output/metric/single/$task_name""_log ${TRAINER} --output_dir "./output""
+LAUNCHER="${LAUNCHER} --log_dir output/$dir_name/$task_name""_log ${TRAINER} --output_dir "./output""
 
 # [max_steps] [logging_steps] [enable_auto_parallel]
 TRAIN_ARGS="
@@ -38,7 +39,7 @@ TRAIN_ARGS="
 # [seq_length] [num_hidden_layers]
 # still need to use llama as model_type
 MODEL_ARGS=(
-    --model_type "llama"
+    --model_type "llama_fine_grained_final"
     --num_hidden_layers 4
     --intermediate_size 49152
     --vocab_size 32000
@@ -53,7 +54,7 @@ MODEL_ARGS=(
 CONFIG_ARGS="
     --per_device_train_batch_size 4 \
     --gradient_accumulation_steps 4 \
-    --recompute true \
+    --recompute false \
     --recompute_use_reentrant true \
     --recompute_granularity full \
     --pp_recompute_interval 0 \
@@ -70,7 +71,7 @@ PARALLEL_ARGS=(
     --sharding_parallel_degree 2
     --sharding "stage2"
     --tensor_parallel_degree 2
-    --sequence_parallel true
+    --sequence_parallel false
     --pipeline_parallel_degree 2
     --virtual_pp_degree 1
     --pipeline_schedule_mode "1F1B"
@@ -116,6 +117,12 @@ DEBUG_ARGS="
     --job_schedule_profiler_end 5 \
 "   
 
+# [GranularityRuntime]
+GRANULARITY_RUNTIME_ARGS="
+    --granularity_type coarse_grained \
+    --usp_flag 1 \
+"
+
 $LAUNCHER \
     "${MODEL_ARGS[@]}" \
     $TRAIN_ARGS \
@@ -124,3 +131,4 @@ $LAUNCHER \
     $DEFAULT_OPTIMIZER_ARGS \
     $DATA_ARGS \
     $RUNTIME_PROFILE_ARGS \
+    $GRANULARITY_RUNTIME_ARGS \

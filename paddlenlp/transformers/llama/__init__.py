@@ -20,3 +20,4 @@ from .modeling_pp import *
 from .tokenizer import *
 from .tokenizer_fast import *
 from .modeling_fine_grained import *
+from .modeling_fine_grained_final import *
