@@ -206,6 +206,8 @@ class RolloutStages(Enum):
     REWARD_MODEL_ENABLE_DISABLE = auto()
     ROLLOUT_REWARD_VALUE = auto()
     ROLLOUT_ADVANTAGE = auto()
+    RESHARD = auto()
+    BATCH = auto() # 一个batch处理用时（rollout->make experience-> train)
 
 
 def get_timer_label(stage: Enum) -> str:
@@ -236,6 +238,8 @@ def get_timer_label(stage: Enum) -> str:
         RolloutStages.ROLLOUT_ADVANTAGE: "rollout",
         RolloutStages.REWARD_MODEL_ENABLE_DISABLE: "rollout",
         RolloutStages.ROLLOUT_REWARD_VALUE: "rollout",
+        RolloutStages.RESHARD: "rollout",
+        RolloutStages.BATCH:"batch"
     }
     # stage
     prefix = step_prefix.get(stage, "unknown")
@@ -294,12 +298,14 @@ def data_group_split(tensors, group):
         return new_dict
     elif isinstance(tensors, paddle.Tensor):
         return tensors.split(group.nranks)[group.rank]
+    elif isinstance(tensors, DataProto):
+        return tensors.split_batch_into_micro_batches(batch_size=len(tensors)//group.nranks)[group.rank]
     else:
         logger.debug(f"[data_group_split]Can't parse for type {type(tensors)}")
         return tensors
 
 
-def data_group_merge(tensors, group):
+def data_group_merge(tensors, group, pad_token_id=None):
     """
     Combine data into a new list or dictionary, or perform all_gather_nd operation in the specified group if not None.
 
@@ -333,6 +339,25 @@ def data_group_merge(tensors, group):
         tensor_list = []
         all_gather_nd(tensor_list, tensors, group=group, padded=True)
         return np.concatenate(tensor_list)
+    elif isinstance(tensors, DataProto):
+        tensor_list = []
+        # all_gather_object(tensor_list, tensors, group=group)
+
+        tensors_to_gather_per_key = defaultdict(list)
+        for key in tensors.batch.keys():
+            tensors_to_gather_per_key[key].append(tensors.batch[key])
+        for key in tensors.non_tensor_batch.keys():
+            tensors_to_gather_per_key[key].append(tensors.non_tensor_batch[key])
+
+        global_balanced_batch_dict = {}
+        # Collect and pad tensors from all workers (across DP and Sharding groups)
+        for key in tensors_to_gather_per_key.keys():
+            tensor_list_from_local_batch = tensors_to_gather_per_key[key]
+
+            global_balanced_batch_dict[key] = gather_tensor_list(group, None)(
+                DataProto.pad_or_concat_tensor_list
+            )(tensor_list_from_local_batch, pad_token_id, key)
+        return DataProto.from_single_dict(global_balanced_batch_dict)
     else:
         logger.debug(f"[data_group_merge]Can't parse for type {type(tensors)}")
         return tensors
@@ -621,28 +646,67 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
     dp_group = hcg.get_data_parallel_group()
     pp_rank = hcg.get_stage_id()
 
-    if not hasattr(self, "global_meta_dict") or self.global_meta_dict is None:
-        self.global_meta_dict = init_reshard_mappings(train_model, self.args, pp_rank, pp_group)
 
     if getattr(self, "reshard_controller", None) is not None:
         self.reshard_controller.set_rollout_env("[export_evaluate_model]")
     hcg = fleet.get_hybrid_communicate_group()
     tensor_parallel_degree = hcg.get_model_parallel_world_size()
+    new_dp, new_sdp = hcg.get_data_parallel_group().nranks, hcg.get_sharding_parallel_group().nranks
     tensor_parallel_rank = hcg.get_model_parallel_rank()
+    # rollout_dp_group = hcg.get_data_parallel_group()
+    # print(f"Fu rank:{paddle.distributed.get_rank()}, rollout_dp_group:{rollout_dp_group}, rollout_tp_group:{hcg.get_model_parallel_group()}")
     eval_tp_size = max(tensor_parallel_degree, 1)
     eval_tp_rank = max(tensor_parallel_rank, 0)
-    reshard_to_rollout(
-        train_model, eval_model, self.global_meta_dict, pp_rank, pp_group, hcg.get_model_parallel_group(), tp_group
-    )
+
+    if not hasattr(self, "global_meta_dict") or self.global_meta_dict is None:
+        self.global_meta_dict = init_reshard_mappings(train_model, self.args, pp_rank, pp_group, hcg.get_model_parallel_group())
+
+    gather_in_micro_dp = self.gather_in_micro_dp
+
+    # print(f"Fu before reshard")
+    # print(f"Fu train model weight `train_model.qwen2.layers[0].mlp.down_proj.weight.data._md5sum`: {train_model.qwen2.layers[0].mlp.down_proj.weight.data._md5sum()}")
+    # print(f"FU eval model weight `eval_model.qwen2.layers[0].mlp.down_proj.weight.data._md5sum`: {eval_model.qwen2.layers[0].mlp.down_proj.weight.data._md5sum()}")
+    # if not kwargs.get('hybridflow', False): # 未优化前
+    if not gather_in_micro_dp:
+        reshard_to_rollout(
+            train_model, eval_model, self.global_meta_dict, pp_rank, pp_group, 
+            rollout_tp_group=hcg.get_model_parallel_group(), 
+            train_tp_group=tp_group, 
+            gather_in_micro_dp=False
+        )
+    else: # 优化后，权重只用在micro dp group中进行聚合即可
+        reshard_to_rollout(
+            train_model, eval_model, self.global_meta_dict, pp_rank, pp_group, 
+            micro_dp_group=self.reshard_controller.micro_dp_group, 
+            train_tp_group=tp_group, 
+            rollout_tp=tensor_parallel_degree,
+            train_tp=tp_group.nranks,
+            gather_in_micro_dp=True,
+        )
     if getattr(self, "reshard_controller", None) is not None:
         self.reshard_controller.set_train_env("[after export_evaluate_model]")
 
-    old_dp_workers = self.args.world_size // (max(sd_group.nranks, 1) * max(dp_group.nranks, 1))
-    group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
+    # print(f"Fu after reshard")
+    # print(f"Fu train model weight `train_model.qwen2.layers[0].mlp.down_proj.weight.data._md5sum`: {train_model.qwen2.layers[0].mlp.down_proj.weight.data._md5sum()}")
+    # print(f"FU eval model weight `eval_model.qwen2.layers[0].mlp.down_proj.weight.data._md5sum`: {eval_model.qwen2.layers[0].mlp.down_proj.weight.data._md5sum()}")
+    
+    if not gather_in_micro_dp:
+        # rank        0 1 2 3 4 5 6 7
+        # train tp id 0 0 0 0 2 2 2 2
+        # tp rank     0 1 0 1 0 1 0 1
+        # ans         0 1 0 1 2 3 2 3 
+        old_dp_workers = self.args.world_size // (max(sd_group.nranks, 1) * max(dp_group.nranks, 1))
+        group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
+    else:
+        # rank        0 1 2 3 4 5 6 7
+        # ans         0 0 1 1 2 2 3 3 
+        new_dp_workers = self.args.world_size // (max(new_sdp, 1) * max(new_dp, 1))
+        group_nums = self.args.logical_process_index // new_dp_workers
 
     if not hasattr(self, "_policy_model_eval_group") or self._policy_model_eval_group is None:
         self._policy_model_eval_group = create_data_trans_group(paddle.distributed.get_rank(), group_nums)
 
+    # print(f"Fu micro dp group/_policy_model_eval_group:{self._policy_model_eval_group}")
     return None
 
 
@@ -666,7 +730,7 @@ def create_data_trans_group(global_rank, group_nums):
     for k, v in all_split_table:
         split_dict[k] = v
 
-    split_ranks = {}
+    split_ranks = {} # group idx:rank idx list
     for k, v in all_split_table:
         if v in split_ranks:
             split_ranks[v].append(k)
@@ -998,7 +1062,7 @@ def gather_tensor(tensor, dp_group=None, sd_group=None):
 
     dtype = tensor[0].dtype
 
-    if (dp_group is None and sd_group is None) or (dp_group.nranks == 1 and sd_group.nranks == 1):
+    if (dp_group is None and sd_group is None) or (getattr(dp_group,'nranks',1) == 1 and getattr(sd_group,'nranks',1) == 1):
         return tensor
 
     def map_func(weight):
@@ -1009,7 +1073,7 @@ def gather_tensor(tensor, dp_group=None, sd_group=None):
     tensor = [map_func(i) for i in tensor]
 
     sd_gathered_tensor = []
-    if sd_group.nranks > 1:
+    if sd_group is not None and sd_group.nranks > 1:
         dist.all_gather_object(sd_gathered_tensor, tensor, group=sd_group)
 
     dp_gathered_tensor = []

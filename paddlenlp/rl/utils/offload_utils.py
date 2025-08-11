@@ -179,7 +179,7 @@ class OffloadController:
             paddle.device.synchronize()
 
 
-def reload_and_offload_scope(trainer, *args):
+def reload_and_offload_scope(trainer, *args, **kwargs):
     offload_map = {
         trainer.actor_model: "train_model",
         trainer.reference_model: "freeze_model",
@@ -201,8 +201,9 @@ def reload_and_offload_scope(trainer, *args):
 
     objs = [(arg, offload_map.get(arg, "")) for arg in args if offload_map.get(arg, "") in trainer.args.offload_level]
     if trainer.actor_model not in [i for i, _ in objs]:
-        if getattr(trainer.actor_trainer, "_inner_eval_model", None) is not None:
+        if getattr(trainer.actor_trainer, "_inner_eval_model", None) is not None and kwargs.get("export_only_rollout", False):
             # NOTE(gongenlei): for export_evaluate_model
+            # print(f"Fu offlaod model {type(trainer.actor_model)} {id(trainer.actor_model)}")
             objs.append((trainer.actor_model, offload_map.get(trainer.actor_model, "")))
     if trainer.args.rl_algorithm == "ppo":
         if trainer.critic_model not in [i for i, _ in objs]:

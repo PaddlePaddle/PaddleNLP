@@ -538,6 +538,7 @@ class RLTrainer(RLTrainerBase):
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
         reshard_controller: Optional[ReshardController] = None,
+        **kwargs
     ):
         super().__init__(
             model,
@@ -567,6 +568,7 @@ class RLTrainer(RLTrainerBase):
         # if self.timers:
         #     self.timers.log = types.MethodType(new_timer_log, self.timers)
         self.reshard_controller = reshard_controller
+        self.gather_in_micro_dp = kwargs.get("gather_in_micro_dp", False)
 
     def create_criterion(self):
         """
@@ -600,14 +602,27 @@ class RLTrainer(RLTrainerBase):
         if self.reshard_controller is not None:
             self.reshard_controller.set_rollout_env("[set eval model]")
         hcg = fleet.get_hybrid_communicate_group()
+        new_dp, new_sdp = hcg.get_data_parallel_group().nranks, hcg.get_sharding_parallel_group().nranks
         tensor_parallel_degree = hcg.get_model_parallel_world_size()
         tensor_parallel_rank = hcg.get_model_parallel_rank()
         if self.reshard_controller is not None:
             self.reshard_controller.set_train_env("[after set eval model]")
         eval_tp_size = max(tensor_parallel_degree, 1)
         eval_tp_rank = max(tensor_parallel_rank, 0)
-        group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
-        self._data_trans_group = create_data_trans_group(global_rank, group_nums)
+
+        gather_in_micro_dp = self.gather_in_micro_dp
+        if not gather_in_micro_dp:
+            group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
+            self._data_trans_group = create_data_trans_group(global_rank, group_nums)
+        else:
+            # new_dp_workers = self.args.world_size // (max(new_sdp, 1) * max(new_dp, 1))
+            # group_nums = self.args.logical_process_index // new_dp_workers
+            # self._data_trans_group = create_data_trans_group(global_rank, group_nums)
+            if self.reshard_controller is not None:
+                self._data_trans_group = self.reshard_controller.micro_dp_group
+            else:
+                group_nums = self.args.logical_process_index
+                self._data_trans_group = create_data_trans_group(global_rank, group_nums)
         # just for compatible with old code
         self._policy_model_eval_group = self._data_trans_group
 
@@ -620,6 +635,7 @@ class RLTrainer(RLTrainerBase):
             return self.model_wrapped
         model = getattr(self, "_eval_model", None)
         if model is not None:
+            # print(f"Fu get trainer's eval model: {id(model)}")
             return model
         inner_eval_model = getattr(self, "_inner_eval_model", None)
         if (self.args.pipeline_parallel_degree > 1 and inner_eval_model is None) or isinstance(

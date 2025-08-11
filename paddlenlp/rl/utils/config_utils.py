@@ -26,6 +26,15 @@ from ...transformers.configuration_utils import llmmetaclass
 @dataclass
 @llmmetaclass
 class TrainingArguments(TrainingArguments):
+    gather_in_micro_dp: bool = field(
+        default=False,
+        metadata={"help": "Whether to gather gradients in micro dp mode."},
+    )
+    use_export_only_rollout: bool = field(
+        default=False,
+        metadata={"help": "Whether to use export only rollout."},
+    )
+    
     global_batch_size: int = field(
         default=8,
         metadata={"help": "Global batch size for input prompt."},

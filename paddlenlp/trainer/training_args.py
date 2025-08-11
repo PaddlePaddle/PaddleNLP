@@ -782,6 +782,7 @@ class TrainingArguments:
                 "Following options are supported:\n"
                 "- pp_first. the topo order is dp, pp, sharding, mp \n"
                 "- sharding_first. the topo order is dp, sharding, pp, mp \n"
+                "- mp_first. the topo order is mp, pp, dp, sharding\n"
                 "Default is None, for pp_first"
             )
         },
@@ -1393,6 +1394,11 @@ class TrainingArguments:
                         order = ["dp", "sharding", "pp", "sep", "mp"]
                     else:
                         order = ["dp", "sharding", "pp", "mp"]
+                if self.hybrid_parallel_topo_order == "mp_first":
+                    if is_segment_parallel_supported():
+                        order = ["sep", "mp", "pp", "dp", "sharding"]
+                    else:
+                        order = ["mp", "pp", "dp", "sharding"]
                 if self.use_expert_parallel:
                     order = order[1:-1] + ["dp", "mp"]
 
@@ -1759,6 +1765,13 @@ class TrainingArguments:
                     self.pipeline_parallel_degree,
                     self.tensor_parallel_degree,
                 ]
+            elif self.hybrid_parallel_topo_order == "mp_first":
+                order = ["mp", "pp", "dp"]
+                degree = [
+                    self.tensor_parallel_degree,
+                    self.pipeline_parallel_degree,
+                    self.dataset_world_size,
+                ]
             if sep_degree > 1:
                 order.insert(-1, "sep")
                 degree.insert(-1, sep_degree)
@@ -1774,6 +1787,8 @@ class TrainingArguments:
                     logger.warning(
                         "Currently using sharding_first topo order, but pp_first is recommended when using experts parallel for performance."
                     )
+            elif self.hybrid_parallel_topo_order == "mp_first":
+                order = ["mp", "pp", "dp", "sharding", "sep"]
 
             strategy = fleet.DistributedStrategy()
             strategy.hybrid_configs = {
@@ -2046,7 +2061,7 @@ class TrainingArguments:
 
         if self.hybrid_parallel_topo_order is None:
             self.hybrid_parallel_topo_order = "pp_first"
-        assert self.hybrid_parallel_topo_order in ["pp_first", "sharding_first"]
+        assert self.hybrid_parallel_topo_order in ["pp_first", "sharding_first", "mp_first"]
 
         if self.use_hybrid_parallel and self.enable_auto_parallel:
             self.use_hybrid_parallel = False

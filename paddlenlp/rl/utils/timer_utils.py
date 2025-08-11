@@ -46,6 +46,7 @@ class TimerScope:
         Explicitly start the timer.
         """
         if self.timers:
+            # print(f"Fu Begin {self.name} , {self.label}")
             self.timers(self.label).start()
             self._started = True
 

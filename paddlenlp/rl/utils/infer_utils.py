@@ -17,6 +17,7 @@ from __future__ import annotations
 import copy
 import inspect
 from contextlib import contextmanager
+import time
 
 import paddle
 import paddle.distributed as dist
@@ -32,6 +33,8 @@ from ...transformers import (
 from ...transformers.model_utils import dtype_guard
 from ..trainer.trainer_utils import process_row
 from .offload_utils import offload_tensor_to_cpu, reload_tensor_to_gpu
+from .timer_utils import TimerScope
+from .comm_utils import RolloutStages
 
 try:
     from llm.predict.predictor import (
@@ -95,6 +98,11 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
             input_ids_list.append(row_ids)
 
         if self.config.dynamic_insert:
+            # input_tensor_list = []
+            # for input_ids_item in input_ids_list:
+            #     input_tensor = paddle.to_tensor(input_ids_item,dtype=input_ids.dtype)
+            #     input_tensor_list.append(input_tensor)
+            # print(f"Fu input_ids_list: {[input_tensor.shape for input_tensor in input_tensor_list]} {[input_tensor._md5sum() for input_tensor in input_tensor_list]}")
             outputs = self.predict_dy_insert(
                 input_ids=input_ids_list,
                 return_tokens=True,
@@ -103,6 +111,8 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
                 repeat_num=repeat_num,
                 **kwargs,
             )[-1]
+            # out_tensor = paddle.to_tensor(outputs, dtype=input_ids.dtype)
+            # print(f"Fu out_tensor: {out_tensor.shape} {out_tensor._md5sum()}")
             return paddle.to_tensor(outputs, dtype=input_ids.dtype)
         else:
             raise NotImplementedError("dynamic_insert is False is not supported.")
@@ -258,16 +268,24 @@ class InferEvalModel:
     def enable(self):
         trainer = self.trainer
         if trainer.model is not self.model:
+            # print(f"Fu export to evaluate model from {type(trainer.model)} {id(trainer.model)} to {type(self.model)} {id(self.model)}")
             reload_tensor_to_gpu((trainer.model, "train_model"))
             reload_tensor_to_gpu((self.model, "freeze_model"))
+            timer_scope_reshard = TimerScope(trainer.timers, RolloutStages.RESHARD)
+            timer_scope_reshard.start()
+            # begin_reshard_time = time.time()
             trainer.export_evaluate_model(
                 trainer.model,
                 self.model,
                 with_offload="train_model" in trainer.args.offload_level,
             )
+            # end_reshard_time = time.time()
+            # logger.info(f"Fu Reshard time cost: {end_reshard_time - begin_reshard_time:.4f}s")
+            timer_scope_reshard.stop()
             # NOTE(gongenlei): Add offload
             offload_tensor_to_cpu((trainer.model, "train_model"))
         else:
+            # print(f"Fu DO NOT export model because trainer.model{type(trainer.model)} {id(trainer.model)} == InferEvelModel.model {type(self.model)} {id(self.model)}")
             reload_tensor_to_gpu((self.model, "train_model"))
 
     def disable(self):

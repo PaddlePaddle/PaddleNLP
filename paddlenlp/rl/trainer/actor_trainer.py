@@ -61,6 +61,7 @@ class ActorReferenceTrainerBase(RLTrainer):
         Raises:
             None.
         """
+        # print(f"Fu compute logprob using model: {type(self.model)} {id(self.model)}")
         input_ids = batch.batch["input_ids"]
         position_ids = batch.batch["position_ids"]
         prompt = batch.batch.get("prompt", None)
