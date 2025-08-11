@@ -27,9 +27,7 @@ from paddle.distributed.fleet.meta_parallel import (
     ScheduleNode,
     SharedLayerDesc,
 )
-from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import (
-    WeightGradStore
-)
+from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import WeightGradStore
 
 try:
     from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import EventStore
@@ -721,20 +719,12 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
         ret = (inputs_embeds_mtp_grad, *ret) if self.send_mtp_embed else ret
         return ret
 
-    def mlp_backward_dw(self):
-        if WeightGradStore.enabled:
-            WeightGradStore.put(self.fp8_fusion_moe_node.mlp_node.backward_dw)
-        else:
-            self.fp8_fusion_moe_node.mlp_node.backward_dw()
-
     def mlp_backward(self, output_grad):
         if self.send_mtp_embed:
             inputs_embeds_mtp_grad, hidden_states_grad, residual_grad, l_aux_grad, hidden_states_out_grad = output_grad
         else:
             hidden_states_grad, residual_grad, l_aux_grad, hidden_states_out_grad = output_grad
-        hs_dispatched_grad, dispatched_probs_grad = self.fp8_fusion_moe_node.mlp_node.backward(
-            hidden_states_out_grad, with_dw=False
-        )
+        hs_dispatched_grad, dispatched_probs_grad = self.fp8_fusion_moe_node.mlp_node.backward(hidden_states_out_grad)
 
         ret = (hidden_states_grad, residual_grad, l_aux_grad, hs_dispatched_grad, dispatched_probs_grad)
         ret = (inputs_embeds_mtp_grad, *ret) if self.send_mtp_embed else ret
@@ -812,7 +802,6 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
         output_grad = self.mlp_backward(output_grad)
         # todo(phlrain): overlap here
         output_grad = self.dispatch_backward(output_grad)
-        self.mlp_backward_dw()
         output_grad = self.attn_backward(output_grad)
         return output_grad
 
@@ -856,7 +845,11 @@ class OverlapedFUsionScheduleNode:
 
         combine_backward_event.calc_stream_wait(self.backward_node.moe_group.id)
         paddle.base.core.nvprof_nvtx_push("mlp_backward_dx")
+        assert WeightGradStore.funcs_queue.empty()
+        WeightGradStore.enabled = True
         output_grad = self.backward_node.mlp_backward(output_grad)
+        WeightGradStore.enabled = False
+        WeightGradStore.flush()
         paddle.base.core.nvprof_nvtx_pop()
 
         output_grad_event = deep_ep.get_event_from_calc_stream(self.backward_node.moe_group.id)
@@ -892,7 +885,6 @@ class OverlapedFUsionScheduleNode:
             final_out = self.forward_node.post_process_node.forward_without_residual(inputs)
             paddle.base.core.nvprof_nvtx_pop()
 
-
         final_out_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
 
         paddle.base.core.nvprof_nvtx_push("combine_forward")
@@ -925,13 +917,13 @@ class OverlapedFUsionScheduleNode:
             paddle.base.core.nvprof_nvtx_pop()
 
         dispatch_backward_event.calc_stream_wait(self.backward_node.moe_group.id)
-        
+
         paddle.base.core.nvprof_nvtx_push("attn_backward")
         assert WeightGradStore.funcs_queue.empty()
         WeightGradStore.enabled = True
         output_grad = self.backward_node.attn_backward(output_grad)
         event_to_wait = deep_ep.get_event_from_calc_stream(self.backward_node.moe_group.id)
-        
+
         if EventStore is not None:
             EventStore.set(event_to_wait)
 
@@ -940,16 +932,12 @@ class OverlapedFUsionScheduleNode:
         WeightGradStore.pop()
         assert WeightGradStore.funcs_queue.empty()
 
-        WeightGradStore.enabled = False
-        WeightGradStore.flush()
-        WeightGradStore.pop()
-        assert WeightGradStore.funcs_queue.empty()
         paddle.base.core.nvprof_nvtx_pop()
 
         # residual add
         if pp_stream is None:
             combine_forward_event.calc_stream_wait(self.forward_node.moe_group.id)
-            
+
             final_out = self.forward_node.post_process_node.forward_without_residual(inputs)
             if final_out.shape[-1] != combine_fwd_out.shape[-1]:
                 final_out[:, :, : combine_fwd_out.shape[-1]] += combine_fwd_out  # 直接广播并相加

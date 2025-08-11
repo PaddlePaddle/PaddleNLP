@@ -28,11 +28,8 @@ except ImportError:
             x, y = paddle.chunk(x, chunks=2, axis=-1)
         return F.silu(x) * y
 
-from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import WeightGradStore
-
 
 from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import WeightGradStore
-
 
 USE_DS_GEMM = os.getenv("USE_DS_GEMM", "False").lower() == "true"
 
@@ -74,10 +71,11 @@ def fused_stack_quant(expert_weight_list, transpose=False):
         w, scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(expert_weight_list, transpose=transpose)
     return w, scale
 
-def weight_quant( weight, transpose=False):
+
+def weight_quant(weight, transpose=False):
     if transpose:
         if hasattr(weight, "fp8_weight_transpose"):
-            return weight.fp8_weight_transpose,  weight.fp8_scale_transpose 
+            return weight.fp8_weight_transpose, weight.fp8_scale_transpose
         else:
             return paddle.incubate.nn.functional.fp8_quant_blockwise(
                 weight,
@@ -97,7 +95,7 @@ def weight_quant( weight, transpose=False):
                 input_transpose=False,
                 return_transpose_only=False,
             )
-        
+
 
 class FP8LinearFunctionBase:
     @staticmethod
@@ -181,7 +179,7 @@ class FP8LinearFunctionBase:
 
     @staticmethod
     def compute_fp8_linear(
-        input, weight, weight_transpose=False, return_transpose_only=False, return_mode="output_only", *, out = None
+        input, weight, weight_transpose=False, return_transpose_only=False, return_mode="output_only", *, out=None
     ):
         """
         FP8 Linear 计算函数，支持多种返回模式，支持量化/未量化输入。
@@ -227,7 +225,7 @@ class FP8LinearFunctionBase:
 
         # quant weight
         weight_fp8, weight_scale = weight_quant(weight, weight_transpose)
-       
+
         # FP8 GEMM
         if out is None:
             out = paddle.empty([input_fp8.shape[0], weight_fp8.shape[0]], dtype=weight.dtype)
@@ -266,15 +264,17 @@ class FP8LinearFunctionBase:
                 weight.main_grad = paddle.zeros(shape=weight.shape, dtype=paddle.float32)
             if WeightGradStore.enabled:
                 WeightGradStore.put(
-                    partial(FP8LinearFunctionBase.kitchen_gemm,
-                    input_t,
-                    input_t_scale,
-                    dout_t,
-                    dout_t_scale,
-                    is_a_1d_scaled,
-                    is_b_1d_scaled,
-                    weight.main_grad,
-                    rtn_dtype, )
+                    partial(
+                        FP8LinearFunctionBase.kitchen_gemm,
+                        input_t,
+                        input_t_scale,
+                        dout_t,
+                        dout_t_scale,
+                        is_a_1d_scaled,
+                        is_b_1d_scaled,
+                        weight.main_grad,
+                        rtn_dtype,
+                    )
                 )
                 result = None
 
@@ -308,7 +308,6 @@ class FP8LinearFunctionBase:
         #     x, w1, weight_transpose=True, return_transpose_only=True, return_mode="with_input_transpose_quant"
         # )
 
-    
         w1_fp8, w1_scale = weight_quant(w1, True)
         o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=do3.dtype)
         deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1, num_sms=118)
@@ -331,7 +330,15 @@ class FP8LinearFunctionBase:
                 WeightGradStore.put(
                     partial(
                         FP8LinearFunctionBase.compute_expert_w_grad,
-                    o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, True, True, w2, rtn_dtype=paddle.float32 )
+                        o2_t_fp8,
+                        o2_t_scale,
+                        do3_t_fp8,
+                        do3_t_scale,
+                        True,
+                        True,
+                        w2,
+                        rtn_dtype=paddle.float32,
+                    )
                 )
             else:
 
@@ -357,9 +364,17 @@ class FP8LinearFunctionBase:
                 WeightGradStore.put(
                     partial(
                         FP8LinearFunctionBase.compute_expert_w_grad,
-                    x_t_fp8, x_t_scale, do1_t_fp8, do1_t_scale, True, True, w1, rtn_dtype=paddle.float32)
+                        x_t_fp8,
+                        x_t_scale,
+                        do1_t_fp8,
+                        do1_t_scale,
+                        True,
+                        True,
+                        w1,
+                        rtn_dtype=paddle.float32,
+                    )
                 )
-            
+
             else:
                 FP8LinearFunctionBase.compute_expert_w_grad(
                     x_t_fp8, x_t_scale, do1_t_fp8, do1_t_scale, True, True, w1, rtn_dtype=paddle.float32
@@ -539,21 +554,23 @@ class FP8Linear(paddle.nn.Layer):
     def forward(self, x):
         return FP8LinearFunction.apply(x, self, keep_x=False)
 
-def cache_fp8_weight( weight ):
+
+def cache_fp8_weight(weight):
     if hasattr(weight, "fp8_weight"):
         return
-    w_fp8, w_scale, w_t_fp8, w_t_scale =  paddle.incubate.nn.functional.fp8_quant_blockwise(
-                weight,
-                output_scale_transpose=False,
-                quant_method="128x128",
-                input_transpose=True,
-                return_transpose_only=False,
-            )
-                
+    w_fp8, w_scale, w_t_fp8, w_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+        weight,
+        output_scale_transpose=False,
+        quant_method="128x128",
+        input_transpose=True,
+        return_transpose_only=False,
+    )
+
     setattr(weight, "fp8_weight_transpose", w_t_fp8)
     setattr(weight, "fp8_scale_transpose", w_t_scale)
     setattr(weight, "fp8_weight", w_fp8)
     setattr(weight, "fp8_scale", w_scale)
+
 
 class FP8KeepXLinear(paddle.nn.Layer):
     def __init__(self, in_features: int, out_features: int, bias_attr: bool = False) -> None:
@@ -567,10 +584,7 @@ class FP8KeepXLinear(paddle.nn.Layer):
         )
 
     def fp8_quant_weight(self):
-        cache_fp8_weight( self.weight)
-
-        
-
+        cache_fp8_weight(self.weight)
 
     def forward(self, x):
         return FP8LinearFunction.apply(x, self, keep_x=True)
@@ -723,10 +737,10 @@ class FP8Mlp(paddle.nn.Layer):
             dtype="bfloat16",
             is_bias=False,
         )
-    
+
     def fp8_quant_weight(self):
-        cache_fp8_weight( self.w1)
-        cache_fp8_weight( self.w2)
+        cache_fp8_weight(self.w1)
+        cache_fp8_weight(self.w2)
 
     def forward(self, x):
         if self.using_post_norm_recompute:
@@ -766,7 +780,7 @@ class FP8GroupGemmMlpFunctionNode:
     ):
         self.experts = custom_map.experts
         self.recompute_fwd_gate_up = recompute_fwd_gate_up
-        #self.recompute_fwd_gate_up = True
+        # self.recompute_fwd_gate_up = True
         self.is_split_group_gemm = is_split_group_gemm
         self.tokens_per_expert = None
         self.m_indices = None
@@ -979,7 +993,9 @@ class FP8GroupGemmMlpFunctionNode:
         return dx
 
     def fused_transpose_split_quant(self, x, scale, tokens_per_expert, pow_2_scales):
-        out, scale = paddle.incubate.nn.functional.fused_transpose_split_quant(x, scale, tokens_per_expert, pow_2_scales)
+        out, scale = paddle.incubate.nn.functional.fused_transpose_split_quant(
+            x, scale, tokens_per_expert, pow_2_scales
+        )
         return out, scale
 
     def bwd_down_weight(self, do3, o2, expert_w2):
@@ -987,12 +1003,12 @@ class FP8GroupGemmMlpFunctionNode:
         dw2 = do2_t * do3
         [n, k] = [n, m_sum] * [m_sum, k] (m_sum = sum(tokens_per_expert))
         """
-        if isinstance( o2, tuple):
+        if isinstance(o2, tuple):
             o2_t_fp8, o2_t_scale = o2
         else:
             o2_t_fp8, o2_t_scale = self.fused_transpose_split_quant(o2, None, self.tokens_per_expert, True)
-        
-        if isinstance( do3, tuple):
+
+        if isinstance(do3, tuple):
             do3_t_fp8, do3_t_scale = do3
         else:
             do3_t_fp8, do3_t_scale = self.fused_transpose_split_quant(do3, None, self.tokens_per_expert, True)
@@ -1001,11 +1017,18 @@ class FP8GroupGemmMlpFunctionNode:
             with paddle.no_grad():
                 for i in range(len(expert_w2)):
                     FP8LinearFunctionBase.compute_expert_w_grad(
-                        o2_t_fp8[i], o2_t_scale[i], do3_t_fp8[i], do3_t_scale[i], True, True, expert_w2[i], paddle.float32
+                        o2_t_fp8[i],
+                        o2_t_scale[i],
+                        do3_t_fp8[i],
+                        do3_t_scale[i],
+                        True,
+                        True,
+                        expert_w2[i],
+                        paddle.float32,
                     )
-            
+
         if WeightGradStore.enabled:
-            WeightGradStore.put(partial(cal_weight_fn, o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, expert_w2) )
+            WeightGradStore.put(partial(cal_weight_fn, o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, expert_w2))
         else:
             cal_weight_fn(o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, expert_w2)
 
@@ -1015,17 +1038,21 @@ class FP8GroupGemmMlpFunctionNode:
         [k, n] = [k, m_sum] * [m_sum, n] (m_sum = sum(tokens_per_expert))
         """
         if input_x is None:
-            input_x_t_fp8, input_x_t_scale = self.fused_transpose_split_quant(self.input_fp8, self.input_scale, self.tokens_per_expert, True)
+            input_x_t_fp8, input_x_t_scale = self.fused_transpose_split_quant(
+                self.input_fp8, self.input_scale, self.tokens_per_expert, True
+            )
 
         else:
-            input_x_t_fp8, input_x_t_scale = self.fused_transpose_split_quant(input_x, None, self.tokens_per_expert, True)
+            input_x_t_fp8, input_x_t_scale = self.fused_transpose_split_quant(
+                input_x, None, self.tokens_per_expert, True
+            )
 
         if clear_input:
             self.input = None
             self.input_fp8 = None
             self.input_scale = None
-            
-        do1_t_fp8, do1_t_scale = self.fused_transpose_split_quant(do1,  None, self.tokens_per_expert, True)
+
+        do1_t_fp8, do1_t_scale = self.fused_transpose_split_quant(do1, None, self.tokens_per_expert, True)
 
         def cal_weight_fn(input_x_t_fp8, input_x_t_scale, do1_t_fp8, do1_t_scale, expert_w1):
             with paddle.no_grad():
@@ -1040,13 +1067,13 @@ class FP8GroupGemmMlpFunctionNode:
                         expert_w1[i],
                         paddle.float32,
                     )
-                
+
         if WeightGradStore.enabled:
-            WeightGradStore.put(partial(cal_weight_fn, input_x_t_fp8, input_x_t_scale, do1_t_fp8, do1_t_scale, expert_w1) ) 
+            WeightGradStore.put(
+                partial(cal_weight_fn, input_x_t_fp8, input_x_t_scale, do1_t_fp8, do1_t_scale, expert_w1)
+            )
         else:
             cal_weight_fn(input_x_t_fp8, input_x_t_scale, do1_t_fp8, do1_t_scale, expert_w1)
-
-        
 
     @paddle.no_grad()
     def forward(self, hs_out, unzipped_probs, tokens_per_expert, origin_token_per_experts, output=None):
@@ -1110,6 +1137,7 @@ class FP8GroupGemmMlpFunctionNode:
         do1, o2_s, probs_grad = self.bwd_dowm_input(expert_w2, out_grad, o1, inplace_swiglu_prob=True)
         del o1
         self.o1 = None
+        self.unzipped_probs = None
 
         # dw1
         self.bwd_gate_up_weight(do1, None, expert_w1, clear_input=True)
@@ -1117,17 +1145,20 @@ class FP8GroupGemmMlpFunctionNode:
         self.input_scale = None
         self.input = None
 
-        # dw2
-        if isinstance(out_grad, tuple):
-            out_grad_dequant_fp16 = paddle.incubate.nn.functional.fused_act_dequant(out_grad[0], out_grad[1])
-            self.bwd_down_weight(out_grad_dequant_fp16, o2_s, expert_w2)
-            del out_grad_dequant_fp16
-        else:
-            self.bwd_down_weight(out_grad, o2_s, expert_w2)
-
         # dx
         dx = self.bwd_gate_up_input(do1, expert_w1, dx=out_grad[0] if isinstance(out_grad, tuple) else out_grad)
         del do1
+
+        # dw2
+        if isinstance(out_grad, tuple):
+            do3_fp8, do3_scale = self.fused_transpose_split_quant(
+                out_grad[0], out_grad[1], self.tokens_per_expert, True
+            )
+            out_grad[0]._clear_to_zero_allocation()
+            out_grad[1]._clear_to_zero_allocation()
+            self.bwd_down_weight((do3_fp8, do3_scale), o2_s, expert_w2)
+        else:
+            self.bwd_down_weight(out_grad, o2_s, expert_w2)
 
         self.reset_statue()
         return dx, probs_grad
@@ -1188,7 +1219,9 @@ class FP8GroupGemmMlpFunctionNode:
 
         # dw2
         if isinstance(self.out_grad, tuple):
-            do3_fp8, do3_scale = self.fused_transpose_split_quant(self.out_grad[0], self.out_grad[1], self.tokens_per_expert, True)
+            do3_fp8, do3_scale = self.fused_transpose_split_quant(
+                self.out_grad[0], self.out_grad[1], self.tokens_per_expert, True
+            )
             self.out_grad = None
             self.bwd_down_weight((do3_fp8, do3_scale), self.o2_s, expert_w2)
         else:

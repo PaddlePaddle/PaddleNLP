@@ -719,7 +719,7 @@ class FusionMlpNode:
     def set_recompute_fwd_gate_up(self, recompute_fwd_gate_up):
         self.experts_group_gemm_node.recompute_fwd_gate_up = recompute_fwd_gate_up
 
-    def reset_statue(self, with_dw=False):
+    def reset_statue(self):
         """
         重置所有状态变量。
 
@@ -740,9 +740,8 @@ class FusionMlpNode:
         self.unzip_node = None
         self.zip_node = None
 
-        if with_dw:
-            self.experts_group_gemm_node.reset_statue()
-            self.experts_group_gemm_node = None
+        self.experts_group_gemm_node.reset_statue()
+        self.experts_group_gemm_node = None
 
     @paddle.no_grad()
     def forward(self, hs_2d_dispatched, dispatched_indices, dispatched_probs):
@@ -849,7 +848,7 @@ class FusionMlpNode:
         return expert_out_zipped
 
     @paddle.no_grad()
-    def backward(self, hidden_states_out_grad, with_dw=True):
+    def backward(self, hidden_states_out_grad):
         """
         反向传播函数。
 
@@ -874,10 +873,7 @@ class FusionMlpNode:
         record_stream_for_multi_input(hidden_states_out_grad)
 
         # expert_grad
-        if with_dw:
-            expert_out, probs_grad = self.experts_group_gemm_node.backward(unzipped_grad)
-        else:
-            expert_out, probs_grad = self.experts_group_gemm_node.backward_dx(unzipped_grad)
+        expert_out, probs_grad = self.experts_group_gemm_node.backward(unzipped_grad)
 
         hs_dispatched_grad, dispatched_probs_grad = self.unzip_node.backward(
             expert_out,
@@ -887,7 +883,7 @@ class FusionMlpNode:
             num_experts=len(self.tokens_per_expert),
         )
 
-        self.reset_statue(with_dw)
+        self.reset_statue()
         return hs_dispatched_grad, dispatched_probs_grad
 
     @paddle.no_grad()
@@ -947,11 +943,11 @@ class FusionMoeNode:
             return output
 
     @paddle.no_grad()
-    def backward(self, output_grad, with_dw=True):
+    def backward(self, output_grad):
         output_combine_grad, _ = self.combine_quant_node.backward(output_grad)
         hidden_states_out_grad = self.combine_node.backward(output_combine_grad)
 
-        hs_dispatched_grad, dispatched_probs_grad = self.mlp_node.backward(hidden_states_out_grad, with_dw=with_dw)
+        hs_dispatched_grad, dispatched_probs_grad = self.mlp_node.backward(hidden_states_out_grad)
 
         if DSV3_USE_FP8_DISPATCH:
             hs_fp8_grad, token_probs_grad = self.dispatch_node.backward(hs_dispatched_grad, dispatched_probs_grad)
