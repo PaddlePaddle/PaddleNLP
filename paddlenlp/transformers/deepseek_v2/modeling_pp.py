@@ -721,11 +721,8 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
         ret = (inputs_embeds_mtp_grad, *ret) if self.send_mtp_embed else ret
         return ret
 
-    def mlp_backward_dw(self):
-        if WeightGradStore.enabled:
-            WeightGradStore.put(self.fp8_fusion_moe_node.mlp_node.backward_dw)
-        else:
-            self.fp8_fusion_moe_node.mlp_node.backward_dw()
+    def mlp_backward_dw(self):        
+        self.fp8_fusion_moe_node.mlp_node.backward_dw()
 
     def mlp_backward(self, output_grad):
         if self.send_mtp_embed:
