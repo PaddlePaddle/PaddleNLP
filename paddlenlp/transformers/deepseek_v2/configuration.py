@@ -186,6 +186,8 @@ class DeepseekV2Config(PretrainedConfig):
         is_split_group_gemm=False,
         fakse_gate_restrict_balance=False,
         adaptive_remained_O1_recompute_ratio=0,
+        offline_quant_expert_weight=True,
+        clear_origin_weight_when_offline_quant=True,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -241,6 +243,8 @@ class DeepseekV2Config(PretrainedConfig):
         self.is_split_group_gemm = is_split_group_gemm
         self.fakse_gate_restrict_balance = fakse_gate_restrict_balance
         self.adaptive_remained_O1_recompute_ratio = adaptive_remained_O1_recompute_ratio
+        self.offline_quant_expert_weight = offline_quant_expert_weight
+        self.clear_origin_weight_when_offline_quant = clear_origin_weight_when_offline_quant
 
         super().__init__(
             pad_token_id=pad_token_id,
