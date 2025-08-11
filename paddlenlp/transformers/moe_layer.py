@@ -633,6 +633,7 @@ class Fp8CombineNode:
             allocate_on_comm_stream=allocate_on_comm_stream,
         )
         output_combine.stop_gradient = False
+        self.token_dispatcher._comm_manager.handle = None
         return output_combine
 
     @paddle.no_grad()
