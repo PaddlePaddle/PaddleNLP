@@ -1,67 +1,67 @@
 {
     "1_1_8_False": {
-        "layernum[1]_bsz8_seq8192_first_ms": 4045.4345703125,
-        "layernum[1]_bsz8_seq8192_first_act": 6026.226806640625,
-        "layernum[1]_bsz8_seq8192_first_act_peak": 7526.1875,
-        "layernum[2]_bsz8_seq8192_first_ms": 6965.472900390625,
-        "layernum[2]_bsz8_seq8192_first_act": 10284.289306640625,
-        "layernum[2]_bsz8_seq8192_first_act_peak": 11784.25
+        "layernum[1]_bsz8_seq2048_first_ms": 4042.1533203125,
+        "layernum[1]_bsz8_seq2048_first_act": 1506.556884765625,
+        "layernum[1]_bsz8_seq2048_first_act_peak": 3850.013916015625,
+        "layernum[2]_bsz8_seq2048_first_ms": 6959.191650390625,
+        "layernum[2]_bsz8_seq2048_first_act": 2571.072509765625,
+        "layernum[2]_bsz8_seq2048_first_act_peak": 4914.529541015625
     },
     "1_2_4_False": {
-        "layernum[1]_bsz8_seq8192_first_ms": 4045.8623046875,
-        "layernum[1]_bsz8_seq8192_first_act": 7410.359619140625,
-        "layernum[1]_bsz8_seq8192_first_act_peak": 10910.28125,
-        "layernum[2]_bsz8_seq8192_first_ms": 6965.935791015625,
-        "layernum[2]_bsz8_seq8192_first_act": 11924.422119140625,
-        "layernum[2]_bsz8_seq8192_first_act_peak": 15424.34375
+        "layernum[1]_bsz8_seq2048_first_ms": 4042.2998046875,
+        "layernum[1]_bsz8_seq2048_first_act": 1852.590087890625,
+        "layernum[1]_bsz8_seq2048_first_act_peak": 2727.5703125,
+        "layernum[2]_bsz8_seq2048_first_ms": 6959.373291015625,
+        "layernum[2]_bsz8_seq2048_first_act": 2981.105712890625,
+        "layernum[2]_bsz8_seq2048_first_act_peak": 3856.0859375
     },
     "1_4_2_False": {
-        "layernum[1]_bsz8_seq8192_first_ms": 4046.7177734375,
-        "layernum[1]_bsz8_seq8192_first_act": 10178.625244140625,
-        "layernum[1]_bsz8_seq8192_first_act_peak": 15678.46875,
-        "layernum[2]_bsz8_seq8192_first_ms": 6966.861572265625,
-        "layernum[2]_bsz8_seq8192_first_act": 15204.687744140625,
-        "layernum[2]_bsz8_seq8192_first_act_peak": 20704.53125
+        "layernum[1]_bsz8_seq2048_first_ms": 4042.5927734375,
+        "layernum[1]_bsz8_seq2048_first_act": 2544.656494140625,
+        "layernum[1]_bsz8_seq2048_first_act_peak": 3919.6171875,
+        "layernum[2]_bsz8_seq2048_first_ms": 6959.736572265625,
+        "layernum[2]_bsz8_seq2048_first_act": 3801.172119140625,
+        "layernum[2]_bsz8_seq2048_first_act_peak": 5176.1328125
     },
     "1_8_1_False": {
-        "layernum[1]_bsz8_seq8192_first_ms": 4048.4287109375,
-        "layernum[1]_bsz8_seq8192_first_act": 15715.156494140625,
-        "layernum[1]_bsz8_seq8192_first_act_peak": 25214.84375,
-        "layernum[2]_bsz8_seq8192_first_ms": 6968.713134765625,
-        "layernum[2]_bsz8_seq8192_first_act": 21765.218994140625,
-        "layernum[2]_bsz8_seq8192_first_act_peak": 31264.90625
+        "layernum[1]_bsz8_seq2048_first_ms": 4043.1787109375,
+        "layernum[1]_bsz8_seq2048_first_act": 3928.789306640625,
+        "layernum[1]_bsz8_seq2048_first_act_peak": 6303.7109375,
+        "layernum[2]_bsz8_seq2048_first_ms": 6960.463134765625,
+        "layernum[2]_bsz8_seq2048_first_act": 5441.304931640625,
+        "layernum[2]_bsz8_seq2048_first_act_peak": 7816.2265625
     },
     "1_1_8_True": {
-        "layernum[1]_bsz8_seq8192_first_ms": 3982.9345703125,
-        "layernum[1]_bsz8_seq8192_first_act": 1896.164306640625,
-        "layernum[1]_bsz8_seq8192_first_act_peak": 7331.560791015625,
-        "layernum[2]_bsz8_seq8192_first_ms": 6902.972900390625,
-        "layernum[2]_bsz8_seq8192_first_act": 2024.164306640625,
-        "layernum[2]_bsz8_seq8192_first_act_peak": 7459.560791015625
+        "layernum[1]_bsz8_seq2048_first_ms": 3979.6533203125,
+        "layernum[1]_bsz8_seq2048_first_act": 474.041259765625,
+        "layernum[1]_bsz8_seq2048_first_act_peak": 3946.013916015625,
+        "layernum[2]_bsz8_seq2048_first_ms": 6896.691650390625,
+        "layernum[2]_bsz8_seq2048_first_act": 506.041259765625,
+        "layernum[2]_bsz8_seq2048_first_act_peak": 4071.015869140625
     },
     "2_1_4_False": {
-        "layernum[2]_bsz8_seq8192_first_ms": 6965.7060546875,
-        "layernum[2]_bsz8_seq8192_first_act": 8516.37548828125,
-        "layernum[2]_bsz8_seq8192_first_act_peak": 12484.125
+        "layernum[2]_bsz8_seq2048_first_ms": 6959.2373046875,
+        "layernum[2]_bsz8_seq2048_first_act": 2129.09423828125,
+        "layernum[2]_bsz8_seq2048_first_act_peak": 4753.03125
     },
     "2_2_2_False": {
-        "layernum[2]_bsz8_seq8192_first_ms": 6966.4013671875,
-        "layernum[2]_bsz8_seq8192_first_act": 9028.62548828125,
-        "layernum[2]_bsz8_seq8192_first_act_peak": 12484.125
+        "layernum[2]_bsz8_seq2048_first_ms": 6959.4638671875,
+        "layernum[2]_bsz8_seq2048_first_act": 2257.15673828125,
+        "layernum[2]_bsz8_seq2048_first_act_peak": 3985.03125
     },
     "2_4_1_False": {
-        "layernum[2]_bsz8_seq8192_first_ms": 6967.7919921875,
-        "layernum[2]_bsz8_seq8192_first_act": 10053.12548828125,
-        "layernum[2]_bsz8_seq8192_first_act_peak": 13188.125
+        "layernum[2]_bsz8_seq2048_first_ms": 6959.9169921875,
+        "layernum[2]_bsz8_seq2048_first_act": 2513.28173828125,
+        "layernum[2]_bsz8_seq2048_first_act_peak": 3409.03125
     },
     "4_1_2_False": {
-        "layernum[4]_bsz8_seq8192_first_ms": 13931.40185546875,
-        "layernum[4]_bsz8_seq8192_first_act": 17032.75048828125,
-        "layernum[4]_bsz8_seq8192_first_act_peak": 23432.25
+        "layernum[4]_bsz8_seq2048_first_ms": 13918.46435546875,
+        "layernum[4]_bsz8_seq2048_first_act": 4258.18798828125,
+        "layernum[4]_bsz8_seq2048_first_act_peak": 7586.0625
     },
     "4_2_1_False": {
-        "layernum[4]_bsz8_seq8192_first_ms": 13932.79248046875,
-        "layernum[4]_bsz8_seq8192_first_act": 18057.25048828125,
-        "layernum[4]_bsz8_seq8192_first_act_peak": 24328.25
+        "layernum[4]_bsz8_seq2048_first_ms": 13918.91748046875,
+        "layernum[4]_bsz8_seq2048_first_act": 4514.31298828125,
+        "layernum[4]_bsz8_seq2048_first_act_peak": 6050.0625
     }
 }

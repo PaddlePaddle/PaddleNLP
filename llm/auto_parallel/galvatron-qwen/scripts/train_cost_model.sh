@@ -1,7 +1,7 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-task_name="test_1_2_4"
+task_name="check"
 dir_name="cost_model"
 
 rm -rf output/$dir_name/$task_name/
@@ -22,7 +22,7 @@ TRAIN_ARGS="
     --max_grad_norm 1.0 \
     --learning_rate 3e-05 \
     --min_learning_rate 3e-06 \
-    --max_steps 10 \
+    --max_steps 21 \
     --logging_steps 1 \
     --continue_training 0 \
     --do_train true \
@@ -44,7 +44,7 @@ MODEL_ARGS=(
     --intermediate_size 49152
     --vocab_size 32000
     --hidden_size 8192
-    --seq_length 8192
+    --seq_length 2048
     --num_attention_heads 64
     --num_key_value_heads 8
 )
@@ -54,7 +54,7 @@ MODEL_ARGS=(
 CONFIG_ARGS="
     --per_device_train_batch_size 2 \
     --gradient_accumulation_steps 8 \
-    --recompute true \
+    --recompute false \
     --recompute_use_reentrant true \
     --recompute_granularity full \
     --pp_recompute_interval 0 \
@@ -69,14 +69,14 @@ CONFIG_ARGS="
 PARALLEL_ARGS=(
     --to_static 1
     --sharding_parallel_degree 2
-    --sharding "stage2"
-    --tensor_parallel_degree 1
+    --sharding "stage3"
+    --tensor_parallel_degree 4
     --sequence_parallel true
-    --pipeline_parallel_degree 4
+    --pipeline_parallel_degree 1
     --virtual_pp_degree 1
     --pipeline_schedule_mode "1F1B"
     --sep_parallel_degree 1
-    --pipeline_parallel_config "enable_send_recv_overlap"
+    --pipeline_parallel_config "enable_send_recv_overlap enable_delay_scale_loss"
     --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate"
     --sharding_parallel_config "enable_overlap enable_release_grads"
     --tensor_parallel_config "enable_mp_async_allreduce replace_with_parallel_cross_entropy"

@@ -6,15 +6,15 @@ ProfileDataParserArgs="
     --num_layertype 1 \
     --hidden_size_list 8192 \
     --layernum_list 4 \
-    --seqlen_list 8192 \
+    --seqlen_list 2048 \
     --profile_gpu_num 8 \
     --time_profile_data_path ./configs/computation_profiling_bf16_llama_rank[0].json \
     --memory_profile_data_path ./configs/memory_profiling_bf16_llama.json \
+    --overlap_coe_path ./configs/overlap_coefficient.json \
+    --allreduce_coe_path ./configs/allreduce_bandwidth_1nodes_8gpus_per_node-nccl.json \
+    --p2p_coe_path ./configs/p2p_bandwidth_1nodes_8gpus_per_node-nccl.json \
+    --sp_time_path ./configs/sp_time_1nodes_8gpus_per_node-nccl.json \
 "
-
-    # --overlap_coe_path ./configs/overlap_coefficient.json \
-    # --allreduce_coe_path ./configs/allreduce_bandwidth_1nodes_8gpus_per_node.json \
-    # --p2p_coe_path ./configs/p2p_bandwidth_1nodes_8gpus_per_node.json \
 
 CostModelTrainArgs="
     --strategy pp1_tp2_dp4_stage2_recompute0 \

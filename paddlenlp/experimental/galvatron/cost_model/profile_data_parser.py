@@ -50,9 +50,9 @@ class ProfileDataParser:
     def __init__(self, args:ProfileDataParserArguments):
         self.args = args
         self.validate_args()
-        # self.parse_profile_computation_configs()
+        self.parse_profile_computation_configs()
         self.parse_profile_memory_configs()
-        # self.parse_profile_hardware_configs()
+        self.parse_profile_hardware_configs()
         
     def validate_args(self):
         args = self.args
@@ -298,7 +298,7 @@ class ProfileDataParser:
                     # memory_cost_model_args = MemoryCostModelArguments(strategy=strategy_no_recompute, global_batch_size=global_batch_size, mixed_precision_type=mixed_precision_type, stage_idx=stage_idx, accumulation_steps=accumulation_steps, parameter_memory=self.param_sizes[i], tp_activation_per_bsz_dict=self.act_sizes[i])
                     # re = MemoryCostModel(memory_cost_model_args).get_memory_cost()
                     # memory_per_layer_each_stage_no_recompute[i][stage_idx] = re['enc_total']
-        print(f'\tMemory cost for each layer type at each stage (no recompute): {memory_per_layer_each_stage_no_recompute}')
+            print(f'\tMemory cost for each layer type at each stage (no recompute): {memory_per_layer_each_stage_no_recompute}')
 
         # compose the memory cost of each stage
         if pp_size == 1:
@@ -332,7 +332,7 @@ class ProfileDataParser:
                     memory_cost_per_stage[stage_idx] += memory_per_layer_each_stage_no_recompute[0][stage_idx]
         return memory_cost_per_stage    
     
-    def get_time_cost_for_specific_strategy(self, strategy:Strategy, global_batch_size:int, mixed_precision_type:str, accumulation_steps:int):
+    def get_time_cost_for_specific_strategy(self, strategy:LayerWiseStrategy, global_batch_size:int, mixed_precision_type:str, accumulation_steps:int):
         args = self.args
         
         # get some basic information
@@ -341,31 +341,40 @@ class ProfileDataParser:
         # calculate time cost for each type layer
         timecost_per_layer = [0 for _ in range(args.num_layertype)]
         timecost_per_layer_no_comm = [0 for _ in range(args.num_layertype)]
+        sp_space = 'tp+sp'
+        # sp_space = 'tp'
         for i in range(args.num_layertype):
             # global_batch_size其实是除以了累积步数的
             time_cost_model_args = TimeCostModelArguments(strategy=strategy, global_batch_size=micro_batch_size, mixed_precision_type=mixed_precision_type, seq_length=self.seqlen_list[i], hidden_size=self.hidden_size_list[i],
-                                                          forward_computation_time=self.time_profiled_list[i], parameter_memory=self.param_sizes[i], dp_overlap_coe=self.overlap_coe, bct_overlap_coe=self.overlap_coe, allreduce_coe_dict=self.allreduce_coe, p2p_coe_dict=self.p2p_coe, bct_fct_coe=2)
+                                                          forward_computation_time=self.time_profiled_list[i], parameter_memory=self.param_sizes[i], dp_overlap_coe=self.overlap_coe, bct_overlap_coe=self.overlap_coe, allreduce_coe_dict=self.allreduce_coe, p2p_coe_dict=self.p2p_coe, bct_fct_coe=2,
+                                                          all2all_dict=self.sp_all2all, allreduce_dict=self.sp_allreduce, sp_space=sp_space)
             timecost_per_layer[i] = TimeCostModel(time_cost_model_args).gen_result()
             time_cost_model_args_no_comm = TimeCostModelArguments(strategy=strategy, global_batch_size=micro_batch_size, mixed_precision_type=mixed_precision_type, seq_length=self.seqlen_list[i], hidden_size=self.hidden_size_list[i],
                                                                 forward_computation_time=self.time_profiled_list[i], parameter_memory=self.param_sizes[i], dp_overlap_coe=self.overlap_coe, bct_overlap_coe=self.overlap_coe, allreduce_coe_dict=self.allreduce_coe, p2p_coe_dict=self.p2p_coe, bct_fct_coe=2,
+                                                                all2all_dict=self.sp_all2all, allreduce_dict=self.sp_allreduce, sp_space=sp_space,
                                                                 no_comm=True)
             timecost_per_layer_no_comm[i] = TimeCostModel(time_cost_model_args_no_comm).gen_result()
         
         # calculate time cost for other layers
         other_time_cost_model_args = OtherTimeCostModelArguments(pp_size=strategy.pp_size, min_tp_size=strategy.tp_size, max_tp_size=strategy.tp_size, world_size=args.profile_gpu_num, sharding_stage=strategy.sharding_stage,
-                                                                 hidden_size=self.hidden_size_list[0], mixed_precision_type=mixed_precision_type, micro_batch_size=micro_batch_size,
+                                                                 hidden_size=self.hidden_size_list[0], mixed_precision_type=mixed_precision_type, 
+                                                                 micro_batch_size=micro_batch_size // strategy.dp_size, # NOTE 此处需要修改为再除以在min_tp下的dp
                                                                  sequence_length_list=self.seqlen_list,
                                                                  other_memory_pp_off=self.other_memory_pp_off, other_memory_pp_on=self.other_memory_pp_on, other_time_profiled=self.other_time_profiled_list[0],
-                                                                 allreduce_coe_dict=self.allreduce_coe, bct_fct_coe=2, dp_overlap_coe=self.overlap_coe)
+                                                                 allreduce_coe_dict=self.allreduce_coe, bct_fct_coe=2, dp_overlap_coe=self.overlap_coe,
+                                                                vocab_use_ulysees=strategy.use_ulysses, sp_space=sp_space, allreduce_dict=self.sp_allreduce)
         time_other, time_other_no_comm = OtherTimeCostModel(other_time_cost_model_args).gen_result()  # len(time_other) == strategy.pp_size
         
-        # print(f'\tTime cost for each layer type: {timecost_per_layer}')
-        # print(f'\tTime cost for each layer type without communication: {timecost_per_layer_no_comm}')
-        # print(f'\tTime cost for other layers: {time_other}')
-        # print(f'\tTime cost for other layers without communication: {time_other_no_comm}')
+        print(f'\tTime cost for each layer type: {timecost_per_layer}')
+        print(f'\tTime cost for each layer type without communication: {timecost_per_layer_no_comm}')
+        print(f'\tTime cost for other layers: {time_other}')
+        print(f'\tTime cost for other layers without communication: {time_other_no_comm}')
         
         if strategy.pp_size == 1:
-            cost = (timecost_per_layer_no_comm[0] * self.layernum_list[0] + time_other_no_comm[strategy.tp_size][0]) * (accumulation_steps - 1) + timecost_per_layer[0] * self.layernum_list[0] + time_other[strategy.tp_size][0]
+            cost = (timecost_per_layer_no_comm[0] * self.layernum_list[0] + time_other_no_comm[strategy.tp_size][0]) * \
+                     (accumulation_steps - 1) + \
+                    timecost_per_layer[0] * self.layernum_list[0] + \
+                    time_other[strategy.tp_size][0]
             return cost
         
         # calculate the time cost of each stage
@@ -387,17 +396,24 @@ class ProfileDataParser:
                 stage_costs_compute[stage_idx] += timecost_per_layer_no_comm[layer_type]
         for stage_idx in range(pp_size):
             stage_costs_compute[stage_idx] += time_other_no_comm[strategy.tp_size][stage_idx]
+            stage_costs_bsz_chunked[stage_idx] += time_other[strategy.tp_size][stage_idx]
 
         # compose all stages' time cost
         stage_costs_reduce = [total for total in stage_costs_bsz_chunked]
         result = np.sum(stage_costs_compute) + stage_costs_compute[-1] * (accumulation_steps - 1)
+        print(f'pp_size: {pp_size}, tp_size: {strategy.tp_size}, time cost: {result}')
         result = max(result,
                      max(min(pp_size - 1, accumulation_steps - 1) * stage_costs_compute[0] * 1/3, np.sum(stage_costs_compute[1:]) * 1/3) + 
                      max(min(pp_size -1 , accumulation_steps - 1) * stage_costs_compute[0] * 2/3, np.sum(stage_costs_compute[1:]) * 2/3) +
                      stage_costs_compute[0] * max(0, accumulation_steps + 1 - pp_size))
+        print(f'[linguangming] stage_costs_compute is {stage_costs_compute}')
+        print(f'[linguangming] origin stage_costs_reduce is {stage_costs_reduce}')
+        # for stage_idx in range(pp_size):
+        #     stage_costs_reduce[stage_idx] -= np.sum(stage_costs_compute[:stage_idx + 1]) # sum不是很对把
         for stage_idx in range(pp_size):
-            stage_costs_reduce[stage_idx] -= np.sum(stage_costs_compute[:stage_idx + 1])
-        reduce_time = np.max(stage_costs_reduce)
+            stage_costs_reduce[stage_idx] -= stage_costs_compute[stage_idx]
+        print(f'[linguangming] after reduce stage_costs_reduce is {stage_costs_reduce}')
+        reduce_time = np.sum(stage_costs_reduce)
         reduce_time = reduce_time if reduce_time > 0 else 0.0
         result += reduce_time
         

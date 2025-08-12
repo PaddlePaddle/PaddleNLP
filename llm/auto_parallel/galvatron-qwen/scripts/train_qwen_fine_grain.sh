@@ -1,7 +1,7 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-task_name="fine_grained"
+task_name="cost_model"
 dir_name="fine_grained_test"
 
 rm -rf output/$dir_name/$task_name/
@@ -44,7 +44,7 @@ MODEL_ARGS=(
     --intermediate_size 49152
     --vocab_size 32000
     --hidden_size 8192
-    --seq_length 8192
+    --seq_length 2048
     --num_attention_heads 64
     --num_key_value_heads 8
 )
@@ -52,7 +52,7 @@ MODEL_ARGS=(
 # "max_position_embeddings": 32768,
 # [mbsz, accumulation_steps] [recompute] [amp]
 CONFIG_ARGS="
-    --per_device_train_batch_size 4 \
+    --per_device_train_batch_size 2 \
     --gradient_accumulation_steps 4 \
     --recompute false \
     --recompute_use_reentrant true \
@@ -68,11 +68,11 @@ CONFIG_ARGS="
 # [dp_deg, dp_type] [tp_deg, megatron-sp] [pp_deg, 1F1B] [parallel_configs]
 PARALLEL_ARGS=(
     --to_static 1
-    --sharding_parallel_degree 2
+    --sharding_parallel_degree 4
     --sharding "stage2"
     --tensor_parallel_degree 2
     --sequence_parallel false
-    --pipeline_parallel_degree 2
+    --pipeline_parallel_degree 1
     --virtual_pp_degree 1
     --pipeline_schedule_mode "1F1B"
     --sep_parallel_degree 1

@@ -52,9 +52,13 @@ class MemoryCostModel:
             
         else:
             self.zero2_ratio = (lambda d: (1/3 + 2/3 * (1/d)))
-            self.zero3_ratio = (lambda d: (1/9 + 7/9 * (1/d)))
+            self.zero3_ratio = (lambda d: (2/9 + 7/9 * (1/d)))
             
-        
+        if self.use_ulysses:
+            self.sdp_size = self.dp_size * self.tp_size
+        else:
+            self.sdp_size = self.dp_size
+            
     def estimate_parameter_size(self):
         args = self.args
         if self.use_ulysses:
@@ -70,9 +74,9 @@ class MemoryCostModel:
         else:
             self.model_states_size = self.parameter_size * 9
         if self.sharding_stage == 3:
-            self.model_states_size *= self.zero3_ratio(self.dp_size)
+            self.model_states_size *= self.zero3_ratio(self.sdp_size)
         elif self.sharding_stage == 2:
-            self.model_states_size *= self.zero2_ratio(self.dp_size)
+            self.model_states_size *= self.zero2_ratio(self.sdp_size)
     
     def estimate_activation_size(self):
         args = self.args
@@ -119,10 +123,9 @@ class OtherMemoryCostModel:
         if args.accumulation_steps == 1:
             self.zero2_ratio = (lambda d: (1/7 + 6/7 * (1/d)))
             self.zero3_ratio = (lambda d: (1/d))
-            
         else:
             self.zero2_ratio = (lambda d: (1/3 + 2/3 * (1/d)))
-            self.zero3_ratio = (lambda d: (1/9 + 7/9 * (1/d)))
+            self.zero3_ratio = (lambda d: (2/9 + 7/9 * (1/d)))
             
         self.zero_ratio = self.zero2_ratio if args.sharding_stage == 2 else (self.zero3_ratio if args.sharding_stage == 3 else (lambda d: 1.0))
     
@@ -142,7 +145,9 @@ class OtherMemoryCostModel:
 
             if args.use_ulysses:
                 model_tp = 1
+                zero_ratio_value = self.zero_ratio(dp_size * tp_size)
             else:
+                zero_ratio_value = self.zero_ratio(dp_size)
                 model_tp = tp_size
             
             model_states_adjust = 1
@@ -152,7 +157,7 @@ class OtherMemoryCostModel:
             if args.pp_size == 1: # no pp -> only one stage
                 # print("other cost model states", args.other_memory_pp_off['model_states'][tp_size] * self.zero_ratio(dp_size))
                 # print("other cost model activation", args.other_memory_pp_off['activation'][tp_size] * other_layers_bsz)
-                tp_other_memory_cost[0] = model_states_adjust * args.other_memory_pp_off['model_states'][model_tp] * self.zero_ratio(dp_size) + args.other_memory_pp_off['activation'][tp_size] * other_layers_bsz
+                tp_other_memory_cost[0] = model_states_adjust * args.other_memory_pp_off['model_states'][model_tp] * zero_ratio_value + args.other_memory_pp_off['activation'][tp_size] * other_layers_bsz
             else: # pp -> 0:first stage, -1:last stage (here we assume accumulation_steps is greater than pp_size, which holds true in industrial practice. )
                 other_layers_bsz_first = other_layers_bsz * args.pp_size
                 other_layers_bsz_last = other_layers_bsz * 1
@@ -161,8 +166,8 @@ class OtherMemoryCostModel:
                 # print("other cost model activation first stage", args.other_memory_pp_on['first_stage']['activation'][tp_size] * other_layers_bsz_first)
                 # print("other cost model states last stage", args.other_memory_pp_on['last_stage']['model_states'][tp_size] * self.zero_ratio(dp_size))
                 # print("other cost model activation last stage", args.other_memory_pp_on['last_stage']['activation'][tp_size] * other_layers_bsz_last)
-                tp_other_memory_cost[0] = model_states_adjust* args.other_memory_pp_on['first_stage']['model_states'][model_tp] * self.zero_ratio(dp_size) + args.other_memory_pp_on['first_stage']['activation'][tp_size] * other_layers_bsz_first
-                tp_other_memory_cost[-1] = model_states_adjust* args.other_memory_pp_on['last_stage']['model_states'][model_tp] * self.zero_ratio(dp_size) + args.other_memory_pp_on['last_stage']['activation'][tp_size] * other_layers_bsz_last
+                tp_other_memory_cost[0] = model_states_adjust* args.other_memory_pp_on['first_stage']['model_states'][model_tp] * zero_ratio_value + args.other_memory_pp_on['first_stage']['activation'][tp_size] * other_layers_bsz_first
+                tp_other_memory_cost[-1] = model_states_adjust* args.other_memory_pp_on['last_stage']['model_states'][model_tp] * zero_ratio_value + args.other_memory_pp_on['last_stage']['activation'][tp_size] * other_layers_bsz_last
             
             for i in range(len(tp_other_memory_cost)):
                 tp_other_memory_cost[i] += args.paddle_context_memory

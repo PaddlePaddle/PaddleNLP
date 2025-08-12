@@ -59,12 +59,13 @@ class DummyDataset(Dataset):
             self.label_list.append(label)
     
     def __getitem__(self, idx):
+        idx = idx % self.dataset_size
         if idx >= self.dataset_size:
             raise IndexError("Index out of range")
         return {"input_ids": self.input_list[idx], "labels": self.label_list[idx]}
     
     def __len__(self):
-        return self.dataset_size * 20 * 8
+        return self.dataset_size * 20 * 8 * 4096
 
 try:
     from datasets import load_dataset as hf_load_dataset

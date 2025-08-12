@@ -58,11 +58,13 @@ class TimeCostModel:
         self.use_ulysses = strategy.use_ulysses
         
         if self.use_ulysses:
+            self.sdp_size = self.dp_size * self.tp_size
             if self.tp_size == 1:
                 self.sp_dict = np.inf
             else:
                 self.sp_dict = args.all2all_dict[self.tp_size]
         else:
+            self.sdp_size = self.dp_size
             if self.tp_size == 1:
                 self.sp_dict = np.inf
             else:
@@ -94,17 +96,17 @@ class TimeCostModel:
             
     def estimate_dp_communication_cost(self):
         args = self.args
-        self.dp_message_size = 2 * (self.dp_size - 1) / self.dp_size * self.parameter_size * args.dummy_layernum
+        self.dp_message_size = 2 * (self.sdp_size - 1) / self.sdp_size * self.parameter_size * args.dummy_layernum # TODO 是否也需要修改为sdp_size
         
-        if args.mixed_precision_type == 'fp16' or args.mixed_precision_type == 'bf16':
-            self.dp_message_size /= 2  # [NOTE] gradient is in fp16 or bf16, so the message size is halved.
+        # if args.mixed_precision_type == 'fp16' or args.mixed_precision_type == 'bf16': # 貌似是fp32规约
+        #     self.dp_message_size /= 2  # [NOTE] gradient is in fp16 or bf16, so the message size is halved.
             
+        self.fsdp_allgather_message_size = self.dp_message_size * 0.5
+        
         if args.no_comm:
             self.dp_message_size = 0.0
         
-        self.fsdp_allgather_message_size = self.dp_message_size * 0.5
-        
-        self.dc = args.allreduce_coe_dict[self.dp_size]  # TODO check this is correct or not
+        self.dc = args.allreduce_coe_dict[self.sdp_size]  # modify to sdp.size
     
     def estimate_tp_communication_cost(self):
         args = self.args
@@ -169,7 +171,7 @@ class TimeCostModel:
             overlap_part = dp_overlap_time
             rest_part = 0.0
             rest_dp_flag = False
-        # print(f'time cost model bct_dp_overlap: overlap_part: {overlap_part}, rest_part: {rest_part}, rest_dp_flag: {rest_dp_flag}')
+        print(f'time cost model bct_dp_overlap: overlap_part: {overlap_part}, rest_part: {rest_part}, rest_dp_flag: {rest_dp_flag}')
         return overlap_part, rest_part, rest_dp_flag
     
     def gen_result(self):
@@ -214,7 +216,7 @@ class OtherTimeCostModelArguments:
     min_tp_size: int = field(default=1, metadata={"help": "The min tp size of the model."})
     max_tp_size: int = field(default=1, metadata={"help": "The max tp size of the model."})
     world_size: int = field(default=1, metadata={"help": "The world size of the model."})
-    embed_sdp: int = field(default=0, metadata={"help": "The sharding stage of the model."})
+    sharding_stage: int = field(default=0, metadata={"help": "The sharding stage of the model."})
     
     hidden_size: int = field(default=4096, metadata={"help": "The hidden size of the model."})
     mixed_precision_type: str = field(default='fp16', metadata={"help": "The mixed precision type of the model."})
@@ -266,24 +268,32 @@ class OtherTimeCostModel:
         self.dp_message_size = {}
         self.dp_coe = {}
         
+        model_state_divide_param = 9 # model states = param * 9
+        gradient_type_divide_param_type = 2
+        
         tp_size = args.min_tp_size
         while tp_size <= args.max_tp_size and tp_size * args.pp_size <= args.world_size:
-            dp_size = args.world_size // tp_size // args.pp_size
-            self.dp_coe[tp_size] = args.allreduce_coe_dict[dp_size] * (dp_size - 1) / dp_size
+            if args.vocab_use_ulysees:
+                sdp_size = args.world_size // args.pp_size
+                self.dp_coe[tp_size] = args.allreduce_coe_dict[sdp_size] * (sdp_size - 1) / sdp_size
+            else:
+                sdp_size = args.world_size // args.pp_size // tp_size
+                self.dp_coe[tp_size] = args.allreduce_coe_dict[sdp_size] * (sdp_size - 1) / sdp_size
+            
             if args.pp_size == 1:
                 if args.vocab_use_ulysees:
-                    self.dp_message_size[tp_size] = args.other_memory_pp_off['model_states'][1] / 4 # Divided by 4 because the model states are 4 times the parameter size.
+                    self.dp_message_size[tp_size] = gradient_type_divide_param_type * args.other_memory_pp_off['model_states'][1] / model_state_divide_param
                 else:
-                    self.dp_message_size[tp_size] = args.other_memory_pp_off['model_states'][tp_size] / 4 # Divided by 4 because the model states are 4 times the parameter size.
+                    self.dp_message_size[tp_size] = gradient_type_divide_param_type * args.other_memory_pp_off['model_states'][tp_size] / model_state_divide_param
             else:
                 if args.vocab_use_ulysees:
-                    self.dp_message_size[tp_size] = (args.other_memory_pp_on['first_stage']['model_states'][1] / 4, args.other_memory_pp_on['last_stage']['model_states'][1] / 4)
+                    self.dp_message_size[tp_size] = gradient_type_divide_param_type * (args.other_memory_pp_on['first_stage']['model_states'][1] / model_state_divide_param, gradient_type_divide_param_type * args.other_memory_pp_on['last_stage']['model_states'][1] / model_state_divide_param)
                 else:
-                    self.dp_message_size[tp_size] = (args.other_memory_pp_on['first_stage']['model_states'][tp_size] / 4, args.other_memory_pp_on['last_stage']['model_states'][tp_size] / 4)
+                    self.dp_message_size[tp_size] = (gradient_type_divide_param_type * args.other_memory_pp_on['first_stage']['model_states'][tp_size] / model_state_divide_param, gradient_type_divide_param_type * args.other_memory_pp_on['last_stage']['model_states'][tp_size] / model_state_divide_param)
             
             tp_size *= 2
             
-        if args.embed_sdp == 1:
+        if args.sharding_stage == 3:
             self.fwd_factor = 0.5
             self.bwd_factor = 1.0
         else:

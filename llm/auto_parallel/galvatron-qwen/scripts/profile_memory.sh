@@ -116,7 +116,7 @@ MODEL_PROFILER_ARGS="
     --profile_fixed_batch_size 8 \
     --layernum_min 1 \
     --layernum_max 2 \
-    --profile_fixed_seq_length_list 8192 \
+    --profile_fixed_seq_length_list 2048 \
     --num_layertype 1 \
     --max_tp_deg 8 \
 "

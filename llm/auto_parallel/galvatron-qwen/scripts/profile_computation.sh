@@ -10,7 +10,7 @@ export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
 
 TRAINER="./train_qwen.py"
-LAUNCHER="python -u -m paddle.distributed.launch"
+LAUNCHER="/apdcephfs_fsgm/share_303760348/anaconda3/envs/lgm-paddle/bin/python -u -m paddle.distributed.launch"
 LAUNCHER="${LAUNCHER} --gpus 7"  # 设置需要使用的GPU
 LAUNCHER="${LAUNCHER} --log_dir output/$dir_name/$task_name""_log ${TRAINER} --output_dir "./output""
 
@@ -80,8 +80,8 @@ PARALLEL_ARGS=(
     --sep_parallel_degree 1
     --pipeline_parallel_config "enable_send_recv_overlap"
     --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate"
-    --sharding_parallel_config "enable_overlap"
-    --tensor_parallel_config "enable_mp_async_allreduce"
+    --sharding_parallel_config "enable_overlap enable_release_grads"
+    --tensor_parallel_config "enable_mp_async_allreduce replace_with_parallel_cross_entropy"
 )
 
 # [fused] [flash_attention]
@@ -89,7 +89,7 @@ DEFAULT_OPTIMIZER="
     --fuse_attention_ffn true \
     --fuse_attention_qkv true \
     --fused_linear_param_grad_add 1 \
-    --fuse_sequence_parallel_allreduce false \
+    --fuse_sequence_parallel_allreduce true \
     --use_flash_attention true \
     --use_fused_rope true \
     --use_fused_rms_norm false \
@@ -114,15 +114,15 @@ MODEL_PROFILER_ARGS="
     --profile_type computation \
     --profile_mode batch \
     --profile_min_batch_size 1 \
-    --profile_max_batch_size 12 \
+    --profile_max_batch_size 8 \
     --profile_batch_size_step 1 \
-    --layernum_min 2 \
-    --layernum_max 4 \
-    --profile_fixed_seq_length_list 8192 \
+    --layernum_min 1 \
+    --layernum_max 2 \
+    --profile_fixed_seq_length_list 2048 \
     --num_layertype 1 \
 "
 
-python ./profile.py \
+/apdcephfs_fsgm/share_303760348/anaconda3/envs/lgm-paddle/bin/python ./profile.py \
     $MODEL_ARGS \
     $TRAIN_ARGS \
     $CONFIG_ARGS \
