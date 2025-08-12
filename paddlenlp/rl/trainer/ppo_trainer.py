@@ -1075,7 +1075,9 @@ class PPOTrainer(RLTrainerBase):
         len_dataloader = None
         if not self._is_iterable_dataset(self.train_dataset):
             len_dataloader = len(train_dataloader)
-            num_train_sub_steps = self.args.global_mini_batch_size // args.per_device_train_batch_size
+            num_train_sub_steps = (
+                args.global_mini_batch_size * args.rollout_n * args.update_iters
+            ) // args.per_device_train_batch_size
             num_update_steps_per_epoch = (num_train_sub_steps // args.gradient_accumulation_steps) * len_dataloader
             num_examples = len(self.train_dataset)
             if args.max_steps > 0:
