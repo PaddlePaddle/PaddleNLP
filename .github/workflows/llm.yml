@@ -135,7 +135,8 @@ jobs:
             docker exec -t $container_name /bin/bash -c '
             cd /workspace/PaddleNLP
             git revert f2477c07272d04244cd3287d1f21c70482a4a85f --no-edit  # 套件PR#10413引入bug-待修复
-            rm -rf tests/llm/test_grpo.py tests/llm/test_reinforce_plus_plus.py
+            git revert 3e9d3518cbecd8357cec14f059776272713d5c62 --no-edit  # 套件PR#10912引入bug-待修复
+            # rm -rf tests/llm/test_grpo.py tests/llm/test_reinforce_plus_plus.py
             '
           fi
       
