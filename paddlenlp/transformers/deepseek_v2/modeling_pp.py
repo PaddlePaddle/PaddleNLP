@@ -870,7 +870,8 @@ class OverlapedFUsionScheduleNode:
         dispatch_backward_event = deep_ep.get_event_from_comm_stream(self.backward_node.moe_group.id)
 
         paddle.base.core.nvprof_nvtx_push("dispatch_backward_dw")
-        self.backward_node.mlp_backward_dw()
+        WeightGradStore.pop()
+        assert WeightGradStore.funcs_queue.empty()
         paddle.base.core.nvprof_nvtx_pop()
 
         dispatch_forward_event.calc_stream_wait(self.forward_node.moe_group.id)
