@@ -35,46 +35,32 @@ export NVSHMEM_IB_TRAFFIC_CLASS=162
 #export NVSHMEM_IB_ENABLE_IBGDA=true
 ##export NVSHMEM_DISABLE_P2P=1
 export NVSHMEM_BOOTSTRAP=UID
-export NVSHMEM_BOOTSTRAP_UID_SOCK_IFNAME==eth0
 
-export FLAGS_cudnn_deterministic=1
-export FLAGS_embedding_deterministic=1
+unset NVSHMEM_HCA_LIST 
+unset NVSHMEM_ENABLE_NIC_PE_MAPPING
 
-# Use nodes in the range [START_RANK, END_RANK)
-START_RANK=0
-END_RANK=1
-
-if [[ $rank -lt $START_RANK ]]; then
+LAUNCH_CMD=`python script/selective_launch.py 36677`
+if [[ -z "$LAUNCH_CMD" ]]; then
     exit 0
 fi
 
-if [[ $rank -ge $END_RANK ]]; then
-    exit 0
-fi
-
-rank=$(($rank-$START_RANK))
-nnodes=$(($END_RANK-$START_RANK))
-
-master=`hostname -i`
-port=36679
 export PYTHONPATH=../:$PYTHONPATH
-export PATH=/opt/nvidia/nsight-systems/2025.1.1/bin/:$PATH
+export CUDA_PATH=/usr/local/cuda-12.9
 
 export DSV3_USE_FP8_GEMM=true
 export DSV3_USE_ATTEN_RECOMPUTE=true
-# export FA_VERSION=3
-export CUDA_PATH=/usr/local/cuda-12.9
+export FA_VERSION=3
 export FLAGS_share_tensor_for_grad_tensor_holder=1
-export DSV3_USE_FP8_DISPATCH=False
+export FLAGS_use_default_stream=false
+export DSV3_USE_FP8_DISPATCH=true
+export USE_DS_GEMM=false
+
 
 bash script/kill_process.sh 
 
-# /opt/nvidia/nsight-compute/2025.2.0/host/target-linux-x64/nsys profile --stats=true -t cuda,nvtx -o fp8_overlap_quant --force-overwrite true \
 python3.10 -m paddle.distributed.launch \
     --log_dir output/paddle_distributed_logs \
-    --master $master:$port \
-    --nnodes $nnodes \
-    --rank $rank \
+    $LAUNCH_CMD \
     --run_mode=collective \
     ${script:-run_pretrain.py}  \
     $@
