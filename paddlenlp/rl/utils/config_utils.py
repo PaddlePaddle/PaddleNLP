@@ -347,7 +347,6 @@ class TrainingArguments(TrainingArguments):
 
         if self.global_mini_batch_size < 0:
             self.global_mini_batch_size = self.global_batch_size
-            
         if (
             self.global_batch_size % self.dataset_world_size != 0
             or self.global_mini_batch_size % self.dataset_world_size != 0
