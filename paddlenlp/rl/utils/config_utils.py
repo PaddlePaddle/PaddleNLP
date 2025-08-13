@@ -300,6 +300,7 @@ class TrainingArguments(TrainingArguments):
         metadata={"help": "Whether to use tgt for KL."},
     )
     use_rm_server: bool = field(default=False, metadata={"help": "Use reward server instead of reward model."})
+    use_rule_reward: bool = field(default=False, metadata={"help": "Use rule-based reward only for gsm8k, to date."})
     use_fp32_compute: bool = field(
         default=False, metadata={"help": "Use fp32 to compute xx_log_prob,rewards, advantages and loss."}
     )
@@ -345,7 +346,7 @@ class TrainingArguments(TrainingArguments):
         self._post_init_parallel_degree()
 
         if self.global_mini_batch_size < 0:
-            self.global_mini_batch_size = self.global_batch_size
+            self.global_mini_batch_size = self.global_batch_size // self.dataset_world_size
 
         if (
             self.global_batch_size % self.dataset_world_size != 0
@@ -382,6 +383,7 @@ class TrainingArguments(TrainingArguments):
             // self.per_device_train_batch_size
             // self.dataset_world_size
         )
+
         if self.gradient_accumulation_steps <= 0:
             logger.warning(
                 f"gradient_accumulation_steps: {self.gradient_accumulation_steps} must be greater than zero!"
@@ -443,14 +445,14 @@ class TrainingArguments(TrainingArguments):
             self.normalize_advantage = False
 
         max_per_device_eval_batch_size = (
-            self.global_mini_batch_size * self.rollout_n * self.update_iters // self.dataset_world_size
+            self.global_batch_size * self.rollout_n * self.update_iters // self.dataset_world_size
         )
         if self.per_device_eval_batch_size > max_per_device_eval_batch_size:
             logger.warning(
                 f"per_device_eval_batch_size: {self.per_device_eval_batch_size} is larger than "
-                f"global_mini_batch_size: {self.global_mini_batch_size} * rollout_n: "
+                f"global_batch_size: {self.global_batch_size} * rollout_n: "
                 f"{self.rollout_n} * update_iters: {self.update_iters}, which may cause infer error. "
-                f"We will set it to global_mini_batch_size * rollout_n * update_iters // dataset_world_size!"
+                f"We will set it to global_batch_size * rollout_n * update_iters // dataset_world_size!"
             )
             self.per_device_eval_batch_size = max_per_device_eval_batch_size
 
@@ -530,7 +532,7 @@ class ModelArgument:
     )
     actor_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
     reward_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
-    reward_critic_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
+    critic_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
     stage: str = field(default="PPO", metadata={"help": "The type of training."})
     critic_recompute_granularity: str = field(
         default="full",

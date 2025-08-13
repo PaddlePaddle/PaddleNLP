@@ -46,6 +46,7 @@ from ...trainer.trainer import (
     logger,
     speed_metrics,
 )
+from ...trainer.trainer_utils import SchedulerType
 from ...trainer.utils.helper import broadcast_dataset_rank0_model, distributed_concat
 from ...transformers import (
     CosineAnnealingWithWarmupDecay,
@@ -287,6 +288,37 @@ class PPOTrainer(RLTrainerBase):
                 preprocess_logits_for_metrics,
             )
 
+        self.train_dataset = train_dataset
+        self.eval_dataset = eval_dataset
+        self._model_config = actor_model.config
+        self._actor_model_eval = actor_model_eval
+        self._critic_model_eval = critic_model_eval
+
+        # ##### trainging data and related num setting #####
+        with (
+            guard_set_args(
+                args,
+                {"per_device_train_batch_size": self.args.global_gen_batch_size // self.args.dataset_world_size},
+            ),
+            guard_set_args(
+                self,
+                {"train_dataset": self.train_dataset, "data_collator": self.data_collator},
+            ),
+        ):
+            self.train_dataloader = self.prompt_only_dataloader = self.get_train_dataloader()  # 64
+
+        (
+            self.total_train_batch_size,
+            self.len_dataloader,
+            self.max_steps,
+            self.num_train_epochs,
+            self.num_update_steps_per_epoch,
+            self.num_examples_,  # There is a problem with duplicate names
+            self.num_train_samples,
+        ) = self.init_train_num(self.train_dataloader)
+
+        args.max_steps = self.max_steps
+
         self.reshard_controller = reshard_controller
         trainer_agrs = {
             # "model": None,
@@ -331,11 +363,6 @@ class PPOTrainer(RLTrainerBase):
             **trainer_agrs,
         )
 
-        self.train_dataset = train_dataset
-        self.eval_dataset = eval_dataset
-        self._model_config = actor_model.config
-        self._actor_model_eval = actor_model_eval
-        self._critic_model_eval = critic_model_eval
         self.reference_model.eval()
         if isinstance(reward_model, PretrainedModel):
             self.reward_model.eval()
@@ -350,7 +377,9 @@ class PPOTrainer(RLTrainerBase):
         self.kl_coeff = self.args.kl_coeff
         self.clip_range_score = self.args.clip_range_score
         self.gamma = 1.0
-        self.gae_lambda = 0.95
+        # [gae_lambda] value needs to be set manually!
+        # On the gsm8k benchmark, this value is 1.0.
+        self.gae_lambda = 1.0
 
         # for reward norm
         self.reward_mean = 0.0
@@ -430,6 +459,7 @@ class PPOTrainer(RLTrainerBase):
         value_training_args = copy.deepcopy(args)
         for attr_name in [
             "critic_learning_rate",
+            "critic_min_learning_rate",
             "critic_weight_decay",
             "critic_lr_scheduler_type",
             "critic_warmup_ratio",
@@ -547,7 +577,7 @@ class PPOTrainer(RLTrainerBase):
                 reward_server=model,
             )
 
-            if not self.args.use_rm_server:
+            if not self.args.use_rm_server and not self.args.use_rule_reward:
                 if args.pipeline_parallel_degree > 1 or ShardingOption.FULL_SHARD in args.sharding:
                     reward_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
 
@@ -638,7 +668,7 @@ class PPOTrainer(RLTrainerBase):
             warmup_steps = args.warmup_ratio * args.max_steps
         lr_scheduler = None
         if args.min_learning_rate is not None:
-            if args.lr_scheduler_type == "cosine":
+            if args.lr_scheduler_type == SchedulerType.COSINE or args.lr_scheduler_type == "cosine":
                 lr_scheduler = CosineAnnealingWithWarmupDecay(
                     max_lr=args.learning_rate,
                     min_lr=args.min_learning_rate,
@@ -646,7 +676,7 @@ class PPOTrainer(RLTrainerBase):
                     decay_step=args.decay_steps,
                     last_epoch=0,
                 )
-            elif args.lr_scheduler_type == "linear":
+            elif args.lr_scheduler_type == SchedulerType.LINEAR or args.lr_scheduler_type == "linear":
                 lr_scheduler = LinearAnnealingWithWarmupDecay(
                     max_lr=args.learning_rate,
                     min_lr=args.min_learning_rate,
@@ -694,7 +724,11 @@ class PPOTrainer(RLTrainerBase):
                 prompt_only_batch = DataProto.from_single_dict(
                     {
                         "input_ids": inputs["input_ids"],
-                        **({"label_ids": inputs["label_ids"]} if self.args.use_rm_server else {}),
+                        **(
+                            {"label_ids": inputs["label_ids"]}
+                            if self.args.use_rm_server or self.args.use_rule_reward
+                            else {}
+                        ),
                     }
                 )
                 generated_seq = self.actor_trainer.generate_sequences(prompt_only_batch, do_eval=True)[0].batch[
@@ -703,7 +737,16 @@ class PPOTrainer(RLTrainerBase):
 
             if self.reshard_controller is not None:
                 self.reshard_controller.set_train_env("[after prediction_step]")
-            if not self.args.use_rm_server:
+            if self.args.use_rule_reward:
+                prompt_len = inputs["input_ids"].shape[-1]
+                if "label_ids" not in inputs:
+                    raise ValueError("Rule-based reward needs labels.")
+                tgt = self.tokenizer.batch_decode(inputs["label_ids"], skip_special_tokens=False)
+                response = self.tokenizer.batch_decode(generated_seq[:, prompt_len:], skip_special_tokens=False)
+                ground_truth = [i.replace(self.tokenizer.pad_token, "") for i in tgt]
+                response_str = [i.replace(self.tokenizer.pad_token, "") for i in response]
+                reward_score = self.reward_trainer.compute_score(response_str, ground_truth)
+            elif not self.args.use_rm_server:
                 if self._model_config.sequence_parallel:
                     # pad to max_sequence_length
                     seq = self.tokenizer.pad(
@@ -1028,15 +1071,12 @@ class PPOTrainer(RLTrainerBase):
                 7. num_train_samples (int) - The total number of samples in the training data.
         """
         args = self.args
-
         total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
         len_dataloader = None
         if not self._is_iterable_dataset(self.train_dataset):
             len_dataloader = len(train_dataloader)
-            num_train_sub_steps = (
-                len_dataloader * self.args.update_iters * self.args.rollout_n // self.args.per_device_train_batch_size
-            )
-            num_update_steps_per_epoch = num_train_sub_steps // args.gradient_accumulation_steps
+            num_train_sub_steps = self.args.global_mini_batch_size // args.per_device_train_batch_size
+            num_update_steps_per_epoch = (num_train_sub_steps // args.gradient_accumulation_steps) * len_dataloader
             num_examples = len(self.train_dataset)
             if args.max_steps > 0:
                 max_steps = args.max_steps
@@ -1044,14 +1084,16 @@ class PPOTrainer(RLTrainerBase):
                     args.max_steps % num_update_steps_per_epoch > 0
                 )
             else:
-                max_steps = int(num_update_steps_per_epoch * args.num_train_epochs)
+                max_steps = int(args.num_train_epochs * num_update_steps_per_epoch)
                 num_train_epochs = math.ceil(args.num_train_epochs)
-            num_train_samples = total_train_batch_size * max_steps
+            num_train_samples = (
+                self.args.global_batch_size * self.args.update_iters * self.args.rollout_n
+            ) * len_dataloader
         else:
             assert args.max_steps > 0
             max_steps = args.max_steps
             num_train_epochs = sys.maxsize
-            num_update_steps_per_epoch = args.max_steps
+            num_update_steps_per_epoch = max_steps
             num_examples = total_train_batch_size * args.max_steps
             num_train_samples = args.max_steps * total_train_batch_size
 
@@ -1113,7 +1155,7 @@ class PPOTrainer(RLTrainerBase):
                     for row in batch.batch["input_ids"]
                 ]
             )
-            if self.args.use_rm_server:
+            if self.args.use_rm_server or self.args.use_rule_reward:
                 label_ids_batches.extend(
                     [
                         process_row(
@@ -1237,42 +1279,18 @@ class PPOTrainer(RLTrainerBase):
         args = self.args
         self.is_in_train = True
 
-        # ##### trainging data and related num setting #####
-        # TODO(guosheng): remove the binding method get_collator of dataset
-        with (
-            guard_set_args(
-                args,
-                {"per_device_train_batch_size": self.args.global_gen_batch_size // self.args.dataset_world_size},
-            ),
-            guard_set_args(
-                self,
-                {"train_dataset": self.train_dataset, "data_collator": self.data_collator},
-            ),
-        ):
-            train_dataloader = self.prompt_only_dataloader = self.get_train_dataloader()
-
-        (
-            total_train_batch_size,
-            len_dataloader,
-            max_steps,
-            num_train_epochs,
-            num_update_steps_per_epoch,
-            num_examples,
-            num_train_samples,
-        ) = self.init_train_num(train_dataloader)
-
         # ##### model and optimizer related setting #####
-        actor_model, critic_model = self.init_train_model_opt(max_steps, resume_from_checkpoint)
+        actor_model, critic_model = self.init_train_model_opt(self.max_steps, resume_from_checkpoint)
         paddle.device.cuda.empty_cache()
 
         # ##### traing statistic logging #####
         # Number of trainable parameters only account for actor_model
         self.init_train_log(
-            num_examples,
-            num_train_epochs,
-            total_train_batch_size,
-            max_steps,
-            num_train_samples,
+            self.num_examples_,
+            self.num_train_epochs,
+            self.total_train_batch_size,
+            self.max_steps,
+            self.num_train_samples,
             actor_model,
         )
 
@@ -1281,20 +1299,19 @@ class PPOTrainer(RLTrainerBase):
         # correct. Thus, data cannot be resumed perfectly when not breaking at epoch end.
         epochs_trained, steps_trained_in_current_epoch, steps_trained_progress_bar = self.init_train_state(
             resume_from_checkpoint,
-            train_dataloader,
-            max_steps,
-            num_train_epochs,
-            num_update_steps_per_epoch,
+            self.train_dataloader,
+            self.max_steps,
+            self.num_train_epochs,
+            self.num_update_steps_per_epoch,
         )
 
-        steps_in_epoch = num_update_steps_per_epoch * args.gradient_accumulation_steps
-
+        steps_in_epoch = self.num_update_steps_per_epoch * args.gradient_accumulation_steps
         # self.callback_handler.model = self.model
         # self.callback_handler.optimizer = self.optimizer
         # self.callback_handler.lr_scheduler = self.lr_scheduler
         # self.callback_handler.train_dataloader = train_dataloader
-        self.state.max_steps = int(max_steps)
-        self.state.num_train_epochs = num_train_epochs
+        self.state.max_steps = int(self.max_steps)
+        self.state.num_train_epochs = self.num_train_epochs
         self.state.is_local_process_zero = self.is_local_process_zero()
         self.state.is_world_process_zero = self.is_world_process_zero()
 
@@ -1321,11 +1338,11 @@ class PPOTrainer(RLTrainerBase):
             sharding_parallel_group = None
             data_parallel_group = None
 
-        for epoch in range(epochs_trained, num_train_epochs):
-            if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
-                train_dataloader.batch_sampler, DistributedBatchSampler
+        for epoch in range(epochs_trained, int(self.num_train_epochs)):
+            if isinstance(self.train_dataloader, paddle.io.DataLoader) and isinstance(
+                self.train_dataloader.batch_sampler, DistributedBatchSampler
             ):
-                train_dataloader.batch_sampler.set_epoch(epoch)
+                self.train_dataloader.batch_sampler.set_epoch(epoch)
 
             num_gen_batches += 1
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
@@ -1408,7 +1425,8 @@ class PPOTrainer(RLTrainerBase):
                     return_attention_mask=False,
                     pad_to_multiple_of=pad_to_multiple_of,
                 )["input_ids"]
-                label_ids = DataProto.pad_batch_data(label_ids_batches, pad_token_id=pad_token_id)
+                if len(label_ids_batches) > 0:
+                    label_ids = DataProto.pad_batch_data(label_ids_batches, pad_token_id=pad_token_id)
                 position_ids = make_position_ids_from_input_ids(input_ids, pad_token_id=pad_token_id)
 
                 prompt_len = paddle.full(shape=[expand_prompt.shape[0]], fill_value=expand_prompt.shape[1], dtype=expand_prompt.dtype)  # fmt: skip
@@ -1424,17 +1442,16 @@ class PPOTrainer(RLTrainerBase):
                         "prompt_len_without_pad": prompt_len_without_pad,
                         "response_len_without_pad": response_len_without_pad,
                         "index": indices,
-                        **({"label_ids": label_ids} if self.args.use_rm_server else {}),
+                        **({"label_ids": label_ids} if self.args.use_rm_server or self.args.use_rule_reward else {}),
                         **(
                             {"raw_label_ids_len": prompt_only_batch_expand.batch["raw_label_ids_len"]}
-                            if self.args.use_rm_server
+                            if self.args.use_rm_server or self.args.use_rule_reward
                             else {}
                         ),
                     }
                 )
 
                 batch = data_group_merge(batch, group=data_trans_group)
-
                 # step 2-2: balance batches based on batch tokens
                 if self.args.balance_batch:
                     batch = self._balance_batch(batch)
@@ -1460,8 +1477,8 @@ class PPOTrainer(RLTrainerBase):
                 ):
                     with reload_and_offload_scope(
                         self,
-                        self.reward_critic_model if self.args.rl_algorithm == "ppo" else None,
-                        self.reward_model if not self.args.use_rm_server else None,
+                        self.critic_model if self.args.rl_algorithm == "ppo" else None,
+                        self.reward_model if not self.args.use_rm_server and not self.args.use_rule_reward else None,
                     ):
                         with TimerScope(self.timers, RolloutStages.ROLLOUT_REWARD_VALUE):
                             reward_tensor = self.reward_trainer.compute_reward(
@@ -1563,7 +1580,6 @@ class PPOTrainer(RLTrainerBase):
                 else:
                     local_batch = batch
                     batch = batch
-
                 # step 2-3: compute reward normalization
                 batch.batch["ori_rewards"] = batch.batch["rewards"].clone()
 
@@ -1572,7 +1588,7 @@ class PPOTrainer(RLTrainerBase):
 
                 with TimerScope(self.timers, RolloutStages.ROLLOUT_ADVANTAGE):
                     # step 2-4: compute advantage
-                    batch = self.compute_advantage(batch, use_tgt_len_value=args.use_tgt_len_value)
+                    batch = self.compute_advantage(batch)
 
                     # step 2-5: compute advantage normalization
                     if self.args.normalize_advantage:
@@ -1597,6 +1613,7 @@ class PPOTrainer(RLTrainerBase):
 
                             for micro_step, micro_batch in enumerate(micro_batches * self.args.update_iters):
                                 step = 0 if step == -1 else step
+
                                 with TimerScopeManualLabel(
                                     self.timers, get_timer_label(ActorStages.MICRO_STEPS) + f"_{micro_step}"
                                 ):
@@ -1606,7 +1623,10 @@ class PPOTrainer(RLTrainerBase):
 
                                 if self.args.rl_algorithm == "ppo":
                                     train_value_loss = self.critic_trainer.update_critic(micro_batch)
-                                    rl_info.union(train_value_loss)
+                                    rl_info.meta_info["metrics"].update(train_value_loss)
+
+                                    paddle.device.cuda.empty_cache()
+
                                 if self.is_step_end():
                                     self.state.global_step += 1
                                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
@@ -1659,7 +1679,7 @@ class PPOTrainer(RLTrainerBase):
         metrics = speed_metrics(
             "train",
             start_time,
-            num_samples=num_train_samples,
+            num_samples=self.num_train_samples,
             num_steps=self.state.max_steps,
         )
 
@@ -1762,57 +1782,6 @@ class PPOTrainer(RLTrainerBase):
         with guard_set_args(self.control, {"should_log": False}):
             super()._maybe_log_save_evaluate(tr_loss.meta_info["metrics"], model, epoch, ignore_keys_for_eval)
 
-    def get_advantages_and_returns(
-        self,
-        values: paddle.Tensor,
-        rewards: paddle.Tensor,
-        sequence_mask: paddle.Tensor,
-        start: int,
-        use_tgt_len_return: bool = True,
-    ) -> Tuple[paddle.Tensor, paddle.Tensor]:
-        """Compute advantages and returns using Generalized Advantage Estimation (GAE)."""
-        # Modified from https://github.com/CarperAI/trlx/blob/main/trlx/models/modeling_ppo.py
-        last_gae_lambda = 0.0
-        advantages_reversed = []
-        values = values * sequence_mask
-        rewards = rewards * sequence_mask
-        length = rewards.shape[-1]
-        if use_tgt_len_return and start > 0:
-            # consistent with Beaver
-            # values length is src+tgt-1, start is src-1, return length is tgt
-            pass
-        elif use_tgt_len_return:
-            # values length is tgt, start is 0, return length is tgt
-            assert start == 0
-        else:
-            # values length is src+tgt-1, start is src-1, return length is src+tgt-1
-            pass
-        for t in reversed(range(start, length)):  # pylint: disable=invalid-name
-            next_values = values[:, t + 1] if t < length - 1 else 0.0
-            delta = rewards[:, t] + self.gamma * next_values - values[:, t]
-            last_gae_lambda = delta + self.gamma * self.gae_lambda * last_gae_lambda
-            advantages_reversed.append(last_gae_lambda)
-        advantages = paddle.stack(advantages_reversed[::-1], axis=1)
-        returns = advantages + values[:, start:].contiguous()
-
-        if not use_tgt_len_return:
-            advantages = paddle.concat(
-                [
-                    paddle.zeros([advantages.shape[0], start], dtype=advantages.dtype),
-                    advantages,
-                ],
-                axis=-1,
-            )
-            returns = paddle.concat(
-                [
-                    paddle.zeros([returns.shape[0], start], dtype=returns.dtype),
-                    returns,
-                ],
-                axis=-1,
-            )
-
-        return advantages.detach(), returns
-
     @paddle.no_grad()
     def compute_reward_normalization(self, batch):
         batch_rewards = batch["rewards"].cast(paddle.float32)
@@ -1857,7 +1826,7 @@ class PPOTrainer(RLTrainerBase):
         return batch
 
     @paddle.no_grad()
-    def compute_advantage(self, batch: DataProto, use_tgt_len_value) -> DataProto:
+    def compute_advantage(self, batch: DataProto) -> DataProto:
         if "log_probs" in batch.batch:
             old_log_probs = batch.batch["log_probs"]  # length: src + tgt -1
         if "ref_log_probs" in batch.batch:
@@ -1868,48 +1837,45 @@ class PPOTrainer(RLTrainerBase):
 
         if self.args.rl_algorithm == "grpo":
             eos_mask = batch.batch["eos_mask"]
-            start = 0
             reward_advantages = compute_grpo_advantages(
-                rewards, batch.non_tensor_batch["index"], eos_mask[:, start:], eos_mask.shape[-1]
+                rewards, batch.non_tensor_batch["index"], eos_mask, eos_mask.shape[-1]
             )
         elif self.args.rl_algorithm == "ppo":
-            start = batch.batch["prompt"].shape[-1] - 1
-            eos_mask = (batch.batch["input_ids"] != self.tokenizer.pad_token_id)[:, 1:].to(old_log_probs.dtype)
+            eos_mask = (batch.batch["input_ids"] != self.tokenizer.pad_token_id)[
+                :, batch.batch["prompt"].shape[-1] :
+            ].to(old_log_probs.dtype)
             rewards_with_kl, kl_rewards = add_kl_divergence_regularization(
                 None,  # prompt,
                 old_log_probs,
                 ref_log_probs,
                 rewards,
-                eos_mask[:, start:],
+                eos_mask,
                 self.kl_coeff,
                 self.clip_range_score,
-            )  # length: tgt if use_tgt_len_value src + tgt -1
+            )
             reward_advantages, reward_returns = compute_gae_advantage_return(
                 rewards_with_kl,
                 old_reward_values,
-                eos_mask[:, start:],
-                start=0 if use_tgt_len_value else start,
+                eos_mask,
                 gamma=self.gamma,
                 lam=self.gae_lambda,
-                use_tgt_len_return=use_tgt_len_value,
-            )  # length: tgt if use_tgt_len_value src + tgt -1
+            )
         elif self.args.rl_algorithm == "reinforce_plus_plus":
-            start = 0
             eos_mask = batch.batch["eos_mask"]
             rewards_with_kl, kl_rewards = add_kl_divergence_regularization(
                 None,  # prompt,
                 old_log_probs,
                 ref_log_probs,
                 rewards,
-                eos_mask[:, start:],
+                eos_mask,
                 self.kl_coeff,
                 self.clip_range_score,
-            )  # length: tgt if use_tgt_len_value src + tgt -1
+            )
             reward_advantages, reward_returns = compute_reinforce_plus_plus_advantages_and_returns(
                 rewards_with_kl,
-                eos_mask[:, start:],
+                eos_mask,
                 self.gamma,
-            )  # length: tgt if use_tgt_len_value src + tgt -1
+            )
         else:
             raise ValueError(f"Unknown rl_algorithm: {self.args.rl_algorithm}")
 
@@ -1917,10 +1883,10 @@ class PPOTrainer(RLTrainerBase):
             {
                 # "log_probs": old_log_probs,
                 "reward_advantages": reward_advantages,
-                "reward_advantages_clean": reward_advantages[eos_mask[:, start:] != 0],
+                "reward_advantages_clean": reward_advantages[eos_mask != 0],
                 # "ref_log_probs": ref_log_probs,
                 "rewards": rewards,
-                "eos_mask": eos_mask[:, start:],
+                "eos_mask": eos_mask,
             }
         )
         if self.args.rl_algorithm in ["reinforce_plus_plus", "ppo"]:
