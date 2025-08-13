@@ -1482,7 +1482,7 @@ class FusedMultiTransformerBase(Layer):
         kwargs["cum_offsets"] = cum_offsets
 
         kv_cache_reuse = kwargs.get("kv_cache_reuse", None)
-        if caches is not None and kv_cache_reuse is None:
+        if caches is not None and kv_cache_reuse is not True:
             assert len(caches) == len(self.linear_weights) or len(caches) == 2 * len(self.linear_weights)
 
         assert self.num_layers == len(self.linear_weights)
