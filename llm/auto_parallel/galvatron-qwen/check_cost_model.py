@@ -23,21 +23,6 @@ cases = [
                 'accumulation_steps': 8
             },
             {
-                'strategy_dict': {'pp_size': 2, 'tp_size': 2, 'use_ulysses': 0, 'dp_size':2, 'sharding_stage': 2, 'recompute': 0}, 
-                'global_batch_size': 32, 
-                'accumulation_steps': 4
-            },
-            {
-                'strategy_dict': {'pp_size': 4, 'tp_size': 2, 'use_ulysses': 0, 'dp_size':1, 'sharding_stage': 2, 'recompute': 0}, 
-                'global_batch_size': 32, 
-                'accumulation_steps': 8
-            },
-            {
-                'strategy_dict': {'pp_size': 4, 'tp_size': 1, 'use_ulysses': 0, 'dp_size':2, 'sharding_stage': 2, 'recompute': 0}, 
-                'global_batch_size': 32, 
-                'accumulation_steps': 8
-            },
-            {
                 'strategy_dict': {'pp_size': 1, 'tp_size': 4, 'use_ulysses': 0, 'dp_size':2, 'sharding_stage': 2, 'recompute': 1}, 
                 'global_batch_size': 32, 
                 'accumulation_steps': 8
@@ -66,6 +51,26 @@ cases = [
                 'strategy_dict': {'pp_size': 1, 'tp_size': 2, 'use_ulysses': 1, 'dp_size':4, 'sharding_stage': 2, 'recompute': 0}, 
                 'global_batch_size': 32, 
                 'accumulation_steps': 4
+            },
+            {
+                'strategy_dict': {'pp_size': 2, 'tp_size': 2, 'use_ulysses': 0, 'dp_size':2, 'sharding_stage': 2, 'recompute': 0}, 
+                'global_batch_size': 32, 
+                'accumulation_steps': 4
+            },
+            {
+                'strategy_dict': {'pp_size': 4, 'tp_size': 2, 'use_ulysses': 0, 'dp_size':1, 'sharding_stage': 2, 'recompute': 0}, 
+                'global_batch_size': 32, 
+                'accumulation_steps': 8
+            },
+            {
+                'strategy_dict': {'pp_size': 4, 'tp_size': 1, 'use_ulysses': 0, 'dp_size':2, 'sharding_stage': 2, 'recompute': 0}, 
+                'global_batch_size': 32, 
+                'accumulation_steps': 8
+            },
+            {
+                'strategy_dict': {'pp_size': 1, 'tp_size': 2, 'use_ulysses': 0, 'dp_size':4, 'sharding_stage': 2, 'recompute': 0}, 
+                'global_batch_size': 16, 
+                'accumulation_steps': 1
             },
         ]
 
@@ -101,17 +106,17 @@ if __name__ == "__main__":
     profile_data_parser = ProfileDataParser(profile_data_parser_args)
     print('profile_data_parser constructed.')
     
-    results = []
-    for case in cases:
-        res = get_result(case)
-        results.append(res)
-        print('\n\n\n')
+    # results = []
+    # for case in cases:
+    #     res = get_result(case)
+    #     results.append(res)
+    #     print('\n\n\n')
     
     
-    print(f'最后汇总')
-    for res in results:
-        memory_cost, time_cost = res
-        print(f'memory cost: {memory_cost}, time cost: {time_cost}')
+    # print(f'最后汇总')
+    # for res in results:
+    #     memory_cost, time_cost = res
+    #     print(f'memory cost: {memory_cost}, time cost: {time_cost}')
 
     
     

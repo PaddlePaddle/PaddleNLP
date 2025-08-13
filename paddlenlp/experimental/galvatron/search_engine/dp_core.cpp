@@ -123,3 +123,4 @@ PYBIND11_MODULE(galvatron_dp_core, m) {
     m.def("dynamic_programming_core", &dynamic_programming_core, "A dynamic programming function");
 }
 // c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) dp_core.cpp -o galvatron_dp_core$(python3-config --extension-suffix)
+// c++ -O3 -Wall -shared -std=c++11 -fPIC $(/apdcephfs_fsgm/share_303760348/anaconda3/envs/lgm-paddle/bin/python3 -m pybind11 --includes) dp_core.cpp -o galvatron_dp_core$(/apdcephfs_fsgm/share_303760348/anaconda3/envs/lgm-paddle/bin/python3-config --extension-suffix)

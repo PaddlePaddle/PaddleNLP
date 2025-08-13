@@ -127,8 +127,11 @@ class SearchEngine:
             'sp_space': self.args.sp_space,
             'allreduce_dict': self.parser.sp_allreduce,
         }
-        
-    
+        print(f'memory_cost_model_args_dict: {self.memory_cost_model_args_dict}')
+        print(f'other_memory_cost_model_args_dict: {self.other_memory_cost_model_args_dict}')
+        print(f'time_cost_model_args_dict: {self.time_cost_model_args_dict}')
+        print(f'other_time_cost_args_dict: {self.other_time_cost_args_dict}')
+
     def set_searching_bsz(self):
         args = self.args
         min_bsz, max_bsz, bsz_step = args.min_bsz, args.max_bsz, args.bsz_step
@@ -298,25 +301,38 @@ class SearchEngine:
             result = dict()
             for sp_search in sp_search_space:
                 if sp_search == 'tp-only' and vsp == 1:
+                    logger.info(f'Skipping tp-only search for vsp={vsp}')
                     continue
                 if sp_search == 'sp-only' and vsp == 0:
+                    logger.info(f'Skipping sp-only search for vsp={vsp}')
                     continue
                 
                 # filter 
-                strategies = [s for s in temp_strategies if min_tp <= s.tp_size <= max_tp] # tp_size belongs to [min_tp, max_tp]
+                strategies = [s for s in temp_strategies if min_tp <= s.tp_size and s.tp_size <= max_tp] # tp_size belongs to [min_tp, max_tp]
+                if len(strategies) == 0:
+                    logger.info(f'no strategy satisfies the constraints [min_tp,  max_tp]')
+                    continue
+
                 strategies = [s for s in strategies if bsz // accumulation_steps >= args.world_size // s.pp_size // min_tp] # micro_batch_size (micro_batch_size = global_batch_size // accumulation_steps) should greater than max_dp_size(max_dp_size = world_size // pp_size // min_tp)
+                if len(strategies) == 0:
+                    logger.info(f'no strategy satisfies the constraints [bsz // accumulation_steps >= args.world_size // s.pp_size // min_tp]')
+                    continue
+
                 if sp_search == 'tp-only':
                     strategies = [s for s in strategies if s.use_ulysses == 0]
                 elif sp_search == 'sp-only':
                     strategies = [s for s in strategies if s.use_ulysses == 1]
                 if len(strategies) == 0:
+                    logger.info(f'no strategy satisfies the constraints [{sp_search}]')
                     continue
                 
                 # get all possible pp_size and filter 
                 pp_deg_list = sorted(list(set(s.pp_size for s in strategies)))
                 pp_deg_list = [pp for pp in pp_deg_list if pp * min_tp <= args.world_size and bsz % (args.world_size // pp // min_tp) == 0]
                 if len(pp_deg_list) == 0:
+                    logger.info(f'no strategy satisfies the constraints [pp * min_tp <= args.world_size and bsz % (args.world_size // pp // min_tp) == 0]')
                     continue
+                
                 strategies = [s for s in strategies if s.pp_size in pp_deg_list]
                 
                 # Calculate the micro-batch size at min_tp under different pp_deg values
@@ -326,6 +342,7 @@ class SearchEngine:
                 # strict mode: search accumulation_steps must be equal to real accumulation_steps 
                 strategies = [s for s in strategies if accumulation_steps == (bsz // (args.world_size // s.pp_size // min_tp) + mbsz_dict[s.pp_size] - 1) // mbsz_dict[s.pp_size]]
                 if len(strategies) == 0:
+                    logger.info(f'no strategy satisfies the constraints [accumulation_steps == (bsz // (args.world_size // s.pp_size // min_tp) + mbsz_dict[s.pp_size] - 1) // mbsz_dict[s.pp_size]]. Actually, this situation not happen')
                     continue
                 
                 # get pp_stage_dict
@@ -391,7 +408,10 @@ class SearchEngine:
             
             print(f'[linguangming] re[min_res_list]')
             for item in re['min_res_list']:
-                print(item)
+                if isinstance(item, List):
+                    for sub_item in item:
+                        print(sub_item)
+                # print(item)
             
             # TODO 以下进行store
             # print_strategies(re['min_res_list'])
@@ -406,6 +426,7 @@ class SearchEngine:
         return max_throughput
                               
     def dynamic_programming(self, strategies:List[LayerWiseStrategy], bsz, accumulation_steps, mbsz_dict, pp_stage_dict, min_tp, max_tp, vsp, embed_sdp, sp_search, logger):
+        logger.info('\n')
         args = self.args
         logger.info(f'bsz={bsz} pp_stage_dict{pp_stage_dict}')
         dp_on_model = DpOnModel(strategies_set=strategies, 
@@ -431,7 +452,8 @@ class SearchEngine:
         throughput = bsz / min_cost
         logger.info(f"[Optimal pp_deg={min_pp_deg}] Minimized timecost={min_cost} Memory remaining={mem_remain} Memory cost={mem_cost} Vocab tp={min_vtp}")
         logger.info(f"Max throughput={throughput} samples/s")
-
+        logger.info('\n')
+        
         result = {'min_cost': min_cost, 'min_res_list': min_res_list, 'min_pp_deg': min_pp_deg, 
                         'mem_remain': mem_remain, 'mem_cost': mem_cost, 'throughput': throughput, "vtp": min_vtp}
         return result

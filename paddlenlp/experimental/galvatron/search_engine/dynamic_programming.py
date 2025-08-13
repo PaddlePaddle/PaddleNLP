@@ -138,7 +138,8 @@ class DpOnModel:
         self.max_mem = max_mem #  in MB
         self.mem_cache = 0
         if self.max_mem // 1024 > 20 and mem_cache_flag:
-            self.mem_cache = int(self.max_mem * 0.2) # reserved memory for paddle memory cache
+            mem_cache_ratio = 0.30
+            self.mem_cache = int(self.max_mem * mem_cache_ratio) # reserved memory for paddle memory cache
             self.max_mem -= self.mem_cache
     
     def match_strategy(self, s1:LayerWiseStrategy, s2:LayerWiseStrategy, except_keys=[]):
@@ -168,15 +169,16 @@ class DpOnModel:
             time_cost_model_args = TimeCostModelArguments(strategy=strategy, global_batch_size=bsz // accumulation_steps, **self.time_cost_model_args_dicts)
             intra_layer_cost.append(TimeCostModel(time_cost_model_args).gen_result())        
         for i, strategy in enumerate(strategy_set):
-            self.logger.info(f'[linguangming] {i}-th, strategy:{strategy}, time_cost: {intra_layer_cost[i]}')
+            self.logger.info(f'{i}-th, strategy:{strategy}, time_cost: {intra_layer_cost[i]}')
         
         intra_layer_cost = np.array(intra_layer_cost, dtype=np.float64).reshape(1, -1).repeat(self.layer_num, axis=0)
         min_cost_strategy_ids = np.argmin(intra_layer_cost, axis=1)
+        self.logger.info(f'min_cost_strategy_id: {min_cost_strategy_ids[0]}')
         
         # [Step2] calculate othertimecost
         other_time_cost_args = OtherTimeCostModelArguments(pp_size=pp_deg, min_tp_size=min_tp, max_tp_size=max_tp, embed_sdp=embed_sdp, micro_batch_size=mbsz, vocab_use_ulysees=vsp, **self.other_time_cost_args_dict)
         other_time_cost = OtherTimeCostModel(other_time_cost_args).gen_result()
-        self.logger.info(f'[linguangming] pp_deg:{pp_deg}, other_time_cost:{other_time_cost}')
+        self.logger.info(f'other_time_cost: {other_time_cost}')
         
         # [Step3] calculate inter cost
         inter_layer_cost = np.zeros((strategy_num, strategy_num))
@@ -242,14 +244,15 @@ class DpOnModel:
             v = v.reshape(1, -1).repeat(self.layer_num, axis=0)
             v_list_stage_idx.append(v)
         for stage_idx in range(pp_deg):
-            self.logger.info(f'stage_idx{stage_idx}, memory_cost:{v_list_stage_idx[stage_idx]}')
-        
+            self.logger.info(f'stage_idx{stage_idx}, memory_cost:{v_list_stage_idx[stage_idx][0]}')
+
         # calculate other memory cost
         # TODO sharding_stage需要进行修改
         other_mem_cost_args = OtherMemoryCostModelArguments(min_tp_size=min_tp, max_tp_size=max_tp, pp_size=pp_deg, sharding_stage=3, global_batch_size=bsz, accumulation_steps=accumulation_steps, use_ulysses=vsp, **self.other_memory_cost_model_args_dict)
         other_mem_cost = OtherMemoryCostModel(other_mem_cost_args).get_other_memory_cost()
         for key, value in other_mem_cost.items():
             other_mem_cost[key] = np.ceil(value).astype(int)
+        self.logger.info(f'other_mem_cost: {other_mem_cost}')
 
         # start solve
         pp_stage_list = self.pp_stage_dict[pp_deg]
@@ -284,7 +287,7 @@ class DpOnModel:
                                   intra_layer_cost[start_layer:start_layer + pp_stage_list[stage_idx]], #  select layers for this stage
                                   inter_layer_cost[start_layer:start_layer + pp_stage_list[stage_idx]]) # select layers for this stage
                 comm_cost, res_list, mem_remain = dp.fit()
-                self.logger.info(f'[linguangming] stage_idx:{stage_idx}, mem_remain:{mem_remain}')
+                # self.logger.info(f'[linguangming] stage_idx:{stage_idx}, mem_remain:{mem_remain}')
                 
                 for k, v in comm_cost.items():
                     if mem_remain[k] == -1:
@@ -361,13 +364,15 @@ class DpOnModel:
             
             # pp_deg is valid, proceed with dynamic programming
             comm_cost, res_list, mem_remain, mem_cost, vtp, best_strategy_flag, from_history = self._build_dp_and_run_multi_layer_type(pp_deg, bsz, mbsz_dict[pp_deg], min_tp, max_tp, vsp, embed_sdp, sp_search)
+            self.logger.info(f'[linguangming] [debug] origin mem_remain: {mem_remain}, origin mem_cost: {mem_cost}')
             mem_cost = [m + self.mem_cache for m in mem_cost] if isinstance(mem_cost, list) else mem_cost + self.mem_cache 
+            
             if print_:
                 if self.logger is not None:
-                    self.logger.info(f'Best strategy: {best_strategy_flag} \nFrom history: {from_history}')
+                    # self.logger.info(f'Best strategy: {best_strategy_flag} \nFrom history: {from_history}')
                     self.logger.info(f'time cost: {comm_cost}, memory remaining: {mem_remain}, memory cost: {mem_cost}')
                 else:
-                    print(f'Best strategy: {best_strategy_flag} \nFrom history: {from_history}')
+                    # print(f'Best strategy: {best_strategy_flag} \nFrom history: {from_history}')
                     print(f'time cost: {comm_cost}, memory remaining: {mem_remain}, memory cost: {mem_cost}')   
             if optimal_comm_cost > comm_cost:
                 optimal_res_list = res_list

@@ -43,7 +43,7 @@ class MemoryCostModel:
         end = self.pp_size - args.stage_idx if self.pp_size - args.stage_idx <= args.accumulation_steps else args.accumulation_steps
         self.act_1f1b_ratio = np.sum(microbatches[:end]) / np.sum(microbatches) if end > 0 else 0.0
         self.local_batch_size *= self.act_1f1b_ratio
-        print(f'local batch size: {self.local_batch_size}, act_1f1b_ratio: {self.act_1f1b_ratio}')
+        # print(f'local batch size: {self.local_batch_size}, act_1f1b_ratio: {self.act_1f1b_ratio}')
 
         # In PaddlePaddle, parameter gradients are stored in FP32 precision
         if args.accumulation_steps == 1:
@@ -93,7 +93,7 @@ class MemoryCostModel:
         result['model_states'] = self.model_states_size
         result['activation'] = self.activation_size
         result['enc_total'] = self.model_states_size + self.activation_size
-        print(f'result: {result}')
+        # print(f'result: {result}')
         return result
     
 @dataclass

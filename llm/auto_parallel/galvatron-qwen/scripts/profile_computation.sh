@@ -109,18 +109,32 @@ RUNTIME_PROFILE_ARGS="
     --save_time_flag 1 \
 "
 
-# [model profiler]
+# [model profiler] [batch type]
+# MODEL_PROFILER_ARGS="
+#     --profile_type computation \
+#     --profile_mode batch \
+#     --profile_min_batch_size 1 \
+#     --profile_max_batch_size 8 \
+#     --profile_batch_size_step 1 \
+#     --layernum_min 1 \
+#     --layernum_max 2 \
+#     --profile_fixed_seq_length_list 2048 \
+#     --num_layertype 1 \
+# "
+
+# [model profiler] [sequence type]
 MODEL_PROFILER_ARGS="
     --profile_type computation \
-    --profile_mode batch \
-    --profile_min_batch_size 1 \
-    --profile_max_batch_size 8 \
-    --profile_batch_size_step 1 \
+    --profile_mode sequence \
+    --profile_fixed_batch_size 1 \
     --layernum_min 1 \
     --layernum_max 2 \
-    --profile_fixed_seq_length_list 2048 \
+    --profile_min_seq_length 4096 \
+    --profile_max_seq_length 32768 \
+    --profile_seq_length_step 4096 \
     --num_layertype 1 \
 "
+
 
 /apdcephfs_fsgm/share_303760348/anaconda3/envs/lgm-paddle/bin/python ./profile.py \
     $MODEL_ARGS \

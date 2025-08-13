@@ -171,7 +171,7 @@ class TimeCostModel:
             overlap_part = dp_overlap_time
             rest_part = 0.0
             rest_dp_flag = False
-        print(f'time cost model bct_dp_overlap: overlap_part: {overlap_part}, rest_part: {rest_part}, rest_dp_flag: {rest_dp_flag}')
+        # print(f'time cost model bct_dp_overlap: overlap_part: {overlap_part}, rest_part: {rest_part}, rest_dp_flag: {rest_dp_flag}')
         return overlap_part, rest_part, rest_dp_flag
     
     def gen_result(self):
@@ -216,7 +216,7 @@ class OtherTimeCostModelArguments:
     min_tp_size: int = field(default=1, metadata={"help": "The min tp size of the model."})
     max_tp_size: int = field(default=1, metadata={"help": "The max tp size of the model."})
     world_size: int = field(default=1, metadata={"help": "The world size of the model."})
-    sharding_stage: int = field(default=0, metadata={"help": "The sharding stage of the model."})
+    embed_sdp: int = field(default=0, metadata={"help": "The sharding stage of the model."})
     
     hidden_size: int = field(default=4096, metadata={"help": "The hidden size of the model."})
     mixed_precision_type: str = field(default='fp16', metadata={"help": "The mixed precision type of the model."})
@@ -293,7 +293,7 @@ class OtherTimeCostModel:
             
             tp_size *= 2
             
-        if args.sharding_stage == 3:
+        if args.embed_sdp == 1:
             self.fwd_factor = 0.5
             self.bwd_factor = 1.0
         else:

@@ -88,6 +88,12 @@ def generate_meshs_fine_grained(gpu_nums, config_file_path):
     recompute_list = [int(i) for i in config['recompute_list'].split(',')]
     vtp = int(config['vtp'])
     vsp_flag = int(config['vsp_flag'])
+    embed_sdp = int(config['embed_sdp'])
+
+    if embed_sdp:
+        sharding_stage_list = [3] + sharding_stage_list
+    else:
+        sharding_stage_list = [2] + sharding_stage_list
     
     num_hidden_layers = len(dp_size_list)
 

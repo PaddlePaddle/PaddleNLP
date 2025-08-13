@@ -124,8 +124,9 @@ class ProfileDataParser:
                 def quadratic_func(x, a, b, c):
                     return a * x ** 2 + b * x + c
                 popt, _ = curve_fit(quadratic_func, x_data, y_data)
-                self.time_profiled_list.append(popt)
                 print("\tFitted popt for transformer layers:", popt)
+                self.time_profiled_list.append(quadratic_func(self.seqlen_list[i], *popt))
+            
             # process other layers, like embedding layer, classifier layer, etc.
             for i in range(args.num_layertype):
                 x_data, y_data = [], []  
@@ -133,12 +134,13 @@ class ProfileDataParser:
                     if key.startswith(f'layertype_other_') and f'_bsz1_' in key:
                         x_data.append(int(key.split('seq')[-1]))
                         y_data.append(value)
-                # fit using a quadratic function
+                # fit using a linear function
                 def linear_func(x, m, c):
                     return m * x + c
                 popt, _ = curve_fit(linear_func, x_data, y_data)
-                self.other_time_profiled_list.append(popt)
                 print("\tFitted popt for other layers:", popt)
+                self.other_time_profiled_list.append(linear_func(self.seqlen_list[i], *popt))
+                
         else:
             raise ValueError(f"Unsupported time profile mode: {args.time_profile_mode}")
         print("Profile computation configs parsed successfully.")
@@ -165,14 +167,16 @@ class ProfileDataParser:
                 tp_activation_per_bsz_dict = layer_mem_config[maxseq]['tp_activation_per_bsz_dict'].copy()
                 self.param_sizes[i] = parameter_size
                 self.act_sizes[i] = tp_activation_per_bsz_dict
+                # adjust activation
                 for tp in self.act_sizes[i]:
                     self.act_sizes[i][tp] = self.act_sizes[i][tp] / maxseq * self.seqlen_list[i]
             self.other_memory_pp_off = self.memory_config['other_memory_pp_off'][maxseq_list[0]]
             self.other_memory_pp_on = {'first_stage':self.memory_config['other_memory_pp_on_first'][maxseq_list[0]], 'last_stage':self.memory_config['other_memory_pp_on_last'][maxseq_list[-1]]}
+            # adjust activation
             for tp in self.other_memory_pp_off['activation']:
-                self.other_memory_pp_off['activation'][tp] = 2/3 * self.other_memory_pp_off['activation'][tp] + 1/3 * self.other_memory_pp_off['activation'][tp] / maxseq_list[0] * self.seqlen_list[0] # TODO: reasonable scaling when len(seqlen_list) > 1
-                self.other_memory_pp_on['first_stage']['activation'][tp] = self.other_memory_pp_on['first_stage']['activation'][tp] # / maxseq_list[0] * self.seqlen_list[0] # first stage is not scaled
-                self.other_memory_pp_on['last_stage']['activation'][tp] = self.other_memory_pp_on['last_stage']['activation'][tp] / maxseq_list[-1] * self.seqlen_list[-1] # last stage is scaled
+                self.other_memory_pp_off['activation'][tp] = self.other_memory_pp_off['activation'][tp] / maxseq_list[0] * self.seqlen_list[0] 
+                self.other_memory_pp_on['first_stage']['activation'][tp] = self.other_memory_pp_on['first_stage']['activation'][tp] / maxseq_list[0] * self.seqlen_list[0] 
+                self.other_memory_pp_on['last_stage']['activation'][tp] = self.other_memory_pp_on['last_stage']['activation'][tp] / maxseq_list[-1] * self.seqlen_list[-1] 
         elif args.memory_profile_mode == 'static':
             for i in range(args.num_layertype):
                 layer_mem_config = self.memory_config[f'layertype_{i}']
@@ -242,7 +246,9 @@ class ProfileDataParser:
                 for size, time in time_config.items():
                     x_data.append(size // 1024 // 1024)
                     y_data.append(time)
-                assert len(x_data) >= 8, f"Different size in communication profile of {op} should not be lower than 8."
+                
+                # 临时注释 因为64和32的tp并行度还是不完整的
+                # assert len(x_data) >= 8, f"Different size in communication profile of {op} should not be lower than 8."
             
                 def linear_func(x, m, c):
                     return m * x + c
@@ -342,7 +348,6 @@ class ProfileDataParser:
         timecost_per_layer = [0 for _ in range(args.num_layertype)]
         timecost_per_layer_no_comm = [0 for _ in range(args.num_layertype)]
         sp_space = 'tp+sp'
-        # sp_space = 'tp'
         for i in range(args.num_layertype):
             # global_batch_size其实是除以了累积步数的
             time_cost_model_args = TimeCostModelArguments(strategy=strategy, global_batch_size=micro_batch_size, mixed_precision_type=mixed_precision_type, seq_length=self.seqlen_list[i], hidden_size=self.hidden_size_list[i],
@@ -356,7 +361,8 @@ class ProfileDataParser:
             timecost_per_layer_no_comm[i] = TimeCostModel(time_cost_model_args_no_comm).gen_result()
         
         # calculate time cost for other layers
-        other_time_cost_model_args = OtherTimeCostModelArguments(pp_size=strategy.pp_size, min_tp_size=strategy.tp_size, max_tp_size=strategy.tp_size, world_size=args.profile_gpu_num, sharding_stage=strategy.sharding_stage,
+        other_time_cost_model_args = OtherTimeCostModelArguments(pp_size=strategy.pp_size, min_tp_size=strategy.tp_size, max_tp_size=strategy.tp_size, world_size=args.profile_gpu_num, 
+                                                                 embed_sdp=1 if strategy.sharding_stage==3 else 0,
                                                                  hidden_size=self.hidden_size_list[0], mixed_precision_type=mixed_precision_type, 
                                                                  micro_batch_size=micro_batch_size // strategy.dp_size, # NOTE 此处需要修改为再除以在min_tp下的dp
                                                                  sequence_length_list=self.seqlen_list,

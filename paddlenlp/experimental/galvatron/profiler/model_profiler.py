@@ -42,6 +42,9 @@ class ModelProfilerArguments:
         self.profile_fixed_seq_length_list = args_dict.pop('--profile_fixed_seq_length_list', '1024,2048')
         self.num_layertype = int(args_dict.pop('--num_layertype', 1))
         self.max_tp_deg = int(args_dict.pop('--max_tp_deg', 1))
+        self.profile_min_seq_length = int(args_dict.pop('--profile_min_seq_length', 1024))
+        self.profile_max_seq_length = int(args_dict.pop('--profile_max_seq_length', 2048))
+        self.profile_seq_length_step = int(args_dict.pop('--profile_seq_length_step', 1024))
 
 class ModelProfiler:
     def __init__(self, args:ModelProfilerArguments, args_dict:dict):
@@ -220,7 +223,8 @@ class ModelProfiler:
         for key in first_rank_config:
             merged_data[key] = {**first_rank_config[key], **last_rank_config[key]}
         write_json_config(file_path, merged_data)
-        
+        print(f'Merged memory profiling data has been written to: {file_path}')
+
         # process memory profiling data for each sequence length
         config = read_json_config(file_path)
         bsz = args.profile_fixed_batch_size # memory profiling only support static or sequence mode, and in this case, the batch size is fixed
@@ -231,7 +235,8 @@ class ModelProfiler:
     
         # Write the processed config back to the file
         write_json_config(file_path, config)
-    
+        print(f'Processed memory profiling data has been written to: {file_path}')
+
     def _process_single_sequence_config(self, seq_tuple, config, layernum_list_base:List[int], layernum_lists_other:List[List[int]], bsz:int):
         seq_info = num2str(list(seq_tuple), 'seq')
         print(f'Processing sequence length: {seq_tuple}')
@@ -484,7 +489,22 @@ class ModelProfiler:
             assert args.profile_min_seq_length is not None and args.profile_max_seq_length is not None and args.profile_seq_length_step is not None, 'please set the min seq length, max seq length and seq length step'
             
             if args.profile_type == 'memory':
-                pass # TODO
+                assert args.profile_min_seq_length is not None and args.profile_max_seq_length is not None
+                # For memory profiling, sequence lengths must be powers of 2
+                assert (
+                    1 << (args.profile_min_seq_length.bit_length() - 1)
+                ) == args.profile_min_seq_length, "profile_min_seq_length must be a power of 2"
+                assert (
+                    1 << (args.profile_max_seq_length.bit_length() - 1)
+                ) == args.profile_max_seq_length, "profile_max_seq_length must be a power of 2"
+                self.sequence_length_list.append(
+                    [
+                        (1 << j)
+                        for j in range(
+                            args.profile_min_seq_length.bit_length() - 1, args.profile_max_seq_length.bit_length()
+                        )
+                    ]
+                )
             elif args.profile_type == 'computation':
                 for i in range(args.num_layertype):
                     self.sequence_length_list.append(list(range(args.profile_min_seq_length, args.profile_max_seq_length + 1, args.profile_seq_length_step)))
