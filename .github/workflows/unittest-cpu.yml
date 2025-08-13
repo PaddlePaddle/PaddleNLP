@@ -68,7 +68,6 @@ jobs:
             echo "Not in a pull_request event. Skipping PR-specific operations."
           fi
           git log --pretty=oneline -10
-          unset http_proxy && unset https_proxy
           '
 
       - name: Setup Environment
@@ -79,6 +78,7 @@ jobs:
           set -e
           python -m pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
           python -m pip config set global.cache-dir "/home/.cache/pip"
+          source $work_dir/../../../proxy
           python -m pip install --upgrade pip
           cd /workspace/PaddleNLP && git config --global --add safe.directory $PWD
           pip install -r tests/requirements.txt
