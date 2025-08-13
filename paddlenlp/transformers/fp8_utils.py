@@ -696,13 +696,13 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
         )
 
         # ===== call func common_fp8_mlp_bwd =====
-        dx, dw1, dw2 = FP8LinearFunctionBase.common_fp8_mlp_bwd(do3, x_fp8, x_scale, x_t_fp8, x_t_scale, w1, w2, False)
+        dx = FP8LinearFunctionBase.common_fp8_mlp_bwd(do3, x_fp8, x_scale, x_t_fp8, x_t_scale, w1, w2, True)
 
         # ===== reshape to origin shape =====
         if len(x_orig_shape) > 2:
             dx = dx.reshape([x_orig_shape[0], -1, dx.shape[-1]])
 
-        return dx, dw1, dw2
+        return dx, None, None
 
 
 class FP8Mlp(paddle.nn.Layer):
