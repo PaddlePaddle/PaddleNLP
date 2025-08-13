@@ -1481,7 +1481,8 @@ class FusedMultiTransformerBase(Layer):
         self.pre_process(**kwargs)
         kwargs["cum_offsets"] = cum_offsets
 
-        if caches is not None and not kwargs["kv_cache_reuse"]:
+        kv_cache_reuse = kwargs.get("kv_cache_reuse", None)
+        if caches is not None and kv_cache_reuse is None:
             assert len(caches) == len(self.linear_weights) or len(caches) == 2 * len(self.linear_weights)
 
         assert self.num_layers == len(self.linear_weights)
@@ -3172,7 +3173,8 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             k_dequant_scales = kwargs.get("k_dequant_scales", None)
             v_dequant_scales = kwargs.get("v_dequant_scales", None)
 
-            if kwargs["kv_cache_reuse"]:
+            kv_cache_reuse = kwargs.get("kv_cache_reuse", None)
+            if kv_cache_reuse:
                 k_cache_index = 0
                 v_cache_index = 1
             else:
