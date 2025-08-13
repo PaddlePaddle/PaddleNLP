@@ -414,7 +414,7 @@ class ZeroCostCheckpointCallback(TrainerCallback):
             self.maybe_update_zcc_worker(args, model, optimizer, state.global_step)
             checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{state.global_step}"
             save_infos = self._get_save_infos_based_on_steps(state, args, checkpoint_folder)
-            non_cached_objects = (lr_scheduler.state_dict(), copy.deepcopy(state), self.get_rng_states(args))
+            non_cached_objects = (lr_scheduler.state_dict(), state, self.get_rng_states(args))
             self.manager.get_idle_worker_for_saving((save_infos, non_cached_objects))
             self.runtime_timer.stop()
         if not isinstance(model, PipelineLayer):
