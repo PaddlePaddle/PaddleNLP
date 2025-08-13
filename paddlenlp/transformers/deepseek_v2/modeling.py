@@ -2354,7 +2354,7 @@ class DeepseekV2MTPLayer(DeepseekV2DecoderLayer):
 
         self.enorm = DeepseekV2RMSNorm(config)
         self.hnorm = DeepseekV2RMSNorm(config)
-        self.eh_proj = nn.Linear(2 * config.hidden_size, config.hidden_size)
+        self.eh_proj = nn.Linear(2 * config.hidden_size, config.hidden_size, bias_attr=False)
 
     def forward(
         self,
