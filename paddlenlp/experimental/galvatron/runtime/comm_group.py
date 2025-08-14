@@ -9,6 +9,7 @@ class GranularityRuntimeArguments:
     granularity_type: str = field(default='coarse_grained', metadata={'help': 'Granularity type of the runtime, can be coarse_grained or fine_grained.'})
     usp_flag: int = field(default=0, metadata={'help': 'Ulysses sp'})
     fine_grained_config_path: str = field(default='', metadata={'help': 'Path to the fine-grained configuration file.'})
+    sharding_stage_level: int = field(default=3, metadata={'help': 'Sharding stage level.'})
 
 def get_pp_division_ranks(gpu_nums, pp_deg):
     assert gpu_nums % pp_deg == 0, f'gpu_nums {gpu_nums} should be divisible by pp_deg {pp_deg}'

@@ -1,8 +1,17 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-task_name="cost_model"
-dir_name="fine_grained_test"
+export CUDA_DEVICE_MAX_CONNECTIONS=1
+export NCCL_DEBUG=INFO
+export NCCL_IB_HCA=mlx5_bond_1,mlx5_bond_4,mlx5_bond_3,mlx5_bond_2,mlx5_bond_7,mlx5_bond_6,mlx5_bond_8,mlx5_bond_5
+export NCCL_IB_DISABLE=0
+export NCCL_SOCKET_IFNAME=bond1
+export NCCL_IB_GID_INDEX=3
+export NCCL_NET_GDR_LEVEL=1
+export GLOO_SOCKET_IFNAME=bond1
+
+task_name="sp16-16rank-zero2"
+dir_name="tp-vs-sp"
 
 rm -rf output/$dir_name/$task_name/
 rm -rf "output/$dir_name/$task_name""_log"
@@ -12,6 +21,7 @@ export PYTHONPATH=../../../:$PYTHONPATH
 
 TRAINER="./train_qwen_fine_graine.py"
 LAUNCHER="python -u -m paddle.distributed.launch --log_level DEBUG"
+LAUNCHER="${LAUNCHER} --ips 28.12.131.41,28.12.130.118"
 LAUNCHER="${LAUNCHER} --gpus 0,1,2,3,4,5,6,7" 
 LAUNCHER="${LAUNCHER} --log_dir output/$dir_name/$task_name""_log ${TRAINER} --output_dir "./output""
 
@@ -22,7 +32,7 @@ TRAIN_ARGS="
     --max_grad_norm 1.0 \
     --learning_rate 3e-05 \
     --min_learning_rate 3e-06 \
-    --max_steps 10 \
+    --max_steps 20 \
     --logging_steps 1 \
     --continue_training 0 \
     --do_train true \
@@ -44,16 +54,16 @@ MODEL_ARGS=(
     --intermediate_size 49152
     --vocab_size 32000
     --hidden_size 8192
-    --seq_length 2048
+    --seq_length 131072
     --num_attention_heads 64
-    --num_key_value_heads 8
+    --num_key_value_heads 16
 )
 
 # "max_position_embeddings": 32768,
 # [mbsz, accumulation_steps] [recompute] [amp]
 CONFIG_ARGS="
-    --per_device_train_batch_size 2 \
-    --gradient_accumulation_steps 4 \
+    --per_device_train_batch_size 1 \
+    --gradient_accumulation_steps 1 \
     --recompute false \
     --recompute_use_reentrant true \
     --recompute_granularity full \
@@ -68,10 +78,10 @@ CONFIG_ARGS="
 # [dp_deg, dp_type] [tp_deg, megatron-sp] [pp_deg, 1F1B] [parallel_configs]
 PARALLEL_ARGS=(
     --to_static 1
-    --sharding_parallel_degree 4
+    --sharding_parallel_degree 1
     --sharding "stage2"
-    --tensor_parallel_degree 2
-    --sequence_parallel false
+    --tensor_parallel_degree 16
+    --sequence_parallel true
     --pipeline_parallel_degree 1
     --virtual_pp_degree 1
     --pipeline_schedule_mode "1F1B"
@@ -100,7 +110,7 @@ DEFAULT_OPTIMIZER_ARGS="
 DATA_ARGS="
     --input_dir ./data \
     --split 949,50,1 \
-    --max_seq_length 32768"
+    --max_seq_length 131072"
 
 # [runtime_profile]
 RUNTIME_PROFILE_ARGS="
@@ -121,6 +131,7 @@ DEBUG_ARGS="
 GRANULARITY_RUNTIME_ARGS="
     --granularity_type coarse_grained \
     --usp_flag 1 \
+    --sharding_stage_level 2 \
 "
 
 $LAUNCHER \

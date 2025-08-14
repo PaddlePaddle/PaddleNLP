@@ -108,12 +108,6 @@ def scaled_dot_product_attention(
                 return_softmax=output_attentions,
             )
         else:
-            # if attention_mask is None:
-                # print(f'[linguangming] [flash-attn-check] come here')
-                # attention_mask = get_triangle_upper_mask(attn_weights)
-            print(f'[linguangming] [flash-attn-check] come here')
-            print(f'[linguangming] [flash-attn-check], attention_mask is {attention_mask}')
-            print(f'[linguangming] [flash-attn-check], dtype is {query_states.dtype}') #  是bf16
             attn_output = fusion_ops.fusion_flash_attention(
                 query_states, config, key_states, value_states, attention_mask, output_attentions, alibi
             )
@@ -173,9 +167,6 @@ def get_rowwise_placements(use_ulysees=False):
     else:
         return [dist.Replicate(), dist.Shard(0)] # ['dp', 'sp']
 
-
-# colwise_placements = [dist.Replicate(), dist.Shard(1)]
-# rowise_placement = [dist.Replicate(), dist.Shard(0)]
 
 def sep_reshard_layer(input, split_axis, concat_axis):
     # Migrate from paddle/tests
@@ -1333,29 +1324,6 @@ class LlamaPretrainingCriterionFineGrainedFinal(paddle.nn.Layer):
         self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
     def forward(self, prediction_scores, masked_lm_labels):
-        print(f'[linguangming] [modeling_fine_grained.py], prediction_scores mesh.shape is {prediction_scores.process_mesh.shape}')
-        print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels mesh.shape is {masked_lm_labels.process_mesh.shape}')
-        print(f'[linguangming] [modeling_fine_grained.py], prediction_scores shape is {prediction_scores.shape}')
-        print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels shape is {masked_lm_labels.shape}')
-        print(f'[linguangming] [modeling_fine_grained.py], prediction_scores local_shape is {prediction_scores._local_shape}')
-        print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels local_shape is {masked_lm_labels._local_shape}')
-        print(f'[linguangming] [modeling_fine_grained.py], prediction_scores.stop_gradient is {prediction_scores.stop_gradient}')
-        print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels.stop_gradient is {masked_lm_labels.stop_gradient}')
-        
-        # # print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels dir is  {dir(masked_lm_labels)}')
-        # # for attr in dir(masked_lm_labels):
-        # #     # 跳过内置方法（以双下划线开头）
-        # #     if not attr.startswith('__'):
-        # #         try:
-        # #             value = getattr(masked_lm_labels, attr)
-        # #             print(f"{attr}: {value}")
-        # #         except Exception as e:
-        # #             print(f"{attr}: <无法获取值，错误: {e}>")
-        # print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels.optimize_attr is {masked_lm_labels.optimize_attr}')
-        # print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels.dist_attr is {masked_lm_labels.dist_attr}')
-        # print(f'[linguangming] [modeling_fine_grained.py],  prediction_scores is {prediction_scores}')
-        # print(f'[linguangming] [modeling_fine_grained.py],  masked_lm_labels is {masked_lm_labels}')
-        
         if masked_lm_labels.process_mesh.shape[0] != prediction_scores.process_mesh.shape[0]:
             print(f'[linguangming] [modeling_fine_grained.py], prediction_scores and masked_lm_labels should be in the same mesh')
             if dist.get_rank() in prediction_scores.process_mesh.process_ids:
@@ -1367,38 +1335,6 @@ class LlamaPretrainingCriterionFineGrainedFinal(paddle.nn.Layer):
             else:
                 from paddlenlp.experimental.galvatron.runtime.redistributed import get_dummy_dtensor
                 masked_lm_labels = get_dummy_dtensor(masked_lm_labels, prediction_scores.process_mesh)
-        print(f'=====================')
-        # if masked_lm_labels.process_mesh.shape[0] != prediction_scores.process_mesh.shape[0]:
-        #     print(f'[linguangming] [modeling_fine_grained.py], prediction_scores and masked_lm_labels should be in the same mesh')
-        #     if dist.get_rank() in prediction_scores.process_mesh.process_ids:
-        #         from paddlenlp.experimental.galvatron.runtime.redistributed import DummyRedistributedLayerWithoutSequenceParallel, RedistributedLayerWithoutSequenceParallel
-        #         prediction_scores = RedistributedLayerWithoutSequenceParallel.apply(prediction_scores, masked_lm_labels.process_mesh)
-        #     else:
-        #         from paddlenlp.experimental.galvatron.runtime.redistributed import DummyRedistributedLayerWithoutSequenceParallel, RedistributedLayerWithoutSequenceParallel
-        #         prediction_scores = DummyRedistributedLayerWithoutSequenceParallel.apply(prediction_scores, masked_lm_labels.process_mesh)        
-        print(f'[linguangming] [modeling_fine_grained.py], prediction_scores mesh.shape is {prediction_scores.process_mesh.shape}')
-        print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels mesh.shape is {masked_lm_labels.process_mesh.shape}')
-        print(f'[linguangming] [modeling_fine_grained.py], prediction_scores shape is {prediction_scores.shape}')
-        print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels shape is {masked_lm_labels.shape}')
-        print(f'[linguangming] [modeling_fine_grained.py], prediction_scores local_shape is {prediction_scores._local_shape}')
-        print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels local_shape is {masked_lm_labels._local_shape}')
-        print(f'[linguangming] [modeling_fine_grained.py], prediction_scores.stop_gradient is {prediction_scores.stop_gradient}')
-        print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels.stop_gradient is {masked_lm_labels.stop_gradient}')
-        
-        # print(f'[linguangming] [modeling_fine_grained.py],  prediction_scores is {prediction_scores}')
-        # print(f'[linguangming] [modeling_fine_grained.py],  masked_lm_labels is {masked_lm_labels}')
-        # # print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels dir is  {dir(masked_lm_labels)}')
-        # # for attr in dir(masked_lm_labels):
-        # #     # 跳过内置方法（以双下划线开头）
-        # #     if not attr.startswith('__'):
-        # #         try:
-        # #             value = getattr(masked_lm_labels, attr)
-        # #             print(f"{attr}: {value}")
-        # #         except Exception as e:
-        # #             print(f"{attr}: <无法获取值，错误: {e}>")
-        # print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels.optimize_attr is {masked_lm_labels.optimize_attr}')
-        # print(f'[linguangming] [modeling_fine_grained.py], masked_lm_labels.dist_attr is {masked_lm_labels.dist_attr}')
-        
         
         if self.enable_parallel_cross_entropy:
             if prediction_scores.shape[-1] == self.config.vocab_size:

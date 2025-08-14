@@ -582,7 +582,17 @@ def main():
         tp_size = training_args.tensor_parallel_degree
         dp_size = gpu_nums // pp_size // tp_size
         usp_flag = granularity_args.usp_flag
-        sharding_stage = training_args.sharding
+        sharding_stage = granularity_args.sharding_stage_level
+        from paddlenlp.trainer.trainer_utils import ShardingOption
+        if sharding_stage == 3:
+            training_args.sharding = [ShardingOption.FULL_SHARD]
+        elif sharding_stage == 2:
+            training_args.sharding = [ShardingOption.SHARD_GRAD_OP]
+        elif sharding_stage == 1:
+            training_args.sharding = [ShardingOption.SHARD_OP]
+        else:
+            training_args.sharding = [""]
+        print(f'[linguangming] training_args.sharding is {training_args.sharding}')
         recompute = training_args.recompute
         mesh_list, pp_stage_idx_list, recompute_list, sharding_stage_list = generate_meshs_coarse_grained(
             num_hidden_layers, gpu_nums, pp_size, tp_size, usp_flag, dp_size, sharding_stage, recompute

@@ -93,14 +93,13 @@ class AutoTrainer(Trainer):
                 ), "if use AutoTrainer.parallel_model , auto_dist_config obtained from parallel_model should be passed to AutoTrainer  "
                 self.auto_dist_config = kwargs.pop("auto_dist_config")
         model = kwargs["model"]
-        for param in model.parameters():
-            # NOTE(zhangwl):in pipeline mode , param my be initialized before while delte init_func ,but param is still not is_initialized
-            if not param._is_initialized() and param._init_func is not None:
-                param.initialize()
+        
         kwargs["model"] = model
 
         super().__init__(*args, **kwargs)
         assert self.args.enable_auto_parallel
+        
+        
 
         self.global_mesh = fleet.auto.get_mesh()
         self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
@@ -207,6 +206,12 @@ class AutoTrainer(Trainer):
         return dist_loader
 
     def _wrap_for_auto(self, model, train_dataloader):
+        # for param in model.parameters():
+        #     # NOTE(zhangwl):in pipeline mode , param my be initialized before while delte init_func ,but param is still not is_initialized
+        #     if not param._is_initialized() and param._init_func is not None:
+        #         param.initialize()
+        #         print(f'[linguangming] {param.name} init')
+        
         logger.info(f"Wrapping model for auto parallel using intermediate api {self.args.use_intermediate_api} ")
         dist_loader = self._wrap_for_dist_loader(train_dataloader)
 
@@ -217,6 +222,7 @@ class AutoTrainer(Trainer):
                 config=self.auto_dist_config,
             )
         else:
+            print(f'[linguangming] [debug] self.args.sharding is {self.args.sharding}')
             sharding_parallel_mesh_dimension = self.args.sharding_parallel_mesh_dimension
             if ShardingOption.SHARD_OP in self.args.sharding:
                 self.optimizer = dist.shard_optimizer(
@@ -241,16 +247,19 @@ class AutoTrainer(Trainer):
             else:
                 self.optimizer = dist.shard_optimizer(self.optimizer, None, self.args.gradient_accumulation_steps)
 
-            print('After dist_optimizer')
-            import math
-            param_total_size,  param_local_size = 0, 0
-            for name, param in model.named_parameters():
-                total_size = math.prod(param.shape)
-                local_size = math.prod(param._local_shape)
-                param_total_size += total_size
-                param_local_size += local_size
-                print(f'[linguangming] auto_trainer.py, param name: {name}, shape: {param.shape}, local_shape: {param._local_shape}, total_size: {total_size}, local_size: {local_size}')
-            print(f'[linguangming] auto_trainer.py, param_total_size: {param_total_size}, param_local_size: {param_local_size}')
+        if self.args.fp16 or self.args.bf16:
+            self._wrap_amp_model(self.args, model)
+
+        print('After dist_optimizer')
+        import math
+        param_total_size,  param_local_size = 0, 0
+        for name, param in model.named_parameters():
+            total_size = math.prod(param.shape)
+            local_size = math.prod(param._local_shape)
+            param_total_size += total_size
+            param_local_size += local_size
+            print(f'[linguangming] auto_trainer.py, param name: {name}, shape: {param.shape}, local_shape: {param._local_shape}, total_size: {total_size}, local_size: {local_size}')
+        print(f'[linguangming] auto_trainer.py, param_total_size: {param_total_size}, param_local_size: {param_local_size}')
 
         if self.args.to_static:
             unified_strategy = dist.Strategy()

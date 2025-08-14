@@ -1,18 +1,29 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
+export CUDA_DEVICE_MAX_CONNECTIONS=1
+export NCCL_DEBUG=INFO
+export NCCL_IB_HCA=mlx5_bond_1,mlx5_bond_4,mlx5_bond_3,mlx5_bond_2,mlx5_bond_7,mlx5_bond_6,mlx5_bond_8,mlx5_bond_5
+export NCCL_IB_DISABLE=0
+export NCCL_SOCKET_IFNAME=bond1
+export NCCL_IB_GID_INDEX=3
+export NCCL_NET_GDR_LEVEL=1
+export GLOO_SOCKET_IFNAME=bond1
 
-task_name="test"
+task_name="tp16-zero2"
+dir_name="tp-vs-sp"
 
-rm -rf output/metric/single/$task_name/
-rm -rf "output/metric/single/$task_name""_log"
+
+rm -rf output/$dir_name/$task_name/
+rm -rf "output/$dir_name/$task_name""_log"
 
 export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
 
 TRAINER="./train_qwen.py"
 LAUNCHER="python -u -m paddle.distributed.launch --log_level DEBUG"
+LAUNCHER="${LAUNCHER} --ips 28.12.131.41,28.12.130.118"
 LAUNCHER="${LAUNCHER} --gpus 0,1,2,3,4,5,6,7" 
-LAUNCHER="${LAUNCHER} --log_dir output/metric/single/$task_name""_log ${TRAINER} --output_dir "./output""
+LAUNCHER="${LAUNCHER} --log_dir output/$dir_name/$task_name""_log ${TRAINER} --output_dir "./output""
 
 # [max_steps] [logging_steps] [enable_auto_parallel]
 TRAIN_ARGS="
@@ -21,7 +32,7 @@ TRAIN_ARGS="
     --max_grad_norm 1.0 \
     --learning_rate 3e-05 \
     --min_learning_rate 3e-06 \
-    --max_steps 10 \
+    --max_steps 20 \
     --logging_steps 1 \
     --continue_training 0 \
     --do_train true \
@@ -43,23 +54,23 @@ MODEL_ARGS=(
     --intermediate_size 49152
     --vocab_size 32000
     --hidden_size 8192
-    --seq_length 8192
+    --seq_length 131072
     --num_attention_heads 64
-    --num_key_value_heads 8
+    --num_key_value_heads 16
 )
 
 # "max_position_embeddings": 32768,
 # [mbsz, accumulation_steps] [recompute] [amp]
 CONFIG_ARGS="
-    --per_device_train_batch_size 4 \
-    --gradient_accumulation_steps 4 \
-    --recompute true \
+    --per_device_train_batch_size 1 \
+    --gradient_accumulation_steps 1 \
+    --recompute false \
     --recompute_use_reentrant true \
     --recompute_granularity full \
     --pp_recompute_interval 0 \
     --bf16 true \
     --fp16_opt_level "O2" \
-    --amp_master_grad true \
+    --amp_master_grad false \
     --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
     --amp_custom_white_list "lookup_table" "lookup_table_v2" \
 "
@@ -67,15 +78,15 @@ CONFIG_ARGS="
 # [dp_deg, dp_type] [tp_deg, megatron-sp] [pp_deg, 1F1B] [parallel_configs]
 PARALLEL_ARGS=(
     --to_static 1
-    --sharding_parallel_degree 2
+    --sharding_parallel_degree 1
     --sharding "stage2"
-    --tensor_parallel_degree 2
+    --tensor_parallel_degree 16
     --sequence_parallel true
-    --pipeline_parallel_degree 2
+    --pipeline_parallel_degree 1
     --virtual_pp_degree 1
     --pipeline_schedule_mode "1F1B"
     --sep_parallel_degree 1
-    --pipeline_parallel_config "enable_send_recv_overlap"
+    --pipeline_parallel_config "enable_send_recv_overlap enable_release_grads"
     --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate"
     --sharding_parallel_config "enable_overlap enable_release_grads"
     --tensor_parallel_config "enable_mp_async_allreduce replace_with_parallel_cross_entropy"
@@ -99,7 +110,7 @@ DEFAULT_OPTIMIZER_ARGS="
 DATA_ARGS="
     --input_dir ./data \
     --split 949,50,1 \
-    --max_seq_length 32768"
+    --max_seq_length 131072"
 
 # [runtime_profile]
 RUNTIME_PROFILE_ARGS="

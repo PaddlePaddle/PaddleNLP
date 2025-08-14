@@ -474,9 +474,11 @@ class Trainer:
 
         self.do_grad_scaling = False
         self.enable_autocast_context_manager = False
-        if args.fp16 or args.bf16:
-            # set do_grad_scaling, enable_autocast_context_manager
-            self._wrap_amp_model(args, model)
+        
+        # move to auto_trainer
+        # if args.fp16 or args.bf16:
+        #     # set do_grad_scaling, enable_autocast_context_manager
+        #     self._wrap_amp_model(args, model)
 
         if args.recompute:
 
@@ -1938,6 +1940,7 @@ class Trainer:
         We provide a reasonable default that works well. If you want to use something else, you can pass a tuple in the
         Trainer's init through `optimizers`, or subclass and override this method in a subclass.
         """
+        print(f'[linguangming] create_optimizer')
         if self.optimizer is None:
             if self.optimizer_grouped_parameters is not None:
                 params = self.optimizer_grouped_parameters
