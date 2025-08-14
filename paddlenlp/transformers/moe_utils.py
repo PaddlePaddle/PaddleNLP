@@ -16,6 +16,7 @@
 
 import numpy as np
 import paddle
+import TokenDispatcherUtils as TDU
 
 from .fp8_utils import FP8LinearFunctionBase
 
@@ -181,16 +182,14 @@ class UnZipNode:
         return (unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_scale)
 
     @paddle.no_grad()
-    def backward(self, dx, hidden_states_out_grad, probs_grad, dispatched_indices, num_experts):
+    def backward(self, dx, total_zipped_tokens, probs_grad, dispatched_indices, num_experts):
         with paddle.amp.auto_cast(False):
             weighted_zipped_tokens, probs_grad_zipped = paddle.nn.functional.moe_unpermute(
                 dx,
                 self.zipped_expertwise_rowmap,
                 dispatched_indices,
                 probs_grad,
-                total_zipped_tokens=hidden_states_out_grad[0].shape[0]
-                if isinstance(hidden_states_out_grad, tuple)
-                else hidden_states_out_grad.shape[0],
+                total_zipped_tokens=total_zipped_tokens,
                 num_experts=num_experts,
             )
         self.reset_statue()
@@ -375,3 +374,27 @@ class UnPermuteNode:
 
         self.reset_status()
         return hidden_states_grad, dispatched_probs_grad
+
+
+def tokens_zip_unique_add_with_subbatch(zipped, unzipped, index_unzipped, zipped_rows, subbatch_rows=None):
+    """
+    tokens_zip_unique_add_with_subbatch
+    """
+    if subbatch_rows is None or subbatch_rows <= 0 or zipped_rows <= 0:
+        return TDU.tokens_zip_unique_add(zipped, unzipped, index_unzipped, zipped_rows)
+    else:
+        if isinstance(zipped, paddle.Tensor):
+            num_split = (zipped_rows + subbatch_rows - 1) // subbatch_rows
+            remainder = zipped_rows % subbatch_rows
+            if remainder == 0:
+                rows = [subbatch_rows] * num_split
+            else:
+                rows = [subbatch_rows] * (num_split - 1) + [remainder]
+
+            if zipped.shape[0] == 0:
+                dtype = zipped.dtype
+                hidden_size = zipped.shape[1]
+                zipped = [paddle.zeros([r, hidden_size], dtype=dtype) for r in rows]
+            else:
+                zipped = paddle.split(zipped, rows, axis=0)
+        return TDU.tokens_zip_unique_add_subbatch(zipped, unzipped, index_unzipped, zipped_rows, subbatch_rows)
