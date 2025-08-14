@@ -338,6 +338,8 @@ class ActorReferenceTrainerBase(RLTrainer):
             "response_start": response_start,
             "attn_mask_startend_row_indices": attn_mask_startend_row_indices,
         }
+        if self.args.rl_algorithm == "vapo":
+            policy_trainer_inputs.update({"rewards": rl_batch.batch["ori_rewards"]})
 
         if self.args.rl_algorithm == "grpo":
             policy_trainer_inputs.update({"ref_log_probs": rl_batch.batch["ref_log_probs"]})
@@ -351,10 +353,10 @@ class ActorReferenceTrainerBase(RLTrainer):
             rewards = rl_batch.batch["rewards"].mean()
             ori_rewards = rl_batch.batch["ori_rewards"].mean()
             mask_cast = sequence_mask.cast(paddle.float32)
-            if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]:
+            if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus", "vapo"]:
                 kl_rewards = (rl_batch.batch["kl_rewards"] * mask_cast).sum() / mask_cast.sum()
                 rewards_with_kl = (rl_batch.batch["rewards_with_kl"] * mask_cast).sum() / mask_cast.sum()
-                if self.args.rl_algorithm == "ppo":
+                if self.args.rl_algorithm in ["ppo", "vapo"]:
                     values = (rl_batch.batch["reward_values"] * mask_cast).sum() / mask_cast.sum()
                 returns = (rl_batch.batch["reward_returns"] * mask_cast).sum() / mask_cast.sum()
             ref_log_probs = rl_batch.batch["ref_log_probs"]
@@ -387,10 +389,10 @@ class ActorReferenceTrainerBase(RLTrainer):
                             "train_norm_reward_with_kl": rewards_with_kl,
                             "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
                             "train_entropy_loss": self.info_buffer.get("entropy_loss"),
-                            **({"train_values": values} if self.args.rl_algorithm == "ppo" else {}),
+                            **({"train_values": values} if self.args.rl_algorithm in ["ppo", "vapo"] else {}),
                             "train_returns": returns,
                         }
-                        if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
+                        if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus", "vapo"]
                         else {}
                     ),
                     "train_kl_divergence": kl_divergence,
