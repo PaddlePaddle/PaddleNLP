@@ -49,8 +49,8 @@ from .modeling import (
     DeepseekV2PretrainedModel,
     DeepseekV2PretrainingCriterion,
     DeepseekV2RMSNorm,
-    set_global_step,
     TemporaryVarContext,
+    set_global_step,
 )
 
 try:
@@ -282,10 +282,18 @@ class PostProcessNode(ScheduleNode):
         residual_grad = hidden_states_grad
         l_aux_grad = paddle.ones(1, dtype=self.l_aux.dtype) * self.alpha
         final_hidden_states_grad = hidden_states_grad
-        
+
         if self.using_post_norm_recompute:
             if self.send_mtp_embed:
-                return (inputs_embeds_mtp_grad, dx, residual_grad, l_aux_grad, final_hidden_states_grad, norm_out, invar)
+                return (
+                    inputs_embeds_mtp_grad,
+                    dx,
+                    residual_grad,
+                    l_aux_grad,
+                    final_hidden_states_grad,
+                    norm_out,
+                    invar,
+                )
             else:
                 return (dx, residual_grad, l_aux_grad, final_hidden_states_grad, norm_out, invar)
         else:
@@ -720,7 +728,6 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
         inputs = (inputs_embeds_mtp, *inputs) if self.send_mtp_embed else inputs
         inputs = (*inputs, norm_out) if self.using_post_norm_recompute else inputs
 
-
         if with_residual:
             inputs = self.post_process_node.forward(inputs)
         else:
@@ -732,7 +739,15 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
 
         if self.using_post_norm_recompute:
             if self.send_mtp_embed:
-                inputs_embeds_mtp_grad, hidden_states_grad, residual_grad, l_aux_grad, final_hidden_states_grad, norm_out, invar = grad
+                (
+                    inputs_embeds_mtp_grad,
+                    hidden_states_grad,
+                    residual_grad,
+                    l_aux_grad,
+                    final_hidden_states_grad,
+                    norm_out,
+                    invar,
+                ) = grad
             else:
                 hidden_states_grad, residual_grad, l_aux_grad, final_hidden_states_grad, norm_out, invar = grad
         else:
@@ -811,16 +826,29 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
     def mlp_backward(self, output_grad):
         if self.using_post_norm_recompute:
             if self.send_mtp_embed:
-                inputs_embeds_mtp_grad, hidden_states_grad, residual_grad, l_aux_grad, hidden_states_out_grad, norm_out, invar = output_grad
+                (
+                    inputs_embeds_mtp_grad,
+                    hidden_states_grad,
+                    residual_grad,
+                    l_aux_grad,
+                    hidden_states_out_grad,
+                    norm_out,
+                    invar,
+                ) = output_grad
             else:
                 hidden_states_grad, residual_grad, l_aux_grad, hidden_states_out_grad, norm_out, invar = output_grad
         else:
             if self.send_mtp_embed:
-                inputs_embeds_mtp_grad, hidden_states_grad, residual_grad, l_aux_grad, hidden_states_out_grad = output_grad
+                (
+                    inputs_embeds_mtp_grad,
+                    hidden_states_grad,
+                    residual_grad,
+                    l_aux_grad,
+                    hidden_states_out_grad,
+                ) = output_grad
             else:
                 hidden_states_grad, residual_grad, l_aux_grad, hidden_states_out_grad = output_grad
         hs_dispatched_grad, dispatched_probs_grad = self.fp8_fusion_moe_node.mlp_node.backward(hidden_states_out_grad)
-
 
         ret = (hidden_states_grad, residual_grad, l_aux_grad, hs_dispatched_grad, dispatched_probs_grad)
         ret = (inputs_embeds_mtp_grad, *ret) if self.send_mtp_embed else ret
@@ -841,7 +869,15 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
                     invar,
                 ) = output_grad
             else:
-                hidden_states_grad, residual_grad, l_aux_grad, hs_dispatched_grad, dispatched_probs_grad, norm_out, invar = output_grad
+                (
+                    hidden_states_grad,
+                    residual_grad,
+                    l_aux_grad,
+                    hs_dispatched_grad,
+                    dispatched_probs_grad,
+                    norm_out,
+                    invar,
+                ) = output_grad
         else:
             if self.send_mtp_embed:
                 (

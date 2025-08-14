@@ -3481,7 +3481,7 @@ class DeepseekV2ForSequenceClassification(DeepseekV2PretrainedModel):
                     loss = loss_fct(pooled_logits.squeeze(), labels.squeeze())
                 else:
                     loss = loss_fct(pooled_logits, labels)
-            elif self.config.problem_type == "single_label_classification":
+            elif self.config.problem_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type == "single_label_classification":
                 loss_fct = CrossEntropyLoss()
                 loss = loss_fct(pooled_logits.reshape([-1, self.num_labels]), labels.reshape([-1]))
             elif self.config.problem_type == "multi_label_classification":
