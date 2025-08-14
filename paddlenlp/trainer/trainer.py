@@ -93,6 +93,10 @@ try:
     )
 except:
     pass
+from collections import defaultdict
+
+from safetensors import safe_open
+
 from ..transformers.context_parallel_utils import split_inputs_sequence_dim_load_balance
 from ..transformers.model_utils import (
     PretrainedModel,
@@ -210,6 +214,120 @@ except:
 
 
 __all__ = ["Trainer"]
+
+
+# 预编译正则表达式提升性能
+_LAYER_RE = re.compile(r"^_layers\.(\d+)\.(\d+)(?:\.(.*))?$")
+_EXPERT_W1_RE = re.compile(r"^mlp\.experts\.(\d+)\.w1(?:\.weight)?$")
+_EXPERT_W2_RE = re.compile(r"^mlp\.experts\.(\d+)\.w2(?:\.weight)?$")
+
+# 保持原有映射关系
+custom_name_map = {
+    "self_attn.fused_rms_norm_linear.rms_norm_weight": "input_layernorm.weight",
+    "self_attn.memory_recompute_att.kv_ln_weigh": "self_attn.kv_a_layernorm.weight",
+    "self_attn.fused_rms_norm_linear.kv_down_weight": "self_attn.kv_a_proj_with_mqa.weight",
+    "self_attn.memory_recompute_att.kv_up_weight": "self_attn.kv_b_proj.weight",
+    "self_attn.memory_recompute_att.q_ln_weight": "self_attn.q_a_layernorm.weight",
+    "self_attn.fused_rms_norm_linear.q_down_weight": "self_attn.q_a_proj.weight",
+    "self_attn.memory_recompute_att.q_up_weight": "self_attn.q_b_proj.weight",
+}
+
+
+def paddle_name_to_hf_names(paddle_name: str) -> List[str]:
+    """
+    将Paddle模型参数名称转换为Hugging Face格式的名称列表
+
+    参数:
+        paddle_name: Paddle格式的参数名称
+
+    返回:
+        Hugging Face格式的参数名称列表（可能拆分多个参数）
+    """
+    # 基础路径解析
+    m = _LAYER_RE.match(paddle_name)
+    if not m:
+        return []
+
+    segment_id = int(m.group(1))
+    id_in_segment = int(m.group(2))
+    rest = m.group(3) or ""
+
+    # 1. 生成HF前缀
+    hf_prefix = _get_hf_prefix(segment_id, id_in_segment)
+
+    # 2. 处理子路径转换
+    if rest in custom_name_map:
+        return [f"{hf_prefix}.{custom_name_map[rest]}"]
+
+    if expert_names := _handle_expert_weights(hf_prefix, rest):
+        return expert_names
+
+    if mlp_names := _handle_mlp_weights(hf_prefix, rest):
+        return mlp_names
+
+    # 3. 默认处理
+    return [f"{hf_prefix}.{rest}"] if rest else [hf_prefix]
+
+
+def _get_hf_prefix(segment_id: int, id_in_segment: int) -> str:
+    """生成Hugging Face格式的层级前缀"""
+    # 特殊层级映射
+    special_cases = {(0, 0): "model", (28, 2): "model.layers.61", (28, 3): "model", (28, 4): "lm_head"}
+
+    if (segment_id, id_in_segment) in special_cases:
+        return special_cases[(segment_id, id_in_segment)]
+
+    # 通用层级计算
+    layer_idx = segment_id + id_in_segment - 1
+    return f"model.layers.{layer_idx}"
+
+
+def _handle_expert_weights(hf_prefix: str, rest: str) -> Optional[List[str]]:
+    """处理专家网络权重拆分"""
+    # 处理专家w1权重（拆分为gate_proj和up_proj）
+    if m := _EXPERT_W1_RE.match(rest):
+        expert_id = int(m.group(1))
+        return [
+            f"{hf_prefix}.mlp.experts.{expert_id}.gate_proj.weight",
+            f"{hf_prefix}.mlp.experts.{expert_id}.up_proj.weight",
+        ]
+
+    # 处理专家w2权重（映射为down_proj）
+    if m := _EXPERT_W2_RE.match(rest):
+        expert_id = int(m.group(1))
+        return [f"{hf_prefix}.mlp.experts.{expert_id}.down_proj.weight"]
+
+    return None
+
+
+def _handle_mlp_weights(hf_prefix: str, rest: str) -> Optional[List[str]]:
+    """处理普通MLP权重拆分"""
+    if rest == "mlp.w1":
+        return [f"{hf_prefix}.mlp.gate_proj.weight", f"{hf_prefix}.mlp.up_proj.weight"]
+
+    if rest == "mlp.w2":
+        return [f"{hf_prefix}.mlp.down_proj.weight"]
+
+    return None
+
+
+def prepare_tensor(tensor, dst_shape):
+    if isinstance(tensor, list):
+        return paddle.concat(
+            [
+                paddle.transpose(tensor[0], perm=[1, 0]).contiguous(),
+                paddle.transpose(tensor[1], perm=[1, 0]).contiguous(),
+            ],
+            axis=-1,
+        )
+    if tensor.shape == dst_shape:
+        return tensor
+    if len(tensor.shape) == 2 and paddle.transpose(tensor, perm=[1, 0]).contiguous().shape == dst_shape:
+        return paddle.transpose(tensor, perm=[1, 0]).contiguous()
+    if len(tensor.shape) == 1:
+        return tensor[0 : dst_shape[0]]
+    if len(tensor.shape) == 2:
+        return paddle.transpose(tensor, perm=[1, 0]).contiguous()[:, 0 : dst_shape[1]]
 
 
 class Trainer:
@@ -1008,6 +1126,99 @@ class Trainer:
 
         if self.args.ignore_data_skip:
             self.timers and self.timers("read-data").start()
+
+        print("================================== load safe tensor ==================================")
+        print("---- paddle param ----")
+        if self.state.global_step == 0:
+            for n, p in model.named_parameters():
+                print("{}:{}".format(n, p.shape))
+
+        # 1. 加载参数-文件映射表
+        weight_map_path = "/root/paddlejob/workspace/env_run/zhangbo/model.safetensors.index.json"
+        with open(weight_map_path, "r") as f:
+            weight_map = json.load(f)["weight_map"]
+        print("weight_map: ", weight_map)
+
+        # 2. 创建反向索引：文件 -> 参数列表
+        file_to_params = defaultdict(list)
+        for param_name, filename in weight_map.items():
+            file_to_params[filename].append(param_name)
+
+        # 2. 收集模型需要的文件列表
+        required_files = set()
+        file_to_pd_param_name = defaultdict(list)
+        pd_param_name_to_file = defaultdict(list)
+        for pd_name, _ in model.named_parameters():
+            hf_name = paddle_name_to_hf_names(pd_name)
+            print("pd_name: ", pd_name)
+            print("hf_name: ", hf_name)
+            if hf_name[0] in weight_map:
+                filename = weight_map[hf_name[0]]
+                required_files.add(filename)
+                file_to_pd_param_name[filename].append(pd_name)
+                pd_param_name_to_file[pd_name].append(filename)
+            if len(hf_name) > 1 and hf_name[1] in weight_map:
+                filename = weight_map[hf_name[1]]
+                required_files.add(filename)
+                file_to_pd_param_name[filename].append(pd_name)
+                if filename != pd_param_name_to_file[pd_name][0]:
+                    pd_param_name_to_file[pd_name].append(filename)
+            else:
+                print(f"Warning: {pd_name} not found in weight map")
+        print("---- required_files ----")
+        print(required_files)
+        print("---- file_to_pd_param_name ----")
+        print(file_to_pd_param_name)
+        print("---- pd_param_name_to_file ----")
+        print(pd_param_name_to_file)
+
+        # 3. 按文件分组加载
+        ckpt_pre = "/root/paddlejob/new_disk/huggingface_model/huggingface/deepseek-ai/DeepSeek-V3-bf16/"
+        check_list = []
+        print("---- start load param ----")
+        for filename in required_files:
+            try:
+                with safe_open(ckpt_pre + filename, framework="paddle", device="cpu") as f:
+                    print("open file: ", ckpt_pre + filename)
+                    # 加载该文件包含的所有参数
+                    pd_params = file_to_pd_param_name[filename]
+                    print("load for params: ", pd_params)
+                    for pd_param in pd_params:
+                        if pd_param in check_list:
+                            continue
+                        hf_name = paddle_name_to_hf_names(pd_param)
+                        if len(hf_name) == 1:
+                            tensor = f.get_tensor(hf_name[0])
+                            model.state_dict()[pd_param].set_value(
+                                paddle.cast(
+                                    prepare_tensor(tensor, model.state_dict()[pd_param].shape),
+                                    model.state_dict()[pd_param].dtype,
+                                )
+                            )
+                        else:
+                            files = pd_param_name_to_file[pd_name]
+                            if len(files) == 1:
+                                tensor0 = f.get_tensor(hf_name[0])
+                                tensor1 = f.get_tensor(hf_name[1])
+                            else:
+                                if weight_map[hf_name[0]] == filename:
+                                    tensor0 = f.get_tensor(hf_name[0])
+                                    with safe_open(
+                                        ckpt_pre + weight_map[hf_name[1]], framework="paddle", device="cpu"
+                                    ) as f_other:
+                                        tensor1 = f_other.get_tensor(hf_name[1])
+                                else:
+                                    with safe_open(
+                                        ckpt_pre + weight_map[hf_name[0]], framework="paddle", device="cpu"
+                                    ) as f_other:
+                                        tensor0 = f_other.get_tensor(hf_name[1])
+                                    tensor1 = f.get_tensor(hf_name[1])
+                            model.state_dict()[pd_param].set_value(prepare_tensor([tensor0, tensor1], None))
+                        check_list.append(pd_param)
+
+            except Exception as e:
+                print(f"Error loading {filename}: {str(e)}")
+                raise
 
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
