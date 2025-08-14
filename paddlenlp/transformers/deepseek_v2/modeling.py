@@ -752,6 +752,18 @@ class DeepseekV2MLP(nn.Layer):
 
 class FusedNormGateFunc(paddle.autograd.PyLayer):
     """recompute of postnorm and gate"""
+    _current_norm_output = None
+    _current_invar = None
+
+    @classmethod
+    def set_temporary_vars(cls, norm_output, invar):
+        FusedNormGateFunc._current_norm_output = norm_output
+        FusedNormGateFunc._current_invar = invar
+
+    @classmethod
+    def clear_temporary_vars(cls):
+        FusedNormGateFunc._current_norm_output = None
+        FusedNormGateFunc._current_invar = None
 
     @staticmethod
     def forward(ctx, x, rms_norm_weight, moe_gate_weight, eps):
@@ -767,7 +779,10 @@ class FusedNormGateFunc(paddle.autograd.PyLayer):
     def backward(ctx, d_gate_logits, d_norm_output):
         x, rms_norm_weight, moe_gate_weight, eps = ctx.saved_tensor()
         # recompute rmsnorm
-        norm_output, invar = fused_ln.fused_rms_norm(x, rms_norm_weight, eps)
+        norm_output = FusedNormGateFunc._current_norm_output
+        invar = FusedNormGateFunc._current_invar
+        if norm_output is None or invar is None:
+            norm_output, invar = fused_ln.fused_rms_norm(x, rms_norm_weight, eps)
         d_norm_output_linear, d_moe_gate_weight = paddle._C_ops.matmul_grad(
             cast_if_needed(norm_output, ctx.dtype),
             cast_if_needed(moe_gate_weight, ctx.dtype),
@@ -784,6 +799,16 @@ class FusedNormGateFunc(paddle.autograd.PyLayer):
 
         return dx, d_rms_norm_weight, d_moe_gate_weight
 
+class TemporaryVarContext:
+    def __init__(self, norm_output, invar):
+        self.norm_output = norm_output
+        self.invar = invar
+
+    def __enter__(self):
+        FusedNormGateFunc.set_temporary_vars(self.norm_output, self.invar)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        FusedNormGateFunc.clear_temporary_vars()
 
 def balance_expert_assignment(n, m, k):
     assert k * n % m == 0

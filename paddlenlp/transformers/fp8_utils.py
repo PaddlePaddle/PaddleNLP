@@ -468,7 +468,7 @@ class FP8LinearFunctionBase:
         if hasattr(norm_w, "_apply_backward_hook"):
             norm_w._apply_backward_hook()
 
-        return dx
+        return dx, norm_output, invar
 
 
 class FP8LinearFunction(paddle.autograd.PyLayer):
