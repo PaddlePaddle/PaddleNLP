@@ -93,10 +93,6 @@ try:
     )
 except:
     pass
-from collections import defaultdict
-
-from safetensors import safe_open
-
 from ..transformers.context_parallel_utils import split_inputs_sequence_dim_load_balance
 from ..transformers.model_utils import (
     PretrainedModel,
@@ -215,6 +211,10 @@ except:
 
 __all__ = ["Trainer"]
 
+
+from collections import defaultdict
+
+from safetensors import safe_open
 
 # 预编译正则表达式提升性能
 _LAYER_RE = re.compile(r"^_layers\.(\d+)\.(\d+)(?:\.(.*))?$")
@@ -1137,7 +1137,6 @@ class Trainer:
         weight_map_path = "/root/paddlejob/workspace/env_run/zhangbo/model.safetensors.index.json"
         with open(weight_map_path, "r") as f:
             weight_map = json.load(f)["weight_map"]
-        print("weight_map: ", weight_map)
 
         # 2. 创建反向索引：文件 -> 参数列表
         file_to_params = defaultdict(list)
@@ -1150,27 +1149,23 @@ class Trainer:
         pd_param_name_to_file = defaultdict(list)
         for pd_name, _ in model.named_parameters():
             hf_name = paddle_name_to_hf_names(pd_name)
-            print("pd_name: ", pd_name)
-            print("hf_name: ", hf_name)
             if hf_name[0] in weight_map:
                 filename = weight_map[hf_name[0]]
                 required_files.add(filename)
                 file_to_pd_param_name[filename].append(pd_name)
                 pd_param_name_to_file[pd_name].append(filename)
-            if len(hf_name) > 1 and hf_name[1] in weight_map:
-                filename = weight_map[hf_name[1]]
-                required_files.add(filename)
-                file_to_pd_param_name[filename].append(pd_name)
-                if filename != pd_param_name_to_file[pd_name][0]:
-                    pd_param_name_to_file[pd_name].append(filename)
             else:
-                print(f"Warning: {pd_name} not found in weight map")
-        print("---- required_files ----")
-        print(required_files)
-        print("---- file_to_pd_param_name ----")
-        print(file_to_pd_param_name)
-        print("---- pd_param_name_to_file ----")
-        print(pd_param_name_to_file)
+                print(f"Warning: {pd_name} -> {hf_name[0]} not found in weight map")
+
+            if len(hf_name) > 1:
+                if hf_name[1] in weight_map:
+                    filename = weight_map[hf_name[1]]
+                    required_files.add(filename)
+                    file_to_pd_param_name[filename].append(pd_name)
+                    if filename != pd_param_name_to_file[pd_name][0]:
+                        pd_param_name_to_file[pd_name].append(filename)
+                else:
+                    print(f"Warning: {pd_name} -> {hf_name[1]} not found in weight map")
 
         # 3. 按文件分组加载
         ckpt_pre = "/root/paddlejob/new_disk/huggingface_model/huggingface/deepseek-ai/DeepSeek-V3-bf16/"
@@ -1182,10 +1177,10 @@ class Trainer:
                     print("open file: ", ckpt_pre + filename)
                     # 加载该文件包含的所有参数
                     pd_params = file_to_pd_param_name[filename]
-                    print("load for params: ", pd_params)
                     for pd_param in pd_params:
                         if pd_param in check_list:
                             continue
+                        print("load for pd_param: ", pd_param)
                         hf_name = paddle_name_to_hf_names(pd_param)
                         if len(hf_name) == 1:
                             tensor = f.get_tensor(hf_name[0])
