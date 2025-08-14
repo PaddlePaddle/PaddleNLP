@@ -781,7 +781,6 @@ class FP8GroupGemmMlpFunctionNode:
         self.experts = custom_map.experts
         self.recompute_fwd_gate_up = recompute_fwd_gate_up
         self.is_split_group_gemm = is_split_group_gemm
-        self.tokens_per_expert = None
         self.m_indices = None
         self.input = None
         self.input_fp8 = None
@@ -790,16 +789,11 @@ class FP8GroupGemmMlpFunctionNode:
         self.all_unzipped_grad = None
         self.fwd_subbatch = None
         self.bwd_subbatch = None
-        self.all_do1_list = []
-        self.all_o2_s_list = []
 
     def reset_statue(self):
-        self.tokens_per_expert = None
         self.m_indices = None
         self.fwd_subbatch = None
         self.bwd_subbatch = None
-        self.all_do1_list = None
-        self.all_o2_s_list = None
         self.clear_activation_tensors()
 
     def clear_activation_tensors(self):
@@ -856,7 +850,7 @@ class FP8GroupGemmMlpFunctionNode:
                     num_sms=118,
                 )
 
-        if not self.fwd_subbatch:
+        if m_indices is None:
             self.input_fp8 = x_fp8
             self.input_scale = x_scale
         return o1
@@ -865,7 +859,9 @@ class FP8GroupGemmMlpFunctionNode:
         o2 = swiglu(o1)
         return o2
 
-    def fwd_down(self, o1, unzipped_probs, expert_w2, num_expert, m_indices=None, o3=None, clear_o1=False):
+    def fwd_down(
+        self, o1, unzipped_probs, expert_w2, num_expert, tokens_per_expert, m_indices=None, o3=None, clear_o1=False
+    ):
         """
         o3 = o2 * w2
         [m_sum, k] = [m_sum, n] * [num_groups, n, k]
@@ -894,7 +890,7 @@ class FP8GroupGemmMlpFunctionNode:
             o3 = paddle.empty(o3_shape, dtype=o1.dtype)
         if numpy.prod(o2_fp8.shape) != 0:
             if self.is_split_group_gemm:
-                split_group_gemm(o2_fp8, o2_scale, w2_quant, w2_scale, self.tokens_per_expert, o3)
+                split_group_gemm(o2_fp8, o2_scale, w2_quant, w2_scale, tokens_per_expert, o3)
             else:
                 deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
                     (o2_fp8, o2_scale),
@@ -906,7 +902,7 @@ class FP8GroupGemmMlpFunctionNode:
 
         return o3
 
-    def bwd_dowm_input(self, expert_w2, unzipped_grad, o1, m_indices=None, unzipped_probs=None):
+    def bwd_dowm_input(self, expert_w2, unzipped_grad, o1, tokens_per_expert, m_indices=None, unzipped_probs=None):
         """
         do2 = do3 * w2_t
         [m_sum, n] = [m_sum, k] * [num_groups, k, n]
@@ -930,7 +926,7 @@ class FP8GroupGemmMlpFunctionNode:
         if numpy.prod(unzipped_grad_fp8.shape) != 0:
             if self.is_split_group_gemm:
                 split_group_gemm(
-                    unzipped_grad_fp8, unzipped_grad_scale, bw_w2_quant, bw_w2_scale, self.tokens_per_expert, do2_s
+                    unzipped_grad_fp8, unzipped_grad_scale, bw_w2_quant, bw_w2_scale, tokens_per_expert, do2_s
                 )
             else:
                 deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
@@ -950,7 +946,7 @@ class FP8GroupGemmMlpFunctionNode:
         do1, _ = paddle._C_ops.swiglu_grad(o1, None, do2)
         return do1
 
-    def bwd_gate_up_input(self, do1, expert_w1, m_indices=None, dx=None):
+    def bwd_gate_up_input(self, do1, expert_w1, tokens_per_expert, m_indices=None, dx=None):
         """
         dx = do1 * w1_t
         [m_sum, k] = [m_sum, n] * [num_groups, n, k]
@@ -973,7 +969,7 @@ class FP8GroupGemmMlpFunctionNode:
             assert dx.shape == dx_shape, f"{dx.shape} vs {dx_shape}"
         if numpy.prod(do1_fp8.shape) != 0:
             if self.is_split_group_gemm:
-                split_group_gemm(do1_fp8, do1_scale, bw_w1_quant, bw_w1_scale, self.tokens_per_expert, dx)
+                split_group_gemm(do1_fp8, do1_scale, bw_w1_quant, bw_w1_scale, tokens_per_expert, dx)
             else:
                 deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
                     (do1_fp8, do1_scale),
@@ -991,7 +987,7 @@ class FP8GroupGemmMlpFunctionNode:
         )
         return out, scale
 
-    def bwd_down_weight(self, do3, o2, expert_w2):
+    def bwd_down_weight(self, do3, o2, expert_w2, tokens_per_expert):
         """
         dw2 = do2_t * do3
         [n, k] = [n, m_sum] * [m_sum, k] (m_sum = sum(tokens_per_expert))
@@ -999,12 +995,12 @@ class FP8GroupGemmMlpFunctionNode:
         if isinstance(o2, tuple):
             o2_t_fp8, o2_t_scale = o2
         else:
-            o2_t_fp8, o2_t_scale = self.fused_transpose_split_quant(o2, None, self.tokens_per_expert, True)
+            o2_t_fp8, o2_t_scale = self.fused_transpose_split_quant(o2, None, tokens_per_expert, True)
 
         if isinstance(do3, tuple):
             do3_t_fp8, do3_t_scale = do3
         else:
-            do3_t_fp8, do3_t_scale = self.fused_transpose_split_quant(do3, None, self.tokens_per_expert, True)
+            do3_t_fp8, do3_t_scale = self.fused_transpose_split_quant(do3, None, tokens_per_expert, True)
 
         def cal_weight_fn(o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, expert_w2):
             with paddle.no_grad():
@@ -1026,29 +1022,32 @@ class FP8GroupGemmMlpFunctionNode:
             cal_weight_fn(o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, expert_w2)
 
     def bwd_gate_up_weight(
-        self, do1, input_x, expert_w1, input_fp8_slice=None, input_scale_slice=None, clear_input=False
+        self,
+        do1,
+        input_x,
+        expert_w1,
+        tokens_per_expert,
+        input_fp8_slice=None,
+        input_scale_slice=None,
+        clear_input=False,
     ):
         """
         dw1 = dx_t * do1
         [k, n] = [k, m_sum] * [m_sum, n] (m_sum = sum(tokens_per_expert))
         """
         if input_x is None:
-            inp = (self.input_fp8, self.input_scale) if self.is_subbatch else (input_fp8_slice, input_scale_slice)
-            input_x_t_fp8, input_x_t_scale = self.fused_transpose_split_quant(
-                inp[0], inp[1], self.tokens_per_expert, True
-            )
+            inp = (input_fp8_slice, input_scale_slice) if self.bwd_subbatch else (self.input_fp8, self.input_scale)
+            input_x_t_fp8, input_x_t_scale = self.fused_transpose_split_quant(inp[0], inp[1], tokens_per_expert, True)
 
         else:
-            input_x_t_fp8, input_x_t_scale = self.fused_transpose_split_quant(
-                input_x, None, self.tokens_per_expert, True
-            )
+            input_x_t_fp8, input_x_t_scale = self.fused_transpose_split_quant(input_x, None, tokens_per_expert, True)
 
         if clear_input:
             self.input = None
             self.input_fp8 = None
             self.input_scale = None
 
-        do1_t_fp8, do1_t_scale = self.fused_transpose_split_quant(do1, None, self.tokens_per_expert, True)
+        do1_t_fp8, do1_t_scale = self.fused_transpose_split_quant(do1, None, tokens_per_expert, True)
 
         def cal_weight_fn(input_x_t_fp8, input_x_t_scale, do1_t_fp8, do1_t_scale, expert_w1):
             with paddle.no_grad():
@@ -1107,7 +1106,9 @@ class FP8GroupGemmMlpFunctionNode:
             clear_o1 = True
 
         # o3
-        o3 = self.fwd_down(o1, unzipped_probs, expert_w2, num_expert, clear_o1=clear_o1, m_indices=m_indices)
+        o3 = self.fwd_down(
+            o1, unzipped_probs, expert_w2, num_expert, tokens_per_expert, clear_o1=clear_o1, m_indices=m_indices
+        )
 
         # save for bwd
         return o3
@@ -1117,15 +1118,20 @@ class FP8GroupGemmMlpFunctionNode:
         self,
         out_grad,
         unzipped_probs,
+        tokens_per_expert,
         input_fp8_slice=None,
         input_scale_slice=None,
-        tokens_per_expert=None,
         m_indices=None,
         reset_status=False,
     ):
         # check subbatch
         if self.bwd_subbatch:
-            assert m_indices is not None and input_fp8_slice is not None and input_scale_slice is not None
+            assert (
+                m_indices is not None
+                and input_fp8_slice is not None
+                and input_scale_slice is not None
+                and tokens_per_expert is not None
+            )
         # deal 0 size
         dtype = paddle.bfloat16
         shape = out_grad[0].shape if isinstance(out_grad, tuple) else out_grad.shape
@@ -1137,22 +1143,28 @@ class FP8GroupGemmMlpFunctionNode:
         expert_w2 = [x.w2 for x in self.experts if x is not None]
 
         if self.recompute_fwd_gate_up:
-            inp = (
-                None if input_fp8_slice is None and input_scale_slice is None else (input_fp8_slice, input_scale_slice)
-            )
+            inp = None if not self.bwd_subbatch else (input_fp8_slice, input_scale_slice)
             o1 = self.fwd_gate_up(inp, expert_w1, len(expert_w1), tokens_per_expert, m_indices=m_indices)
         else:
             o1 = self.o1
 
         # do2
         do1, o2_s, probs_grad = self.bwd_dowm_input(
-            expert_w2, out_grad, o1, unzipped_probs=unzipped_probs, m_indices=m_indices
+            expert_w2, out_grad, o1, tokens_per_expert, unzipped_probs=unzipped_probs, m_indices=m_indices
         )
         del o1
         self.o1 = None
 
         # dw1
-        self.bwd_gate_up_weight(do1, None, expert_w1, input_fp8_slice, input_scale_slice, clear_input=reset_status)
+        self.bwd_gate_up_weight(
+            do1,
+            None,
+            expert_w1,
+            tokens_per_expert,
+            input_fp8_slice=input_fp8_slice,
+            input_scale_slice=input_scale_slice,
+            clear_input=reset_status,
+        )
 
         if reset_status:
             self.input_fp8 = None
@@ -1161,103 +1173,23 @@ class FP8GroupGemmMlpFunctionNode:
 
         # dx
         dx = self.bwd_gate_up_input(
-            do1, expert_w1, dx=out_grad[0] if isinstance(out_grad, tuple) else out_grad, m_indices=m_indices
+            do1,
+            expert_w1,
+            tokens_per_expert,
+            dx=out_grad[0] if isinstance(out_grad, tuple) else out_grad,
+            m_indices=m_indices,
         )
         del do1
 
         # dw2
         if isinstance(out_grad, tuple):
-            do3_fp8, do3_scale = self.fused_transpose_split_quant(
-                out_grad[0], out_grad[1], self.tokens_per_expert, True
-            )
+            do3_fp8, do3_scale = self.fused_transpose_split_quant(out_grad[0], out_grad[1], tokens_per_expert, True)
             out_grad[0]._clear_to_zero_allocation()
             out_grad[1]._clear_to_zero_allocation()
-            self.bwd_down_weight((do3_fp8, do3_scale), o2_s, expert_w2)
+            self.bwd_down_weight((do3_fp8, do3_scale), o2_s, expert_w2, tokens_per_expert)
         else:
-            self.bwd_down_weight(out_grad, o2_s, expert_w2)
+            self.bwd_down_weight(out_grad, o2_s, expert_w2, tokens_per_expert)
 
         if reset_status:
             self.reset_statue()
         return dx, probs_grad
-
-    @paddle.no_grad()
-    def backward_dx(self, out_grad, unzipped_probs, input_fp8_slice=None, input_scale_slice=None, m_indices=None):
-        if self.bwd_subbatch:
-            assert m_indices is not None and input_fp8_slice is not None and input_scale_slice is not None
-        # deal 0 size
-        dtype = paddle.bfloat16
-        shape = out_grad[0].shape if isinstance(out_grad, tuple) else out_grad.shape
-        if shape[0] == 0:
-            return paddle.zeros_like(out_grad, dtype=dtype), paddle.zeros_like(unzipped_probs, dtype=dtype)
-
-        # recompute expert_w2 and expert_w1
-        expert_w1 = [x.w1 for x in self.experts if x is not None]
-        expert_w2 = [x.w2 for x in self.experts if x is not None]
-
-        if self.recompute_fwd_gate_up:
-            inp = (
-                None if input_fp8_slice is None and input_scale_slice is None else (input_fp8_slice, input_scale_slice)
-            )
-            o1 = self.fwd_gate_up(inp, expert_w1, len(expert_w1), self.tokens_per_expert, m_indices=m_indices)
-        else:
-            o1 = self.o1
-
-        # do2
-        do1, o2_s, probs_grad = self.bwd_dowm_input(
-            expert_w2, out_grad, o1, unzipped_probs=unzipped_probs, m_indices=m_indices
-        )
-        del o1
-        self.o1 = None
-
-        self.all_do1_list.append(do1)
-        self.all_o2_s_list.append(o2_s)
-
-        if self.all_unzipped_grad is None:
-            self.out_grad = out_grad
-
-        # clear status for save memory
-        self.unzipped_probs = None
-        self.input = None
-
-        # dx
-        dx = self.bwd_gate_up_input(
-            do1, expert_w1, dx=out_grad[0] if isinstance(out_grad, tuple) else out_grad, m_indices=m_indices
-        )
-
-        self.m_indices = None
-
-        return dx, probs_grad
-
-    @paddle.no_grad()
-    def backward_dw(self):
-        # deal 0 size
-        if self.input_fp8 is None or self.input_fp8.shape[0] == 0:
-            return
-        # recompute expert_w2 and expert_w1
-        expert_w1 = [x.w1 for x in self.experts if x is not None]
-        expert_w2 = [x.w2 for x in self.experts if x is not None]
-
-        do1 = paddle.concat(self.all_do1_list, axis=0) if len(self.all_do1_list) > 1 else self.all_do1_list[0]
-        o2_s = paddle.concat(self.all_o2_s_list, axis=0) if len(self.all_o2_s_list) > 1 else self.all_o2_s_list[0]
-
-        # dw1
-        self.bwd_gate_up_weight(do1, None, expert_w1, clear_input=True)
-        self.input_fp8 = None
-        self.input_scale = None
-        self.input = None
-        self.all_do1_list = None
-
-        out_grad = self.out_grad if self.all_unzipped_grad is None else self.all_unzipped_grad
-
-        # dw2
-        if isinstance(out_grad, tuple):
-            do3_fp8, do3_scale = self.fused_transpose_split_quant(
-                out_grad[0], out_grad[1], self.tokens_per_expert, True
-            )
-
-            self.bwd_down_weight((do3_fp8, do3_scale), o2_s, expert_w2)
-        else:
-            self.bwd_down_weight(out_grad, o2_s, expert_w2)
-
-        self.reset_statue()
-        return

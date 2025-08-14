@@ -897,8 +897,9 @@ class FusionMlpNode:
         """
         self.tokens_per_expert = self.token_dispatcher._comm_manager.tokens_per_expert
         self.dispatched_probs = dispatched_probs
-
         num_experts = len(self.tokens_per_expert)
+        padding_token_per_experts = [(x + 127) // 128 * 128 for x in self.tokens_per_expert]
+
         # 1 unzip
         self.dispatched_indices = dispatched_indices.to(paddle.int32)
         if DSV3_USE_FP8_DISPATCH:
@@ -921,7 +922,6 @@ class FusionMlpNode:
 
             total_unzipped_tokens = extract_first_if_tuple(unzipped_tokens).shape[0]
             total_zipped_tokens = extract_first_if_tuple(hs_2d_dispatched).shape[0]
-            padding_token_per_experts = [(x + 127) // 128 * 128 for x in self.tokens_per_expert]
 
             # If adaptive O1 recompute is enabled, determine whether to enable recompute O1 based on the degree of imbalance
             if self.recompute_fwd_gate_up == -1:
@@ -945,7 +945,7 @@ class FusionMlpNode:
                 map_unzipped_indices_to_zipped = TDU.tokens_unzip_slice(
                     extract_first_if_tuple(hs_2d_dispatched),
                     zipped_expertwise_rowmap,
-                    len(self.tokens_per_expert),
+                    num_experts,
                     total_unzipped_tokens,
                     0,
                     total_unzipped_tokens + 1,
@@ -980,6 +980,7 @@ class FusionMlpNode:
                     )
 
                 output = self.merge_subbatch_cast(output, paddle.bfloat16)
+                output.stop_gradient = False
                 return output
 
             # 2 experts
@@ -1010,7 +1011,6 @@ class FusionMlpNode:
                     self.set_recompute_fwd_gate_up(False)
 
             # 2 experts
-            padding_token_per_experts = [(x + 127) // 128 * 128 for x in self.tokens_per_expert]
             expert_out = self.experts_group_gemm_node.forward(
                 unzipped_tokens, unzipped_probs, padding_token_per_experts
             )
@@ -1063,12 +1063,14 @@ class FusionMlpNode:
         total_zipped_tokens = extract_first_if_tuple(hidden_states_out_grad).shape[0]
         total_unzipped_tokens = extract_first_if_tuple(unzipped_grad).shape[0]
         hidden_states_size = extract_first_if_tuple(hidden_states_out_grad).shape[-1]
+        num_experts = len(self.tokens_per_expert)
+        padding_token_per_experts = [(x + 127) // 128 * 128 for x in self.tokens_per_expert]
 
         if self.mlp_bwd_subbatch_rows != 0 and total_unzipped_tokens > self.mlp_bwd_subbatch_rows * 2:
             map_unzipped_indices_to_zipped = TDU.tokens_unzip_slice(
                 extract_first_if_tuple(hidden_states_out_grad),
                 self.unzip_node.zipped_expertwise_rowmap,
-                len(self.tokens_per_expert),
+                num_experts,
                 total_unzipped_tokens,
                 0,
                 total_unzipped_tokens + 1,
@@ -1079,7 +1081,7 @@ class FusionMlpNode:
             else:
                 hidden_states_out_grad._clear_to_zero_allocation()
 
-            subbatch_rows = min(total_unzipped_tokens // len(self.tokens_per_expert), self.mlp_bwd_subbatch_rows)
+            subbatch_rows = min(total_unzipped_tokens // num_experts, self.mlp_bwd_subbatch_rows)
             nparts = (total_unzipped_tokens + subbatch_rows - 1) // subbatch_rows
             output = paddle.empty([0, hidden_states_size], dtype=paddle.float32)
             probs_grad_list = []
@@ -1117,7 +1119,7 @@ class FusionMlpNode:
 
         # expert_grad
         expert_out, probs_grad = self.experts_group_gemm_node.backward(
-            unzipped_grad, self.unzipped_probs, tokens_per_expert=self.tokens_per_expert
+            unzipped_grad, self.unzipped_probs, padding_token_per_experts
         )
 
         hs_dispatched_grad, dispatched_probs_grad = self.unzip_node.backward(
@@ -1125,16 +1127,11 @@ class FusionMlpNode:
             total_zipped_tokens,
             probs_grad,
             self.dispatched_indices,
-            num_experts=len(self.tokens_per_expert),
+            num_experts=num_experts,
         )
 
         self.reset_statue()
         return hs_dispatched_grad, dispatched_probs_grad
-
-    @paddle.no_grad()
-    def backward_dw(self):
-        self.experts_group_gemm_node.backward_dw()
-        self.reset_statue()
 
 
 class FusionMoeNode:
@@ -1207,10 +1204,6 @@ class FusionMoeNode:
         else:
             hs_bf16_grad, token_probs_grad = self.dispatch_node.backward(hs_dispatched_grad, dispatched_probs_grad)
             return hs_bf16_grad, None, token_probs_grad
-
-    @paddle.no_grad()
-    def backward_dw(self):
-        self.mlp_node.backward_dw()
 
 
 class FusionMoe(paddle.autograd.PyLayer):
