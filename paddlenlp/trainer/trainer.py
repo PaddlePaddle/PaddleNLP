@@ -1191,7 +1191,7 @@ class Trainer:
                                 )
                             )
                         else:
-                            files = pd_param_name_to_file[pd_name]
+                            files = pd_param_name_to_file[pd_param]
                             if len(files) == 1:
                                 tensor0 = f.get_tensor(hf_name[0])
                                 tensor1 = f.get_tensor(hf_name[1])
