@@ -2011,6 +2011,8 @@ function llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
         fi
         echo "result: $pp_mode loss=$loss"
     done
+    loss_base_fthenb=10.24240494
+    loss_base_vpp=10.24149513  # Paddle PR#74530
     ips=-1
     mem=-1
     ips_base=-1
@@ -2018,7 +2020,10 @@ function llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
     for step in $(seq 1 $max_step); do
         echo "step=$step fthenb loss: ${loss1_array[$step-1]}, vpp loss: ${loss2_array[$step-1]}"
     done
-    check_result $FUNCNAME ${loss1} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
+    echo "FThenB check"
+    check_result $FUNCNAME ${loss_base_fthenb} ${loss1} ${ips_base} ${ips} ${mem_base} ${mem}
+    echo "VPP check"
+    check_result $FUNCNAME ${loss_base_vpp} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
