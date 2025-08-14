@@ -187,13 +187,13 @@ class PostProcessNode(ScheduleNode):
         with paddle.no_grad():
             if self.shared_experts is not None:
                 if self.using_post_norm_recompute:
-                    _, _, shared_expert_output = FP8LinearFunctionBase.fp8_mlp_fwd(
+                    _, _, _, shared_expert_output = FP8LinearFunctionBase.fp8_mlp_fwd(
                         norm_out, self.shared_experts.w1, self.shared_experts.w2
                     )
                     norm_out = None
                     del norm_out
                 else:
-                    _, _, shared_expert_output = FP8LinearFunctionBase.fp8_mlp_fwd(
+                    _, _, _, _, shared_expert_output = FP8LinearFunctionBase.fp8_mlp_fwd(
                         hidden_states, self.shared_experts.w1, self.shared_experts.w2
                     )
                 residual = residual + shared_expert_output
@@ -229,13 +229,13 @@ class PostProcessNode(ScheduleNode):
         with paddle.no_grad():
             if self.shared_experts is not None:
                 if self.using_post_norm_recompute:
-                    _, _, shared_expert_output = FP8LinearFunctionBase.fp8_mlp_fwd(
+                    _, _, _, shared_expert_output = FP8LinearFunctionBase.fp8_mlp_fwd(
                         norm_out, self.shared_experts.w1, self.shared_experts.w2
                     )
                     norm_out = None
                     del norm_out
                 else:
-                    _, _, shared_expert_output = FP8LinearFunctionBase.fp8_mlp_fwd(
+                    _, _, _, shared_expert_output = FP8LinearFunctionBase.fp8_mlp_fwd(
                         hidden_states, self.shared_experts.w1, self.shared_experts.w2
                     )
                 final_hidden_states = final_hidden_states + shared_expert_output
