@@ -283,7 +283,6 @@ def _get_hf_prefix(segment_id: int, id_in_segment: int) -> str:
 
 
 def _handle_expert_weights(hf_prefix: str, rest: str) -> Optional[List[str]]:
-    """处理专家网络权重拆分"""
     # 处理专家w1权重（拆分为gate_proj和up_proj）
     if m := _EXPERT_W1_RE.match(rest):
         expert_id = int(m.group(1))
@@ -301,7 +300,6 @@ def _handle_expert_weights(hf_prefix: str, rest: str) -> Optional[List[str]]:
 
 
 def _handle_mlp_weights(hf_prefix: str, rest: str) -> Optional[List[str]]:
-    """处理普通MLP权重拆分"""
     if rest == "mlp.w1":
         return [f"{hf_prefix}.mlp.gate_proj.weight", f"{hf_prefix}.mlp.up_proj.weight"]
 
@@ -1127,12 +1125,6 @@ class Trainer:
         if self.args.ignore_data_skip:
             self.timers and self.timers("read-data").start()
 
-        print("================================== load safe tensor ==================================")
-        print("---- paddle param ----")
-        if self.state.global_step == 0:
-            for n, p in model.named_parameters():
-                print("{}:{}".format(n, p.shape))
-
         # 1. 加载参数-文件映射表
         weight_map_path = "/root/paddlejob/workspace/env_run/zhangbo/model.safetensors.index.json"
         with open(weight_map_path, "r") as f:
@@ -1174,7 +1166,6 @@ class Trainer:
         for filename in required_files:
             try:
                 with safe_open(ckpt_pre + filename, framework="paddle", device="cpu") as f:
-                    print("open file: ", ckpt_pre + filename)
                     # 加载该文件包含的所有参数
                     pd_params = file_to_pd_param_name[filename]
                     for pd_param in pd_params:
