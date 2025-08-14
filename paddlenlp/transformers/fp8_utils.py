@@ -259,6 +259,10 @@ class FP8LinearFunctionBase:
         """
         统一处理 expert_w 的梯度计算（支持 main_grad 和普通 grad)
         """
+
+        if input_t is None or input_t.numel() == 0:
+            return
+
         if hasattr(weight, "main_grad"):
             if weight.main_grad is None:
                 weight.main_grad = paddle.zeros(shape=weight.shape, dtype=paddle.float32)
