@@ -1206,7 +1206,7 @@ class Trainer:
                                     with safe_open(
                                         ckpt_pre + weight_map[hf_name[0]], framework="paddle", device="cpu"
                                     ) as f_other:
-                                        tensor0 = f_other.get_tensor(hf_name[1])
+                                        tensor0 = f_other.get_tensor(hf_name[0])
                                     tensor1 = f.get_tensor(hf_name[1])
                             model.state_dict()[pd_param].set_value(prepare_tensor([tensor0, tensor1], None))
                         check_list.append(pd_param)
