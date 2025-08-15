@@ -301,7 +301,7 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
             echo "case=$case_name sharding_config=$sharding_config acc_step=$acc_step"
             if [ "$case_name" = "default" ]; then
                 loss_base=9.23504105
-            elif [ "$case_name" = "tensor_fusion_overlap" ]; then
+            elif [[ "$case_name" =~ "tensor_fusion_overlap" ]]; then
                 if [ $acc_step -eq 1 ]; then
                     loss_base=9.23504868
                 else
