@@ -1484,6 +1484,10 @@ class Qwen2LMHead(nn.Layer):
             self.weight.split_axis = 0 if self.transpose_y else 1
 
     def forward(self, hidden_states, tensor_parallel_output=None, batch_size=None):
+        # add this for fused_head_and_loss_fn
+        if self.config.use_fused_head_and_loss_fn:
+            return hidden_states, self.weight, None, self.transpose_y
+
         if self.config.sequence_parallel:
             hidden_states = GatherOp.apply(hidden_states)
             hidden_states = paddle.reshape_(hidden_states, [batch_size, -1, self.config.hidden_size])
@@ -1669,19 +1673,6 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
         )
 
         hidden_states = outputs[0]
-
-        # add this for fused_head_and_loss_fn
-        if self.config.use_fused_head_and_loss_fn and self.training:
-            if self.config.tensor_parallel_degree > 1 and self.config.sequence_parallel:
-                hidden_states = GatherOp.apply(hidden_states)
-                hidden_states = hidden_states.reshape(
-                    [
-                        batch_size,
-                        -1,
-                        hidden_states.shape[-1],
-                    ]
-                )
-            return hidden_states, self.lm_head.weight, None, self.lm_head.transpose_y
 
         # if labels is None，means we need full output, instead of tensor_parallel_output
         # tensor_parallel_output is together with ParallelCrossEntropy
