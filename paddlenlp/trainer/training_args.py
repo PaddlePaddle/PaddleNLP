@@ -1085,7 +1085,6 @@ class TrainingArguments:
     def __post_init__(self):
         world_size = paddle.distributed.get_world_size()
         if in_auto_parallel_align_mode():
-            self.max_grad_norm = 0.0
             os.environ["FLAGS_max_inplace_grad_add"] = "65536"
             os.environ["FLAGS_embedding_deterministic"] = "1"
             os.environ["FLAGS_cudnn_deterministic"] = "1"
