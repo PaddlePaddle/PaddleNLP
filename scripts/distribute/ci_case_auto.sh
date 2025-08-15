@@ -288,7 +288,7 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
                 --tensor_parallel_degree 1 \
                 --sharding "stage1" \
                 --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
-                --sharding_parallel_config $sharding_config \
+                --sharding_parallel_config "$sharding_config" \
                 --to_static 0 \
                 --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
                 --amp_custom_white_list "lookup_table" "lookup_table_v2" \
