@@ -1306,9 +1306,9 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
         )
 
         q_head_dim = query_states.shape[-1]
-        softmax_scale = softmax_scale * (q_head_dim**0.5)
 
         if FA_VERSION == 2:
+            softmax_scale = softmax_scale * (q_head_dim**0.5)
             query_states = query_states * softmax_scale
             kv_seq_len = value_states.shape[1]
             v_num_heads = value_states.shape[2]
