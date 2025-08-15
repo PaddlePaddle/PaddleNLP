@@ -591,6 +591,12 @@ def create_peft_model(model_args, reft_args, training_args, dtype, model_config,
         else:
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
 
+        if model_args.ir_qlora:
+            from paddlenlp.quantization.irqlora_utils import get_my_model
+            model2 = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
+            model = get_my_model(model, model2)
+            del model2
+
         model.print_trainable_parameters()
 
     if model_args.lokr:
