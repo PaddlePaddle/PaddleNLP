@@ -3,9 +3,9 @@ name: Distribute CI (V100)
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    branches: [develop]
+    branches: [incubate/paddlenlp-fleety_20250421]
   schedule:
-    - cron: "2 0 * * *"
+    - cron: "0 20 * * *"
   workflow_call:
     inputs:
       run_downstream:
