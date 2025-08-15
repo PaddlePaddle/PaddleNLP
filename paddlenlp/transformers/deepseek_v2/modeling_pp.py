@@ -193,7 +193,7 @@ class PostProcessNode(ScheduleNode):
                     norm_out = None
                     del norm_out
                 else:
-                    _, _, _, _, shared_expert_output = FP8LinearFunctionBase.fp8_mlp_fwd(
+                    _, _, _, shared_expert_output = FP8LinearFunctionBase.fp8_mlp_fwd(
                         hidden_states, self.shared_experts.w1, self.shared_experts.w2
                     )
                 residual = residual + shared_expert_output
