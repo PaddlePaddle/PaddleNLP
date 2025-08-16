@@ -498,10 +498,14 @@ class DecoderLayerNode(ScheduleNode):
 
 class OverlapedScheduleChunk:
     def __init__(self, forward_nodes, backward_nodes, use_fuion=True):
-        schedule_node_class = OverlapedFUsionScheduleNode if use_fuion else OverlapedScheduleNode
         assert len(forward_nodes) == len(backward_nodes)
         self.nodes = []
         for f, b in zip(forward_nodes, backward_nodes):
+            schedule_node_class = OverlapedScheduleNode
+            if use_fuion:
+                schedule_node_class = OverlapedFUsionScheduleNode
+                if isinstance(f, DenseDecoderLayerNode) or isinstance(b, DenseDecoderLayerNode):
+                    schedule_node_class = OverlapedDenseFusionScheduleNode
             self.nodes.append(schedule_node_class(f, b, f"OverlapedNode_{len(self.nodes)}"))
 
     def forward_backward(self, inputs, output_grad, combine_bw_event_to_wait=None, pp_stream=None):
@@ -941,6 +945,29 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
         return output_grad
 
 
+class DenseDecoderLayerNode(ScheduleNode):
+    def __init__(
+        self,
+        attn_node,
+        mlp_node,
+        name="DenseDecoderLayerNode",
+    ):
+        super().__init__(fwd_func=None, name=name)
+        self.attn_node = attn_node
+        self.mlp_node = mlp_node
+
+    def forward(self, inputs):
+        inputs = self.attn_node.forward(inputs)
+        inputs = self.mlp_node.forward(inputs)
+        return inputs
+
+    def backward(self, output_grad=None, scaler=None):
+        assert (output_grad is not None) and (scaler is None)
+        output_grad = self.mlp_node.backward(output_grad)
+        output_grad = self.attn_node.backward(output_grad)
+        return output_grad
+
+
 class OverlapedFUsionScheduleNode:
     def __init__(self, forward_node, backward_node, name=""):
         assert isinstance(forward_node, FusionFp8DecoderLayerNode) and isinstance(
@@ -1086,8 +1113,99 @@ class OverlapedFUsionScheduleNode:
         return inputs, output_grad, event_to_wait
 
 
+class OverlapedDenseFusionScheduleNode:
+    def __init__(self, forward_node, backward_node, name=""):
+        assert isinstance(forward_node, FusionFp8DecoderLayerNode) or isinstance(
+            backward_node, FusionFp8DecoderLayerNode
+        )
+        assert isinstance(forward_node, DenseDecoderLayerNode) or isinstance(
+            backward_node, DenseDecoderLayerNode
+        )
+        self.forward_node = forward_node
+        self.backward_node = backward_node
+        self.name = name
+
+    def forward_backward(self, inputs, output_grad, combine_bw_event_to_wait=None, pp_stream=None):
+        # Dense forward + MoE backward
+        if isinstance(self.forward_node, DenseDecoderLayerNode):
+            paddle.base.core.nvprof_nvtx_push("dense_fw_moe_bw")
+
+            paddle.base.core.nvprof_nvtx_push("dense_attn_moe_combine")
+            output_grad = self.backward_node.post_process_backward(output_grad, combine_bw_event_to_wait)
+            output_grad = self.backward_node.combine_backward(
+                output_grad, previous_event=combine_bw_event_to_wait, async_finish=True, allocate_on_comm_stream=True
+            )
+            combine_bw_event = deep_ep.get_event_from_comm_stream(self.backward_node.moe_group.id)
+            inputs = self.forward_node.attn_node.forward(inputs)
+            combine_bw_event.calc_stream_wait(self.backward_node.moe_group.id)
+            paddle.base.core.nvprof_nvtx_pop()  # dense_attn_moe_combine
+
+            paddle.base.core.nvprof_nvtx_push("moe_mlp")
+            output_grad = self.backward_node.mlp_backward(output_grad)
+            paddle.base.core.nvprof_nvtx_pop()  # moe_mlp
+
+            paddle.base.core.nvprof_nvtx_push("dense_mlp_moe_dispatch")
+            output_grad = self.backward_node.dispatch_backward(
+                output_grad, async_finish=True, allocate_on_comm_stream=True
+            )
+            dispatch_bw_event = deep_ep.get_event_from_comm_stream(self.backward_node.moe_group.id)
+            inputs = self.forward_node.mlp_node.forward(inputs)
+            dispatch_bw_event.calc_stream_wait(self.backward_node.moe_group.id)
+            paddle.base.core.nvprof_nvtx_pop()  # dense_mlp_moe_dispatch
+
+            paddle.base.core.nvprof_nvtx_push("moe_attn")
+            output_grad = self.backward_node.attn_backward(output_grad)
+            paddle.base.core.nvprof_nvtx_pop()  # moe_attn
+
+            event_to_wait = deep_ep.get_event_from_calc_stream(self.backward_node.moe_group.id)
+            paddle.base.core.nvprof_nvtx_pop()  # dense_fw_moe_bw
+
+        # Dense backward + MoE forward
+        else:
+            paddle.base.core.nvprof_nvtx_push("dense_bw_moe_fw")
+
+            paddle.base.core.nvprof_nvtx_push("moe_attn")
+            inputs = self.forward_node.attn_forward(inputs)
+            attn_fw_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
+            paddle.base.core.nvprof_nvtx_pop()  # moe_attn
+
+            paddle.base.core.nvprof_nvtx_push("dense_mlp_moe_dispatch")
+            output_grad = self.backward_node.mlp_node.backward(output_grad)
+            inputs = self.forward_node.dispatch_forward(
+                inputs, previous_event=attn_fw_event, async_finish=True, allocate_on_comm_stream=True
+            )
+            dispatch_fw_event = deep_ep.get_event_from_comm_stream(self.forward_node.moe_group.id)
+            dispatch_fw_event.calc_stream_wait(self.forward_node.moe_group.id)
+            paddle.base.core.nvprof_nvtx_pop()  # dense_mlp_moe_dispatch
+
+            paddle.base.core.nvprof_nvtx_push("moe_mlp")
+            inputs = self.forward_node.mlp_forward(inputs)
+            paddle.base.core.nvprof_nvtx_pop()  # moe_mlp
+
+            paddle.base.core.nvprof_nvtx_push("dense_attn_moe_combine")
+            inputs = self.forward_node.combine_forward(
+                inputs, async_finish=True, allocate_on_comm_stream=True
+            )
+            combine_fw_event = deep_ep.get_event_from_comm_stream(self.forward_node.moe_group.id)
+            output_grad = self.backward_node.attn_node.backward(output_grad)
+            combine_fw_event.calc_stream_wait(self.forward_node.moe_group.id)
+            paddle.base.core.nvprof_nvtx_pop()  # dense_attn_moe_combine
+
+            paddle.base.core.nvprof_nvtx_push("moe_post")
+            inputs = self.forward_node.post_process_forward(inputs)
+            paddle.base.core.nvprof_nvtx_pop()  # moe_post
+
+            event_to_wait = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
+            paddle.base.core.nvprof_nvtx_pop()  # dense_bw_moe_fw
+
+        return inputs, output_grad, event_to_wait
+
+
 def build_overlapped_nodes(forward_chunk, backward_chunk):
-    overlap_element_class = FusionFp8DecoderLayerNode if DSV3_USE_FP8_GEMM else DecoderLayerNode
+    overlap_element_class = (
+        FusionFp8DecoderLayerNode if DSV3_USE_FP8_GEMM else DecoderLayerNode,
+        DenseDecoderLayerNode
+    )
     forward_decoder_layer_num = 0
     backward_decoder_layer_num = 0
     assert isinstance(forward_chunk, ScheduleChunk) and isinstance(backward_chunk, ScheduleChunk)
@@ -1466,6 +1584,20 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
 
         return return_args(hidden_states)
 
+    def attn_compute_dense(self, args):
+        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
+        assert attention_mask is None
+        assert attn_mask_startend_row_indices is None
+        assert position_ids is None
+        hidden_states, _ = self.self_attn_compute(hidden_states)
+        return hidden_states
+
+    def mlp_compute_dense(self, hidden_states):
+        residual = hidden_states
+        hidden_states = self.mlp(hidden_states)
+        hidden_states = residual + hidden_states
+        return hidden_states
+
     def build_schedule_node(self):
         if isinstance(self.mlp, DeepseekV2MoE):
             self.mlp.update_flex_token()
@@ -1515,7 +1647,14 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
                         mlp_layer=self.mlp,
                         name="DecoderLayerNode",
                     )
-        return ScheduleNode(self.forward, name="DeepseekV2DecoderLayerPipe")
+
+        attn_node = ScheduleNode(self.attn_compute_dense, name="attn_node")
+        mlp_node = ScheduleNode(self.mlp_compute_dense, name="mlp_node")
+        return DenseDecoderLayerNode(
+            attn_node=attn_node,
+            mlp_node=mlp_node,
+            name="DenseDecoderLayerNode",
+        )
 
 
 class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
