@@ -220,11 +220,13 @@ from safetensors import safe_open
 _LAYER_RE = re.compile(r"^_layers\.(\d+)\.(\d+)(?:\.(.*))?$")
 _EXPERT_W1_RE = re.compile(r"^mlp\.experts\.(\d+)\.w1(?:\.weight)?$")
 _EXPERT_W2_RE = re.compile(r"^mlp\.experts\.(\d+)\.w2(?:\.weight)?$")
+_SHARE_EXPERT_W1_RE = re.compile(r"^mlp\.shared_experts\.w1(?:\.weight)?$")
+_SHARE_EXPERT_W2_RE = re.compile(r"^mlp\.shared_experts\.w2(?:\.weight)?$")
 
 # 保持原有映射关系
 custom_name_map = {
     "self_attn.fused_rms_norm_linear.rms_norm_weight": "input_layernorm.weight",
-    "self_attn.memory_recompute_att.kv_ln_weigh": "self_attn.kv_a_layernorm.weight",
+    "self_attn.memory_recompute_att.kv_ln_weight": "self_attn.kv_a_layernorm.weight",
     "self_attn.fused_rms_norm_linear.kv_down_weight": "self_attn.kv_a_proj_with_mqa.weight",
     "self_attn.memory_recompute_att.kv_up_weight": "self_attn.kv_b_proj.weight",
     "self_attn.memory_recompute_att.q_ln_weight": "self_attn.q_a_layernorm.weight",
@@ -244,6 +246,8 @@ def paddle_name_to_hf_names(paddle_name: str) -> List[str]:
         Hugging Face格式的参数名称列表（可能拆分多个参数）
     """
     # 基础路径解析
+    if paddle_name == "_layers.local_shared_layers.DeepseekV2_shared_weight.embed_tokens.weight":
+        return ["model.embed_tokens.weight"]
     m = _LAYER_RE.match(paddle_name)
     if not m:
         return []
@@ -261,6 +265,8 @@ def paddle_name_to_hf_names(paddle_name: str) -> List[str]:
 
     if expert_names := _handle_expert_weights(hf_prefix, rest):
         return expert_names
+    if shared_mlp_names := _handle_shared_expert_weights(hf_prefix, rest):
+        return shared_mlp_names
 
     if mlp_names := _handle_mlp_weights(hf_prefix, rest):
         return mlp_names
@@ -298,6 +304,19 @@ def _handle_expert_weights(hf_prefix: str, rest: str) -> Optional[List[str]]:
 
     return None
 
+def _handle_shared_expert_weights(hf_prefix: str, rest: str) -> Optional[List[str]]:
+    # 处理专家w1权重（拆分为gate_proj和up_proj）
+    if m := _SHARE_EXPERT_W1_RE.match(rest):
+        return [
+            f"{hf_prefix}.mlp.shared_experts.gate_proj.weight",
+            f"{hf_prefix}.mlp.shared_experts.up_proj.weight",
+        ]
+
+    # 处理专家w2权重（映射为down_proj）
+    if m := _SHARE_EXPERT_W2_RE.match(rest):
+        return [f"{hf_prefix}.mlp.shared_experts.down_proj.weight"]
+
+    return None
 
 def _handle_mlp_weights(hf_prefix: str, rest: str) -> Optional[List[str]]:
     if rest == "mlp.w1":
@@ -1148,6 +1167,9 @@ class Trainer:
                 pd_param_name_to_file[pd_name].append(filename)
             else:
                 print(f"Warning: {pd_name} -> {hf_name[0]} not found in weight map")
+                import sys
+                sys.exit()
+
 
             if len(hf_name) > 1:
                 if hf_name[1] in weight_map:
