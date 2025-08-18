@@ -481,7 +481,7 @@ def apply_gptq(quant_args, trainer, ptq_dataloader):
                     description="GPTQ",
                     max_eval_iters=quant_args.gptq_step,
                 )
-                cur_quant_layer.fasterquant(percdamp=0.1, groupsize=-1, actorder=True)
+                cur_quant_layer.fasterquant(percdamp=0.1, groupsize=-1, actorder=True, do_foem=quant_args.do_foem, foem_beta=quant_args.foem_beta)
             del cur_quant_layer
             setattr(parent_layer, sub_name, cur_layer)
     logger.info("***** GPTQ done *****")

@@ -314,6 +314,7 @@ Large model quantization reduces 16-bit and 32-bit floating-point model paramete
 
 - **PTQ**. The self-developed adaptive LLM.PTQ quantization algorithm by the PaddleSlim team builds upon [SmoothQuant](https://arxiv.org/abs/2211.10438) and [Outlier Suppression+](https://arxiv.org/abs/2304.09145), adding the PieceWiseSearch parameter search algorithm to adjust model weight and activation distributions, reducing subsequent A8W8 PTQ quantization loss.
 - **GPTQ**. [GPTQ](https://arxiv.org/abs/2210.17323) is a mainstream weight quantization algorithm that enables lossless 4-bit integer quantization of large model weights to improve inference speed.
+- **FOEM**. [FOEM](https://arxiv.org/abs/2507.11017) is a PTQ method that explicitly incorporates first-order gradient terms to improve quantization error compensation.
 
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/969b62db-9692-4d50-b91a-85cff305d153">
@@ -338,6 +339,9 @@ python run_quantization.py ./config/llama/ptq_argument.json
 
 # GPTQ Quantization Command Reference
 python run_quantization.py ./config/llama/gptq_argument.json
+
+# FOEM Quantization Command Reference
+python run_quantization.py ./config/llama/foem_argument.json
 
 # W8A8C8(INT) Quantization Command Reference
 python run_quantization.py ./config/llama/ptq_c8_argument.json
