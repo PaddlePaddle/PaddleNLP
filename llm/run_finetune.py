@@ -123,6 +123,11 @@ def main():
     training_args.print_config(data_args, "Data")
     training_args.print_config(gen_args, "Generation")
 
+    if training_args.pre_alloc_memory > 0:
+        memory_size = int(training_args.pre_alloc_memory * 1024 * 1024 * 1024)
+        x = paddle.empty([memory_size], dtype=paddle.uint8)
+        del x
+    
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
     set_seed(seed=training_args.seed)
@@ -250,7 +255,9 @@ def main():
             raise ValueError("Please set eval_with_do_generation to false in pipeline parallel mode.")
 
         model_class = AutoModelForCausalLMPipe
-
+    model_config["using_flex_token"] = model_args.using_fake_gate
+    model_config.using_fake_gate = model_args.using_fake_gate
+    print("model_config ", model_config, flush=True)
     if model_args.continue_training and not training_args.autotuner_benchmark:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
@@ -261,6 +268,7 @@ def main():
         # NOTE(gongenlei): new add autotuner_benchmark
         model = model_class.from_config(model_config, dtype=dtype)
 
+    print("model:", model, flush=True)
     if model_args.flash_mask and (not data_args.zero_padding or not model.config.use_flash_attention):
         logger.warning("`flash_mask` must use with zero padding and flash attention.")
         data_args.zero_padding = True

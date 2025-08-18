@@ -132,6 +132,19 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
                 attention_mask = attention_mask[
                     :, :, : -self.config.num_nextn_predict_layers, : -self.config.num_nextn_predict_layers
                 ]
+            
+            # attn_mask_startend_row_indices: [b, num_head, seq_len] or [b, num_head, seq_len, C], C is 2 or 4
+            if attn_mask_startend_row_indices is not None:
+                if attn_mask_startend_row_indices.ndim == 3:
+                    attn_mask_startend_row_indices = attn_mask_startend_row_indices[
+                        :, :, : -self.config.num_nextn_predict_layers,
+                    ]
+                elif attn_mask_startend_row_indices.ndim == 4:
+                    attn_mask_startend_row_indices = attn_mask_startend_row_indices[
+                        :, :, : -self.config.num_nextn_predict_layers, :
+                    ]
+                else:
+                    raise ValueError("attn_mask_startend_row_indices must be 3D or 4D tensor")
 
         if attention_mask is not None:
             assert (

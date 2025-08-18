@@ -1081,6 +1081,11 @@ class TrainingArguments:
     nccl_comm_group_config: Optional[str] = field(
         default=None, metadata={"help": "NCCL中通信组的细粒度控制的配置文件路径, 默认值为None, 代表不启用此项配置"}
     )
+    
+    pre_alloc_memory: int = field(
+        default=0,
+        metadata={"help": "pre allocate memory size GB"},
+    )
 
     def __post_init__(self):
         world_size = paddle.distributed.get_world_size()

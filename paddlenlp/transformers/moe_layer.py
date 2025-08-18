@@ -351,8 +351,7 @@ class MoEFlexTokenLayer(nn.Layer):
         self.token_dispatcher = MoEFlexTokenDispatcher(
             self.num_local_experts, self.moe_router_topk, self.moe_num_experts, moe_group
         )
-
-        self.experts = nn.LayerList([expert_class(**expert_kwargs)] * self.num_local_experts)
+        self.experts = nn.LayerList([expert_class(**expert_kwargs) for _ in range(self.num_local_experts)])
         self.router = gate
 
     def expert_forward(self, dispatched_input, tokens_per_expert):

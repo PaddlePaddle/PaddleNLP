@@ -80,7 +80,7 @@ class SFTConfig(TrainingArguments):
         super().__post_init__()
         # NOTE(gongenlei): new add autotuner_benchmark
         if self.autotuner_benchmark:
-            self.max_steps = 5
+            self.max_steps = 20
             self.do_train = True
             self.do_export = False
             self.do_predict = False

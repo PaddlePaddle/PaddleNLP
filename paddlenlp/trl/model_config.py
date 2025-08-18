@@ -145,3 +145,5 @@ class ModelConfig:
     )
     actscale_moving_rate: float = field(default=0.01, metadata={"help": "EMA moving_rate for activation scale"})
     fp8_format_type: str = field(default="hybrid", metadata={"help": "FP8 Format"})
+    using_flex_token: bool = field(default=False, metadata={"help": "Whether to use deepep moe_layer"})
+    using_fake_gate: bool = field(default=False, metadata={"help": "Whether to fake gate"})
