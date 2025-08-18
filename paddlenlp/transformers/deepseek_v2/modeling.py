@@ -785,8 +785,10 @@ class DeepseekV2MoE(MoELayer):
         )
 
         # (LiuTing) only support either tp or ep.
-        moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
+        moe_group = fleet.get_hybrid_communicate_group().get_expert_parallel_group()
         expert_parallel_degree = dist.get_world_size(moe_group)
+        moe_grad_group = fleet.get_hybrid_communicate_group().get_moe_sharding_parallel_group()
+
         expert_parallel_degree = 1 if expert_parallel_degree < 0 else expert_parallel_degree
         act_tp_shard = config.tensor_parallel_degree > 1 and expert_parallel_degree <= 1
         super().__init__(
@@ -800,7 +802,12 @@ class DeepseekV2MoE(MoELayer):
             },
             gate=gate,
             capacity=2.0,
+            moe_group="expert",
         )
+
+        for p in self.experts.parameters():
+            setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
+
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
             intermediate_size = config.moe_intermediate_size * config.n_shared_experts
@@ -838,8 +845,8 @@ class DeepseekV2MoEFlexToken(MoEFlexTokenLayer):
         )
 
         hcg = fleet.get_hybrid_communicate_group()
-        moe_group = hcg.expert_parallel_group
-        moe_grad_group = hcg.expert_grad_comm_group
+        moe_group = hcg.get_expert_parallel_group()
+        moe_grad_group = hcg.get_moe_sharding_parallel_group()
 
         super().__init__(
             config=config,
@@ -1467,7 +1474,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
                 base_actions["layers.0.mlp.down_proj.weight.weight_scale_inv"] = partial(fn, is_column=False)
 
             # moe unit routed experts
-            moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
+            moe_group = fleet.get_hybrid_communicate_group().get_expert_parallel_group()
             expert_parallel_degree = dist.get_world_size(moe_group)
             if expert_parallel_degree <= 1:
                 for e_i in range(config.n_routed_experts):

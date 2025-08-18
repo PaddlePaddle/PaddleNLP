@@ -176,12 +176,13 @@ class MoELayer(nn.Layer):
         except AttributeError:
             is_fleet_init = False
 
-        if (
-            is_fleet_init
-            and dist.fleet.get_hybrid_communicate_group().get_data_parallel_world_size() > 1
-            and moe_group == "data"
-        ):
-            self.moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
+        if is_fleet_init and dist.get_world_size() > 1:
+            if moe_group == "data":
+                self.moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
+            elif moe_group == "expert":
+                self.moe_group = dist.fleet.get_hybrid_communicate_group().expert_parallel_group
+            else:
+                assert NotImplementedError("moe_group can only be data or expert, but given {}".format(self.moe_group))
             self.moe_rank = dist.get_rank(self.moe_group)
             self.moe_rank = 0 if self.moe_rank < 0 else self.moe_rank
             self.expert_parallel_degree = dist.get_world_size(self.moe_group)
