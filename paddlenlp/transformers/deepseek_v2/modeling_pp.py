@@ -1167,6 +1167,8 @@ class OverlapedDenseFusionScheduleNode:
             paddle.base.core.nvprof_nvtx_push("dense_fw_moe_bw")
 
             paddle.base.core.nvprof_nvtx_push("dense_attn_moe_combine")
+            # Note: the input combine_bw_event_to_wait is unreliable, we need to record a new event here.
+            combine_bw_event_to_wait = deep_ep.get_event_from_calc_stream(self.backward_node.moe_group.id)
             output_grad = self.backward_node.post_process_backward(output_grad, combine_bw_event_to_wait)
             output_grad = self.backward_node.combine_backward(
                 output_grad, previous_event=combine_bw_event_to_wait, async_finish=True, allocate_on_comm_stream=True
@@ -1625,13 +1627,31 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
         assert attention_mask is None
         assert attn_mask_startend_row_indices is None
         assert position_ids is None
-        hidden_states, _ = self.self_attn_compute(hidden_states)
-        return hidden_states
 
-    def mlp_compute_dense(self, hidden_states):
-        residual = hidden_states
+        if self.config.send_mtp_embed:
+            batch_size, _, hidden_size = hidden_states.shape
+            batch_size_mtp = hidden_size // (self.config.num_nextn_predict_layers + 1)
+            inputs_embeds_mtp = hidden_states[..., batch_size_mtp:]
+            hidden_states = hidden_states[..., :batch_size_mtp]
+
+        hidden_states, residual = self.self_attn_compute(hidden_states)
+
+        ret = (hidden_states, residual)
+        ret = (inputs_embeds_mtp, *ret) if self.config.send_mtp_embed else ret
+        return ret
+
+    def mlp_compute_dense(self, inputs):
+        if self.config.send_mtp_embed:
+            (inputs_embeds_mtp, hidden_states, residual) = inputs
+        else:
+            (hidden_states, residual) = inputs
+
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
+
+        if self.config.send_mtp_embed:
+            hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp], axis=-1)
+
         return hidden_states
 
     def build_schedule_node(self):
