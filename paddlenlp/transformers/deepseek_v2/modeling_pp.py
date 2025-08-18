@@ -1340,9 +1340,8 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
 
                     # recompute_fwd_gate_up_ may be 1, 0 or -1, 1 means recompute, 0 means disable recompute, -1 means adaptive recompute.
                     recompute_fwd_gate_up_ = 1 if self.layer_idx in self.config.recompute_fwd_gate_up_list else 0
-                    recompute_fwd_gate_up_ = (
-                        -1 if self.config.adaptive_remained_O1_recompute_ratio else recompute_fwd_gate_up_
-                    )
+                    if recompute_fwd_gate_up_ == 0 and self.config.adaptive_remained_O1_recompute_ratio:
+                        recompute_fwd_gate_up_ = -1
 
                     fp8_fusion_moe_node = FusionMoeNode(
                         self.mlp,

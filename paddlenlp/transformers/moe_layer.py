@@ -26,10 +26,16 @@ from paddle import Tensor, nn
 from paddle.distributed.communication.group import Group
 
 from ..utils.log import logger
-from .fp8_utils import FP8GroupGemmMlpFunctionNode
+from .fp8_utils import FP8GroupGemmMlpFunctionNode, extract_first_if_tuple
 from .fused_a2a import CombineNode, DispatchNode, get_buffer, get_hidden_bytes
 from .moe_gate import PretrainedMoEGate
-from .moe_utils import UnZipNode, ZipNode, tokens_zip_unique_add_with_subbatch
+from .moe_utils import (
+    UnZipNode,
+    ZipNode,
+    offload,
+    reload,
+    tokens_zip_unique_add_with_subbatch,
+)
 from .token_dispatcher import MoEFlexTokenDispatcher, PreDispatchNode
 
 try:
@@ -60,10 +66,6 @@ def stop_gradient_for_multi_input(x):
         x[0].stop_gradient = False
     else:
         x.stop_gradient = False
-
-
-def extract_first_if_tuple(x):
-    return x[0] if isinstance(x, tuple) else x
 
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
@@ -730,6 +732,7 @@ class FusionMlpNode:
         self.dispatched_indices = None
         self.dispatched_probs = None
         self.tokens_per_expert = None
+        self.padding_token_per_experts = None
         self.router_topk = max_topk
         self.mlp_fwd_subbatch_rows = mlp_fwd_subbatch_rows
         self.mlp_bwd_subbatch_rows = mlp_bwd_subbatch_rows
@@ -752,6 +755,7 @@ class FusionMlpNode:
         self.dispatched_indices = None
         self.dispatched_probs = None
         self.tokens_per_expert = None
+        self.padding_token_per_experts = None
         self.router_topk = None
 
         del self.unzip_node
@@ -777,15 +781,17 @@ class FusionMlpNode:
             assert unzipped_tokens is not None and unzipped_tokens_scale is not None
             self.experts_group_gemm_node.input_fp8 = unzipped_tokens
             self.experts_group_gemm_node.input_scale = unzipped_tokens_scale
-            self.m_indices = self.experts_group_gemm_node.gen_m_indices(self.tokens_per_expert)
+            self.m_indices = self.experts_group_gemm_node.gen_m_indices(self.padding_token_per_experts)
             self.experts_group_gemm_node.fwd_subbatch = True
         else:
             self.m_indices = (
-                self.experts_group_gemm_node.gen_m_indices(self.tokens_per_expert)
+                self.experts_group_gemm_node.gen_m_indices(self.padding_token_per_experts)
                 if not hasattr(self, "m_indices")
                 else self.m_indices
             )
             self.experts_group_gemm_node.bwd_subbatch = True
+            reload(self.experts_group_gemm_node.input_fp8)
+            reload(self.experts_group_gemm_node.input_scale)
 
     def gemm_forward_subbatch(
         self,
@@ -828,6 +834,7 @@ class FusionMlpNode:
         map_unzipped_indices_to_zipped,
         total_zipped_tokens,
         output,
+        padding_token_per_experts,
         start_idx=None,
         end_idx=None,
         output_subbatch_rows=None,
@@ -857,17 +864,17 @@ class FusionMlpNode:
 
         # m_indices = self.experts_group_gemm_node.gen_m_indices(self.tokens_per_expert)
         unzipped_inp_grad = (
-            (unzipped_grad[0][start_idx:end_idx], unzipped_grad[1][start_idx:end_idx])
+            (unzipped_grad[0][start_idx:end_idx].contiguous(), unzipped_grad[1][start_idx:end_idx].contiguous())
             if isinstance(unzipped_grad, tuple)
-            else unzipped_grad[start_idx:end_idx]
+            else unzipped_grad[start_idx:end_idx].contiguous()
         )
         unzipped_grad, unzipped_probs_grad = self.experts_group_gemm_node.backward(
             unzipped_inp_grad,
-            self.unzipped_probs[start_idx:end_idx],
-            input_fp8_slice=self.experts_group_gemm_node.input_fp8[start_idx:end_idx],
-            input_scale_slice=self.experts_group_gemm_node.input_scale[start_idx:end_idx],
-            tokens_per_expert=split_list_prefix(self.tokens_per_expert, start_idx, end_idx),
-            m_indices=self.m_indices[start_idx:end_idx],
+            self.unzipped_probs[start_idx:end_idx].contiguous(),
+            input_fp8_slice=self.experts_group_gemm_node.input_fp8[start_idx:end_idx].contiguous(),
+            input_scale_slice=self.experts_group_gemm_node.input_scale[start_idx:end_idx].contiguous(),
+            tokens_per_expert=split_list_prefix(padding_token_per_experts, start_idx, end_idx),
+            m_indices=self.m_indices[start_idx:end_idx].contiguous(),
             reset_status=reset_status,
         )
 
@@ -899,7 +906,7 @@ class FusionMlpNode:
         self.dispatched_probs = dispatched_probs
         num_experts = len(self.tokens_per_expert)
         padding_token_per_experts = [(x + 127) // 128 * 128 for x in self.tokens_per_expert]
-
+        self.padding_token_per_experts = padding_token_per_experts
         # 1 unzip
         self.dispatched_indices = dispatched_indices.to(paddle.int32)
         if DSV3_USE_FP8_DISPATCH:
@@ -956,7 +963,7 @@ class FusionMlpNode:
                 else:
                     hs_2d_dispatched._clear_to_zero_allocation()
 
-                subbatch_rows = min(total_unzipped_tokens // num_experts, self.mlp_fwd_subbatch_rows)
+                subbatch_rows = min((total_unzipped_tokens // num_experts) // 128 * 128, self.mlp_fwd_subbatch_rows)
                 nparts = (total_unzipped_tokens + subbatch_rows - 1) // subbatch_rows
                 output = paddle.empty([0, extract_first_if_tuple(hs_2d_dispatched).shape[-1]], dtype=paddle.float32)
                 self.prepare_env_subbatch(unzipped_tokens, unzipped_tokens_scale, True)
@@ -981,6 +988,8 @@ class FusionMlpNode:
 
                 output = self.merge_subbatch_cast(output, paddle.bfloat16)
                 output.stop_gradient = False
+                offload(self.experts_group_gemm_node.input_fp8)
+                offload(self.experts_group_gemm_node.input_scale)
                 return output
 
             # 2 experts
@@ -1081,7 +1090,7 @@ class FusionMlpNode:
             else:
                 hidden_states_out_grad._clear_to_zero_allocation()
 
-            subbatch_rows = min(total_unzipped_tokens // num_experts, self.mlp_bwd_subbatch_rows)
+            subbatch_rows = min((total_unzipped_tokens // num_experts) // 128 * 128, self.mlp_bwd_subbatch_rows)
             nparts = (total_unzipped_tokens + subbatch_rows - 1) // subbatch_rows
             output = paddle.empty([0, hidden_states_size], dtype=paddle.float32)
             probs_grad_list = []
@@ -1098,12 +1107,18 @@ class FusionMlpNode:
                     map_unzipped_indices_to_zipped,
                     total_zipped_tokens,
                     output,
+                    padding_token_per_experts,
                     start_idx=start_idx,
                     end_idx=end_idx,
                     output_subbatch_rows=self.output_subbatch_rows,
                     reset_status=reset_status,
                 )
                 probs_grad_list.append(probs_grad)
+            if isinstance(unzipped_grad, tuple):
+                unzipped_grad[0]._clear_to_zero_allocation()
+                unzipped_grad[1]._clear_to_zero_allocation()
+            else:
+                unzipped_grad._clear_to_zero_allocation()
             hs_dispatched_grad = self.merge_subbatch_cast(output, paddle.bfloat16)
             dispatched_probs_grad = TDU.tokens_zip_prob_seq_subbatch(
                 probs_grad_list, self.unzip_node.zipped_expertwise_rowmap, self.dispatched_indices, subbatch_rows

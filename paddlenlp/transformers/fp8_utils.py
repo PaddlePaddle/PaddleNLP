@@ -49,6 +49,10 @@ __all__ = [
 ]
 
 
+def extract_first_if_tuple(x):
+    return x[0] if isinstance(x, tuple) else x
+
+
 def _get_fp8_weight_and_scale(weight, stacked=False, transpose=False):
     """_get_fp8_weight_and_scale"""
     if stacked:
@@ -1047,9 +1051,15 @@ class FP8GroupGemmMlpFunctionNode:
             input_x_t_fp8, input_x_t_scale = self.fused_transpose_split_quant(input_x, None, tokens_per_expert, True)
 
         if clear_input:
-            self.input = None
-            self.input_fp8 = None
-            self.input_scale = None
+            if self.input_fp8 is not None:
+                self.input_fp8._clear_to_zero_allocation()
+                self.input_fp8 = None
+            if self.input_scale is not None:
+                self.input_scale._clear_to_zero_allocation()
+                self.input_scale = None
+            if self.input is not None:
+                self.input._clear_to_zero_allocation()
+                self.input = None
 
         do1_t_fp8, do1_t_scale = self.fused_transpose_split_quant(do1, None, tokens_per_expert, True)
 
@@ -1140,7 +1150,7 @@ class FP8GroupGemmMlpFunctionNode:
         dtype = paddle.bfloat16
         shape = out_grad[0].shape if isinstance(out_grad, tuple) else out_grad.shape
         if shape[0] == 0:
-            return paddle.zeros_like(out_grad, dtype=dtype), paddle.zeros_like(unzipped_probs, dtype=dtype)
+            return paddle.zeros_like(extract_first_if_tuple(out_grad), dtype=dtype), paddle.zeros_like(unzipped_probs)
 
         # recompute expert_w2 and expert_w1
         expert_w1 = [x.w1 for x in self.experts if x is not None]
@@ -1157,6 +1167,8 @@ class FP8GroupGemmMlpFunctionNode:
             expert_w2, out_grad, o1, tokens_per_expert, unzipped_probs=unzipped_probs, m_indices=m_indices
         )
         del o1
+        if self.o1 is not None:
+            self.o1._clear_to_zero_allocation()
         self.o1 = None
 
         # dw1
@@ -1171,9 +1183,15 @@ class FP8GroupGemmMlpFunctionNode:
         )
 
         if reset_status:
-            self.input_fp8 = None
-            self.input_scale = None
-            self.input = None
+            if self.input_fp8 is not None:
+                self.input_fp8._clear_to_zero_allocation()
+                self.input_fp8 = None
+            if self.input_scale is not None:
+                self.input_scale._clear_to_zero_allocation()
+                self.input_scale = None
+            if self.input is not None:
+                self.input._clear_to_zero_allocation()
+                self.input = None
 
         # dx
         dx = self.bwd_gate_up_input(

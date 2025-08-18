@@ -398,3 +398,55 @@ def tokens_zip_unique_add_with_subbatch(zipped, unzipped, index_unzipped, zipped
             else:
                 zipped = paddle.split(zipped, rows, axis=0)
         return TDU.tokens_zip_unique_add_subbatch(zipped, unzipped, index_unzipped, zipped_rows, subbatch_rows)
+
+
+def get_env_device():
+    """
+    Return the device name of running environment.
+    """
+    if paddle.is_compiled_with_cuda():
+        return "gpu"
+    elif "npu" in paddle.device.get_all_custom_device_type():
+        return "npu"
+    elif "mlu" in paddle.device.get_all_custom_device_type():
+        return "mlu"
+    elif "gcu" in paddle.device.get_all_custom_device_type():
+        return "gcu"
+    elif "intel_hpu" in paddle.device.get_all_custom_device_type():
+        return "intel_hpu"
+    elif paddle.is_compiled_with_rocm():
+        return "rocm"
+    elif paddle.is_compiled_with_xpu():
+        return "xpu"
+    return "cpu"
+
+
+def to_device(tensor, place=None):
+    if place is None:
+        place = get_env_device()
+
+    if isinstance(place, str):
+        place = paddle.device._convert_to_place(place)
+
+    if not tensor.place._equals(place):
+        new_t = tensor._copy_to(place, True)
+        dst_tensor = tensor.value().get_tensor()
+        src_tensor = new_t.value().get_tensor()
+        dst_tensor._share_data_with(src_tensor)
+
+    return tensor
+
+
+def offload(tensor):
+    if paddle.is_compiled_with_cuda():
+        place = paddle.CUDAPinnedPlace()
+    else:
+        place = paddle.CPUPlace()
+
+    new_tensor = to_device(tensor, place)
+    assert new_tensor is tensor, "to_device must be inplace operation"
+
+
+def reload(tensor):
+    new_tensor = to_device(tensor)
+    assert new_tensor is tensor, "to_device must be inplace operation"

@@ -590,6 +590,7 @@ __global__ void tokens_zip_unique_add_kernel(
   for (int64_t unzipped_row = blockIdx.x; unzipped_row < unzipped_rows;
        unzipped_row += gridDim.x) {
     int64_t zipped_row = index_unzipped[unzipped_row];
+    if (zipped_row < 0) continue;
     auto *zipped_ptr = zipped_ptrs[zipped_row / subbatch_rows] +
                        (zipped_row % subbatch_rows) * hidden_size;
     const auto *unzipped_ptr = unzipped + unzipped_row * hidden_size;
@@ -957,7 +958,7 @@ std::vector<paddle::Tensor> tokens_zip_prob_seq_subbatch_impl(
       num_expert, ([&] {
         phi::Array<const T *, MAX_NUM_EXPERTS_C> unzipped_probs_info;
         int64_t offset = 0;
-        for (int i = 0; i < num_expert; ++i) {
+        for (size_t i = 0; i < unzipped_probs.size(); ++i) {
           unzipped_probs_info[i] = unzipped_probs[i].data<T>();
         }
 
@@ -1183,8 +1184,7 @@ std::vector<paddle::Tensor> tokens_unzip_slice(
   int64_t total_zipped_rows = x_shape[0];
 
   auto index_unzipped =
-      paddle::empty({total_unzipped_rows}, paddle::DataType::INT64, place);
-
+      paddle::full({total_unzipped_rows}, -1, paddle::DataType::INT64, place);
   int block = 1024;
   int grid = LimitGridDim(total_zipped_rows);
 
