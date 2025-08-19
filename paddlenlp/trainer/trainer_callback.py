@@ -27,6 +27,7 @@ from typing import Dict, List, Optional, Union
 import numpy as np
 from tqdm.auto import tqdm
 
+from paddlenlp.transformers.moe_utils import offload, reload
 from paddlenlp.utils.log import logger
 
 from .trainer_utils import IntervalStrategy, has_length
@@ -646,5 +647,23 @@ class FP8QuantWeightCallback(TrainerCallback):
         if not g_shard_bypass_dygraph_optimizer or skip_count == 0:
             model.fp8_quant_weight(True)
             optimizer.clear_param_storage("moe_expert")
+            optimizer.clear_param_storage("rms_linear")
+            optimizer.clear_param_storage("memory_attn")
+            optimizer.clear_param_storage("attn_out_project")
+            optimizer.clear_param_storage("shared_expert")
+
+            self.moe_weights_name = []
+            for param in optimizer._inner_opt._parameter_list:
+                color = getattr(param, "color", -1)
+                if isinstance(color, dict) and color["color"] == "moe_expert":
+                    self.moe_weights_name.append(param.name)
+
+            for name in self.moe_weights_name:
+                offload(optimizer._master_weights[name])
 
         skip_count += 1
+
+    def on_optimizer_begin(self, args, state, control, **kwargs):
+        optimizer = kwargs["optimizer"]
+        for name in self.moe_weights_name:
+            reload(optimizer._master_weights[name])

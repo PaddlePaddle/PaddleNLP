@@ -88,6 +88,7 @@ from ..fp8_utils import (
     FP8LinearFunctionBase,
     FP8Mlp,
     cache_fp8_weight,
+    set_parameter_color,
 )
 from .fp8_linear import Linear
 
@@ -105,6 +106,7 @@ except ImportError:
         if y is None:
             x, y = paddle.chunk(x, chunks=2, axis=-1)
         return F.silu(x) * y
+
 
 try:
     from paddle.incubate.nn.functional import fused_partial_rope
@@ -752,6 +754,7 @@ class DeepseekV2MLP(nn.Layer):
 
 class FusedNormGateFunc(paddle.autograd.PyLayer):
     """recompute of postnorm and gate"""
+
     _current_norm_output = None
     _current_invar = None
 
@@ -799,6 +802,7 @@ class FusedNormGateFunc(paddle.autograd.PyLayer):
 
         return dx, d_rms_norm_weight, d_moe_gate_weight
 
+
 class TemporaryVarContext:
     def __init__(self, norm_output, invar):
         self.norm_output = norm_output
@@ -809,6 +813,7 @@ class TemporaryVarContext:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         FusedNormGateFunc.clear_temporary_vars()
+
 
 def balance_expert_assignment(n, m, k):
     assert k * n % m == 0
@@ -999,7 +1004,11 @@ class DeepseekV2MoE(MoELayer):
 
         if config.offline_quant_expert_weight and config.clear_origin_weight_when_offline_quant:
             moe_grad_group = fleet.get_hybrid_communicate_group().expert_grad_comm_group
-            for p in self.experts.parameters():
+            expert_w1_list = [expert.w1 for expert in self.experts if expert is not None]
+            expert_w2_list = [expert.w2 for expert in self.experts if expert is not None]
+            for p in expert_w1_list:
+                setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
+            for p in expert_w2_list:
                 setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
 
         self.alpha = config.aux_loss_alpha
@@ -1019,6 +1028,7 @@ class DeepseekV2MoE(MoELayer):
                 self.shared_experts = DeepseekV2MLPClass(
                     config=config, intermediate_size=intermediate_size, is_moe=False
                 )
+            set_parameter_color([self.shared_experts.w1, self.shared_experts.w2], "shared_expert")
 
     def fp8_quant_weight(self, batch_mode=False):
         """Quantize weights in FP8 format.
@@ -1171,7 +1181,16 @@ def qkv_pre_process(
 ):
     if (fused_partial_rope is None) or (position_ids is not None):
         return qkv_pre_process_no_fuse(
-            q, kv, k_pe, rotary_emb, num_heads, q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, position_ids
+            q,
+            kv,
+            k_pe,
+            rotary_emb,
+            num_heads,
+            q_head_dim,
+            qk_nope_head_dim,
+            v_head_dim,
+            qk_rope_head_dim,
+            position_ids,
         )
 
     bsz, q_len, _ = q.shape
@@ -1712,6 +1731,7 @@ class MemroyRecomputeAttn(paddle.nn.Layer):
             kv_lora_rank,
             softmax_scale,
         )
+        set_parameter_color([self.q_up_weight, self.kv_up_weight], "memory_attn")
 
     def fp8_quant_weight(self):
         cache_fp8_weight(self.q_up_weight)
@@ -1839,6 +1859,7 @@ class FusedRMSLinear(paddle.nn.Layer):
             is_bias=False,
         )
         self.eps = eps
+        set_parameter_color([self.q_down_weight], "rms_linear")
 
     def fp8_quant_weight(self):
         cache_fp8_weight(self.q_down_weight)
@@ -2236,6 +2257,8 @@ class DeepseekV2DecoderLayer(nn.Layer):
         if isinstance(self.mlp, DeepseekV2MoE):
             # logger.info(f"fp8 quant weight for mlp {type(self.mlp)}")
             self.mlp.fp8_quant_weight(batch_mode)
+            self.self_attn.fp8_quant_weight()
+        elif isinstance(self.mlp, FP8Mlp):
             self.self_attn.fp8_quant_weight()
 
     def forward(
