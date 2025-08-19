@@ -107,6 +107,19 @@ def paddlenlp_verison_check():
         )
 
 
+def mock_offload_optimizer():
+    """
+    mock offload optimizer
+    """
+    try:
+        from paddlenlp.trainer.utils.offload_optimizer import hack_offload_optimizer
+
+        hack_offload_optimizer()
+        logger.warning("hack_offload_optimizer called.")
+    except ImportError:
+        logger.warning("hack_offload_optimizer is not imported")
+
+
 def main():
     paddlenlp_verison_check()
     parser = PdArgumentParser((GenerateArgument, ModelConfig, ReftArgument, DataConfig, SFTConfig))
@@ -119,6 +132,9 @@ def main():
     else:
         gen_args, model_args, reft_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+    if training_args.tensorwise_offload_optimizer:
+        mock_offload_optimizer()
+
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
     training_args.print_config(gen_args, "Generation")
@@ -126,8 +142,9 @@ def main():
     if training_args.pre_alloc_memory > 0:
         memory_size = int(training_args.pre_alloc_memory * 1024 * 1024 * 1024)
         x = paddle.empty([memory_size], dtype=paddle.uint8)
+        logger.info(f"pre_alloc_memory size {x.shape}")
         del x
-    
+
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
     set_seed(seed=training_args.seed)
