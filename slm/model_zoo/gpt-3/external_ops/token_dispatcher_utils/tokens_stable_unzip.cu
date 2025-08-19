@@ -902,9 +902,9 @@ std::vector<paddle::Tensor> tokens_zip_prob(
 }
 
 
-template <typename T, int MAX_NUM_EXPERTS_C>
+template <typename T, int SPLIT_NUMS>
 __global__ void tokens_zip_prob_seq_subbatch_kernel(
-    phi::Array<const T *, MAX_NUM_EXPERTS_C> unzipped_probs,
+    phi::Array<const T *, SPLIT_NUMS> unzipped_probs,
     const int *__restrict__ zipped_expertwise_rowmap,
     const int *__restrict__ dispatched_indices,
     T *zipped_probs,
@@ -954,30 +954,73 @@ std::vector<paddle::Tensor> tokens_zip_prob_seq_subbatch_impl(
   auto zipped_probs =
       paddle::empty({zipped_rows, topk}, dtype, unzipped_probs[0].place());
 
-  PD_SWITCH_NUM_EXPERTS(
-      num_expert, ([&] {
-        phi::Array<const T *, MAX_NUM_EXPERTS_C> unzipped_probs_info;
-        int64_t offset = 0;
-        for (size_t i = 0; i < unzipped_probs.size(); ++i) {
-          unzipped_probs_info[i] = unzipped_probs[i].data<T>();
-        }
+  int thread = 1024;
+  int grid = LimitGridDim((zipped_rows * topk + thread - 1) / thread);
 
-        int thread = 1024;
-        int grid = LimitGridDim((zipped_rows * topk + thread - 1) / thread);
+#define LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, __num_split)       \
+  if (unzipped_probs.size() <= __num_split) {                                \
+    phi::Array<const __T *, __num_split> unzipped_probs_info;                \
+    for (size_t i = 0; i < unzipped_probs.size(); ++i) {                     \
+      unzipped_probs_info[i] = unzipped_probs[i].data<__T>();                \
+    }                                                                        \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_CASE_IMPL(__T, unzipped_probs_info); \
+    break;                                                                   \
+  }
 
-        if (grid > 0) {
-          tokens_zip_prob_seq_subbatch_kernel<T, MAX_NUM_EXPERTS_C>
-              <<<grid, thread, 0, zipped_probs.stream()>>>(
-                  unzipped_probs_info,
-                  zipped_expertwise_rowmap.data<int>(),
-                  dispatched_indices.data<int>(),
-                  zipped_probs.data<T>(),
-                  zipped_rows,
-                  topk,
-                  num_expert,
-                  subbatch_rows);
-        }
-      }));
+#define LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_DYNAMIC_CASE(__T)              \
+  paddle::Tensor ptr_tensor;                                               \
+  auto unzipped_probs_info =                                               \
+      GetTensorDevicePtrs<const __T>(unzipped_probs,                       \
+                                     &ptr_tensor,                          \
+                                     zipped_probs.stream(),                \
+                                     zipped_probs.place());                \
+  LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_CASE_IMPL(__T, unzipped_probs_info); \
+  break
+
+#define LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_CASE_IMPL(__T,                   \
+                                                      __unzipped_probs_info) \
+  do {                                                                       \
+    if (grid > 0) {                                                          \
+      tokens_zip_prob_seq_subbatch_kernel<                                   \
+          __T,                                                               \
+          std::remove_reference_t<decltype(__unzipped_probs_info)>::size()>  \
+          <<<grid, thread, 0, zipped_probs.stream()>>>(                      \
+              __unzipped_probs_info,                                         \
+              zipped_expertwise_rowmap.data<int>(),                          \
+              dispatched_indices.data<int>(),                                \
+              zipped_probs.data<__T>(),                                      \
+              zipped_rows,                                                   \
+              topk,                                                          \
+              num_expert,                                                    \
+              subbatch_rows);                                                \
+    }                                                                        \
+  } while (0)
+
+#define LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH(__T)           \
+  do {                                                     \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 1);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 2);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 3);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 4);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 5);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 6);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 7);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 8);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 9);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 10); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 11); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 12); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 13); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 14); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 15); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 16); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 17); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 18); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 19); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 20); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_DYNAMIC_CASE(__T); \
+  } while (0)
+
   return {zipped_probs};
 }
 
