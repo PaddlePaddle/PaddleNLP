@@ -902,9 +902,9 @@ std::vector<paddle::Tensor> tokens_zip_prob(
 }
 
 
-template <typename T, int SPLIT_NUMS>
+template <typename T, typename UnZipProbPtrsT>
 __global__ void tokens_zip_prob_seq_subbatch_kernel(
-    phi::Array<const T *, SPLIT_NUMS> unzipped_probs,
+    UnZipProbPtrsT unzipped_probs,
     const int *__restrict__ zipped_expertwise_rowmap,
     const int *__restrict__ dispatched_indices,
     T *zipped_probs,
@@ -916,15 +916,15 @@ __global__ void tokens_zip_prob_seq_subbatch_kernel(
   int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
   int64_t limit = zipped_rows * topk;
   while (idx < limit) {
-    auto zipped_row = idx / topk;
-    auto topk_idx = idx % topk;
-    auto expert_id = dispatched_indices[idx];
+    int64_t zipped_row = idx / topk;
+    int64_t topk_idx = idx % topk;
+    int64_t expert_id = dispatched_indices[idx];
     T value = static_cast<T>(0);
     if (expert_id >= 0) {
-      auto unzipped_row =
+      int64_t unzipped_row =
           zipped_expertwise_rowmap[zipped_row * num_expert + expert_id];
-      auto i = unzipped_row / subbatch_rows;
-      auto j = unzipped_row % subbatch_rows;
+      int64_t i = unzipped_row / subbatch_rows;
+      int64_t j = unzipped_row % subbatch_rows;
       if (unzipped_row >= 0) {
         value = unzipped_probs[i][j];
       }
@@ -953,7 +953,6 @@ std::vector<paddle::Tensor> tokens_zip_prob_seq_subbatch_impl(
 
   auto zipped_probs =
       paddle::empty({zipped_rows, topk}, dtype, unzipped_probs[0].place());
-
   int thread = 1024;
   int grid = LimitGridDim((zipped_rows * topk + thread - 1) / thread);
 
@@ -983,7 +982,8 @@ std::vector<paddle::Tensor> tokens_zip_prob_seq_subbatch_impl(
     if (grid > 0) {                                                          \
       tokens_zip_prob_seq_subbatch_kernel<                                   \
           __T,                                                               \
-          std::remove_reference_t<decltype(__unzipped_probs_info)>::size()>  \
+          typename std::remove_reference<                                    \
+              decltype(__unzipped_probs_info)>::type>                        \
           <<<grid, thread, 0, zipped_probs.stream()>>>(                      \
               __unzipped_probs_info,                                         \
               zipped_expertwise_rowmap.data<int>(),                          \
@@ -1021,6 +1021,7 @@ std::vector<paddle::Tensor> tokens_zip_prob_seq_subbatch_impl(
     LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_DYNAMIC_CASE(__T); \
   } while (0)
 
+  LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH(T);
   return {zipped_probs};
 }
 
