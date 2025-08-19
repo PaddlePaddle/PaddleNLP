@@ -106,6 +106,7 @@ except ImportError:
             x, y = paddle.chunk(x, chunks=2, axis=-1)
         return F.silu(x) * y
 
+
 try:
     from paddle.incubate.nn.functional import fused_partial_rope
 except ImportError:
@@ -752,6 +753,7 @@ class DeepseekV2MLP(nn.Layer):
 
 class FusedNormGateFunc(paddle.autograd.PyLayer):
     """recompute of postnorm and gate"""
+
     _current_norm_output = None
     _current_invar = None
 
@@ -799,6 +801,7 @@ class FusedNormGateFunc(paddle.autograd.PyLayer):
 
         return dx, d_rms_norm_weight, d_moe_gate_weight
 
+
 class TemporaryVarContext:
     def __init__(self, norm_output, invar):
         self.norm_output = norm_output
@@ -809,6 +812,7 @@ class TemporaryVarContext:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         FusedNormGateFunc.clear_temporary_vars()
+
 
 def balance_expert_assignment(n, m, k):
     assert k * n % m == 0
@@ -1014,6 +1018,7 @@ class DeepseekV2MoE(MoELayer):
                     using_post_norm_recompute=self.using_post_norm_recompute,
                     norm_weight=norm_weight,
                     norm_eps=norm_eps,
+                    recompute_fwd_gate_up=True,
                 )
             else:
                 self.shared_experts = DeepseekV2MLPClass(
@@ -1171,7 +1176,16 @@ def qkv_pre_process(
 ):
     if (fused_partial_rope is None) or (position_ids is not None):
         return qkv_pre_process_no_fuse(
-            q, kv, k_pe, rotary_emb, num_heads, q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, position_ids
+            q,
+            kv,
+            k_pe,
+            rotary_emb,
+            num_heads,
+            q_head_dim,
+            qk_nope_head_dim,
+            v_head_dim,
+            qk_rope_head_dim,
+            position_ids,
         )
 
     bsz, q_len, _ = q.shape
