@@ -400,6 +400,17 @@ def tokens_zip_unique_add_with_subbatch(zipped, unzipped, index_unzipped, zipped
         return TDU.tokens_zip_unique_add_subbatch(zipped, unzipped, index_unzipped, zipped_rows, subbatch_rows)
 
 
+def merge_subbatch_cast(x, dtype):
+    if isinstance(x, (list, tuple)):
+        if len(x) == 1:
+            x = x[0]
+            return x.cast(dtype) if x.dtype != dtype else x
+        else:
+            return TDU.merge_subbatch_cast(x, dtype)
+    else:
+        return x.cast(dtype) if x.dtype != dtype else x
+
+
 def get_env_device():
     """
     Return the device name of running environment.

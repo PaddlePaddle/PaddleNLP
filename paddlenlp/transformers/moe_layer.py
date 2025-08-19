@@ -32,6 +32,7 @@ from .moe_gate import PretrainedMoEGate
 from .moe_utils import (
     UnZipNode,
     ZipNode,
+    merge_subbatch_cast,
     offload,
     reload,
     tokens_zip_unique_add_with_subbatch,
@@ -766,16 +767,6 @@ class FusionMlpNode:
         self.experts_group_gemm_node.reset_statue()
         self.experts_group_gemm_node = None
 
-    def merge_subbatch_cast(self, x, dtype):
-        if isinstance(x, (list, tuple)):
-            if len(x) == 1:
-                x = x[0]
-                return x.cast(dtype) if x.dtype != dtype else x
-            else:
-                return TDU.merge_subbatch_cast(x, dtype)
-        else:
-            return x.cast(dtype) if x.dtype != dtype else x
-
     def prepare_env_subbatch(self, unzipped_tokens=None, unzipped_tokens_scale=None, is_fwd=True):
         if is_fwd:
             assert unzipped_tokens is not None and unzipped_tokens_scale is not None
@@ -986,7 +977,7 @@ class FusionMlpNode:
                         output_subbatch_rows=self.output_subbatch_rows,
                     )
 
-                output = self.merge_subbatch_cast(output, paddle.bfloat16)
+                output = merge_subbatch_cast(output, paddle.bfloat16)
                 output.stop_gradient = False
                 offload(self.experts_group_gemm_node.input_fp8)
                 offload(self.experts_group_gemm_node.input_scale)
@@ -1119,7 +1110,7 @@ class FusionMlpNode:
                 unzipped_grad[1]._clear_to_zero_allocation()
             else:
                 unzipped_grad._clear_to_zero_allocation()
-            hs_dispatched_grad = self.merge_subbatch_cast(output, paddle.bfloat16)
+            hs_dispatched_grad = merge_subbatch_cast(output, paddle.bfloat16)
             dispatched_probs_grad = TDU.tokens_zip_prob_seq_subbatch(
                 probs_grad_list, self.unzip_node.zipped_expertwise_rowmap, self.dispatched_indices, subbatch_rows
             )
