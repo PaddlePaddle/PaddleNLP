@@ -155,6 +155,7 @@ class PostProcessNode(ScheduleNode):
         config,
         shared_experts=None,
         using_post_norm_recompute=False,
+        output_mtp_embed_first=False,
         name="PostProcessNode",
     ):
         self.send_mtp_embed = send_mtp_embed
@@ -163,6 +164,7 @@ class PostProcessNode(ScheduleNode):
         self.config = config
         self.alpha = alpha
         self.using_post_norm_recompute = using_post_norm_recompute
+        self.output_mtp_embed_first = output_mtp_embed_first
         self.name = name
 
         if self.using_post_norm_recompute:
@@ -205,6 +207,7 @@ class PostProcessNode(ScheduleNode):
         hidden_states.stop_gradient = False
 
         if self.send_mtp_embed:
+            assert not self.output_mtp_embed_first, "forward_without_residual doesn't support output_mtp_embed_first"
             hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp], axis=-1)
             self.mtp_embed_shape = inputs_embeds_mtp.shape  # 保存mtp_embed的shape用于反向传播
 
@@ -245,7 +248,10 @@ class PostProcessNode(ScheduleNode):
         hidden_states = residual + final_hidden_states
 
         if self.send_mtp_embed:
-            hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp], axis=-1)
+            if self.output_mtp_embed_first:
+                hidden_states = paddle.concat([inputs_embeds_mtp, hidden_states], axis=-1)
+            else:
+                hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp], axis=-1)
             self.mtp_embed_shape = inputs_embeds_mtp.shape  # 保存mtp_embed的shape用于反向传播
 
         return return_args(hidden_states)
@@ -257,8 +263,12 @@ class PostProcessNode(ScheduleNode):
         if self.send_mtp_embed:
             # 分割梯度：do3的前部分对应hidden_states，后部分对应inputs_embeds_mtp
             hidden_size = do3.shape[-1] - self.mtp_embed_shape[-1]
-            hidden_states_grad = do3[..., :hidden_size]
-            inputs_embeds_mtp_grad = do3[..., hidden_size:]
+            if self.output_mtp_embed_first:
+                hidden_states_grad = do3[..., hidden_size:]
+                inputs_embeds_mtp_grad = do3[..., :hidden_size]
+            else:
+                hidden_states_grad = do3[..., :hidden_size]
+                inputs_embeds_mtp_grad = do3[..., hidden_size:]
         else:
             hidden_states_grad = do3
             inputs_embeds_mtp_grad = None
@@ -1682,7 +1692,8 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
                         self.config,
                         self.mlp.shared_experts,
                         self.config.using_post_norm_recompute,
-                        "post_process_node",
+                        output_mtp_embed_first=isinstance(self, DeepseekV2MTPLayer),
+                        name="post_process_node",
                     )
                     return FusionFp8DecoderLayerNode(
                         attn_and_gate_node=attn_and_gate_node,
@@ -1780,7 +1791,68 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
         hidden_states = paddle.concat(output_list, axis=-1)
         return return_args(hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids)
 
+    def attn_compute_for_fusion(self, args):
+        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
+        assert attention_mask is None
+        assert attn_mask_startend_row_indices is None
+        assert position_ids is None
+        assert self.config.num_nextn_predict_layers == 1
+
+        if self.config.send_mtp_embed:
+            hidden_states_list = paddle.split(hidden_states, self.config.num_nextn_predict_layers + 1, axis=-1)
+            hidden_states_main_model = hidden_states_list[0]
+            inputs_embeds_cur_depth_list = hidden_states_list[1:]
+        else:
+            hidden_states_main_model = hidden_states
+            global global_inputs_embeds_mtp_queue
+            inputs_embeds_cur_depth_list = global_inputs_embeds_mtp_queue.get()
+
+        hidden_states = hidden_states_main_model
+        nextn_hidden_state = inputs_embeds_cur_depth_list[0]
+
+        # mtp compute
+        hidden_states = self.hnorm(hidden_states)
+        nextn_hidden_state = self.enorm(nextn_hidden_state)
+
+        hidden_states = self.eh_proj(paddle.concat([hidden_states, nextn_hidden_state], axis=-1))
+
+        # attention compute
+        hidden_states, residual = self.self_attn_compute(hidden_states)
+
+        if self.using_post_norm_recompute:
+            probs, routing_map, l_aux, _, norm_out = self.mlp.router(hidden_states)
+        else:
+            probs, routing_map, l_aux, _ = self.mlp.router(hidden_states)
+
+        # common return values
+        ret = (
+            hidden_states_main_model,
+            hidden_states,
+            residual,
+            probs,
+            routing_map,
+            l_aux,
+        )
+        ret = (*ret, norm_out) if self.using_post_norm_recompute else ret
+
+        return ret
+
     def build_schedule_node(self):
+        if isinstance(self.mlp, DeepseekV2MoE):
+            self.mlp.update_flex_token()
+            if (
+                self.mlp.using_flex_token and
+                DSV3_USE_FP8_GEMM and
+                self.config.num_nextn_predict_layers == 1
+            ):
+                prev_send_mtp_embed = self.config.send_mtp_embed
+                self.config.send_mtp_embed = True  # must be True in MTP node
+
+                node = DeepseekV2DecoderLayerPipe.build_schedule_node(self)
+                assert isinstance(node, FusionFp8DecoderLayerNode)
+
+                self.config.send_mtp_embed = prev_send_mtp_embed
+                return node
         return ScheduleNode(self.forward, name="DeepseekV2MTPLayerPipe")
 
 
