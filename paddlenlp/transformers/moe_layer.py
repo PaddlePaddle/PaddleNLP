@@ -26,10 +26,17 @@ from paddle import Tensor, nn
 from paddle.distributed.communication.group import Group
 
 from ..utils.log import logger
-from .fp8_utils import FP8GroupGemmMlpFunctionNode
+from .fp8_utils import FP8GroupGemmMlpFunctionNode, extract_first_if_tuple
 from .fused_a2a import CombineNode, DispatchNode, get_buffer, get_hidden_bytes
 from .moe_gate import PretrainedMoEGate
-from .moe_utils import UnZipNode, ZipNode
+from .moe_utils import (
+    UnZipNode,
+    ZipNode,
+    merge_subbatch_cast,
+    offload,
+    reload,
+    tokens_zip_unique_add_with_subbatch,
+)
 from .token_dispatcher import MoEFlexTokenDispatcher, PreDispatchNode
 
 try:
@@ -42,6 +49,9 @@ DSV3_USE_FP8_GEMM = os.getenv("DSV3_USE_FP8_GEMM", "False").lower() == "true"
 DSV3_USE_FP8_GROUP_GEMM = os.getenv("DSV3_USE_FP8_GROUP_GEMM", "False").lower() == "true"
 
 DSV3_USE_FP8_DISPATCH = os.getenv("DSV3_USE_FP8_DISPATCH", "False").lower() == "true"
+
+
+import TokenDispatcherUtils as TDU
 
 
 def record_stream_for_multi_input(x):
@@ -695,7 +705,16 @@ class FusionMlpNode:
     The FusedMoeLayer class includes operations for unzipping, expert computation, and zipping.
     """
 
-    def __init__(self, custom_map, max_topk, recompute_fwd_gate_up=False, is_split_group_gemm=True):
+    def __init__(
+        self,
+        custom_map,
+        max_topk,
+        recompute_fwd_gate_up=False,
+        is_split_group_gemm=True,
+        mlp_fwd_subbatch_rows=0,
+        mlp_bwd_subbatch_rows=0,
+        output_subbatch_rows=0,
+    ):
         self.token_dispatcher = custom_map.token_dispatcher
         self.experts = custom_map.experts
         self.unzip_node = UnZipNode()
@@ -714,7 +733,11 @@ class FusionMlpNode:
         self.dispatched_indices = None
         self.dispatched_probs = None
         self.tokens_per_expert = None
+        self.padding_token_per_experts = None
         self.router_topk = max_topk
+        self.mlp_fwd_subbatch_rows = mlp_fwd_subbatch_rows
+        self.mlp_bwd_subbatch_rows = mlp_bwd_subbatch_rows
+        self.output_subbatch_rows = output_subbatch_rows
 
     def set_recompute_fwd_gate_up(self, recompute_fwd_gate_up):
         self.experts_group_gemm_node.recompute_fwd_gate_up = recompute_fwd_gate_up
@@ -733,6 +756,7 @@ class FusionMlpNode:
         self.dispatched_indices = None
         self.dispatched_probs = None
         self.tokens_per_expert = None
+        self.padding_token_per_experts = None
         self.router_topk = None
 
         del self.unzip_node
@@ -742,6 +766,118 @@ class FusionMlpNode:
 
         self.experts_group_gemm_node.reset_statue()
         self.experts_group_gemm_node = None
+
+    def prepare_env_subbatch(self, unzipped_tokens=None, unzipped_tokens_scale=None, is_fwd=True):
+        if is_fwd:
+            assert unzipped_tokens is not None and unzipped_tokens_scale is not None
+            self.experts_group_gemm_node.input_fp8 = unzipped_tokens
+            self.experts_group_gemm_node.input_scale = unzipped_tokens_scale
+            self.m_indices = self.experts_group_gemm_node.gen_m_indices(self.padding_token_per_experts)
+            self.experts_group_gemm_node.fwd_subbatch = True
+        else:
+            self.m_indices = (
+                self.experts_group_gemm_node.gen_m_indices(self.padding_token_per_experts)
+                if not hasattr(self, "m_indices")
+                else self.m_indices
+            )
+            self.experts_group_gemm_node.bwd_subbatch = True
+            reload(self.experts_group_gemm_node.input_fp8)
+            reload(self.experts_group_gemm_node.input_scale)
+
+    def gemm_forward_subbatch(
+        self,
+        unzipped_tokens,
+        unzipped_tokens_scale,
+        unzipped_probs,
+        map_unzipped_indices_to_zipped,
+        output,
+        total_zipped_tokens,
+        padding_token_per_experts,
+        start_idx=None,
+        end_idx=None,
+        output_subbatch_rows=None,
+    ):
+        if start_idx is None or end_idx is None:
+            start_idx = 0
+            end_idx = unzipped_tokens.shape[0]
+        start_idx = max(0, start_idx)
+        end_idx = min(unzipped_tokens.shape[0], end_idx)
+
+        expert_out = self.experts_group_gemm_node.forward(
+            (unzipped_tokens[start_idx:end_idx], unzipped_tokens_scale[start_idx:end_idx]),
+            unzipped_probs[start_idx:end_idx],
+            padding_token_per_experts,
+            m_indices=self.m_indices[start_idx:end_idx],
+        )
+
+        output = tokens_zip_unique_add_with_subbatch(
+            output,
+            expert_out,
+            map_unzipped_indices_to_zipped[start_idx:end_idx],
+            total_zipped_tokens,
+            subbatch_rows=output_subbatch_rows,
+        )
+        return output
+
+    def gemm_backward_subbatch(
+        self,
+        unzipped_grad,
+        map_unzipped_indices_to_zipped,
+        total_zipped_tokens,
+        output,
+        padding_token_per_experts,
+        start_idx=None,
+        end_idx=None,
+        output_subbatch_rows=None,
+        reset_status=False,
+    ):
+        def split_list_prefix(l, start, end):
+            prefix_sum = [0] * (len(l) + 1)
+            for i in range(len(l)):
+                prefix_sum[i + 1] = prefix_sum[i] + l[i]
+
+            result = []
+            for i in range(len(l)):
+                segment_start = prefix_sum[i]
+                segment_end = prefix_sum[i + 1]
+                overlap_start = max(start, segment_start)
+                overlap_end = min(end, segment_end)
+                selected = max(0, overlap_end - overlap_start)
+                result.append(selected)
+            return result
+
+        if start_idx is None or end_idx is None:
+            start_idx = 0
+            end_idx = extract_first_if_tuple(unzipped_grad).shape[0]
+
+        start_idx = max(0, start_idx)
+        end_idx = min(extract_first_if_tuple(unzipped_grad).shape[0], end_idx)
+
+        # m_indices = self.experts_group_gemm_node.gen_m_indices(self.tokens_per_expert)
+        unzipped_inp_grad = (
+            (unzipped_grad[0][start_idx:end_idx].contiguous(), unzipped_grad[1][start_idx:end_idx].contiguous())
+            if isinstance(unzipped_grad, tuple)
+            else unzipped_grad[start_idx:end_idx].contiguous()
+        )
+        unzipped_grad, unzipped_probs_grad = self.experts_group_gemm_node.backward(
+            unzipped_inp_grad,
+            self.unzipped_probs[start_idx:end_idx].contiguous(),
+            input_fp8_slice=self.experts_group_gemm_node.input_fp8[start_idx:end_idx].contiguous(),
+            input_scale_slice=self.experts_group_gemm_node.input_scale[start_idx:end_idx].contiguous(),
+            tokens_per_expert=split_list_prefix(padding_token_per_experts, start_idx, end_idx),
+            m_indices=self.m_indices[start_idx:end_idx].contiguous(),
+            reset_status=reset_status,
+        )
+
+        output = tokens_zip_unique_add_with_subbatch(
+            output,
+            unzipped_grad,
+            map_unzipped_indices_to_zipped[start_idx:end_idx],
+            zipped_rows=total_zipped_tokens,
+            subbatch_rows=output_subbatch_rows,
+        )
+
+        return output, unzipped_probs_grad
 
     @paddle.no_grad()
     def forward(self, hs_2d_dispatched, dispatched_indices, dispatched_probs):
@@ -758,8 +894,10 @@ class FusionMlpNode:
 
         """
         self.tokens_per_expert = self.token_dispatcher._comm_manager.tokens_per_expert
-
+        self.dispatched_probs = dispatched_probs
         num_experts = len(self.tokens_per_expert)
+        padding_token_per_experts = [(x + 127) // 128 * 128 for x in self.tokens_per_expert]
+        self.padding_token_per_experts = padding_token_per_experts
         # 1 unzip
         self.dispatched_indices = dispatched_indices.to(paddle.int32)
         if DSV3_USE_FP8_DISPATCH:
@@ -780,10 +918,13 @@ class FusionMlpNode:
             dispatched_indices._record_stream()
             dispatched_probs._record_stream()
 
+            total_unzipped_tokens = extract_first_if_tuple(unzipped_tokens).shape[0]
+            total_zipped_tokens = extract_first_if_tuple(hs_2d_dispatched).shape[0]
+
             # If adaptive O1 recompute is enabled, determine whether to enable recompute O1 based on the degree of imbalance
             if self.recompute_fwd_gate_up == -1:
                 if (
-                    unzipped_tokens.shape[0]
+                    total_unzipped_tokens
                     > self.seq_length * self.num_experts_per_tok * self.adaptive_remained_O1_recompute_ratio
                 ):
                     # logger.debug(f"recompute_fwd_gate_up changed to True, Because the receives {unzipped_tokens.shape[0]} Tensors greater then {self.seq_length*self.num_experts_per_tok*self.adaptive_remained_O1_recompute_ratio}.")
@@ -792,13 +933,59 @@ class FusionMlpNode:
                     # logger.debug(f"recompute_fwd_gate_up changed to False, Because the receives {unzipped_tokens.shape[0]} Tensors less then {self.seq_length*self.num_experts_per_tok*self.adaptive_remained_O1_recompute_ratio}.")
                     self.set_recompute_fwd_gate_up(False)
 
+            self.unzipped_probs = unzipped_probs.unsqueeze(-1)
+
+            # if use_mlp_subbatch is enabled, then split the unzipped_tokens into subbatches
+            if self.mlp_fwd_subbatch_rows != 0 and total_unzipped_tokens > self.mlp_fwd_subbatch_rows * 2:
+                assert (
+                    self.experts_group_gemm_node.recompute_fwd_gate_up
+                ), "recompute_fwd_gate_up must be true when use_mlp_subbatch = True"
+                map_unzipped_indices_to_zipped = TDU.tokens_unzip_slice(
+                    extract_first_if_tuple(hs_2d_dispatched),
+                    zipped_expertwise_rowmap,
+                    num_experts,
+                    total_unzipped_tokens,
+                    0,
+                    total_unzipped_tokens + 1,
+                )
+                if isinstance(hs_2d_dispatched, tuple):
+                    hs_2d_dispatched[0]._clear_to_zero_allocation()
+                    hs_2d_dispatched[1]._clear_to_zero_allocation()
+                else:
+                    hs_2d_dispatched._clear_to_zero_allocation()
+
+                subbatch_rows = min((total_unzipped_tokens // num_experts) // 128 * 128, self.mlp_fwd_subbatch_rows)
+                nparts = (total_unzipped_tokens + subbatch_rows - 1) // subbatch_rows
+                output = paddle.empty([0, extract_first_if_tuple(hs_2d_dispatched).shape[-1]], dtype=paddle.float32)
+                self.prepare_env_subbatch(unzipped_tokens, unzipped_tokens_scale, True)
+                logger.info(
+                    f"Enable subbatch_forward!! total_zipped_tokens:{total_zipped_tokens}, total_unzipped_tokens:{total_unzipped_tokens}, nparts:{nparts}, subbatch_rows:{subbatch_rows}, output_sub_rows:{self.output_subbatch_rows}"
+                )
+                for i in range(nparts):
+                    start_idx = i * subbatch_rows
+                    end_idx = min(start_idx + subbatch_rows, total_unzipped_tokens)
+                    output = self.gemm_forward_subbatch(
+                        unzipped_tokens,
+                        unzipped_tokens_scale,
+                        unzipped_probs,
+                        map_unzipped_indices_to_zipped,
+                        output,
+                        total_zipped_tokens,
+                        padding_token_per_experts,
+                        start_idx=start_idx,
+                        end_idx=end_idx,
+                        output_subbatch_rows=self.output_subbatch_rows,
+                    )
+
+                output = merge_subbatch_cast(output, paddle.bfloat16)
+                output.stop_gradient = False
+                offload(self.experts_group_gemm_node.input_fp8)
+                offload(self.experts_group_gemm_node.input_scale)
+                return output
+
             # 2 experts
-            padding_token_per_experts = [(x + 127) // 128 * 128 for x in self.tokens_per_expert]
             expert_out = self.experts_group_gemm_node.forward(
-                (unzipped_tokens, unzipped_tokens_scale),
-                unzipped_probs,
-                padding_token_per_experts,
-                self.tokens_per_expert,
+                (unzipped_tokens, unzipped_tokens_scale), unzipped_probs, padding_token_per_experts
             )
         else:
             (unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, _,) = self.unzip_node.forward(
@@ -824,12 +1011,16 @@ class FusionMlpNode:
                     self.set_recompute_fwd_gate_up(False)
 
             # 2 experts
-            padding_token_per_experts = [(x + 127) // 128 * 128 for x in self.tokens_per_expert]
             expert_out = self.experts_group_gemm_node.forward(
-                unzipped_tokens, unzipped_probs, padding_token_per_experts, self.tokens_per_expert
+                unzipped_tokens, unzipped_probs, padding_token_per_experts
             )
 
         # 3 zip
+        if isinstance(hs_2d_dispatched, tuple):
+            hs_2d_dispatched[0]._clear_to_zero_allocation()
+            hs_2d_dispatched[1]._clear_to_zero_allocation()
+        else:
+            hs_2d_dispatched._clear_to_zero_allocation()
         expert_out_tmp = expert_out.reshape([-1, expert_out.shape[-1]])
 
         expert_out_zipped = self.zip_node.forward(
@@ -837,13 +1028,10 @@ class FusionMlpNode:
             zipped_expertwise_rowmap,
             self.dispatched_indices,
             unzipped_probs,
-            total_zipped_tokens=hs_2d_dispatched.shape[0]
-            if not isinstance(hs_2d_dispatched, tuple)
-            else hs_2d_dispatched[0].shape[0],
+            total_zipped_tokens=total_zipped_tokens,
             num_experts=num_experts,
         )
 
-        self.dispatched_probs = dispatched_probs
         expert_out_zipped.stop_gradient = False
         return expert_out_zipped
 
@@ -872,24 +1060,84 @@ class FusionMlpNode:
         )
         record_stream_for_multi_input(hidden_states_out_grad)
 
+        total_zipped_tokens = extract_first_if_tuple(hidden_states_out_grad).shape[0]
+        total_unzipped_tokens = extract_first_if_tuple(unzipped_grad).shape[0]
+        hidden_states_size = extract_first_if_tuple(hidden_states_out_grad).shape[-1]
+        num_experts = len(self.tokens_per_expert)
+        padding_token_per_experts = [(x + 127) // 128 * 128 for x in self.tokens_per_expert]
+
+        if self.mlp_bwd_subbatch_rows != 0 and total_unzipped_tokens > self.mlp_bwd_subbatch_rows * 2:
+            map_unzipped_indices_to_zipped = TDU.tokens_unzip_slice(
+                extract_first_if_tuple(hidden_states_out_grad),
+                self.unzip_node.zipped_expertwise_rowmap,
+                num_experts,
+                total_unzipped_tokens,
+                0,
+                total_unzipped_tokens + 1,
+            )
+            if isinstance(hidden_states_out_grad, tuple):
+                hidden_states_out_grad[0]._clear_to_zero_allocation()
+                hidden_states_out_grad[1]._clear_to_zero_allocation()
+            else:
+                hidden_states_out_grad._clear_to_zero_allocation()
+
+            subbatch_rows = min((total_unzipped_tokens // num_experts) // 128 * 128, self.mlp_bwd_subbatch_rows)
+            nparts = (total_unzipped_tokens + subbatch_rows - 1) // subbatch_rows
+            output = paddle.empty([0, hidden_states_size], dtype=paddle.float32)
+            probs_grad_list = []
+            self.prepare_env_subbatch(is_fwd=False)
+            logger.info(
+                f"Enable subbatch_backward!! total_zipped_tokens:{total_zipped_tokens}, total_unzipped_tokens:{total_unzipped_tokens}, nparts:{nparts}, subbatch_rows:{subbatch_rows}, output_sub_rows:{self.output_subbatch_rows}"
+            )
+            for i in range(nparts):
+                reset_status = True if i == nparts - 1 else False  # release saved status in the last part.
+                start_idx = i * subbatch_rows
+                end_idx = min(start_idx + subbatch_rows, total_unzipped_tokens)
+                output, probs_grad = self.gemm_backward_subbatch(
+                    unzipped_grad,
+                    map_unzipped_indices_to_zipped,
+                    total_zipped_tokens,
+                    output,
+                    padding_token_per_experts,
+                    start_idx=start_idx,
+                    end_idx=end_idx,
+                    output_subbatch_rows=self.output_subbatch_rows,
+                    reset_status=reset_status,
+                )
+                probs_grad_list.append(probs_grad)
+            if isinstance(unzipped_grad, tuple):
+                unzipped_grad[0]._clear_to_zero_allocation()
+                unzipped_grad[1]._clear_to_zero_allocation()
+            else:
+                unzipped_grad._clear_to_zero_allocation()
+            hs_dispatched_grad = merge_subbatch_cast(output, paddle.bfloat16)
+            dispatched_probs_grad = TDU.tokens_zip_prob_seq_subbatch(
+                probs_grad_list, self.unzip_node.zipped_expertwise_rowmap, self.dispatched_indices, subbatch_rows
+            )
+            self.reset_statue()
+            return hs_dispatched_grad, dispatched_probs_grad
+
+        if isinstance(hidden_states_out_grad, tuple):
+            hidden_states_out_grad[0]._clear_to_zero_allocation()
+            hidden_states_out_grad[1]._clear_to_zero_allocation()
+        else:
+            hidden_states_out_grad._clear_to_zero_allocation()
+
         # expert_grad
-        expert_out, probs_grad = self.experts_group_gemm_node.backward(unzipped_grad)
+        expert_out, probs_grad = self.experts_group_gemm_node.backward(
+            unzipped_grad, self.unzipped_probs, padding_token_per_experts
+        )
 
         hs_dispatched_grad, dispatched_probs_grad = self.unzip_node.backward(
             expert_out,
-            hidden_states_out_grad,
+            total_zipped_tokens,
             probs_grad,
             self.dispatched_indices,
-            num_experts=len(self.tokens_per_expert),
+            num_experts=num_experts,
         )
 
         self.reset_statue()
         return hs_dispatched_grad, dispatched_probs_grad
-
-    @paddle.no_grad()
-    def backward_dw(self):
-        self.experts_group_gemm_node.backward_dw()
-        self.reset_statue(True)
 
 
 class FusionMoeNode:
@@ -898,6 +1146,9 @@ class FusionMoeNode:
         custom_map,
         recompute_fwd_gate_up=False,
         is_split_group_gemm=True,
+        mlp_fwd_subbatch_rows=0,
+        mlp_bwd_subbatch_rows=0,
+        output_subbatch_rows=0,
         name="fusion_moe_node",
     ):
         self.token_dispatcher = custom_map.token_dispatcher
@@ -909,6 +1160,9 @@ class FusionMoeNode:
             self.moe_router_topk,
             recompute_fwd_gate_up=recompute_fwd_gate_up,
             is_split_group_gemm=is_split_group_gemm,
+            mlp_fwd_subbatch_rows=mlp_fwd_subbatch_rows,
+            mlp_bwd_subbatch_rows=mlp_bwd_subbatch_rows,
+            output_subbatch_rows=output_subbatch_rows,
         )
         self.combine_node = Fp8CombineNode(self.token_dispatcher)
         self.combine_quant_node = Fp8CombineQuantNode(self.token_dispatcher, custom_map.moe_group)
@@ -956,10 +1210,6 @@ class FusionMoeNode:
         else:
             hs_bf16_grad, token_probs_grad = self.dispatch_node.backward(hs_dispatched_grad, dispatched_probs_grad)
             return hs_bf16_grad, None, token_probs_grad
-
-    @paddle.no_grad()
-    def backward_dw(self):
-        self.mlp_node.backward_dw()
 
 
 class FusionMoe(paddle.autograd.PyLayer):

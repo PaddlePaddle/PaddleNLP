@@ -16,6 +16,7 @@
 
 import numpy as np
 import paddle
+import TokenDispatcherUtils as TDU
 
 from .fp8_utils import FP8LinearFunctionBase
 
@@ -181,16 +182,14 @@ class UnZipNode:
         return (unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_scale)
 
     @paddle.no_grad()
-    def backward(self, dx, hidden_states_out_grad, probs_grad, dispatched_indices, num_experts):
+    def backward(self, dx, total_zipped_tokens, probs_grad, dispatched_indices, num_experts):
         with paddle.amp.auto_cast(False):
             weighted_zipped_tokens, probs_grad_zipped = paddle.nn.functional.moe_unpermute(
                 dx,
                 self.zipped_expertwise_rowmap,
                 dispatched_indices,
                 probs_grad,
-                total_zipped_tokens=hidden_states_out_grad[0].shape[0]
-                if isinstance(hidden_states_out_grad, tuple)
-                else hidden_states_out_grad.shape[0],
+                total_zipped_tokens=total_zipped_tokens,
                 num_experts=num_experts,
             )
         self.reset_statue()
@@ -375,3 +374,90 @@ class UnPermuteNode:
 
         self.reset_status()
         return hidden_states_grad, dispatched_probs_grad
+
+
+def tokens_zip_unique_add_with_subbatch(zipped, unzipped, index_unzipped, zipped_rows, subbatch_rows=None):
+    """
+    tokens_zip_unique_add_with_subbatch
+    """
+    if subbatch_rows is None or subbatch_rows <= 0 or zipped_rows <= 0:
+        return TDU.tokens_zip_unique_add(zipped, unzipped, index_unzipped, zipped_rows)
+    else:
+        if isinstance(zipped, paddle.Tensor):
+            num_split = (zipped_rows + subbatch_rows - 1) // subbatch_rows
+            remainder = zipped_rows % subbatch_rows
+            if remainder == 0:
+                rows = [subbatch_rows] * num_split
+            else:
+                rows = [subbatch_rows] * (num_split - 1) + [remainder]
+
+            if zipped.shape[0] == 0:
+                dtype = zipped.dtype
+                hidden_size = zipped.shape[1]
+                zipped = [paddle.zeros([r, hidden_size], dtype=dtype) for r in rows]
+            else:
+                zipped = paddle.split(zipped, rows, axis=0)
+        return TDU.tokens_zip_unique_add_subbatch(zipped, unzipped, index_unzipped, zipped_rows, subbatch_rows)
+
+
+def merge_subbatch_cast(x, dtype):
+    if isinstance(x, (list, tuple)):
+        if len(x) == 1:
+            x = x[0]
+            return x.cast(dtype) if x.dtype != dtype else x
+        else:
+            return TDU.merge_subbatch_cast(x, dtype)
+    else:
+        return x.cast(dtype) if x.dtype != dtype else x
+
+
+def get_env_device():
+    """
+    Return the device name of running environment.
+    """
+    if paddle.is_compiled_with_cuda():
+        return "gpu"
+    elif "npu" in paddle.device.get_all_custom_device_type():
+        return "npu"
+    elif "mlu" in paddle.device.get_all_custom_device_type():
+        return "mlu"
+    elif "gcu" in paddle.device.get_all_custom_device_type():
+        return "gcu"
+    elif "intel_hpu" in paddle.device.get_all_custom_device_type():
+        return "intel_hpu"
+    elif paddle.is_compiled_with_rocm():
+        return "rocm"
+    elif paddle.is_compiled_with_xpu():
+        return "xpu"
+    return "cpu"
+
+
+def to_device(tensor, place=None):
+    if place is None:
+        place = get_env_device()
+
+    if isinstance(place, str):
+        place = paddle.device._convert_to_place(place)
+
+    if not tensor.place._equals(place):
+        new_t = tensor._copy_to(place, True)
+        dst_tensor = tensor.value().get_tensor()
+        src_tensor = new_t.value().get_tensor()
+        dst_tensor._share_data_with(src_tensor)
+
+    return tensor
+
+
+def offload(tensor):
+    if paddle.is_compiled_with_cuda():
+        place = paddle.CUDAPinnedPlace()
+    else:
+        place = paddle.CPUPlace()
+
+    new_tensor = to_device(tensor, place)
+    assert new_tensor is tensor, "to_device must be inplace operation"
+
+
+def reload(tensor):
+    new_tensor = to_device(tensor)
+    assert new_tensor is tensor, "to_device must be inplace operation"

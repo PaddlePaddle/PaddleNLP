@@ -14,8 +14,21 @@
 # limitations under the License.
 */
 #include "paddle/common/array.h"
+#include "paddle/common/flags.h"
+#include "paddle/phi/core/utils/data_type.h"
 #include "paddle/phi/kernels/funcs/aligned_vector.h"
 #include "utils.h"
+
+COMMON_DECLARE_bool(enable_pir_api);
+
+
+static paddle::DataType TransToDataType(int64_t dtype) {
+  if (FLAGS_enable_pir_api) {
+    return static_cast<paddle::DataType>(dtype);
+  } else {
+    return phi::TransToPhiDataType(dtype);
+  }
+}
 
 #define CUMSUM_BLOCK_SIZE 48  // cumsum开销和并行度之间的tradeoff的结果，勿动
 #define CUMSUM_INVALID_TAG -1  // 用于标记无效的cumsum，尝试过-114514但失败了
@@ -566,16 +579,20 @@ std::vector<paddle::Tensor> tokens_unzip_gather(
   return {x_unzipped, x_scale_unzipped, index_unzipped};
 }
 
-template <typename ZipT, typename UnzipT, int VecSize>
+template <typename ZipT, typename UnzipT, typename ZipPtrsT, int VecSize>
 __global__ void tokens_zip_unique_add_kernel(
-    ZipT *__restrict__ zipped,
+    ZipPtrsT zipped_ptrs,
     const UnzipT *__restrict__ unzipped,
     const int64_t *__restrict__ index_unzipped,
     const int64_t unzipped_rows,
+    const int64_t subbatch_rows,
     const int hidden_size) {
   for (int64_t unzipped_row = blockIdx.x; unzipped_row < unzipped_rows;
        unzipped_row += gridDim.x) {
-    auto *zipped_ptr = zipped + index_unzipped[unzipped_row] * hidden_size;
+    int64_t zipped_row = index_unzipped[unzipped_row];
+    if (zipped_row < 0) continue;
+    auto *zipped_ptr = zipped_ptrs[zipped_row / subbatch_rows] +
+                       (zipped_row % subbatch_rows) * hidden_size;
     const auto *unzipped_ptr = unzipped + unzipped_row * hidden_size;
     for (int i = threadIdx.x * VecSize; i < hidden_size;
          i += blockDim.x * VecSize) {
@@ -592,12 +609,42 @@ __global__ void tokens_zip_unique_add_kernel(
   }
 }
 
-std::vector<paddle::Tensor> tokens_zip_unique_add(
-    const paddle::Tensor &zipped_origin,
+
+template <typename T>
+T **GetTensorDevicePtrs(const std::vector<paddle::Tensor> &tensors,
+                        paddle::Tensor *ptr_tensor,
+                        cudaStream_t stream,
+                        phi::Place place) {
+  auto nbytes = tensors.size() * sizeof(T *);
+  std::vector<const T *> cpu_ptrs(tensors.size());
+  for (size_t i = 0; i < tensors.size(); ++i) {
+    cpu_ptrs[i] = tensors[i].data<T>();
+  }
+  *ptr_tensor = paddle::empty(
+      {static_cast<int64_t>(nbytes)}, paddle::DataType::UINT8, place);
+  auto *device_ptrs = reinterpret_cast<T **>(ptr_tensor->data());
+  auto err = cudaMemcpyAsync(
+      device_ptrs, cpu_ptrs.data(), nbytes, cudaMemcpyHostToDevice, stream);
+  PD_CHECK(
+      err == cudaSuccess, "cudaMemcpyAsync error", cudaGetErrorString(err));
+  err = cudaStreamSynchronize(stream);
+  PD_CHECK(err == cudaSuccess,
+           "cudaStreamSynchronize error",
+           cudaGetErrorString(err));
+  return device_ptrs;
+}
+
+
+std::vector<paddle::Tensor> tokens_zip_unique_add_impl(
+    const std::vector<paddle::Tensor> &zipped_origin,
     const paddle::Tensor &unzipped,
     const paddle::Tensor &index_unzipped,
-    int64_t zipped_rows) {
-  auto zipped_shape = zipped_origin.shape();
+    int64_t zipped_rows,
+    int64_t subbatch_rows) {
+  int64_t num_split = static_cast<int64_t>(zipped_origin.size());
+  PD_CHECK(num_split >= 1, "num_split should be larger than or equal to 1");
+
+  auto zipped_shape = zipped_origin[0].shape();
   auto unzipped_shape = unzipped.shape();
   PD_CHECK(zipped_shape.size() == 2);
   PD_CHECK(unzipped_shape.size() == 2);
@@ -605,16 +652,50 @@ std::vector<paddle::Tensor> tokens_zip_unique_add(
 
   auto hidden_size = zipped_shape[1];
 
-  auto out_dtype = zipped_origin.dtype();
+  auto out_dtype = zipped_origin[0].dtype();
   auto in_dtype = unzipped.dtype();
-  auto place = zipped_origin.place();
+  auto place = zipped_origin[0].place();
 
-  paddle::Tensor zipped;
+  if (zipped_rows <= 0) {
+    return zipped_origin;
+  }
+
+  if (subbatch_rows <= 0) {
+    subbatch_rows = zipped_rows;
+  }
+  subbatch_rows = std::min(zipped_rows, subbatch_rows);
+  auto desired_num_split = (zipped_rows + subbatch_rows - 1) / subbatch_rows;
+  auto remainder_rows = zipped_rows - (desired_num_split - 1) * subbatch_rows;
+
+  std::vector<paddle::Tensor> zipped;
+  zipped.reserve(desired_num_split);
   if (zipped_shape[0] == 0) {
-    zipped = paddle::zeros({zipped_rows, hidden_size}, out_dtype, place);
+    PD_CHECK(num_split == 1,
+             "When input is 0-size tensor, it should be a single tensor "
+             "instead of a tensor list");
+    for (int64_t i = 0; i < desired_num_split; ++i) {
+      auto tmp_rows =
+          (i + 1 == desired_num_split ? remainder_rows : subbatch_rows);
+      zipped.emplace_back(
+          paddle::zeros({tmp_rows, hidden_size}, out_dtype, place));
+    }
+    num_split = desired_num_split;
   } else {
-    PD_CHECK(zipped_shape[0] == zipped_rows);
-    zipped = zipped_origin;
+    PD_CHECK(num_split == desired_num_split);
+    for (int64_t i = 0; i < desired_num_split; ++i) {
+      auto tmp_shape = zipped_origin[i].shape();
+      auto tmp_dtype = zipped_origin[i].dtype();
+      PD_CHECK(tmp_shape.size() == 2);
+      if (i + 1 == desired_num_split) {
+        PD_CHECK(tmp_shape[0] == remainder_rows);
+      } else {
+        PD_CHECK(tmp_shape[0] == subbatch_rows);
+      }
+      PD_CHECK(tmp_shape[1] == hidden_size);
+      PD_CHECK(tmp_dtype == out_dtype);
+
+      zipped.emplace_back(zipped_origin[i]);
+    }
   }
 
   auto index_shape = index_unzipped.shape();
@@ -629,16 +710,54 @@ std::vector<paddle::Tensor> tokens_zip_unique_add(
   int block = 1024;
   int grid = LimitGridDim(unzipped_rows);
 
-#define LAUNCH_TOKENS_ZIP_UNIQUE_ADD(__ZipT, __UnzipT)       \
-  do {                                                       \
-    tokens_zip_unique_add_kernel<__ZipT, __UnzipT, kVecSize> \
-        <<<grid, block, 0, unzipped.stream()>>>(             \
-            zipped.data<__ZipT>(),                           \
-            unzipped.data<__UnzipT>(),                       \
-            index_unzipped.data<int64_t>(),                  \
-            unzipped_rows,                                   \
-            hidden_size);                                    \
+  auto stream = unzipped.stream();
+  paddle::Tensor ptr_tensor;
+
+#define LAUNCH_TOKENS_ZIP_UNIQUE_ADD_CASE_IMPL(__ZipT, __UnzipT, __out_ptrs)  \
+  do {                                                                        \
+    auto stream = unzipped.stream();                                          \
+    tokens_zip_unique_add_kernel<                                             \
+        __ZipT,                                                               \
+        __UnzipT,                                                             \
+        typename std::remove_reference<decltype(__out_ptrs)>::type,           \
+        kVecSize><<<grid, block, 0, stream>>>(__out_ptrs,                     \
+                                              unzipped.data<__UnzipT>(),      \
+                                              index_unzipped.data<int64_t>(), \
+                                              unzipped_rows,                  \
+                                              subbatch_rows,                  \
+                                              hidden_size);                   \
   } while (0)
+
+
+#define LAUNCH_TOKENS_ZIP_UNIQUE_ADD_FIX_CASE(__ZipT, __UnzipT, __num_split) \
+  if (num_split <= __num_split) {                                            \
+    phi::Array<__ZipT *, __num_split> array;                                 \
+    for (int64_t i = 0; i < num_split; ++i) {                                \
+      array[i] = zipped[i].data<__ZipT>();                                   \
+    }                                                                        \
+    LAUNCH_TOKENS_ZIP_UNIQUE_ADD_CASE_IMPL(__ZipT, __UnzipT, array);         \
+    break;                                                                   \
+  }
+
+
+#define LAUNCH_TOKENS_ZIP_UNIQUE_ADD_DYNAMIC_CASE(__ZipT, __UnzipT)      \
+  paddle::Tensor ptr_tensor;                                             \
+  auto device_ptrs =                                                     \
+      GetTensorDevicePtrs<__ZipT>(zipped, &ptr_tensor, stream, place);   \
+  LAUNCH_TOKENS_ZIP_UNIQUE_ADD_CASE_IMPL(__ZipT, __UnzipT, device_ptrs); \
+  break
+
+
+#define LAUNCH_TOKENS_ZIP_UNIQUE_ADD(__ZipT, __UnzipT)           \
+  do {                                                           \
+    LAUNCH_TOKENS_ZIP_UNIQUE_ADD_FIX_CASE(__ZipT, __UnzipT, 1);  \
+    LAUNCH_TOKENS_ZIP_UNIQUE_ADD_FIX_CASE(__ZipT, __UnzipT, 2);  \
+    LAUNCH_TOKENS_ZIP_UNIQUE_ADD_FIX_CASE(__ZipT, __UnzipT, 4);  \
+    LAUNCH_TOKENS_ZIP_UNIQUE_ADD_FIX_CASE(__ZipT, __UnzipT, 8);  \
+    LAUNCH_TOKENS_ZIP_UNIQUE_ADD_FIX_CASE(__ZipT, __UnzipT, 16); \
+    LAUNCH_TOKENS_ZIP_UNIQUE_ADD_DYNAMIC_CASE(__ZipT, __UnzipT); \
+  } while (0)
+
 
   if (grid > 0) {
     if (out_dtype == paddle::DataType::FLOAT32 &&
@@ -654,10 +773,27 @@ std::vector<paddle::Tensor> tokens_zip_unique_add(
       PD_THROW("Unsupported data type");
     }
   }
-
-  return {zipped};
+  return zipped;
 }
 
+std::vector<paddle::Tensor> tokens_zip_unique_add(
+    const paddle::Tensor &zipped_origin,
+    const paddle::Tensor &unzipped,
+    const paddle::Tensor &index_unzipped,
+    int64_t zipped_rows) {
+  return tokens_zip_unique_add_impl(
+      {zipped_origin}, unzipped, index_unzipped, zipped_rows, 0);
+}
+
+void tokens_zip_unique_add_subbatch(
+    const std::vector<paddle::Tensor> &zipped_origin,
+    const paddle::Tensor &unzipped,
+    const paddle::Tensor &index_unzipped,
+    int64_t zipped_rows,
+    int64_t subbatch_rows) {
+  tokens_zip_unique_add_impl(
+      zipped_origin, unzipped, index_unzipped, zipped_rows, subbatch_rows);
+}
 
 template <typename T>
 struct UnzippedProbInfo {
@@ -766,6 +902,370 @@ std::vector<paddle::Tensor> tokens_zip_prob(
 }
 
 
+template <typename T, typename UnZipProbPtrsT>
+__global__ void tokens_zip_prob_seq_subbatch_kernel(
+    UnZipProbPtrsT unzipped_probs,
+    const int *__restrict__ zipped_expertwise_rowmap,
+    const int *__restrict__ dispatched_indices,
+    T *zipped_probs,
+    int64_t zipped_rows,
+    int topk,
+    int num_expert,
+    int64_t subbatch_rows) {
+  int64_t idx = threadIdx.x + static_cast<int64_t>(blockDim.x) * blockIdx.x;
+  int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+  int64_t limit = zipped_rows * topk;
+  while (idx < limit) {
+    int64_t zipped_row = idx / topk;
+    int64_t topk_idx = idx % topk;
+    int64_t expert_id = dispatched_indices[idx];
+    T value = static_cast<T>(0);
+    if (expert_id >= 0) {
+      int64_t unzipped_row =
+          zipped_expertwise_rowmap[zipped_row * num_expert + expert_id];
+      int64_t i = unzipped_row / subbatch_rows;
+      int64_t j = unzipped_row % subbatch_rows;
+      if (unzipped_row >= 0) {
+        value = unzipped_probs[i][j];
+      }
+    }
+    zipped_probs[idx] = value;
+    idx += stride;
+  }
+}
+
+template <typename T>
+std::vector<paddle::Tensor> tokens_zip_prob_seq_subbatch_impl(
+    const std::vector<paddle::Tensor> &unzipped_probs,
+    const paddle::Tensor &zipped_expertwise_rowmap,
+    const paddle::Tensor &dispatched_indices,
+    int64_t subbatch_rows,
+    paddle::DataType dtype) {
+  auto zipped_expertwise_rowmap_shape = zipped_expertwise_rowmap.shape();
+  auto dispatched_indices_shape = dispatched_indices.shape();
+  PD_CHECK(zipped_expertwise_rowmap_shape.size() == 2);
+  PD_CHECK(dispatched_indices_shape.size() == 2);
+  PD_CHECK(zipped_expertwise_rowmap_shape[0] == dispatched_indices_shape[0]);
+
+  int64_t zipped_rows = zipped_expertwise_rowmap_shape[0];
+  int num_expert = zipped_expertwise_rowmap_shape[1];
+  int topk = dispatched_indices_shape[1];
+
+  auto zipped_probs =
+      paddle::empty({zipped_rows, topk}, dtype, unzipped_probs[0].place());
+  int thread = 1024;
+  int grid = LimitGridDim((zipped_rows * topk + thread - 1) / thread);
+
+#define LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, __num_split)       \
+  if (unzipped_probs.size() <= __num_split) {                                \
+    phi::Array<const __T *, __num_split> unzipped_probs_info;                \
+    for (size_t i = 0; i < unzipped_probs.size(); ++i) {                     \
+      unzipped_probs_info[i] = unzipped_probs[i].data<__T>();                \
+    }                                                                        \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_CASE_IMPL(__T, unzipped_probs_info); \
+    break;                                                                   \
+  }
+
+#define LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_DYNAMIC_CASE(__T)              \
+  paddle::Tensor ptr_tensor;                                               \
+  auto unzipped_probs_info =                                               \
+      GetTensorDevicePtrs<const __T>(unzipped_probs,                       \
+                                     &ptr_tensor,                          \
+                                     zipped_probs.stream(),                \
+                                     zipped_probs.place());                \
+  LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_CASE_IMPL(__T, unzipped_probs_info); \
+  break
+
+#define LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_CASE_IMPL(__T,                   \
+                                                      __unzipped_probs_info) \
+  do {                                                                       \
+    if (grid > 0) {                                                          \
+      tokens_zip_prob_seq_subbatch_kernel<                                   \
+          __T,                                                               \
+          typename std::remove_reference<                                    \
+              decltype(__unzipped_probs_info)>::type>                        \
+          <<<grid, thread, 0, zipped_probs.stream()>>>(                      \
+              __unzipped_probs_info,                                         \
+              zipped_expertwise_rowmap.data<int>(),                          \
+              dispatched_indices.data<int>(),                                \
+              zipped_probs.data<__T>(),                                      \
+              zipped_rows,                                                   \
+              topk,                                                          \
+              num_expert,                                                    \
+              subbatch_rows);                                                \
+    }                                                                        \
+  } while (0)
+
+#define LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH(__T)           \
+  do {                                                     \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 1);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 2);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 3);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 4);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 5);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 6);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 7);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 8);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 9);  \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 10); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 11); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 12); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 13); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 14); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 15); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 16); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 17); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 18); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 19); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_FIX_CASE(__T, 20); \
+    LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH_DYNAMIC_CASE(__T); \
+  } while (0)
+
+  LAUNCH_TOKENS_ZIP_PROB_SEQ_SUBBATCH(T);
+  return {zipped_probs};
+}
+
+
+std::vector<paddle::Tensor> tokens_zip_prob_seq_subbatch(
+    const std::vector<paddle::Tensor> &unzipped_probs,
+    const paddle::Tensor &zipped_expertwise_rowmap,
+    const paddle::Tensor &dispatched_indices,
+    int64_t subbatch_rows) {
+  PD_CHECK(zipped_expertwise_rowmap.dtype() == paddle::DataType::INT32);
+  PD_CHECK(dispatched_indices.dtype() == paddle::DataType::INT32);
+
+  auto dtype = unzipped_probs[0].dtype();
+  if (dtype == paddle::DataType::FLOAT32) {
+    return tokens_zip_prob_seq_subbatch_impl<float>(unzipped_probs,
+                                                    zipped_expertwise_rowmap,
+                                                    dispatched_indices,
+                                                    subbatch_rows,
+                                                    dtype);
+  } else if (dtype == paddle::DataType::BFLOAT16) {
+    return tokens_zip_prob_seq_subbatch_impl<phi::bfloat16>(
+        unzipped_probs,
+        zipped_expertwise_rowmap,
+        dispatched_indices,
+        subbatch_rows,
+        dtype);
+  } else {
+    PD_THROW("Unsupported data type: %s", dtype);
+  }
+}
+
+
+template <typename InT, typename OutT, typename InPtrsT, int VecSize>
+__global__ void merge_subbatch_cast_kernel(const InPtrsT in_ptrs,
+                                           OutT *__restrict__ out,
+                                           int64_t total_num,
+                                           int64_t subbatch_num) {
+  int64_t idx =
+      (threadIdx.x + static_cast<int64_t>(blockDim.x) * blockIdx.x) * VecSize;
+  int64_t stride = (static_cast<int64_t>(blockDim.x) * gridDim.x) * VecSize;
+
+  while (idx < total_num) {
+    const InT *x_ptr = in_ptrs[idx / subbatch_num] + idx % subbatch_num;
+    phi::AlignedVector<InT, VecSize> in_data;
+    phi::Load(x_ptr, &in_data);
+    if constexpr (std::is_same<InT, OutT>::value) {
+      phi::Store(in_data, out + idx);
+    } else {
+      phi::AlignedVector<OutT, VecSize> out_data;
+#pragma unroll
+      for (int i = 0; i < VecSize; ++i) {
+        out_data[i] = static_cast<OutT>(in_data[i]);
+      }
+      phi::Store(out_data, out + idx);
+    }
+    idx += stride;
+  }
+}
+
+
+std::vector<paddle::Tensor> merge_subbatch_cast(
+    const std::vector<paddle::Tensor> &x, int64_t int_dtype) {
+  if (x.empty()) return {};
+
+  auto in_dtype = x[0].dtype();
+  auto merged_dtype = TransToDataType(int_dtype);
+
+  auto place = x[0].place();
+  auto merged_shape = x[0].shape();
+  int64_t subbatch_rows = merged_shape[0];
+  for (size_t i = 1; i < x.size(); ++i) {
+    auto tmp_shape = x[i].shape();
+    PD_CHECK(tmp_shape.size() == merged_shape.size());
+    for (size_t j = 1; j < tmp_shape.size(); ++j) {
+      PD_CHECK(tmp_shape[j] == merged_shape[j]);
+    }
+    if (i + 1 != x.size()) {
+      PD_CHECK(tmp_shape[0] == subbatch_rows);
+    } else {
+      PD_CHECK(tmp_shape[0] <= subbatch_rows);
+    }
+    merged_shape[0] += tmp_shape[0];
+
+    PD_CHECK(x[i].dtype() == in_dtype);
+  }
+
+  auto output = paddle::empty(merged_shape, merged_dtype, place);
+  int64_t hidden_size = 1;
+  for (size_t i = 1; i < merged_shape.size(); ++i) {
+    hidden_size *= merged_shape[i];
+  }
+
+  int64_t total_num = merged_shape[0] * hidden_size;
+  int64_t subbatch_num = subbatch_rows * hidden_size;
+
+  constexpr int kVecSize = 4;
+  PD_CHECK(total_num % kVecSize == 0);
+  PD_CHECK(subbatch_num % kVecSize == 0);
+  auto stream = output.stream();
+
+  int thread = 1024;
+  int grid = LimitGridDim((total_num / kVecSize + thread - 1) / thread);
+  auto num_split = static_cast<int64_t>(x.size());
+
+#define LAUNCH_MERGE_SUBBATCH_CAST_CASE_IMPL(__InT, __OutT, __in_ptrs) \
+  do {                                                                 \
+    merge_subbatch_cast_kernel<                                        \
+        __InT,                                                         \
+        __OutT,                                                        \
+        typename std::remove_reference<decltype(__in_ptrs)>::type,     \
+        kVecSize><<<grid, thread, 0, stream>>>(                        \
+        __in_ptrs, output.data<__OutT>(), total_num, subbatch_num);    \
+  } while (0)
+
+#define LAUNCH_MERGE_SUBBATCH_CAST_FIX_CASE(__InT, __OutT, __num_split) \
+  if (num_split <= __num_split) {                                       \
+    phi::Array<const __InT *, __num_split> array;                       \
+    for (int64_t i = 0; i < num_split; ++i) {                           \
+      array[i] = x[i].data<__InT>();                                    \
+    }                                                                   \
+    LAUNCH_MERGE_SUBBATCH_CAST_CASE_IMPL(__InT, __OutT, array);         \
+    break;                                                              \
+  }
+
+#define LAUNCH_MERGE_SUBBATCH_CAST_DYNAMIC_CASE(__InT, __OutT)      \
+  paddle::Tensor ptr_tensor;                                        \
+  auto device_ptrs =                                                \
+      GetTensorDevicePtrs<__InT>(x, &ptr_tensor, stream, place);    \
+  LAUNCH_MERGE_SUBBATCH_CAST_CASE_IMPL(__InT, __OutT, device_ptrs); \
+  break
+
+
+#define LAUNCH_MERGE_SUBBATCH_CAST(__InT, __OutT)           \
+  do {                                                      \
+    LAUNCH_MERGE_SUBBATCH_CAST_FIX_CASE(__InT, __OutT, 1);  \
+    LAUNCH_MERGE_SUBBATCH_CAST_FIX_CASE(__InT, __OutT, 2);  \
+    LAUNCH_MERGE_SUBBATCH_CAST_FIX_CASE(__InT, __OutT, 4);  \
+    LAUNCH_MERGE_SUBBATCH_CAST_FIX_CASE(__InT, __OutT, 8);  \
+    LAUNCH_MERGE_SUBBATCH_CAST_FIX_CASE(__InT, __OutT, 16); \
+    LAUNCH_MERGE_SUBBATCH_CAST_DYNAMIC_CASE(__InT, __OutT); \
+  } while (0)
+
+
+  if (grid > 0) {
+    if (in_dtype == paddle::DataType::FLOAT32 &&
+        merged_dtype == paddle::DataType::BFLOAT16) {
+      LAUNCH_MERGE_SUBBATCH_CAST(float, paddle::bfloat16);
+    } else if (in_dtype == paddle::DataType::BFLOAT16 &&
+               merged_dtype == paddle::DataType::FLOAT32) {
+      LAUNCH_MERGE_SUBBATCH_CAST(paddle::bfloat16, float);
+    } else if (in_dtype == paddle::DataType::FLOAT32 &&
+               merged_dtype == paddle::DataType::FLOAT32) {
+      LAUNCH_MERGE_SUBBATCH_CAST(float, float);
+    } else if (in_dtype == paddle::DataType::BFLOAT16 &&
+               merged_dtype == paddle::DataType::BFLOAT16) {
+      LAUNCH_MERGE_SUBBATCH_CAST(paddle::bfloat16, paddle::bfloat16);
+    } else {
+      PD_THROW("Unsupported data type");
+    }
+  }
+
+  return {output};
+}
+
+
+template <typename T>
+__global__ void tokens_unzip_slice_kernel(
+    const T *__restrict__ x,
+    const int *__restrict__ zipped_expertwise_rowmap,
+    int64_t *__restrict__ index_out,
+    int64_t total_zipped_rows,
+    int num_experts,
+    int start_idx,
+    int end_idx) {
+  const int64_t slice_len = end_idx - start_idx;
+  if (slice_len <= 0) return;
+
+  const int64_t total = total_zipped_rows * static_cast<int64_t>(num_experts);
+
+  for (int64_t elem = blockIdx.x * blockDim.x + threadIdx.x; elem < total;
+       elem += blockDim.x * gridDim.x) {
+    int64_t row = elem / num_experts;
+    int64_t u = zipped_expertwise_rowmap[elem];
+    if (u < 0) continue;
+    if (u < start_idx || u >= end_idx) continue;
+    int64_t out = static_cast<int64_t>(u) - start_idx;
+    index_out[out] = row;
+  }
+  // TODO: thread_level memcpy elements
+}
+
+std::vector<paddle::Tensor> tokens_unzip_slice(
+    const paddle::Tensor &x,
+    const paddle::Tensor &zipped_expertwise_rowmap,
+    const int num_experts,
+    const int total_unzipped_rows,
+    const int start_idx,
+    const int end_idx) {
+  auto dtype = x.dtype();
+  auto place = x.place();
+  auto stream = x.stream();
+  auto x_shape = x.shape();
+  PD_CHECK(x_shape.size() == 2);
+  int64_t total_zipped_rows = x_shape[0];
+
+  auto index_unzipped =
+      paddle::full({total_unzipped_rows}, -1, paddle::DataType::INT64, place);
+  int block = 1024;
+  int grid = LimitGridDim(total_zipped_rows);
+
+#define LAUNCH_TOKENS_UNZIP_SLICE_KERNEL_IMPL(__cpp_dtype)                 \
+  do {                                                                     \
+    tokens_unzip_slice_kernel<__cpp_dtype>                                 \
+        <<<grid, block, 0, stream>>>(x.data<__cpp_dtype>(),                \
+                                     zipped_expertwise_rowmap.data<int>(), \
+                                     index_unzipped.data<int64_t>(),       \
+                                     total_zipped_rows,                    \
+                                     num_experts,                          \
+                                     start_idx,                            \
+                                     end_idx);                             \
+  } while (0)
+
+#define LAUNCH_TOKENS_UNZIP_SLICE_KERNEL(__cpp_dtype)   \
+  do {                                                  \
+    LAUNCH_TOKENS_UNZIP_SLICE_KERNEL_IMPL(__cpp_dtype); \
+  } while (0)
+
+  if (grid > 0) {
+    LAUNCH_TOKENS_UNZIP_SLICE_KERNEL(phi::float8_e4m3fn);
+  }
+
+  return {index_unzipped};
+}
+
+PD_BUILD_OP(tokens_unzip_slice)
+    .Inputs({"x", "zipped_expertwise_rowmap"})
+    .Outputs({"idx_unzipped"})
+    .Attrs({"num_experts: int",
+            "total_unzipped_rows: int",
+            "start_idx: int",
+            "end_idx: int"})
+    .SetKernelFn(PD_KERNEL(tokens_unzip_slice));
+
+
 PD_BUILD_OP(tokens_unzip_gather)
     .Inputs({"x", paddle::Optional("x_scale"), "zipped_expertwise_rowmap"})
     .Outputs({"x_unzipped",
@@ -783,6 +1283,13 @@ PD_BUILD_OP(tokens_zip_unique_add)
     .Attrs({"zipped_rows: int64_t"})
     .SetKernelFn(PD_KERNEL(tokens_zip_unique_add));
 
+PD_BUILD_OP(tokens_zip_unique_add_subbatch)
+    .Inputs({paddle::Vec("x_zipped"), "x_unzipped", "idx_unzipped"})
+    .Outputs({paddle::Vec("y_zipped")})
+    .SetInplaceMap({{paddle::Vec("x_zipped"), paddle::Vec("y_zipped")}})
+    .Attrs({"zipped_rows: int64_t", "subbatch_rows: int64_t"})
+    .SetKernelFn(PD_KERNEL(tokens_zip_unique_add_subbatch));
+
 
 PD_BUILD_OP(tokens_zip_prob)
     .Inputs({paddle::Vec("unzipped_prob"),
@@ -790,3 +1297,17 @@ PD_BUILD_OP(tokens_zip_prob)
              "dispatched_indices"})
     .Outputs({"zipped_prob"})
     .SetKernelFn(PD_KERNEL(tokens_zip_prob));
+
+PD_BUILD_OP(tokens_zip_prob_seq_subbatch)
+    .Inputs({paddle::Vec("unzipped_prob"),
+             "zipped_expertwise_rowmap",
+             "dispatched_indices"})
+    .Outputs({"zipped_prob"})
+    .Attrs({"subbatch_rows: int64_t"})
+    .SetKernelFn(PD_KERNEL(tokens_zip_prob_seq_subbatch));
+
+PD_BUILD_OP(merge_subbatch_cast)
+    .Inputs({paddle::Vec("x")})
+    .Outputs({"y"})
+    .Attrs({"dtype: int64_t"})
+    .SetKernelFn(PD_KERNEL(merge_subbatch_cast));

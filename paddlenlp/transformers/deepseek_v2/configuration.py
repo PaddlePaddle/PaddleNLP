@@ -188,6 +188,9 @@ class DeepseekV2Config(PretrainedConfig):
         adaptive_remained_O1_recompute_ratio=0,
         offline_quant_expert_weight=True,
         clear_origin_weight_when_offline_quant=True,
+        mlp_bwd_subbatch_rows=0,
+        mlp_fwd_subbatch_rows=0,
+        output_subbatch_rows=0,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -245,6 +248,9 @@ class DeepseekV2Config(PretrainedConfig):
         self.adaptive_remained_O1_recompute_ratio = adaptive_remained_O1_recompute_ratio
         self.offline_quant_expert_weight = offline_quant_expert_weight
         self.clear_origin_weight_when_offline_quant = clear_origin_weight_when_offline_quant
+        self.mlp_bwd_subbatch_rows = mlp_bwd_subbatch_rows
+        self.mlp_fwd_subbatch_rows = mlp_fwd_subbatch_rows
+        self.output_subbatch_rows = output_subbatch_rows
 
         super().__init__(
             pad_token_id=pad_token_id,
