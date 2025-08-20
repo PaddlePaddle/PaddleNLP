@@ -212,6 +212,34 @@ def assign_kv_heads(num_kv_heads: int, num_gpus: int):
     return assignment_list
 
 
+class LMHeadFunction(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, x, weight, transpose_y):
+        out = paddle.matmul(x, weight, transpose_y = transpose_y)
+
+        ctx.save_for_backward(x, weight,  transpose_y)
+        return out
+
+    @staticmethod
+    def backward(ctx, dout):
+        if dout.dtype == paddle.float32:
+            dout = dout.cast( paddle.bfloat16)
+
+        x, weight, transpose_y = ctx.saved_tensor()
+
+        dx = paddle.matmul( dout, weight, transpose_y = not transpose_y)
+        if transpose_y:
+            with paddle.amp.auto_cast(False):
+                paddle._C_ops.fused_linear_param_grad_add(
+                            dout.reshape( [-1, dout.shape[-1]]), x.reshape( [-1, x.shape[-1]]), weight.main_grad, None, True, False
+                        )
+        else:
+            with paddle.amp.auto_cast(False):
+                paddle._C_ops.fused_linear_param_grad_add(
+                            x.reshape([-1, x.shape[-1]]), dout.reshape([-1, dout.shape[-1]]), weight.main_grad, None, True, False
+                        )
+        return dx, None
+
 def parallel_matmul(x: Tensor, y: Tensor, transpose_y=False, tensor_parallel_output=True):
     is_fleet_init = True
     tensor_parallel_degree = 1
@@ -238,9 +266,8 @@ def parallel_matmul(x: Tensor, y: Tensor, transpose_y=False, tensor_parallel_out
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
 
     else:
-        logits = paddle.matmul(x, y, transpose_y=transpose_y)
+        logits = LMHeadFunction.apply(x, y, transpose_y=transpose_y)
         return logits
-
 
 def scaled_dot_product_attention(
     query_states,
@@ -2467,8 +2494,9 @@ class DeepseekV2MTPLayer(DeepseekV2DecoderLayer):
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         hidden_states = self.hnorm(hidden_states)
         nextn_hidden_state = self.enorm(nextn_hidden_state)
-
-        hidden_states = self.eh_proj(paddle.concat([hidden_states, nextn_hidden_state], axis=-1))
+        
+        concat_h = paddle.concat([hidden_states, nextn_hidden_state], axis=-1)
+        hidden_states = LMHeadFunction.apply( concat_h, self.eh_proj.weight, False)
 
         layer_outputs = super(DeepseekV2MTPLayer, self).forward(
             hidden_states,
