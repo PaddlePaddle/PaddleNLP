@@ -921,6 +921,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether to use async_save instead of paddle.save."},
     )
+    using_flex_checkpoint: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether use FlexCheckpoint."},
+    )
     ordered_save_group_size: int = field(
         default=0,
         metadata={
@@ -2355,6 +2359,8 @@ class TrainingArguments:
                 return True
             elif self.enable_auto_parallel:
                 return True
+            elif self.using_flex_checkpoint:
+                return False
             elif self.use_hybrid_parallel:
                 # save on dataset rank 0
                 return self.sharding_parallel_rank == 0 and (self.data_parallel_rank == 0 or self.use_expert_parallel)
@@ -2370,6 +2376,7 @@ class TrainingArguments:
 
     @property
     def should_save_sharding_stage1_model(self):
+        # return True
         if self.enable_auto_parallel:
             return False
         return (

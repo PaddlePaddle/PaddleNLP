@@ -30,6 +30,7 @@ from paddle.autograd import PyLayer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.recompute.recompute import recompute
+from paddle.distributed.flex_checkpoint import build_sharded_state_dict
 
 from paddlenlp.transformers.refined_recompute import (
     RRColumnParallelLinear,
@@ -1367,7 +1368,6 @@ class LlamaPretrainedModel(PretrainedModel):
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config: LlamaConfig, is_split=True):
-
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
         fn = split_or_merge_func(
@@ -1427,6 +1427,7 @@ class LlamaPretrainedModel(PretrainedModel):
 
     @classmethod
     def _get_fuse_or_split_param_mappings(cls, config: LlamaConfig, is_fuse=False):
+        raise NotImplementedError
         # return parameter fuse utils
         from paddlenlp.transformers.conversion_utils import split_or_fuse_func
 
@@ -1994,6 +1995,14 @@ class LlamaLMHead(nn.Layer):
                 hidden_states, self.weight, transpose_y=self.transpose_y, tensor_parallel_output=tensor_parallel_output
             )
         return logits
+
+    def sharded_state_dict(
+        self,
+        structured_name_prefix: str = "",
+    ):
+        axis = 0 if self.transpose_y else 1
+        state_dict = self.state_dict(structured_name_prefix="")
+        return build_sharded_state_dict(state_dict, {"weight": axis}, structured_name_prefix)
 
 
 class LlamaForCausalLM(LlamaPretrainedModel):
