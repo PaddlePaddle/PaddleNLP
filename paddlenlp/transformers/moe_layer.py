@@ -900,6 +900,8 @@ class FusionMlpNode:
         self.padding_token_per_experts = padding_token_per_experts
         # 1 unzip
         self.dispatched_indices = dispatched_indices.to(paddle.int32)
+
+        total_zipped_tokens = extract_first_if_tuple(hs_2d_dispatched).shape[0]
         if DSV3_USE_FP8_DISPATCH:
             (
                 unzipped_tokens,
@@ -919,8 +921,6 @@ class FusionMlpNode:
             dispatched_probs._record_stream()
 
             total_unzipped_tokens = extract_first_if_tuple(unzipped_tokens).shape[0]
-            total_zipped_tokens = extract_first_if_tuple(hs_2d_dispatched).shape[0]
-
             # If adaptive O1 recompute is enabled, determine whether to enable recompute O1 based on the degree of imbalance
             if self.recompute_fwd_gate_up == -1:
                 if (
