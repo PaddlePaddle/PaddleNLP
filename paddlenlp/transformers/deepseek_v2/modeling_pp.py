@@ -1307,6 +1307,32 @@ def build_overlapped_nodes(forward_chunk, backward_chunk):
     overlap_node = OverlapedScheduleChunk(forward_overlap_layers, backward_overlap_layers, use_fuion=DSV3_USE_FP8_GEMM)
     return forward_pre_node, backward_pre_node, overlap_node, forward_post_node, backward_post_node
 
+class EmbeddingFunction(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, x, weight):        
+        out =  paddle.nn.functional.embedding(
+            x,
+            weight=weight,
+            padding_idx=None,
+            max_norm=None,
+            norm_type=2.0,
+            sparse=False,
+            scale_grad_by_freq=False )
+
+        ctx.save_for_backward(x, weight)
+        return out
+
+    @staticmethod
+    def backward(ctx, dout):
+        x, weight = ctx.saved_tensor()
+        
+        if hasattr( weight, "main_grad" ):
+            paddle.incubate.nn.functional.embedding_grad_add_to_(x, weight.main_grad, dout)            
+        else:
+            paddle.incubate.nn.functional.embedding_grad_add_to_(x, weight.grad, dout)
+
+        
+        return None, None
 
 class DeepseekV2EmbeddingPipe(nn.Layer):
     def __init__(self, config: DeepseekV2Config):
@@ -1337,7 +1363,7 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
             _type_: _description_
         """
         input_ids, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
-        inputs_embeds = self.embed_tokens(input_ids)
+        inputs_embeds = EmbeddingFunction.apply( input_ids, self.embed_tokens.weight )
 
         batch_size, seq_length = input_ids.shape
         if self.config.num_nextn_predict_layers > 0:
