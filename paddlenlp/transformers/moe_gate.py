@@ -566,8 +566,6 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
                 gates, k=self.top_k, n_group=self.n_group, topk_group=self.topk_group
             )
 
-            print("topk gate", top_gate)
-            print("top_idx", top_idx)
             # norm gate to sum 1
         # if self.top_k > 1 and self.norm_topk_prob:
         #     denominator = top_gate.sum(axis=-1, keepdim=True) + 1e-20
