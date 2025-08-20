@@ -53,6 +53,7 @@ class ScoreModelMixin:
     normalize_function: NormalizeFunction = "affine"
     _initialized: bool = False
 
+    @classmethod
     def init_score_head(self, config: PretrainedConfig, hidden_size: int, **kwargs: Any) -> None:
         """Initialize the score head."""
         if self._initialized:
@@ -113,11 +114,13 @@ class ScoreModelMixin:
     def get_score(
         self,
         hidden_state: paddle.Tensor,  # size = (B, L, E)
-        attention_mask: paddle.Tensor | None = None,  # size = (B, L)
         position_ids: paddle.Tensor | None = None,  # size = (B, L)
+        attn_mask_startend_row_indices: paddle.Tensor | None = None,  # size = (B, 1), (B, 2), (B, 3) or (B, 4)
         return_dict: bool | None = None,
+        attention_mask: paddle.Tensor | None = None,  # size = (B, L)
     ) -> ScoreModelOutput:
         """Forward pass of the score model."""
+        hidden_state = hidden_state.cast(paddle.float32)
         scores = self.score_head(hidden_state)  # size = (B, L, D)
         if scores.dtype != hidden_state.dtype:  # EB rm cast to float32
             scores = scores.cast(hidden_state.dtype)
@@ -170,7 +173,6 @@ class ScoreModelMixin:
 
         if self.do_normalize:
             scores = self.normalizer.normalize(scores)
-            end_score = self.normalizer.normalize(end_score)
 
         if not return_dict:
             return scores, end_score
@@ -179,6 +181,8 @@ class ScoreModelMixin:
             scores=scores,  # size = (B, L, D)
             end_scores=end_score,  # size = (B, D)
         )
+
+        return scores
 
     def set_normalize(self, mode: bool = True) -> None:
         """

@@ -92,7 +92,7 @@ class GRPOTest(LLMTest, unittest.TestCase):
             # 运行主逻辑
             cmd = 'python -u -m paddle.distributed.launch \
                     --devices "$CUDA_VISIBLE_DEVICES" run_rl.py \
-                    ../../config/qwen/reinforce_plus_plus_argument.yaml \
+                    ../../config/qwen/grpo_argument.yaml \
                     --actor_model_name_or_path "Qwen/Qwen2-1.5B" \
                     --max_dec_len 128 \
                     --max_steps 3 \

@@ -72,8 +72,6 @@ jobs:
           else
             echo "local develop branch exist, skipping"
           fi
-
-          unset http_proxy && unset https_proxy
           '
           
       - name: Setup Environment
@@ -84,6 +82,7 @@ jobs:
           set -e
           python -m pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
           python -m pip config set global.cache-dir "/home/.cache/pip"
+          source $work_dir/../../../proxy
           python -m pip install --upgrade pip
           cd /workspace/PaddleNLP && git config --global --add safe.directory $PWD
           make install
@@ -93,6 +92,7 @@ jobs:
         run: |
           docker exec -t $container_name /bin/bash -c '
           set -e
+          source $work_dir/../../../proxy
           cd /workspace/PaddleNLP
           make lint
           '
