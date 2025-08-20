@@ -1826,7 +1826,7 @@ function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1() {
         rm -rf $case_log_dir
         rm -rf ${log_path}/$FUNCNAME
 
-        /usr/bin/python -u -m paddle.distributed.launch \
+        python -u -m paddle.distributed.launch \
             --gpus "0" \
             --log_dir $case_log_dir \
             run_pretrain_auto.py \
