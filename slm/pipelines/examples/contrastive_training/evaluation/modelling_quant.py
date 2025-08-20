@@ -19,7 +19,6 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 import paddle
-import paddle.incubate.multiprocessing as mp
 from paddle.distributed import fleet
 from tqdm import tqdm
 
@@ -44,7 +43,6 @@ from paddlenlp.transformers import (
     Llama3Tokenizer,
     LlamaTokenizer,
 )
-from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 
 MODEL_FLAG = ""
 MAX_SEQ_LENGTH = 0
@@ -74,28 +72,6 @@ class DygraphBlockInferenceHiddenPredictor(DygraphBlockInferencePredictor):
                 self.proposer.insert_query(
                     base_model_inputs=self.model_inputs, real_bs=len(sentences_batch), seq_lens=self.seq_lens
                 )
-            result_queue = mp.Queue()
-            tensor_queue = mp.Queue()
-            done_event = mp.Event()
-
-            output_tensor_shape = (
-                [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
-                if self.proposer
-                else [MAX_BSZ + 2, 1]
-            )
-            read_res_func = llm_utils.speculate_read_res if self.proposer else llm_utils.read_res
-
-            read_res_process = mp.Process(
-                target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
-            )
-            if self.tensor_parallel_rank == 0:
-                read_res_process.start()
-
-            output_tensor = paddle.full(shape=output_tensor_shape, fill_value=2, dtype="int64").cpu()
-            tensor_queue.put(output_tensor)
-
-            if self.tensor_parallel_rank == 0:
-                done_event.wait()
 
             if self.proposer is not None:
                 self.proposer.run(
