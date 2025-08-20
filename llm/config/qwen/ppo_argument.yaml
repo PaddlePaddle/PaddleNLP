@@ -50,8 +50,8 @@ do_train: true # Whether to perform training
 seed: 42 # Random seed for reproducibility
 global_batch_size: 256 # Global batch size for training (rollouts = rollout_n * global_batch_size)
 global_gen_batch_size: -1 # Global generation batch size for dynamic sampling
-global_mini_batch_size: 64 # Mini-batch size for training, default = (global_batch_size * rollout_n * update_iters) // dataset_world_size
-rollout_n: 1 # Number of rollouts, set rollout_n = 1 for 'ppo'
+global_mini_batch_size: 64 # Mini-batch size for training, default = global_batch_size
+rollout_n: 1 # Number of rollouts
 update_iters: 1 # Number of training iterations for rollout samples
 per_device_logprob_batch_size: 4 # Log probability batch size per device
 per_device_reward_batch_size: 2 # Reward batch size per device
