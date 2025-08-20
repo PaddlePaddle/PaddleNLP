@@ -601,34 +601,35 @@ class DeepseekV2YarnRotaryEmbedding(DeepseekV2RotaryEmbedding):
         super().__init__(dim, max_position_embeddings, base)
 
     def _set_cos_sin_cache(self, seq_len):
-        self.max_seq_len_cached = seq_len
-        dim = self.dim
+        with paddle.amp.auto_cast(False):
+            self.max_seq_len_cached = seq_len
+            dim = self.dim
 
-        freq_extra = 1.0 / (self.base ** (paddle.arange(0, dim, 2, dtype=paddle.float32) / dim))
-        freq_inter = 1.0 / (self.scaling_factor * self.base ** (paddle.arange(0, dim, 2, dtype=paddle.float32) / dim))
+            freq_extra = 1.0 / (self.base ** (paddle.arange(0, dim, 2, dtype=paddle.float32) / dim))
+            freq_inter = 1.0 / (self.scaling_factor * self.base ** (paddle.arange(0, dim, 2, dtype=paddle.float32) / dim))
 
-        low, high = yarn_find_correction_range(
-            self.beta_fast,
-            self.beta_slow,
-            dim,
-            self.base,
-            self.original_max_position_embeddings,
-        )
-        inv_freq_mask = 1.0 - yarn_linear_ramp_mask(low, high, dim // 2)
-        self.inv_freq = freq_inter * (1 - inv_freq_mask) + freq_extra * inv_freq_mask
+            low, high = yarn_find_correction_range(
+                self.beta_fast,
+                self.beta_slow,
+                dim,
+                self.base,
+                self.original_max_position_embeddings,
+            )
+            inv_freq_mask = 1.0 - yarn_linear_ramp_mask(low, high, dim // 2)
+            self.inv_freq = freq_inter * (1 - inv_freq_mask) + freq_extra * inv_freq_mask
 
-        t = paddle.arange(seq_len, dtype=paddle.float32)
+            t = paddle.arange(seq_len, dtype=paddle.float32)
 
-        freqs = paddle.outer(t, paddle.cast(self.inv_freq, dtype="float32"))
+            freqs = paddle.outer(t, paddle.cast(self.inv_freq, dtype="float32"))
 
-        _mscale = float(
-            yarn_get_mscale(self.scaling_factor, self.mscale)
-            / yarn_get_mscale(self.scaling_factor, self.mscale_all_dim)
-        )
+            _mscale = float(
+                yarn_get_mscale(self.scaling_factor, self.mscale)
+                / yarn_get_mscale(self.scaling_factor, self.mscale_all_dim)
+            )
 
-        emb = paddle.concat((freqs, freqs), axis=-1)
-        self.cos_cached = emb.cos() * _mscale
-        self.sin_cached = emb.sin() * _mscale
+            emb = paddle.concat((freqs, freqs), axis=-1)
+            self.cos_cached = emb.cos() * _mscale
+            self.sin_cached = emb.sin() * _mscale
 
 
 def rotate_half(x):
