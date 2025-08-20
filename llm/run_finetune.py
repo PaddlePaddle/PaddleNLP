@@ -272,8 +272,9 @@ def main():
             raise ValueError("Please set eval_with_do_generation to false in pipeline parallel mode.")
 
         model_class = AutoModelForCausalLMPipe
-    model_config["using_flex_token"] = model_args.using_fake_gate
+    model_config.using_flex_token = model_args.using_flex_token
     model_config.using_fake_gate = model_args.using_fake_gate
+    model_config.moe_subbatch_token_num = model_args.moe_subbatch_token_num
     print("model_config ", model_config, flush=True)
     if model_args.continue_training and not training_args.autotuner_benchmark:
         model = model_class.from_pretrained(

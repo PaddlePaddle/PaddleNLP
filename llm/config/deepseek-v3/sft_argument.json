@@ -41,6 +41,7 @@
   "flash_mask": true,
   "using_fake_gate": true,
   "using_flex_token": true,
+  "use_fused_rms_norm": true,
   "pre_alloc_memory": 60,
   "tensorwise_offload_optimizer": true,
   "autotuner_benchmark": true

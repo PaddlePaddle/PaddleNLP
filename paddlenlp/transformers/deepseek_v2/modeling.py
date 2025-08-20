@@ -330,17 +330,8 @@ class DeepseekV2RMSNorm(nn.Layer):
             mark_as_sequence_parallel_parameter(self.weight)
 
     def forward(self, hidden_states):
-        if self.config.use_fused_rms_norm and get_env_device() == "xpu":
-            if self.weight.dtype != hidden_states.dtype:
-                hidden_states = paddle.cast(hidden_states, self.weight.dtype)
-            try:
-                import paddle_xpu_nn  # noqa: F821
-
-                return paddle_xpu_nn.xpu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
-            except ImportError:
-                raise NotImplementedError(
-                    f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
-                )
+        if self.config.use_fused_rms_norm:
+            return fusion_ops.fusion_rms_norm(hidden_states, self.weight, self.variance_epsilon)
 
         with paddle.amp.auto_cast(False):
             hidden_states = hidden_states.astype("float32")
@@ -1728,12 +1719,14 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
                 attention_mask = attention_mask[
                     :, :, : -self.config.num_nextn_predict_layers, : -self.config.num_nextn_predict_layers
                 ]
-                
+
             # attn_mask_startend_row_indices: [b, num_head, seq_len] or [b, num_head, seq_len, C], C is 2 or 4
             if attn_mask_startend_row_indices is not None:
                 if attn_mask_startend_row_indices.ndim == 3:
                     attn_mask_startend_row_indices = attn_mask_startend_row_indices[
-                        :, :, : -self.config.num_nextn_predict_layers,
+                        :,
+                        :,
+                        : -self.config.num_nextn_predict_layers,
                     ]
                 elif attn_mask_startend_row_indices.ndim == 4:
                     attn_mask_startend_row_indices = attn_mask_startend_row_indices[

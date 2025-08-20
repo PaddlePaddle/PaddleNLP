@@ -147,3 +147,6 @@ class ModelConfig:
     fp8_format_type: str = field(default="hybrid", metadata={"help": "FP8 Format"})
     using_flex_token: bool = field(default=False, metadata={"help": "Whether to use deepep moe_layer"})
     using_fake_gate: bool = field(default=False, metadata={"help": "Whether to fake gate"})
+    moe_subbatch_token_num: int = field(
+        default=0, metadata={"help": "moelayer subbatch token num, The smaller the value, the smaller the peak memory"}
+    )
