@@ -685,7 +685,7 @@ class FusedNormFP8MLPFunction(paddle.autograd.PyLayer):
 
 class FP8MlpFunction(paddle.autograd.PyLayer):
     @staticmethod
-    def forward(ctx, x, w1, w2):
+    def forward(ctx, x, w1, w2, recompute_fwd_gate_up):
         # ===== reshape for deep_gemm, since deep_gemm only support 2D =====
         x_orig_shape = x.shape
         x = x.reshape([-1, x_orig_shape[-1]])
@@ -697,6 +697,7 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
             o3 = o3.reshape([x_orig_shape[0], -1, o3.shape[-1]])
 
         # ===== save for backward =====
+        o1 = None if recompute_fwd_gate_up else o1
         ctx.save_for_backward(
             o1,
             x_fp8,
@@ -729,9 +730,14 @@ class FP8MlpFunction(paddle.autograd.PyLayer):
         )
 
         # ===== call func common_fp8_mlp_bwd =====
-        dx = FP8LinearFunctionBase.common_fp8_mlp_bwd(
-            do3, x_t_fp8, x_t_scale, w1, w2, o1=o1, x_fp8=None, x_scale=None, apply_backward_hook=True
-        )
+        if o1 is None:
+            dx = FP8LinearFunctionBase.common_fp8_mlp_bwd(
+                do3, x_t_fp8, x_t_scale, w1, w2, o1=None, x_fp8=x_fp8, x_scale=x_scale, apply_backward_hook=True
+            )
+        else:
+            dx = FP8LinearFunctionBase.common_fp8_mlp_bwd(
+                do3, x_t_fp8, x_t_scale, w1, w2, o1=o1, x_fp8=None, x_scale=None, apply_backward_hook=True
+            )
         # ===== reshape to origin shape =====
         if len(x_orig_shape) > 2:
             dx = dx.reshape([x_orig_shape[0], -1, dx.shape[-1]])
@@ -749,6 +755,7 @@ class FP8Mlp(paddle.nn.Layer):
         using_post_norm_recompute=False,
         norm_weight=None,
         norm_eps=None,
+        recompute_fwd_gate_up=False,
     ):
         super().__init__()
         self.config = config
@@ -760,6 +767,8 @@ class FP8Mlp(paddle.nn.Layer):
 
         self.hidden_size = config.hidden_size if hidden_size is None else hidden_size
         self.intermediate_size = config.intermediate_size if intermediate_size is None else intermediate_size
+
+        self.recompute_fwd_gate_up = recompute_fwd_gate_up
 
         self.w1 = self.create_parameter(
             shape=[self.hidden_size, self.intermediate_size * 2],
@@ -780,7 +789,7 @@ class FP8Mlp(paddle.nn.Layer):
         if self.using_post_norm_recompute:
             return FusedNormFP8MLPFunction.apply(x, self.norm_weight, self.w1, self.w2, self.norm_eps)
         else:
-            return FP8MlpFunction.apply(x, self.w1, self.w2)
+            return FP8MlpFunction.apply(x, self.w1, self.w2, self.recompute_fwd_gate_up)
 
 
 def split_group_gemm(x_fp8, x_scale, w_fp8, w_scale, tokens_per_expert, gemm_out):

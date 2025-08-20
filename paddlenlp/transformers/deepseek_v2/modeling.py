@@ -1023,6 +1023,7 @@ class DeepseekV2MoE(MoELayer):
                     using_post_norm_recompute=self.using_post_norm_recompute,
                     norm_weight=norm_weight,
                     norm_eps=norm_eps,
+                    recompute_fwd_gate_up=True,
                 )
             else:
                 self.shared_experts = DeepseekV2MLPClass(
