@@ -50,8 +50,10 @@ DSV3_USE_FP8_GROUP_GEMM = os.getenv("DSV3_USE_FP8_GROUP_GEMM", "False").lower() 
 
 DSV3_USE_FP8_DISPATCH = os.getenv("DSV3_USE_FP8_DISPATCH", "False").lower() == "true"
 
-
-import TokenDispatcherUtils as TDU
+try:
+    import TokenDispatcherUtils as TDU
+except ImportError:
+    TDU = None
 
 
 def record_stream_for_multi_input(x):
