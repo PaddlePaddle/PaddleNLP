@@ -179,6 +179,7 @@ class DeepseekV2Config(PretrainedConfig):
         attention_dropout=0.0,
         speculate_model_type=False,
         using_flex_token=False,
+        decoderlayer_act_offload_settings={},
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -227,7 +228,7 @@ class DeepseekV2Config(PretrainedConfig):
         self.speculate_model_type = speculate_model_type
         self.use_fp8 = False
         self.using_flex_token = using_flex_token
-
+        self.decoderlayer_act_offload_settings = decoderlayer_act_offload_settings
         super().__init__(
             pad_token_id=pad_token_id,
             bos_token_id=bos_token_id,

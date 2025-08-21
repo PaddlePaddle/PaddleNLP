@@ -93,6 +93,27 @@ def get_attr(layer, name):
         return get_attr(layer._layer, name)
 
 
+def get_offload_kwargs(layer_idx, decoderlayer_act_offload_settings):
+    setting_type = decoderlayer_act_offload_settings["type"]
+    offload_value = decoderlayer_act_offload_settings["value"]
+
+    # NOTE: the first layer inputs will be used in mtp, so do not offload it
+    if layer_idx == 0:
+        offload_kwargs = {}
+    else:
+        offload_kwargs = {}
+        if "mod" == setting_type:
+            assert isinstance(offload_value, (list, tuple))
+            v1, v2 = offload_value
+            offload_kwargs["offload_indices"] = [0] if layer_idx % v1 == v2 else []
+        elif setting_type is not None and setting_type != "":
+            raise ValueError(
+                f"decoderlayer_act_offload_settings only support type == 'mod' ,but get type {setting_type}"
+            )
+    print("offload_kwargs ", offload_kwargs)
+    return offload_kwargs
+
+
 class DeepseekV2EmbeddingPipe(nn.Layer):
     def __init__(self, config: DeepseekV2Config):
         super(DeepseekV2EmbeddingPipe, self).__init__()
@@ -132,12 +153,14 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
                 attention_mask = attention_mask[
                     :, :, : -self.config.num_nextn_predict_layers, : -self.config.num_nextn_predict_layers
                 ]
-            
+
             # attn_mask_startend_row_indices: [b, num_head, seq_len] or [b, num_head, seq_len, C], C is 2 or 4
             if attn_mask_startend_row_indices is not None:
                 if attn_mask_startend_row_indices.ndim == 3:
                     attn_mask_startend_row_indices = attn_mask_startend_row_indices[
-                        :, :, : -self.config.num_nextn_predict_layers,
+                        :,
+                        :,
+                        : -self.config.num_nextn_predict_layers,
                     ]
                 elif attn_mask_startend_row_indices.ndim == 4:
                     attn_mask_startend_row_indices = attn_mask_startend_row_indices[
@@ -222,6 +245,10 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
             attn_mask_startend_row_indices, position_ids = None, attn_mask_startend_row_indices
 
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
+            decoderlayer_act_offload_settings = self.config.get(
+                "decoderlayer_act_offload_settings", {"type": "", "value": ""}
+            )
+            offload_kwargs = get_offload_kwargs(self.layer_idx, decoderlayer_act_offload_settings)
             if attention_mask is not None or attn_mask_startend_row_indices is not None:
                 hidden_states = recompute(
                     super().forward,
@@ -230,6 +257,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
                     attention_mask=attention_mask,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                     use_reentrant=False,
+                    **offload_kwargs,
                 )
             else:
                 # for pretrain
@@ -239,6 +267,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
                     position_ids=position_ids,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                     use_reentrant=self.config.recompute_use_reentrant,
+                    **offload_kwargs,
                 )
         else:
             hidden_states = super().forward(
@@ -279,6 +308,10 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
         for depth in range(self.config.num_nextn_predict_layers):
             inputs_embeds_cur_depth = inputs_embeds_cur_depth_list[depth]
             if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
+                decoderlayer_act_offload_settings = self.config.get(
+                    "decoderlayer_act_offload_settings", {"type": "", "value": ""}
+                )
+                offload_kwargs = get_offload_kwargs(self.layer_idx, decoderlayer_act_offload_settings)
                 if attention_mask is not None or attn_mask_startend_row_indices is not None:
                     hidden_states = recompute(
                         super().forward,
@@ -288,6 +321,7 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
                         attention_mask=attention_mask,
                         attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                         use_reentrant=False,
+                        **offload_kwargs,
                     )
                 else:
                     # for pretrain
@@ -298,6 +332,7 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
                         position_ids=position_ids,
                         attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                         use_reentrant=self.config.recompute_use_reentrant,
+                        **offload_kwargs,
                     )
             else:
                 hidden_states = super().forward(

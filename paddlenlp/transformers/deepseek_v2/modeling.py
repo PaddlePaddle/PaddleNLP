@@ -1660,6 +1660,33 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
         use_cache: bool,
         attn_mask_startend_row_indices: Optional[Tensor] = None,
     ):
+        decoderlayer_act_offload_settings = self.config.get(
+            "decoderlayer_act_offload_settings", {"type": "", "value": ""}
+        )
+
+        setting_type = decoderlayer_act_offload_settings["type"]
+        offload_value = decoderlayer_act_offload_settings["value"]
+
+        def get_offload_kwargs(layer_idx, setting_type, offload_value):
+            offload_kwargs = {}
+            if "mod" == setting_type:
+                assert isinstance(offload_value, (list, tuple))
+                v1, v2 = offload_value
+                offload_kwargs["offload_indices"] = [0] if layer_idx % v1 == v2 else []
+            else:
+                raise ValueError(
+                    f"decoderlayer_act_offload_settings only support type == 'mod' ,but get type {setting_type}"
+                )
+            return offload_kwargs
+
+        layer_idx = layer_module.layer_idx
+        # NOTE: the first layer inputs will be used in mtp, so do not offload it
+        if layer_idx == 0:
+            offload_kwargs = {}
+        else:
+            offload_kwargs = get_offload_kwargs(layer_idx, setting_type, offload_value)
+        print("recompute offload ", offload_kwargs)
+
         def create_custom_forward(module):
             def custom_forward(*inputs):
                 return module(*inputs)
@@ -1676,6 +1703,7 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
             use_cache,
             attn_mask_startend_row_indices,
             use_reentrant=self.config.recompute_use_reentrant,
+            **offload_kwargs,
         )
 
         return hidden_states
