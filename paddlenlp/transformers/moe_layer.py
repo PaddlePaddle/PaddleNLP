@@ -362,6 +362,7 @@ class MoEFlexTokenLayer(nn.Layer):
         for chunk, expert in zip(chunks, self.experts):
             chunk = chunk.contiguous()
             # assert chunk.shape[0] != 0, "Cannot dispatch empty input"
+            # print("expert token:", chunk.shape, flush=True)
             outputs += [expert(chunk)]
 
         return paddle.concat(outputs, axis=0)

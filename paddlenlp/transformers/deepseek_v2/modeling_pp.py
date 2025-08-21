@@ -132,12 +132,14 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
                 attention_mask = attention_mask[
                     :, :, : -self.config.num_nextn_predict_layers, : -self.config.num_nextn_predict_layers
                 ]
-            
+
             # attn_mask_startend_row_indices: [b, num_head, seq_len] or [b, num_head, seq_len, C], C is 2 or 4
             if attn_mask_startend_row_indices is not None:
                 if attn_mask_startend_row_indices.ndim == 3:
                     attn_mask_startend_row_indices = attn_mask_startend_row_indices[
-                        :, :, : -self.config.num_nextn_predict_layers,
+                        :,
+                        :,
+                        : -self.config.num_nextn_predict_layers,
                     ]
                 elif attn_mask_startend_row_indices.ndim == 4:
                     attn_mask_startend_row_indices = attn_mask_startend_row_indices[
@@ -221,7 +223,15 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
         elif attn_mask_startend_row_indices is not None and attn_mask_startend_row_indices.dtype == paddle.int64:
             attn_mask_startend_row_indices, position_ids = None, attn_mask_startend_row_indices
 
-        if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
+        moelayer_use_subbatch_recompute = self.config.moe_subbatch_token_num > 0
+        if moelayer_use_subbatch_recompute:
+            hidden_states = super().subbatch_recompute_forward(
+                hidden_states,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+            )
+        elif self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
             if attention_mask is not None or attn_mask_startend_row_indices is not None:
                 hidden_states = recompute(
                     super().forward,

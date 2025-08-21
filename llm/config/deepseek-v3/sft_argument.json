@@ -42,6 +42,7 @@
   "using_fake_gate": true,
   "using_flex_token": true,
   "use_fused_rms_norm": true,
+  "moe_subbatch_token_num": 1024,
   "pre_alloc_memory": 60,
   "tensorwise_offload_optimizer": true,
   "autotuner_benchmark": true

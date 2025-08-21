@@ -1185,7 +1185,66 @@ class DeepseekV2DecoderLayer(nn.Layer):
         self.input_layernorm = DeepseekV2RMSNorm(config)
         self.post_attention_layernorm = DeepseekV2RMSNorm(config)
 
-    def forward(
+    def subbatch_recompute_forward(
+        self,
+        hidden_states: paddle.Tensor,
+        position_ids: Optional[paddle.Tensor] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        output_attentions: Optional[bool] = False,
+        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
+        use_cache: Optional[bool] = False,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
+    ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
+        offload_kwargs = {}
+        offload_kwargs["offload_indices"] = [0]
+        assert self.recompute_granularity != "full_attn"
+        attn_outputs = recompute(
+            self.attn,
+            hidden_states,
+            position_ids,
+            attention_mask,
+            output_attentions,
+            past_key_value,
+            use_cache,
+            attn_mask_startend_row_indices,
+        )
+
+        hidden_states = attn_outputs[0]
+        residual = attn_outputs[1]
+        self_attn_weights = attn_outputs[2] if output_attentions else None
+        present_key_value = attn_outputs[3] if use_cache else None
+
+        assert len(hidden_states.shape) == 3
+        sub_seq_len = self.config.moe_subbatch_token_num
+        seq_len = hidden_states.shape[1]
+        assert seq_len % sub_seq_len == 0
+        num_chunks = seq_len // sub_seq_len
+        split_list = [sub_seq_len] * num_chunks
+        input_list = paddle.split(hidden_states, split_list, axis=1)
+        output_list = []
+        for chunk in input_list:
+            offload_kwargs = {}
+            offload_kwargs["offload_indices"] = [0]
+            out = recompute(
+                self.mlp.forward,
+                chunk,
+                **offload_kwargs,
+            )
+            output_list.append(out)
+        hidden_states = paddle.concat(output_list, axis=1)
+        outputs = recompute(
+            self.post_process,
+            hidden_states,
+            residual,
+            output_attentions,
+            use_cache,
+            self_attn_weights,
+            present_key_value,
+            **offload_kwargs,
+        )
+        return outputs
+
+    def attn(
         self,
         hidden_states: paddle.Tensor,
         position_ids: Optional[paddle.Tensor] = None,
@@ -1195,25 +1254,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
         use_cache: Optional[bool] = False,
         attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
         **kwargs,
-    ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
-        """
-        Args:
-            hidden_states (`paddle.Tensor`): input to the layer of shape `(batch, seq_len, embed_axis)`
-            attention_mask (`paddle.Tensor`, *optional*):
-                attention mask of size `(batch_size, sequence_length)` if flash attention is used or `(batch_size, 1,
-                query_sequence_length, key_sequence_length)` if default attention is used.
-            output_attentions (`bool`, *optional*):
-                Whether or not to return the attentions tensors of all attention layers. See `attentions` under
-                returned tensors for more detail.
-            use_cache (`bool`, *optional*):
-                If set to `True`, `past_key_values` key value states are returned and can be used to speed up decoding
-                (see `past_key_values`).
-            past_key_value (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
-        """
-        if "padding_mask" in kwargs:
-            warnings.warn(
-                "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
-            )
+    ):
         residual = hidden_states
 
         hidden_states = self.input_layernorm(hidden_states)
@@ -1254,18 +1295,32 @@ class DeepseekV2DecoderLayer(nn.Layer):
         else:
             hidden_states = outputs
 
-        if output_attentions:
-            self_attn_weights = outputs[1]
-
-        if use_cache:
-            present_key_value = outputs[2 if output_attentions else 1]
-
         hidden_states = residual + hidden_states
 
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states = self.mlp(hidden_states)
+        attn_outputs = (hidden_states, residual)
+
+        if output_attentions:
+            self_attn_weights = outputs[1]
+            attn_outputs += (self_attn_weights,)
+
+        if use_cache:
+            present_key_value = outputs[2 if output_attentions else 1]
+            attn_outputs += (present_key_value,)
+
+        return attn_outputs
+
+    def post_process(
+        self,
+        hidden_states,
+        residual,
+        output_attentions=False,
+        use_cache=False,
+        self_attn_weights=None,
+        present_key_value=None,
+    ):
         hidden_states = residual + hidden_states
 
         outputs = (hidden_states,)
@@ -1280,6 +1335,139 @@ class DeepseekV2DecoderLayer(nn.Layer):
             outputs = outputs[0]
 
         return outputs
+
+    def forward(
+        self,
+        hidden_states: paddle.Tensor,
+        position_ids: Optional[paddle.Tensor] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        output_attentions: Optional[bool] = False,
+        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
+        use_cache: Optional[bool] = False,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
+        **kwargs,
+    ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
+        if "padding_mask" in kwargs:
+            warnings.warn(
+                "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
+            )
+
+        attn_outputs = self.attn(
+            hidden_states,
+            position_ids,
+            attention_mask,
+            output_attentions,
+            past_key_value,
+            use_cache,
+            attn_mask_startend_row_indices,
+            **kwargs,
+        )
+        hidden_states = attn_outputs[0]
+        residual = attn_outputs[1]
+        self_attn_weights = attn_outputs[2] if output_attentions else None
+        present_key_value = attn_outputs[3] if use_cache else None
+
+        hidden_states = self.mlp(hidden_states)
+        outputs = self.post_process(
+            hidden_states, residual, output_attentions, use_cache, self_attn_weights, present_key_value
+        )
+        return outputs
+
+    # def forward(
+    #     self,
+    #     hidden_states: paddle.Tensor,
+    #     position_ids: Optional[paddle.Tensor] = None,
+    #     attention_mask: Optional[paddle.Tensor] = None,
+    #     output_attentions: Optional[bool] = False,
+    #     past_key_value: Optional[Tuple[paddle.Tensor]] = None,
+    #     use_cache: Optional[bool] = False,
+    #     attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
+    #     **kwargs,
+    # ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
+    #     """
+    #     Args:
+    #         hidden_states (`paddle.Tensor`): input to the layer of shape `(batch, seq_len, embed_axis)`
+    #         attention_mask (`paddle.Tensor`, *optional*):
+    #             attention mask of size `(batch_size, sequence_length)` if flash attention is used or `(batch_size, 1,
+    #             query_sequence_length, key_sequence_length)` if default attention is used.
+    #         output_attentions (`bool`, *optional*):
+    #             Whether or not to return the attentions tensors of all attention layers. See `attentions` under
+    #             returned tensors for more detail.
+    #         use_cache (`bool`, *optional*):
+    #             If set to `True`, `past_key_values` key value states are returned and can be used to speed up decoding
+    #             (see `past_key_values`).
+    #         past_key_value (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
+    #     """
+    #     if "padding_mask" in kwargs:
+    #         warnings.warn(
+    #             "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
+    #         )
+    #     residual = hidden_states
+
+    #     hidden_states = self.input_layernorm(hidden_states)
+
+    #     # Self Attention
+    #     has_gradient = not hidden_states.stop_gradient
+    #     if (
+    #         self.enable_recompute
+    #         and self.layerwise_recompute
+    #         and has_gradient
+    #         and self.recompute_granularity == "full_attn"
+    #     ):
+    #         outputs = recompute(
+    #             self.self_attn,
+    #             hidden_states=hidden_states,
+    #             position_ids=position_ids,
+    #             attention_mask=attention_mask,
+    #             output_attentions=output_attentions,
+    #             past_key_value=past_key_value,
+    #             use_cache=use_cache,
+    #             attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+    #             **kwargs,
+    #         )
+    #     else:
+    #         outputs = self.self_attn(
+    #             hidden_states=hidden_states,
+    #             position_ids=position_ids,
+    #             attention_mask=attention_mask,
+    #             output_attentions=output_attentions,
+    #             past_key_value=past_key_value,
+    #             use_cache=use_cache,
+    #             attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+    #             **kwargs,
+    #         )
+
+    #     if type(outputs) is tuple:
+    #         hidden_states = outputs[0]
+    #     else:
+    #         hidden_states = outputs
+
+    #     if output_attentions:
+    #         self_attn_weights = outputs[1]
+
+    #     if use_cache:
+    #         present_key_value = outputs[2 if output_attentions else 1]
+
+    #     hidden_states = residual + hidden_states
+
+    #     # Fully Connected
+    #     residual = hidden_states
+    #     hidden_states = self.post_attention_layernorm(hidden_states)
+    #     hidden_states = self.mlp(hidden_states)
+    #     hidden_states = residual + hidden_states
+
+    #     outputs = (hidden_states,)
+
+    #     if output_attentions:
+    #         outputs += (self_attn_weights,)
+
+    #     if use_cache:
+    #         outputs += (present_key_value,)
+
+    #     if type(outputs) is tuple and len(outputs) == 1:
+    #         outputs = outputs[0]
+
+    #     return outputs
 
 
 class DeepseekV2MTPLayer(DeepseekV2DecoderLayer):
@@ -1800,6 +1988,8 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
         next_decoder_cache = () if use_cache else None
         mtp_outputs = []
 
+        moelayer_use_subbatch_recompute = self.config.moe_subbatch_token_num > 0
+
         for idx in range(self.config.num_hidden_layers):
             decoder_layer = self.layers[idx]
 
@@ -1809,7 +1999,17 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
             past_key_value = past_key_values[idx] if past_key_values is not None else None
 
             has_gradient = not hidden_states.stop_gradient
-            if (
+            if moelayer_use_subbatch_recompute:
+                layer_outputs = decoder_layer.subbatch_recompute_forward(
+                    hidden_states,
+                    position_ids,
+                    attention_mask,
+                    output_attentions,
+                    past_key_value,
+                    use_cache,
+                    attn_mask_startend_row_indices,
+                )
+            elif (
                 self.enable_recompute
                 and idx not in self.no_recompute_layers
                 and has_gradient
