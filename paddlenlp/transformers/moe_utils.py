@@ -101,3 +101,85 @@ def unpermute(
     else:
         output_tokens.scatter_(index=sorted_indices, updates=permuted_tokens, overwrite=False)
     return output_tokens
+
+
+def topk_to_permuted_indices_single(x, num_tokens, expert_id, topk):
+    """
+    Convert the topk indices to permuted indices.
+    """
+    x = paddle.flatten(x)
+    prob_permuted_indices = paddle.tensor.search._restrict_nonzero(x == expert_id, num_tokens).flatten()
+    token_permuted_indices = prob_permuted_indices // topk
+    return token_permuted_indices, prob_permuted_indices
+
+
+def topk_to_permuted_indices(x, num_tokens_per_expert_list, topk):
+    """
+    Convert the topk indices to permuted indices.
+    """
+    x = paddle.flatten(x)
+    prob_permuted_indices = paddle.concat(
+        [
+            paddle.tensor.search._restrict_nonzero(x == i, total_true_num)
+            for i, total_true_num in enumerate(num_tokens_per_expert_list)
+        ]
+    ).flatten()
+    token_permuted_indices = prob_permuted_indices // topk
+    return token_permuted_indices, prob_permuted_indices
+
+
+class FakeClone(paddle.autograd.PyLayer):
+    """
+    manual_backward中, 为了保留局部的计算图做临时反向计算
+    需要把manual_backward的output给clone出来, 这个clone
+    本质上不需要output的值, 而是需要拿到output身上的计算图
+
+    但调用paddle.clone会做一次额外的数据拷贝, 这是没必要的
+    FakeClone可以免去这个数据拷贝, 实现摘取计算图的目的
+    """
+
+    @staticmethod
+    def forward(ctx, input):
+        """forward"""
+        if input.is_contiguous():
+            fake_output = paddle.empty_like(input)
+            input._share_buffer_to(fake_output)
+        else:
+            fake_output = input.clone()
+        return fake_output
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        """backward"""
+        return grad_output
+
+
+class FakeGather(paddle.autograd.PyLayer):
+    """
+    临时绕开gather 0size索引的coredump问题
+    """
+
+    @staticmethod
+    def forward(ctx, input, indices):
+        """forward"""
+        assert len(indices.shape) == 1
+        ctx.save_for_backward(indices)
+        ctx.input_shape = input.shape
+        if indices.shape[0] == 0:
+            out_shape = input.shape
+            out_shape[0] = 0
+            return paddle.zeros(out_shape, dtype=input.dtype)
+        return paddle.index_select(input, axis=0, index=indices)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        """backward"""
+        indices = ctx.saved_tensor()
+        input_shape = ctx.input_shape
+        grad_input = paddle.zeros(input_shape, dtype=grad_output.dtype)
+        if indices.shape[0] != 0:
+            if scatter_add_ is not None:
+                scatter_add_(grad_input, indices.unsqueeze(-1), grad_output)
+            else:
+                paddle.scatter_(grad_input, indices.unsqueeze(-1), grad_output, overwrite=False)
+        return grad_input, None
