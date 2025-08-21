@@ -1360,8 +1360,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         """
 
         def fn(layer):
-            if hasattr(layer, "enable_recompute") and (layer.enable_recompute is False or layer.enable_recompute == 0):
-                layer.enable_recompute = True
+            if hasattr(layer, "enable_recompute") and (layer.enable_recompute is True or layer.enable_recompute == 1):
+                layer.enable_recompute = False
 
         self.apply(fn)
 
