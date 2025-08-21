@@ -11,6 +11,11 @@ env:
   COMMIT_ID: ${{ github.event.pull_request.head.sha }}
   BRANCH: ${{ github.event.pull_request.base.ref }}
   TASK: PaddleNLP-CI-${{ github.event.pull_request.number }}-unittest-cpu
+  HF_ENDPOINT: https://hf-mirror.com
+  STUDIO_GIT_HOST: http://git.prod.idc-to-cloud.aistudio.baidu-int.com
+  PPNLP_HOME: /home/disk1/cache
+  HF_DATASETS_CACHE: /home/disk1/cache/huggingface/datasets
+  TRANSFORMERS_CACHE: /home/disk1/cache/huggingface
 
 jobs:
   Test:
@@ -33,12 +38,18 @@ jobs:
             -v $work_dir/../../..:$work_dir/../../.. \
             -v $work_dir:/workspace \
             -v /home/.cache/pip:/home/.cache/pip \
+            -v /home/disk1/cache:/home/disk1/cache \
             -e BRANCH \
             -e PR_ID \
             -e COMMIT_ID \
             -e work_dir \
             -e no_proxy \
             -e python_version \
+            -e HF_ENDPOINT \
+            -e STUDIO_GIT_HOST \
+            -e PPNLP_HOME \
+            -e HF_DATASETS_CACHE \
+            -e TRANSFORMERS_CACHE \
             -w /workspace ${docker_image}
 
       - name: Download Code
@@ -68,7 +79,6 @@ jobs:
             echo "Not in a pull_request event. Skipping PR-specific operations."
           fi
           git log --pretty=oneline -10
-          unset http_proxy && unset https_proxy
           '
 
       - name: Setup Environment
@@ -79,6 +89,7 @@ jobs:
           set -e
           python -m pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
           python -m pip config set global.cache-dir "/home/.cache/pip"
+          source $work_dir/../../../proxy
           python -m pip install --upgrade pip
           cd /workspace/PaddleNLP && git config --global --add safe.directory $PWD
           pip install -r tests/requirements.txt

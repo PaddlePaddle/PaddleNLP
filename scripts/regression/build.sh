@@ -22,15 +22,16 @@ mkdir -p ${PPNLP_HOME}/upload_${AGILE_PIPELINE_BUILD_NUMBER}
 upload_path=${PPNLP_HOME}/upload_${AGILE_PIPELINE_BUILD_NUMBER}
 export Build_list=()
 
-python -m pip config --user set global.index http://pip.baidu-int.com/search/
-python -m pip config --user set global.index-url http://pip.baidu-int.com/simple
-python -m pip config --user set global.trusted-host pip.baidu-int.com
+python -m pip config --user set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+python -m pip config --user set global.trusted-host pypi.tuna.tsinghua.edu.cn
 
 get_diff_case(){
     git diff --name-only HEAD~1 HEAD
     for file_name in `git diff --name-only HEAD~1 HEAD`;do
         arr_file_name=(${file_name//// })
         if [[ ${arr_file_name[0]} == "paddlenlp" ]];then
+            Build_list[${#Build_list[*]}]="paddlenlp"
+        elif [[ ${arr_file_name[0]} == "requirements"* ]]; then
             Build_list[${#Build_list[*]}]="paddlenlp"
         elif [[ ${arr_file_name[0]} == "csrc" ]];then
             Build_list[${#Build_list[*]}]="paddlenlp_ops"
@@ -64,12 +65,9 @@ paddlenlp_build (){
     rm -rf paddle_pipelines.egg-info/
     rm -rf dist/
 
-    python -m pip install -r requirements.txt --trusted-host pip.baidu-int.com
-    python -m pip install -r requirements-dev.txt --trusted-host pip.baidu-int.com
+    python -m pip install -r requirements.txt
+    python -m pip install -r requirements-dev.txt
     python setup.py bdist_wheel
-    python -m pip uninstall protobuf -y
-    python -m pip install protobuf==3.20.2
-    python -m pip install numpy==1.26.4 --force-reinstall
     python -m pip install --ignore-installed  dist/p****.whl --force-reinstall
     python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)" >> ${log_path}/commit_info.txt
 
@@ -127,7 +125,6 @@ if [[ ${#Build_list[*]} -ne 0 ]];then
     fi
 
     if [ -e "${upload_path}" ] && [ "$(ls -A "${upload_path}/")" ]; then
-        python -m pip install bce-python-sdk==0.8.74 --trusted-host pip.baidu-int.com --force-reinstall
         cd ${upload_path} && ls -A "${upload_path}"
         cd ${PPNLP_HOME} && python upload.py ${upload_path} 'paddlenlp/wheels'
         rm -rf ${upload_path}
