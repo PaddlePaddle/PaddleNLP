@@ -196,7 +196,7 @@ class PredictorArgument:
     )
     dynamic_insert: bool = field(default=False, metadata={"help": "whether use dynamic insert"})
     total_request_num: int = field(default=None, metadata={"help": "The total number of request data"})
-    kv_cache_reuse: int = field(default=1)
+    kv_cache_reuse: int = field(default=0)
 
     def __post_init__(self):
         if self.speculate_method is not None:
