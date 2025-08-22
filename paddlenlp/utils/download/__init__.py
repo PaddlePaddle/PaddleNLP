@@ -30,11 +30,6 @@ from huggingface_hub.utils import (
 from paddle import __version__
 from requests import HTTPError
 
-from .aistudio_hub_download import (
-    aistudio_hub_download,
-    aistudio_hub_file_exists,
-    aistudio_hub_try_to_load_from_cache,
-)
 from .bos_download import bos_download, bos_file_exists, bos_try_to_load_from_cache
 
 
@@ -146,8 +141,8 @@ def resolve_file_path(
 
     # check cache
     for filename in filenames:
-        cache_file_name = bos_aistudio_hf_try_to_load_from_cache(
-            repo_id, filename, cache_dir, subfolder, revision, repo_type, from_bos, from_aistudio, from_hf_hub
+        cache_file_name = bos_hf_try_to_load_from_cache(
+            repo_id, filename, cache_dir, subfolder, revision, repo_type, from_bos, from_hf_hub
         )
         if from_hf_hub and cache_file_name is _CACHED_NO_EXIST:
             cache_file_name = None
@@ -187,32 +182,25 @@ def resolve_file_path(
                         return None
 
         elif from_aistudio:
-            log_endpoint = "Aistudio Hub"
-            for filename in filenames:
-                download_kwargs["filename"] = filename
-                is_available = bos_aistudio_hf_file_exist(
-                    repo_id,
-                    filename,
-                    subfolder=subfolder,
-                    repo_type=repo_type,
-                    revision=revision,
-                    token=token,
-                    endpoint=endpoint,
-                    from_bos=from_bos,
-                    from_aistudio=from_aistudio,
-                    from_hf_hub=from_hf_hub,
-                )
-                if is_available:
-                    cached_file = aistudio_hub_download(
-                        **download_kwargs,
+            for index, filename in enumerate(filenames):
+                try:
+                    from aistudio_sdk.file_download import (
+                        model_file_download as aistudio_download,
                     )
-                    if cached_file is not None:
-                        return cached_file
+
+                    return aistudio_download(repo_id, filename, revision, local_files_only, local_dir)
+                except Exception:
+                    if index < len(filenames) - 1:
+                        continue
+                    else:
+                        print(f"please make sure one of the {filenames} under the repo {repo_id}")
+                        return None
+
         elif from_hf_hub:
             log_endpoint = "Huggingface Hub"
             for filename in filenames:
                 download_kwargs["filename"] = filename
-                is_available = bos_aistudio_hf_file_exist(
+                is_available = bos_hf_file_exist(
                     repo_id,
                     filename,
                     subfolder=subfolder,
@@ -221,7 +209,6 @@ def resolve_file_path(
                     token=token,
                     endpoint=endpoint,
                     from_bos=from_bos,
-                    from_aistudio=from_aistudio,
                     from_hf_hub=from_hf_hub,
                 )
                 if is_available:
@@ -235,7 +222,7 @@ def resolve_file_path(
             download_kwargs["url"] = url
             for filename in filenames:
                 download_kwargs["filename"] = filename
-                is_available = bos_aistudio_hf_file_exist(
+                is_available = bos_hf_file_exist(
                     repo_id,
                     filename,
                     subfolder=subfolder,
@@ -244,7 +231,6 @@ def resolve_file_path(
                     token=token,
                     endpoint=endpoint,
                     from_bos=from_bos,
-                    from_aistudio=from_aistudio,
                     from_hf_hub=from_hf_hub,
                 )
                 if is_available:
@@ -291,7 +277,7 @@ def resolve_file_path(
         )
 
 
-def bos_aistudio_hf_file_exist(
+def bos_hf_file_exist(
     repo_id: str,
     filename: str,
     *,
@@ -301,7 +287,6 @@ def bos_aistudio_hf_file_exist(
     token: Optional[str] = None,
     endpoint: Optional[str] = None,
     from_bos: bool = True,
-    from_aistudio: bool = False,
     from_hf_hub: bool = False,
 ):
     assert repo_id is not None, "repo_id cannot be None"
@@ -310,16 +295,7 @@ def bos_aistudio_hf_file_exist(
     if subfolder is None:
         subfolder = ""
     filename = os.path.join(subfolder, filename)
-    if from_aistudio:
-        out = aistudio_hub_file_exists(
-            repo_id=repo_id,
-            filename=filename,
-            repo_type=repo_type,
-            revision=revision,
-            token=token,
-            endpoint=endpoint,
-        )
-    elif from_hf_hub:
+    if from_hf_hub:
         out = hf_hub_file_exists(
             repo_id=repo_id,
             filename=filename,
@@ -339,7 +315,7 @@ def bos_aistudio_hf_file_exist(
     return out
 
 
-def bos_aistudio_hf_try_to_load_from_cache(
+def bos_hf_try_to_load_from_cache(
     repo_id: str,
     filename: str,
     cache_dir: Union[str, Path, None] = None,
@@ -347,7 +323,6 @@ def bos_aistudio_hf_try_to_load_from_cache(
     revision: Optional[str] = None,
     repo_type: Optional[str] = None,
     from_bos: bool = True,
-    from_aistudio: bool = False,
     from_hf_hub: bool = False,
 ):
     if subfolder is None:
@@ -359,9 +334,7 @@ def bos_aistudio_hf_try_to_load_from_cache(
         revision=revision,
         repo_type=repo_type,
     )
-    if from_aistudio:
-        return aistudio_hub_try_to_load_from_cache(**load_kwargs)
-    elif from_hf_hub:
+    if from_hf_hub:
         return hf_hub_try_to_load_from_cache(**load_kwargs)
     else:
         return bos_try_to_load_from_cache(**load_kwargs)

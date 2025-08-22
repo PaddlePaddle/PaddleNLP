@@ -257,19 +257,12 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
             # merge batch and seq_len dimension.
             inputs_embeds = inputs_embeds.reshape([batch * seq_len, hidden_dim])
 
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
-        )
-
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
         hidden_states = inputs_embeds
 
         # decoder layers
-        all_hidden_states = () if output_hidden_states else None
         with dy2st_nocheck_guard_context():
             hidden_states = self.transformer_block(
                 input_ids=input_ids,
@@ -280,11 +273,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
             )
         hidden_states = self.norm(hidden_states)
 
-        if output_hidden_states:
-            all_hidden_states = all_hidden_states + (hidden_states,)
-
-        if not return_dict:
-            return tuple(v for v in [hidden_states, None, all_hidden_states, None] if v is not None)
+        return hidden_states
 
     @paddle.no_grad()
     # avx
@@ -401,7 +390,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.epsilon = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
         self.quant_type = config.get("quant_type", "")
-        self.return_full_hidden_states = config.get("return_full_hidden_states", False)
 
         self.rope_theta = config.rope_theta
         self.use_neox = True
@@ -617,7 +605,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         speculate_config = SpeculateConfig(
             speculate_method=config.get("speculate_method", None),
             speculate_max_draft_token_num=config.get("speculate_max_draft_token_num", 5),
-            return_full_hidden_states=config.get("return_full_hidden_states", False),
         )
 
         hpu_config = HpuConfig(
@@ -1496,7 +1483,7 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         inputs_embeds = self.embed_tokens(ids_remove_padding)
 
         with dy2st_nocheck_guard_context():
-            hidden_states, _ = self.transformer_block(
+            hidden_states, full_hidden_states = self.transformer_block(
                 input_ids=input_ids,
                 src=inputs_embeds,
                 cum_offsets=cum_offsets,
@@ -1508,17 +1495,11 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
             )
         hidden_states = self.norm(hidden_states)
 
-        return BaseModelOutputWithPastAndCrossAttentions(
-            last_hidden_state=hidden_states,
-            past_key_values=None,
-            hidden_states=None,
-            attentions=None,
-            cum_offsets=cum_offsets,
-        )
+        return hidden_states, full_hidden_states
 
 
 @register_base_model
-class EagleForLlamaInferenceModel(LlamaBlockInferenceModel):
+class EagleForLlamaBlockInferenceModel(LlamaBlockInferenceModel):
     def __init__(self, config: LlamaConfig):
         self.append_attn = config.append_attn
         super().__init__(config)
@@ -2078,8 +2059,9 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         excess_blocks=None,
         draft_tokens=None,
         output_padding_offset=None,
+        **kwargs,
     ):
-        outputs = self.llama(
+        hidden_states, full_hidden_states = self.llama(
             input_ids,
             src_mask=src_mask,
             caches=caches,
@@ -2096,24 +2078,9 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             excess_blocks=excess_blocks,
             draft_tokens=draft_tokens,
             output_padding_offset=output_padding_offset,
+            **kwargs,
         )
-        # hidden_states = outputs[0]
-        if self.return_full_hidden_states:
-            from paddlenlp_ops import rebuild_padding_v2
 
-            # full_hidden_states = outputs[1]
-            full_hidden_states = outputs[0]
-            cum_offsets = outputs[1]
-            hidden_states = rebuild_padding_v2(
-                full_hidden_states,
-                cum_offsets,
-                seq_lens_decoder,
-                seq_lens_encoder,
-                output_padding_offset,
-                self.max_seq_len,
-            )
-        else:
-            hidden_states = outputs[0]
         logits = self.lm_head(
             hidden_states,
             tensor_parallel_output=False,
@@ -2139,7 +2106,7 @@ class EagleLlamaForCausalLMBlockInferenceModel(LlamaForCausalLMBlockInferenceMod
         self.verify_window = config.get("speculate_verify_window", 2)
         self.max_seq_len = config.max_seq_len
 
-        self.eagle = EagleForLlamaInferenceModel(config)
+        self.eagle = EagleForLlamaBlockInferenceModel(config)
         if config.tie_word_embeddings:
             self.lm_head = LlamaLMHead(config, embedding_weights=self.llama.embed_tokens.weight, transpose_y=True)
             self.tie_weights()

@@ -590,7 +590,9 @@ class Qwen2Attention(nn.Layer):
                 )
                 self.k_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=self.has_bias, gather_output=False)  # fmt:skip
                 self.v_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=self.has_bias, gather_output=False)  # fmt:skip
-            self.o_proj = RowParallelLinear(self.hidden_size, self.hidden_size, has_bias=False, input_is_parallel=True)
+            self.o_proj = RowParallelLinear(
+                self.num_attention_heads * self.head_dim, self.hidden_size, has_bias=False, input_is_parallel=True
+            )
         else:
             if self.fuse_attention_qkv:
                 self.qkv_proj = Linear(
@@ -1856,6 +1858,7 @@ class Qwen2ForTokenClassification(Qwen2PretrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
+        attn_mask_startend_row_indices=None,
     ) -> Union[Tuple, SequenceClassifierOutputWithPast]:
         r"""
         labels (`paddle.Tensor` of shape `(batch_size,)`, *optional*):
@@ -1875,6 +1878,7 @@ class Qwen2ForTokenClassification(Qwen2PretrainedModel):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
         )
         sequence_output = outputs[0]
         sequence_output = self.dropout(sequence_output)

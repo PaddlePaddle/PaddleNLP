@@ -77,6 +77,8 @@ from paddlenlp.utils.log import logger
 from ..generation import GenerationConfig, GenerationMixin
 from ..quantization.quantization_utils import (
     convert_to_quantize_state_dict,
+    convert_to_weight_quantize_state_dict,
+    parse_weight_quantize_algo,
     replace_with_quantization_linear,
     update_loaded_state_dict_keys,
 )
@@ -360,7 +362,15 @@ def _split_keys_evenly(keys: list, n: int) -> list:
 
 
 def _load_part_state_dict(
-    keys, checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping, fliter_dict_keys, device
+    keys,
+    checkpoint_file: Union[str, os.PathLike],
+    tensor_parallel_split_mapping,
+    fliter_dict_keys,
+    device,
+    quantization_linear_list=None,
+    quantization_config=None,
+    dtype=None,
+    return_numpy=False,
 ):
     """load part state dict from checkpoint file.
 
@@ -391,15 +401,48 @@ def _load_part_state_dict(
                 continue
 
             py_safe_slice_ = f.get_slice(key)
-            if key in tensor_parallel_split_mapping:
-                weight = tensor_parallel_split_mapping[key](py_safe_slice_)
+            if quantization_linear_list is not None and key.split(".weight")[0] in quantization_linear_list:
+                # numpy.array -> paddle.tensor
+                weight = paddle.Tensor.__call__(py_safe_slice_[:], zero_copy=True)
+                key_name = key.split(".weight")[0]
+                quant_key_name = key_name + ".quant_weight"
+                quant_scale_name = key_name + ".quant_scale"
+                # 16bit -> 4/8bit
+                quant_state_dict = convert_to_weight_quantize_state_dict(
+                    state_dict={key: weight},
+                    name=key_name,
+                    quantization_config=quantization_config,
+                    dtype=dtype,
+                    weight_quantize_algo=parse_weight_quantize_algo(quantization_config, quant_key_name),
+                )
+                for key in list(quant_state_dict.keys()):
+                    quant_state_dict[key] = quant_state_dict[key].numpy()
+                if quant_key_name in tensor_parallel_split_mapping:
+                    quant_state_dict[quant_key_name] = tensor_parallel_split_mapping[quant_key_name](
+                        quant_state_dict[quant_key_name]
+                    )
+                    if quant_scale_name in tensor_parallel_split_mapping:
+                        quant_state_dict[quant_scale_name] = tensor_parallel_split_mapping[quant_scale_name](
+                            quant_state_dict[quant_scale_name]
+                        )
+                part_state_dict.update(quant_state_dict)
             else:
-                weight = py_safe_slice_[:]
-            if device == "expected":
-                with device_guard():
-                    weight = paddle.Tensor.__call__(weight, zero_copy=True)
-                weight = weight._copy_to(paddle.framework._current_expected_place(), False)
-            part_state_dict[key] = weight
+                if key in tensor_parallel_split_mapping:
+                    if len(py_safe_slice_.shape) == 0:
+                        weight = tensor_parallel_split_mapping[key](py_safe_slice_.get())
+                    else:
+                        weight = tensor_parallel_split_mapping[key](py_safe_slice_)
+                else:
+                    if len(py_safe_slice_.shape) == 0:
+                        weight = py_safe_slice_.get()
+                    else:
+                        weight = py_safe_slice_[:]
+                if not return_numpy and device == "expected":
+                    with device_guard():
+                        weight = paddle.Tensor.__call__(weight, zero_copy=True)
+                    weight = weight._copy_to(paddle.framework._current_expected_place(), False)
+                part_state_dict[key] = weight
+
         for key in keys:
             if (
                 key.endswith(SYMMETRY_QUANT_SCALE)
@@ -407,9 +450,10 @@ def _load_part_state_dict(
                 or key.endswith(ASYMMETRY_QUANT_SCALE_MAX)
             ):
                 scale = f.get_tensor(key)
-                with device_guard():
-                    scale = paddle.Tensor.__call__(scale, zero_copy=True)
-                scale = scale._copy_to(paddle.framework._current_expected_place(), False)
+                if not return_numpy and device == "expected":
+                    with device_guard():
+                        scale = paddle.Tensor.__call__(scale, zero_copy=True)
+                    scale = scale._copy_to(paddle.framework._current_expected_place(), False)
                 scale_dict[key] = scale
     return part_state_dict, scale_dict
 
@@ -420,6 +464,10 @@ def load_state_dict(
     fliter_dict_keys=None,
     device="cpu",
     ckpt_quant_stage="O0",
+    quantization_linear_list=None,
+    quantization_config=None,
+    dtype=None,
+    return_numpy=False,
 ):
     """
     Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
@@ -455,6 +503,10 @@ def load_state_dict(
                         tensor_parallel_split_mapping,
                         fliter_dict_keys,
                         device,
+                        quantization_linear_list,
+                        quantization_config,
+                        dtype,
+                        return_numpy,
                     )
             else:
                 # Load state dict in multi-thread to speed up loading
@@ -469,6 +521,10 @@ def load_state_dict(
                             tensor_parallel_split_mapping,
                             fliter_dict_keys,
                             device,
+                            quantization_linear_list,
+                            quantization_config,
+                            dtype,
+                            return_numpy,
                         ): keys
                         for keys in keys_groups
                     }
@@ -477,9 +533,9 @@ def load_state_dict(
                         state_dict.update(res_state_dict)
                         scale_dict.update(res_scale_dict)
 
-            if device == "cpu":
-                for k in list(state_dict.keys()):
-                    with device_guard():
+            if not return_numpy and device == "cpu":
+                with device_guard():
+                    for k in list(state_dict.keys()):
                         state_dict[k] = paddle.Tensor.__call__(state_dict.pop(k), zero_copy=True)
 
             if len(scale_dict) != 0:
@@ -859,8 +915,11 @@ def faster_set_state_dict(model, state_dict, model_state_dict=None, strict_dtype
     return error_msgs
 
 
-def _load_state_dict_into_model(model_to_load, state_dict, start_prefix, model_to_load_state_dict):
+def _load_state_dict_into_model(model_to_load, state_dict, start_prefix, model_to_load_state_dict=None):
     # torch will cast dtype in load_state_dict, but paddle strictly check dtype
+    if model_to_load_state_dict is None:
+        model_to_load_state_dict = model_to_load.state_dict()
+
     if len(start_prefix) > 0:
         for key in list(state_dict.keys()):
             if key.startswith(start_prefix):
@@ -1981,7 +2040,22 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # Weight quantization if not yet quantized & update loaded_keys
         if quantization_linear_list is not None:
-            origin_loaded_keys = copy.deepcopy(loaded_keys)
+            if isinstance(config.quantization_config.weight_quantize_algo, str):
+                post_quantize = config.quantization_config.weight_quantize_algo in [
+                    "weight_only_int4",
+                    "weight_only_int8",
+                ]
+            elif isinstance(config.quantization_config.weight_quantize_algo, dict):
+                post_quantize = any(
+                    key in ["weight_only_int4", "weight_only_int8"]
+                    for key in config.quantization_config.weight_quantize_algo.keys()
+                )
+            else:
+                post_quantize = False
+            if post_quantize:
+                origin_loaded_keys = copy.deepcopy(loaded_keys)
+            else:
+                origin_loaded_keys = list(model.state_dict())
             loaded_keys = update_loaded_state_dict_keys(
                 loaded_keys, quantization_linear_list, config.quantization_config
             )
@@ -2186,19 +2260,35 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         pre_tensor_parallel_split = True
                         assert origin_loaded_keys is not None, "loaded_keys is not None."
                         tp_actions = cls.get_tensor_parallel_convert_actions(
-                            config, origin_loaded_keys, ignore_error=True, base_model_prefix=prefix
+                            config,
+                            origin_loaded_keys,
+                            ignore_error=True,
+                            base_model_prefix=prefix,
+                            post_quantize=post_quantize,
                         )
-                    state_dict = load_state_dict(
-                        shard_file,
-                        tp_actions if pre_tensor_parallel_split else None,
-                        None,
-                    )
-                    state_dict = convert_to_quantize_state_dict(
-                        state_dict,
-                        quantization_linear_list,
-                        config.quantization_config,
-                        dtype,
-                    )
+                    if post_quantize:
+                        # Split -> quantize(Not support mdoel save)
+                        state_dict = load_state_dict(
+                            shard_file,
+                            tp_actions if pre_tensor_parallel_split else None,
+                            None,
+                        )
+                        state_dict = convert_to_quantize_state_dict(
+                            state_dict,
+                            quantization_linear_list,
+                            config.quantization_config,
+                            dtype,
+                        )
+                    else:
+                        # quantize -> split(Support mdoel save)
+                        state_dict = load_state_dict(
+                            shard_file,
+                            tp_actions if pre_tensor_parallel_split else None,
+                            None,
+                            quantization_linear_list=quantization_linear_list,
+                            quantization_config=config.quantization_config,
+                            dtype=dtype,
+                        )
                 else:
                     if (
                         shard_file.endswith(".safetensors")
@@ -2537,6 +2627,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # load pt weights early so that we know which dtype to init the model under
         if not is_sharded and state_dict is None:
             # 4. loading non-sharded ckpt from the state dict
+            # Quantization: Loading non-sharded ckpt does not support saving with merge_tensor_parallel
             if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
                 state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
             elif config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model.safetensors"):
@@ -2737,7 +2828,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     variant = weight_name_suffix() if variant is None else variant
 
         # Attach architecture to the config
-        config_to_save.architectures = [model_to_save.__class__.__name__]
+        config_to_save.architectures = [clean_model_class_name(model_to_save.__class__.__name__)]
+
         # Save the config
         if is_main_process:
             config_to_save.save_pretrained(save_directory)
@@ -2842,6 +2934,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             "mp_config": None,
             "sp_config": None,
             "pp_config": None,
+            "cp_config": None,
         }
         for config in configs:
             if "mp_config" in config and config["mp_config"] is not None:
@@ -2874,10 +2967,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         final_config["pp_config"] = config["pp_config"]
                     else:
                         final_config["pp_config"]["split_spec"] += config["pp_config"]["split_spec"]
+            if "cp_config" in config and config["cp_config"] is not None:
+                if final_config["cp_config"] is None:
+                    final_config["cp_config"] = config["cp_config"]
+                else:
+                    for k, v in config["cp_config"]["parallelize_plan"].items():
+                        assert (
+                            k not in final_config["cp_config"]["parallelize_plan"].keys()
+                        ), f"sublayer cp_config should be a subset of model but got sublayer config {config['cp_config']} and model config {final_config['cp_config']}."
+                        final_config["cp_config"]["parallelize_plan"][k] = v
 
         if final_config["pp_config"] is not None and len(final_config["pp_config"]["split_spec"]) == 1:
             final_config["pp_config"]["split_spec"] = final_config["pp_config"]["split_spec"][0]
-
         return final_config
 
     def _generate_auto_dist_config(self, auto_dist_degree):
@@ -2885,6 +2986,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             "sp_config": None,
             "mp_config": None,
             "pp_config": None,
+            "cp_config": None,
         }
         for name, layer in self.named_sublayers(include_self=True):
             if hasattr(layer, "auto_dist_config"):
@@ -2898,6 +3000,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             "dp_config": None,
             "mp_config": None,
             "pp_config": None,
+            "cp_config": None,
         }
         if "tensor_parallel" in auto_dist_degree and auto_dist_degree["tensor_parallel"]:
             merged_config["mp_config"] is not None
@@ -2906,6 +3009,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if "sequence_parallel" in auto_dist_degree and auto_dist_degree["sequence_parallel"]:
             merged_config["sp_config"] is not None
             final_config["mp_config"] = merged_config["sp_config"]
+
+        if "context_parallel" in auto_dist_degree and auto_dist_degree["context_parallel"]:
+            merged_config["cp_config"] is not None
+            final_config["cp_config"] = merged_config["cp_config"]
 
         if "pipeline_parallel" in auto_dist_degree and auto_dist_degree["pipeline_parallel"]:
             merged_config["pp_config"] is not None
@@ -2928,7 +3035,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 "sharding_level": level,
                 "sharding_mesh_dim": auto_dist_degree.get("sharding_mesh_dim", None),
             }
-
         return final_config
 
 
@@ -3174,7 +3280,7 @@ def load_tp_checkpoint(folder, cls, config, return_numpy=False):
             with safe_open(safe_model_path, framework="np", device="cpu") as f:
                 loaded_keys = f.keys()
             tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
-            state_dict = load_state_dict(safe_model_path, tp_actions)
+            state_dict = load_state_dict(safe_model_path, tp_actions, return_numpy=return_numpy)
         else:  # shard files safetensors
             resolved_archive_file, resolved_sharded_files, sharded_metadata, is_sharded = cls._resolve_model_file_path(
                 pretrained_model_name_or_path=folder,
@@ -3190,10 +3296,33 @@ def load_tp_checkpoint(folder, cls, config, return_numpy=False):
                     shard_file,
                     tp_actions,
                     loaded_state_dict_keys,
+                    return_numpy=return_numpy,
                 )
                 state_dict.update(shard_state_dict)
-        if return_numpy:
-            for k in list(state_dict.keys()):
-                if not isinstance(state_dict[k], np.ndarray):
-                    state_dict[k] = state_dict.pop(k).cpu().numpy()
     return state_dict
+
+
+def clean_model_class_name(class_name, suffixes_to_strip: Union[str, List[str]] = "Pipe"):
+    """
+    Returns the class name of the given model with specified suffixes removed.
+
+    This is typically used to clean up the model name before saving it to
+    config.architectures, removing implementation-specific suffixes like "Pipe".
+
+    Args:
+        class_name: The __class__.__name__ attribute.
+        suffixes_to_strip (str or list of str, optional): One or more suffix strings to remove
+            from the class name (e.g., 'Pipe' or ['Pipe', 'Wrapper']). If None or empty,
+            no stripping is applied.
+
+    Returns:
+        str: The cleaned model class name with specified suffix removed (if present).
+    """
+    if not suffixes_to_strip:
+        return class_name
+
+    if isinstance(suffixes_to_strip, str):
+        suffixes_to_strip = [suffixes_to_strip]
+
+    pattern = f"({'|'.join(map(re.escape, suffixes_to_strip))})$"
+    return re.sub(pattern, "", class_name)

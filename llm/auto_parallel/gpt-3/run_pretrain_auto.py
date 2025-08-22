@@ -38,6 +38,7 @@ from paddlenlp.transformers import (
     CosineAnnealingWithWarmupDecay,
     GPTConfig,
     GPTForCausalLMAuto,
+    GPTForCausalLMAutoPP,
     GPTForCausalLMNet,
     GPTPretrainingCriterionAuto,
     GPTPretrainingCriterionNet,
@@ -48,6 +49,7 @@ from paddlenlp.utils.tools import get_env_device
 
 MODEL_CLASSES = {
     "gpt": (GPTConfig, GPTForCausalLMAuto, GPTPretrainingCriterionAuto),
+    "gpt_pp": (GPTConfig, GPTForCausalLMAutoPP, GPTPretrainingCriterionAuto),
     "gpt_network": (GPTConfig, GPTForCausalLMNet, GPTPretrainingCriterionNet),
 }
 
@@ -72,6 +74,12 @@ class PreTrainingArguments(AutoTrainingArguments):
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
         },
     )
+    enable_linear_fused_grad_add: bool = field(
+        default=False,
+        metadata={
+            "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
+        },
+    )
     job_schedule_profiler_start: int = field(
         default=-1,
         metadata={"help": "The step to start job_schedule_profiler."},
@@ -85,12 +93,17 @@ class PreTrainingArguments(AutoTrainingArguments):
     )
     sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
     virtual_pipeline_seg_method: str = field(
-        default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of splitting pp layer for virtual pipeline."}
+        default="LlamaDecoderLayerAuto",
+        metadata={"help": "The seg method of splitting pp layer for virtual pipeline."},
     )
     # NOTE(gongenlei): new add autotuner_benchmark
     autotuner_benchmark: bool = field(
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
+    )
+    n_microbatches: int = field(
+        default=1,
+        metadata={"help": "Control the num of microbatches in one pp step."},
     )
     pre_alloc_memory: float = field(
         default=0.0,
@@ -431,6 +444,26 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+    do_enable_linear_fused_grad_add = training_args.enable_linear_fused_grad_add
+    do_enable_mp_async_allreduce = (
+        training_args.enable_auto_parallel
+        and training_args.tensor_parallel_degree > 1
+        and "enable_mp_async_allreduce" in training_args.tensor_parallel_config
+        and not training_args.sequence_parallel
+    )
+    do_enable_sp_async_reduce_scatter = (
+        training_args.enable_auto_parallel
+        and training_args.tensor_parallel_degree > 1
+        and training_args.sequence_parallel
+        and "enable_sp_async_reduce_scatter" in training_args.tensor_parallel_config
+    )
+    if (
+        do_enable_linear_fused_grad_add or do_enable_mp_async_allreduce or do_enable_sp_async_reduce_scatter
+    ) and not training_args.to_static:
+        from llm.utils.fused_layers import mock_layers
+
+        mock_layers(do_enable_linear_fused_grad_add, do_enable_mp_async_allreduce, do_enable_sp_async_reduce_scatter)
+
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
 
@@ -525,6 +558,7 @@ def main():
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
+    config.to_static = training_args.to_static
 
     if training_args.strategy.pipeline.enable and config.virtual_pp_degree > 1:
         pipeline = training_args.strategy.pipeline
@@ -534,6 +568,14 @@ def main():
     config.hidden_dropout_prob = model_args.hidden_dropout_prob
     config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
     print("Final pre-training config:", config)
+    if (
+        "replace_with_parallel_cross_entropy" in training_args.tensor_parallel_config
+        and config.tensor_parallel_degree > 1
+        and config.to_static is False
+    ):
+        from llm.utils.replace_ops import replace_cross_entropy
+
+        replace_cross_entropy()
 
     # Set the dtype for loading model
     dtype = "float32"
@@ -589,6 +631,7 @@ def main():
 
     trainer = PretrainingTrainer(
         model=model,
+        model_type=model_args.model_type,
         criterion=criterion,
         args=training_args,
         data_collator=data_collator,
