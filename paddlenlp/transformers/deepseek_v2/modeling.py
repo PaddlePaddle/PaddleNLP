@@ -212,6 +212,34 @@ def assign_kv_heads(num_kv_heads: int, num_gpus: int):
     return assignment_list
 
 
+class LMHeadFunction(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, x, weight, transpose_y):
+        out = paddle.matmul(x, weight, transpose_y = transpose_y)
+
+        ctx.save_for_backward(x, weight,  transpose_y)
+        return out
+
+    @staticmethod
+    def backward(ctx, dout):
+        if dout.dtype == paddle.float32:
+            dout = dout.cast( paddle.bfloat16)
+
+        x, weight, transpose_y = ctx.saved_tensor()
+
+        dx = paddle.matmul( dout, weight, transpose_y = not transpose_y)
+        if transpose_y:
+            with paddle.amp.auto_cast(False):
+                paddle._C_ops.fused_linear_param_grad_add(
+                            dout.reshape( [-1, dout.shape[-1]]), x.reshape( [-1, x.shape[-1]]), weight.main_grad, None, True, False
+                        )
+        else:
+            with paddle.amp.auto_cast(False):
+                paddle._C_ops.fused_linear_param_grad_add(
+                            x.reshape([-1, x.shape[-1]]), dout.reshape([-1, dout.shape[-1]]), weight.main_grad, None, True, False
+                        )
+        return dx, None
+
 def parallel_matmul(x: Tensor, y: Tensor, transpose_y=False, tensor_parallel_output=True):
     is_fleet_init = True
     tensor_parallel_degree = 1
@@ -238,9 +266,8 @@ def parallel_matmul(x: Tensor, y: Tensor, transpose_y=False, tensor_parallel_out
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
 
     else:
-        logits = paddle.matmul(x, y, transpose_y=transpose_y)
+        logits = LMHeadFunction.apply(x, y, transpose_y=transpose_y)
         return logits
-
 
 def scaled_dot_product_attention(
     query_states,
@@ -601,34 +628,35 @@ class DeepseekV2YarnRotaryEmbedding(DeepseekV2RotaryEmbedding):
         super().__init__(dim, max_position_embeddings, base)
 
     def _set_cos_sin_cache(self, seq_len):
-        self.max_seq_len_cached = seq_len
-        dim = self.dim
+        with paddle.amp.auto_cast(False):
+            self.max_seq_len_cached = seq_len
+            dim = self.dim
 
-        freq_extra = 1.0 / (self.base ** (paddle.arange(0, dim, 2, dtype=paddle.float32) / dim))
-        freq_inter = 1.0 / (self.scaling_factor * self.base ** (paddle.arange(0, dim, 2, dtype=paddle.float32) / dim))
+            freq_extra = 1.0 / (self.base ** (paddle.arange(0, dim, 2, dtype=paddle.float32) / dim))
+            freq_inter = 1.0 / (self.scaling_factor * self.base ** (paddle.arange(0, dim, 2, dtype=paddle.float32) / dim))
 
-        low, high = yarn_find_correction_range(
-            self.beta_fast,
-            self.beta_slow,
-            dim,
-            self.base,
-            self.original_max_position_embeddings,
-        )
-        inv_freq_mask = 1.0 - yarn_linear_ramp_mask(low, high, dim // 2)
-        self.inv_freq = freq_inter * (1 - inv_freq_mask) + freq_extra * inv_freq_mask
+            low, high = yarn_find_correction_range(
+                self.beta_fast,
+                self.beta_slow,
+                dim,
+                self.base,
+                self.original_max_position_embeddings,
+            )
+            inv_freq_mask = 1.0 - yarn_linear_ramp_mask(low, high, dim // 2)
+            self.inv_freq = freq_inter * (1 - inv_freq_mask) + freq_extra * inv_freq_mask
 
-        t = paddle.arange(seq_len, dtype=paddle.float32)
+            t = paddle.arange(seq_len, dtype=paddle.float32)
 
-        freqs = paddle.outer(t, paddle.cast(self.inv_freq, dtype="float32"))
+            freqs = paddle.outer(t, paddle.cast(self.inv_freq, dtype="float32"))
 
-        _mscale = float(
-            yarn_get_mscale(self.scaling_factor, self.mscale)
-            / yarn_get_mscale(self.scaling_factor, self.mscale_all_dim)
-        )
+            _mscale = float(
+                yarn_get_mscale(self.scaling_factor, self.mscale)
+                / yarn_get_mscale(self.scaling_factor, self.mscale_all_dim)
+            )
 
-        emb = paddle.concat((freqs, freqs), axis=-1)
-        self.cos_cached = emb.cos() * _mscale
-        self.sin_cached = emb.sin() * _mscale
+            emb = paddle.concat((freqs, freqs), axis=-1)
+            self.cos_cached = emb.cos() * _mscale
+            self.sin_cached = emb.sin() * _mscale
 
 
 def rotate_half(x):
@@ -2468,8 +2496,9 @@ class DeepseekV2MTPLayer(DeepseekV2DecoderLayer):
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         hidden_states = self.hnorm(hidden_states)
         nextn_hidden_state = self.enorm(nextn_hidden_state)
-
-        hidden_states = self.eh_proj(paddle.concat([hidden_states, nextn_hidden_state], axis=-1))
+        
+        concat_h = paddle.concat([hidden_states, nextn_hidden_state], axis=-1)
+        hidden_states = LMHeadFunction.apply( concat_h, self.eh_proj.weight, False)
 
         layer_outputs = super(DeepseekV2MTPLayer, self).forward(
             hidden_states,
