@@ -645,7 +645,7 @@ class FP8QuantWeightCallback(TrainerCallback):
         global skip_count
 
         if not g_shard_bypass_dygraph_optimizer or skip_count == 0:
-            model.fp8_quant_weight(True)
+            model.fp8_quant_weight(True, quant_transpose=False)
             optimizer.clear_param_storage("moe_expert")
             optimizer.clear_param_storage("rms_linear")
             optimizer.clear_param_storage("memory_attn")

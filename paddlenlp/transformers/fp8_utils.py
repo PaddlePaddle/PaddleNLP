@@ -86,8 +86,12 @@ def _get_fp8_weight_and_scale(weight, stacked=False, transpose=False):
 
 
 def fused_stack_quant(expert_weight_list, transpose=False):
-    if hasattr(expert_weight_list[0], "fp8_weight_stacked"):
-        w, scale = _get_fp8_weight_and_scale(expert_weight_list[0], stacked=True, transpose=transpose)
+    if transpose is False and hasattr(expert_weight_list[0], "fp8_weight_stacked"):
+        w, scale = _get_fp8_weight_and_scale(expert_weight_list[0], stacked=True, transpose=False)
+    elif transpose is True and hasattr(expert_weight_list[0], "fp8_weight_stacked_transpose"):
+        w, scale = _get_fp8_weight_and_scale(expert_weight_list[0], stacked=True, transpose=True)
+    elif transpose is True and hasattr(expert_weight_list[0], "fp8_weight_stacked"):
+        w, scale = _get_fp8_weight_and_scale(expert_weight_list[0], stacked=True, transpose=False)
     else:
         w, scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(expert_weight_list, transpose=transpose)
     return w, scale
@@ -97,6 +101,8 @@ def weight_quant(weight, transpose=False):
     if transpose:
         if hasattr(weight, "fp8_weight_transpose"):
             return weight.fp8_weight_transpose, weight.fp8_scale_transpose
+        elif hasattr(weight, "fp8_weight"):
+            return weight.fp8_weight.T.contiguous(), weight.fp8_scale.T.contiguous()
         else:
             return paddle.incubate.nn.functional.fp8_quant_blockwise(
                 weight,
@@ -590,21 +596,32 @@ class FP8Linear(paddle.nn.Layer):
         return FP8LinearFunction.apply(x, self, keep_x=False)
 
 
-def cache_fp8_weight(weight):
+def cache_fp8_weight(weight, quant_transpose=True):
     if hasattr(weight, "fp8_weight"):
         return
-    w_fp8, w_scale, w_t_fp8, w_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
-        weight,
-        output_scale_transpose=False,
-        quant_method="128x128",
-        input_transpose=True,
-        return_transpose_only=False,
-    )
 
-    setattr(weight, "fp8_weight_transpose", w_t_fp8)
-    setattr(weight, "fp8_scale_transpose", w_t_scale)
-    setattr(weight, "fp8_weight", w_fp8)
-    setattr(weight, "fp8_scale", w_scale)
+    if quant_transpose:
+        w_fp8, w_scale, w_t_fp8, w_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            weight,
+            output_scale_transpose=False,
+            quant_method="128x128",
+            input_transpose=True,
+            return_transpose_only=False,
+        )
+        setattr(weight, "fp8_weight_transpose", w_t_fp8)
+        setattr(weight, "fp8_scale_transpose", w_t_scale)
+        setattr(weight, "fp8_weight", w_fp8)
+        setattr(weight, "fp8_scale", w_scale)
+    else:
+        w_fp8, w_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
+            weight,
+            output_scale_transpose=False,
+            quant_method="128x128",
+            input_transpose=False,
+            return_transpose_only=False,
+        )
+        setattr(weight, "fp8_weight", w_fp8)
+        setattr(weight, "fp8_scale", w_scale)
 
 
 class FP8KeepXLinear(paddle.nn.Layer):
@@ -619,8 +636,8 @@ class FP8KeepXLinear(paddle.nn.Layer):
         )
         set_parameter_color([self.weight], "attn_out_project")
 
-    def fp8_quant_weight(self):
-        cache_fp8_weight(self.weight)
+    def fp8_quant_weight(self, quant_transpose=True):
+        cache_fp8_weight(self.weight, quant_transpose=quant_transpose)
 
     def forward(self, x):
         return FP8LinearFunction.apply(x, self, keep_x=True)
@@ -781,9 +798,9 @@ class FP8Mlp(paddle.nn.Layer):
             is_bias=False,
         )
 
-    def fp8_quant_weight(self):
-        cache_fp8_weight(self.w1)
-        cache_fp8_weight(self.w2)
+    def fp8_quant_weight(self, quant_transpose=True):
+        cache_fp8_weight(self.w1, quant_transpose)
+        cache_fp8_weight(self.w2, quant_transpose)
 
     def forward(self, x):
         if self.using_post_norm_recompute:
@@ -865,6 +882,10 @@ class FP8GroupGemmMlpFunctionNode:
         w1_t_quant = w1_t_quant.reshape([num_expert, -1, w1_t_quant.shape[-1]])
         w1_t_scale = w1_t_scale.reshape([num_expert, -1, w1_t_scale.shape[-1]])
 
+        if hasattr(expert_w1[0], "fp8_weight_stacked") and not hasattr(expert_w1[0], "fp8_weight_stacked_transpose"):
+            w1_t_quant = w1_t_quant.contiguous().transpose([0, 2, 1]).contiguous()
+            w1_t_scale = w1_t_scale.contiguous().transpose([0, 2, 1]).contiguous()
+
         if x is None:
             x_fp8, x_scale = self.input_fp8, self.input_scale
             assert x_fp8 is not None and x_scale is not None
@@ -913,6 +934,10 @@ class FP8GroupGemmMlpFunctionNode:
         w2_quant, w2_scale = fused_stack_quant(expert_w2, transpose=True)
         w2_quant = w2_quant.reshape([num_expert, -1, w2_quant.shape[-1]])
         w2_scale = w2_scale.reshape([num_expert, -1, w2_scale.shape[-1]])
+
+        if hasattr(expert_w2[0], "fp8_weight_stacked") and not hasattr(expert_w2[0], "fp8_weight_stacked_transpose"):
+            w2_quant = w2_quant.contiguous().transpose([0, 2, 1]).contiguous()
+            w2_scale = w2_scale.contiguous().transpose([0, 2, 1]).contiguous()
 
         # quant o2
         with paddle.amp.auto_cast(False):
