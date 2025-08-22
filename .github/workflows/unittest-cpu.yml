@@ -1,4 +1,4 @@
-name: Test
+name: Unittest CPU CI
 
 on: [pull_request]
 
@@ -18,8 +18,8 @@ env:
   TRANSFORMERS_CACHE: /home/disk1/cache/huggingface
 
 jobs:
-  Test:
-    name: Test
+  unittest-cpu-ci:
+    name:   unittest-cpu-ci
     runs-on: [self-hosted, ernie-cpu]
     permissions:
       pull-requests: write
