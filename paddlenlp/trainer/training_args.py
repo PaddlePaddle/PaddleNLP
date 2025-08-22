@@ -407,6 +407,10 @@ class TrainingArguments:
             Whether to release gradients during training. Default is `False`.
         ckpt_quant_stage (`str`, *optional*):
             Whether activate checkpoint quantization. O0: deactivate, O1: Int8 compression, O2: Int4 compression. (default: O0).
+        using_flex_checkpoint(`bool`, *optional*):
+            Whether to use FlexCheckpoint for save and load. Default is False.
+        aoa_config (`Optional[dict[str, list[str]]]`, *optional*):
+            The AoA configuration of FlexCheckpoint, used to describe the mapping between model weights and the checkpoint content. Default is None.
     """
 
     output_dir: str = field(
@@ -1084,6 +1088,13 @@ class TrainingArguments:
 
     nccl_comm_group_config: Optional[str] = field(
         default=None, metadata={"help": "NCCL中通信组的细粒度控制的配置文件路径, 默认值为None, 代表不启用此项配置"}
+    )
+
+    aoa_config: Optional[dict[str, list[str]]] = field(
+        default=None,
+        metadata={
+            "help": "The AoA configuration of FlexCheckpoint, used to describe the mapping between model weights and the checkpoint content. Default is None."
+        },
     )
 
     def __post_init__(self):
@@ -2376,7 +2387,6 @@ class TrainingArguments:
 
     @property
     def should_save_sharding_stage1_model(self):
-        # return True
         if self.enable_auto_parallel:
             return False
         return (

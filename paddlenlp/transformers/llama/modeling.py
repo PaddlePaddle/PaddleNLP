@@ -30,7 +30,9 @@ from paddle.autograd import PyLayer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.recompute.recompute import recompute
-from paddle.distributed.flex_checkpoint import build_sharded_state_dict
+from paddle.distributed.flex_checkpoint.dcp.sharded_weight import (
+    build_sharded_state_dict,
+)
 
 from paddlenlp.transformers.refined_recompute import (
     RRColumnParallelLinear,
@@ -1427,7 +1429,6 @@ class LlamaPretrainedModel(PretrainedModel):
 
     @classmethod
     def _get_fuse_or_split_param_mappings(cls, config: LlamaConfig, is_fuse=False):
-        raise NotImplementedError
         # return parameter fuse utils
         from paddlenlp.transformers.conversion_utils import split_or_fuse_func
 

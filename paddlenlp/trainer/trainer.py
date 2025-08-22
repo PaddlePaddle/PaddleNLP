@@ -166,6 +166,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     split_parallel_config,
 )
 from .training_args import TrainingArguments
+from .unified_checkpoint import UnifiedCheckpointHandler
 from .utils import reshard as reshard_util
 from .utils.async_save import AsyncSaver
 
@@ -957,7 +958,7 @@ class Trainer:
                     init_optimizer(self.optimizer)
                     optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
                     sharded_state_dict = {**model_sharded_state_dict, **optimizer_sharded_state_dict}
-                    dist.load_state_dict(sharded_state_dict, resume_from_checkpoint)
+                    dist.load_state_dict(sharded_state_dict, resume_from_checkpoint, aoa_config=self.args.aoa_config)
                     self._load_scheduler(resume_from_checkpoint)
         else:
             model = self.model_wrapped
