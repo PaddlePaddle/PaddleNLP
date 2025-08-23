@@ -260,8 +260,8 @@ if __name__ == "__main__":
         [
             setup_fast_ln,
             setup_fused_ln,
-            setup_causal_conv1d,
-            setup_selective_scan,
-            setup_paddle_bwd_ops,
+            # setup_causal_conv1d,
+            # setup_selective_scan,
+            # setup_paddle_bwd_ops,
         ],
     )

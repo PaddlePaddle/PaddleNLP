@@ -133,10 +133,13 @@ def fusion_rope(
 
 def rms_norm_fused(x_in, w, eps, use_fast_ln=False):
     if use_fast_ln:
-        fast_ln = try_import("fast_ln")
+        # fast_ln = try_import("fast_ln")
+        import paddlenlp_kernel.cuda.fast_ln as fast_ln
         return fast_ln.fast_rms_norm(x_in, w, eps)[0]
     else:
-        fused_ln = try_import("fused_ln")
+        import paddlenlp_kernel.cuda.fused_ln as fused_ln
+        print(f'[liguangming] use fused_ln')
+        # fused_ln = try_import("fused_ln")
         return fused_ln.fused_rms_norm(x_in, w, eps)[0]
 
 

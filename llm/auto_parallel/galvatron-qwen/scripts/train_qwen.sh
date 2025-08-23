@@ -1,8 +1,9 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-task_name="test"
+task_name="real_data-try-dynamic"
 
+export HF_ENDPOINT=https://hf-mirror.com
 rm -rf output/metric/single/$task_name/
 rm -rf "output/metric/single/$task_name""_log"
 
@@ -52,7 +53,7 @@ MODEL_ARGS=(
 # [mbsz, accumulation_steps] [recompute] [amp]
 CONFIG_ARGS="
     --per_device_train_batch_size 1 \
-    --gradient_accumulation_steps 1 \
+    --gradient_accumulation_steps 2 \
     --recompute true \
     --recompute_use_reentrant true \
     --recompute_granularity full \
@@ -66,10 +67,10 @@ CONFIG_ARGS="
 
 # [dp_deg, dp_type] [tp_deg, megatron-sp] [pp_deg, 1F1B] [parallel_configs]
 PARALLEL_ARGS=(
-    --to_static 1
-    --sharding_parallel_degree 1
-    --sharding "stage2"
-    --tensor_parallel_degree 8
+    --to_static 0
+    --sharding_parallel_degree 2
+    --sharding "stage3"
+    --tensor_parallel_degree 4
     --sequence_parallel true
     --pipeline_parallel_degree 1
     --virtual_pp_degree 1
@@ -95,6 +96,7 @@ DEFAULT_OPTIMIZER_ARGS="
     --enable_linear_fused_grad_add true \
 "
 
+    # --use_fast_layer_norm true \
 # [data] max_seq_length equal config.max_position_embeddings
 DATA_ARGS="
     --input_dir ./data \

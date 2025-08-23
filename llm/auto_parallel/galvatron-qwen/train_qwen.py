@@ -73,7 +73,7 @@ except ImportError:
     hf_load_dataset = None
 
 class WikiTextDataset(Dataset):
-    def __init__(self, tokenizer, seq_length=1024, split="train", cache_dir="./dataset_cache"):
+    def __init__(self, tokenizer, seq_length=1024, split="train", cache_dir="./datacache"):
         super(WikiTextDataset, self).__init__()
         self.tokenizer = tokenizer
         self.seq_length = seq_length
@@ -88,7 +88,8 @@ class WikiTextDataset(Dataset):
         # 使用tokenizer的vocab_size和seq_length作为缓存标识
         cache_key = f"{self.split}_{self.seq_length}_{getattr(self.tokenizer, 'vocab_size', 'unknown')}"
         cache_hash = hashlib.md5(cache_key.encode()).hexdigest()[:8]
-        return os.path.join(self.cache_dir, f"wikitext_{cache_hash}.npz")
+        # return os.path.join(self.cache_dir, f"wikitext_{cache_hash}.npz")
+        return os.path.join(self.cache_dir, 'wikitext_5c3eeb52.npz')
     
     def load_and_process_data(self):
         cache_file = self.get_cache_filename()
@@ -98,13 +99,44 @@ class WikiTextDataset(Dataset):
             try:
                 logger.info(f"Loading cached dataset from {cache_file}")
                 cached_data = np.load(cache_file)
-                self.input_ids_list = [cached_data[f'input_ids_{i}'] for i in range(len(cached_data.files)//2)]
-                self.labels_list = [cached_data[f'labels_{i}'] for i in range(len(cached_data.files)//2)]
-                logger.info(f"Successfully loaded {len(self.input_ids_list)} cached samples")
+                assert len(cached_data['input_ids_0']) == 8192
+                small_seq_len = 8192
+                seqs_per_big = self.seq_length // small_seq_len
+                input_keys = sorted([k for k in cached_data.files if k.startswith('input_ids_')])
+                label_keys = sorted([k for k in cached_data.files if k.startswith('labels_')])
+                
+                self.input_ids_list = []
+                self.labels_list = []
+                
+                for i in range(0, len(input_keys), seqs_per_big):
+                    if i + seqs_per_big >= len(input_keys):
+                        logger.info(f"最后一批次 长度不匹配")
+                        break
+                    input_batch_keys = input_keys[i:i + seqs_per_big]
+                    label_batch_keys = label_keys[i:i + seqs_per_big]
+
+                    input_big = np.concatenate([cached_data[k] for k in input_batch_keys], axis=0)
+                    label_big = np.concatenate([cached_data[k] for k in label_batch_keys], axis=0)
+
+                    assert input_big.shape[0] == self.seq_length, f"拼接后 input 长度不对: {input_big.shape[0]}"
+                    assert label_big.shape[0] == self.seq_length, f"拼接后 label 长度不对: {label_big.shape[0]}"
+
+                    self.input_ids_list.append(input_big)
+                    self.labels_list.append(label_big)
+                    
+                logger.info(f"成功拼接得到 {len(self.input_ids_list)} 个样本，每个长度 {self.seq_length}")
+
+                # print(f'[linguangming] {len(cached_data.files)}')
+                # self.input_ids_list = [cached_data[f'input_ids_{i}'] for i in range(len(cached_data.files)//2)]
+                # self.labels_list = [cached_data[f'labels_{i}'] for i in range(len(cached_data.files)//2)]
+                # print(f'input_id_len is  {len(self.input_ids_list)}')
+                # print(f'input_ids_seq is {len(self.input_ids_list[0])}')
+                # logger.info(f"Successfully loaded {len(self.input_ids_list)} cached samples")
+                # exit(0)
                 return
             except Exception as e:
                 logger.warning(f"Failed to load cache: {e}, will recreate dataset")
-        
+        # exit(0)
         # 如果没有缓存或缓存加载失败，重新处理数据
         if hf_load_dataset is None:
             raise ImportError("Please install datasets: pip install datasets")
@@ -216,7 +248,7 @@ def get_tokenizer():
     
     return tokenizer
 
-def create_dataset(tokenizer, seq_length=1024):
+def create_real_dataset(tokenizer, seq_length=1024):
     """使用已有的tokenizer创建数据集"""
     # Create WikiText dataset
     train_dataset = WikiTextDataset(tokenizer, seq_length=seq_length, split="train")
@@ -612,7 +644,9 @@ def main():
             last_epoch=0,
         )
     
-    train_dataset, data_collator = create_dataset(config.vocab_size, config.seq_length)
+    tokenizer = get_tokenizer()
+    train_dataset, data_collator = create_real_dataset(tokenizer, model_args.seq_length)
+    # train_dataset, data_collator = create_dataset(config.vocab_size, config.seq_length)
     
     # [workflow] 以下为模型封装代码
     trainer = PretrainingTrainer(

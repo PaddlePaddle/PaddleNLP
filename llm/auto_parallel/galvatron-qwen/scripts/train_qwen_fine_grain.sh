@@ -10,7 +10,7 @@ export NCCL_IB_GID_INDEX=3
 export NCCL_NET_GDR_LEVEL=1
 export GLOO_SOCKET_IFNAME=bond1
 
-task_name="sp16-16rank-zero2"
+task_name="sp-check"
 dir_name="tp-vs-sp"
 
 rm -rf output/$dir_name/$task_name/
@@ -21,7 +21,7 @@ export PYTHONPATH=../../../:$PYTHONPATH
 
 TRAINER="./train_qwen_fine_graine.py"
 LAUNCHER="python -u -m paddle.distributed.launch --log_level DEBUG"
-LAUNCHER="${LAUNCHER} --ips 28.12.131.41,28.12.130.118"
+LAUNCHER="${LAUNCHER} --ips 28.12.131.41"
 LAUNCHER="${LAUNCHER} --gpus 0,1,2,3,4,5,6,7" 
 LAUNCHER="${LAUNCHER} --log_dir output/$dir_name/$task_name""_log ${TRAINER} --output_dir "./output""
 
@@ -32,7 +32,7 @@ TRAIN_ARGS="
     --max_grad_norm 1.0 \
     --learning_rate 3e-05 \
     --min_learning_rate 3e-06 \
-    --max_steps 20 \
+    --max_steps 10 \
     --logging_steps 1 \
     --continue_training 0 \
     --do_train true \
@@ -79,8 +79,8 @@ CONFIG_ARGS="
 PARALLEL_ARGS=(
     --to_static 1
     --sharding_parallel_degree 1
-    --sharding "stage2"
-    --tensor_parallel_degree 16
+    --sharding "stage3"
+    --tensor_parallel_degree 8
     --sequence_parallel true
     --pipeline_parallel_degree 1
     --virtual_pp_degree 1
@@ -131,7 +131,7 @@ DEBUG_ARGS="
 GRANULARITY_RUNTIME_ARGS="
     --granularity_type coarse_grained \
     --usp_flag 1 \
-    --sharding_stage_level 2 \
+    --sharding_stage_level 3 \
 "
 
 $LAUNCHER \

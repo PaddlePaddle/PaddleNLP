@@ -1741,6 +1741,8 @@ class TrainingArguments:
                 gradient_merge.enable = True
                 gradient_merge.k_steps = self.gradient_accumulation_steps
                 gradient_merge.avg = True
+                # 临时强制修改
+                # gradient_merge.enable = False
 
             if self.tensor_parallel_degree > 1:
                 mp_optimization = strategy.mp_optimization

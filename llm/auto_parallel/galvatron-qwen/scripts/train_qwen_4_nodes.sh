@@ -12,6 +12,7 @@ unset CUDA_VISIBLE_DEVICES
 
 # 28.12.26.158,28.12.25.197,28.12.25.237,28.12.24.94
 # 8月12日 28.12.131.41,28.12.25.40,28.12.130.118,28.12.24.94
+# 8月16日 28.12.26.158,28.12.25.197,28.12.25.237,28.12.24.94
 # bash scripts/train_qwen_4_nodes.sh
 # source /apdcephfs_fsgm/share_303760348/lhy/activate && conda activate lgm-paddle && cd /apdcephfs_fsgm/share_303760348/guangming/WorkSpace/paddle3.0/llm/auto_parallel/galvatron-qwen/ && clear
 export CUDA_DEVICE_MAX_CONNECTIONS=1
@@ -23,26 +24,26 @@ export NCCL_IB_GID_INDEX=3
 export NCCL_NET_GDR_LEVEL=1
 export GLOO_SOCKET_IFNAME=bond1
 
-task_name="four_nodes"
 MY_IP=$(hostname -I | tr ' ' '\n' | grep '^28\.12')
-task_name="qwen-multi-mechine"
+task_name="qwen-multi-machine"
 task_name="${task_name}_${MY_IP}"
 
-dir_name="layer80-dp2-tp1-full-recompute-seq128k"
+dir_name="four_nodes-layer74"
+sub_dir_name="74-layer-check-accumulation2-zero3"
 current_time=$(date +"%Y-%m-%d-%H-%M")
-dir_name="${dir_name}_${current_time}"
+sub_dir_name="${sub_dir_name}_${current_time}"
 
-rm -rf output/four_nodes/$dir_name/$task_name/
-rm -rf "output/four_nodes/$dir_name/$task_name""_log"
+rm -rf output/$dir_name/$sub_dir_name/$task_name/
+rm -rf "output/$dir_name/$sub_dir_name/$task_name""_log"
 
 export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
 
 TRAINER="./train_qwen.py"
 LAUNCHER="python -u -m paddle.distributed.launch"
-LAUNCHER="${LAUNCHER} --ips 28.12.131.41,28.12.25.40,28.12.130.118,28.12.24.94"
+LAUNCHER="${LAUNCHER} --ips 28.12.26.158,28.12.25.197,28.12.25.237,28.12.24.94"
 LAUNCHER="${LAUNCHER} --gpus 0,1,2,3,4,5,6,7" 
-LAUNCHER="${LAUNCHER} --log_dir output/four_nodes/$dir_name/$task_name""_log ${TRAINER} --output_dir "./output""
+LAUNCHER="${LAUNCHER} --log_dir output/$dir_name/$sub_dir_name/$task_name""_log ${TRAINER} --output_dir "./output""
 
 # [max_steps] [logging_steps] [enable_auto_parallel]
 TRAIN_ARGS="
@@ -69,7 +70,7 @@ TRAIN_ARGS="
 # still need to use llama as model_type
 MODEL_ARGS=(
     --model_type "llama"
-    --num_hidden_layers 80
+    --num_hidden_layers 74
     --intermediate_size 49152
     --vocab_size 32000
     --hidden_size 8192
@@ -82,7 +83,7 @@ MODEL_ARGS=(
 # [mbsz, accumulation_steps] [recompute] [amp]
 CONFIG_ARGS="
     --per_device_train_batch_size 1 \
-    --gradient_accumulation_steps 1 \
+    --gradient_accumulation_steps 2 \
     --recompute true \
     --recompute_use_reentrant true \
     --recompute_granularity full \
@@ -121,7 +122,7 @@ DEFAULT_OPTIMIZER_ARGS="
     --fuse_sequence_parallel_allreduce true \
     --use_flash_attention true \
     --use_fused_rope true \
-    --use_fused_rms_norm false \
+    --use_fused_rms_norm true \
     --enable_linear_fused_grad_add true \
 "
 

@@ -545,9 +545,9 @@ class LlamaAttentionFineGrainedFinal(nn.Layer):
             kv_seq_len += past_key_value[0].shape[-3]
 
         if self.config.rope:
-            if self.sep_parallel_degree > 1:
-                batch_size, seq_length, _, _ = query_states.shape
-                position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
+            # if self.sep_parallel_degree > 1:
+            #     batch_size, seq_length, _, _ = query_states.shape
+            #     position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
                 batch_size, seq_length, num_heads, head_dim = query_states.shape
@@ -1555,5 +1555,6 @@ class LlamaForCausalLMFineGrainedFinal(LlamaPretrainedModelFineGrainedFinal):
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output) # actually, tensor_parallel_output is unused
 
         print(f'[linguangming]  logits.mesh.shape is {logits.process_mesh.shape}')
+        print(f'[linguangming] logits._local_shape  is {logits._local_shape}')
         
         return logits

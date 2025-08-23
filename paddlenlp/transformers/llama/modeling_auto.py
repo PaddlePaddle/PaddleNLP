@@ -210,8 +210,20 @@ class LlamaRMSNormAuto(nn.Layer):
         )
         self.variance_epsilon = config.rms_norm_eps
         self.config = config
+        
+        self.layer_norm = None
+        # from paddle.nn import LayerNorm
+        # self.layer_norm = LayerNorm(self.hidden_size, epsilon=self.variance_epsilon)
+        # self.layer_norm.weight = dist.shard_tensor(self.layer_norm.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()])
 
     def forward(self, hidden_states):
+        if self.layer_norm is not None:
+            hidden_states = self.layer_norm(hidden_states)
+            if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
+                hidden_states = paddle.cast(hidden_states, self.weight.dtype)
+
+            return hidden_states * self.weight
+            
         if self.config.use_fused_rms_norm:
             return fusion_ops.fusion_rms_norm(
                 hidden_states, self.weight, self.variance_epsilon, self.config.use_fast_layer_norm
@@ -592,7 +604,7 @@ class LlamaAttentionAuto(nn.Layer):
 
 
 class LlamaDecoderLayerAuto(nn.Layer):
-    def __init__(self, config, layerwise_recompute: bool = False, ipp: Optional[int] = None):
+    def __init__(self, config, layerwise_recompute: bool = False, ipp: Optional[int] = None, layer_idx=None):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size
@@ -606,6 +618,7 @@ class LlamaDecoderLayerAuto(nn.Layer):
         self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
         self.ipp = ipp
+        self.layer_idx = layer_idx
 
     def forward(
         self,
@@ -691,7 +704,26 @@ class LlamaDecoderLayerAuto(nn.Layer):
                 [dist.Shard(1), dist.Replicate()],
             )
 
-        hidden_states = self.mlp(hidden_states)
+        if self.layer_idx in [60, 61, 62, 63, 64, 65, 66, 67, 68]:
+            hidden_states = recompute(
+                self.mlp,
+                hidden_states,
+                use_reentrant=self.config.recompute_use_reentrant,
+            )
+        else:
+            hidden_states = self.mlp(hidden_states)
+
+        # if self.layer_idx in [71, 72, 73, 74]:
+        #     hidden_states = recompute(
+        #         self.mlp,
+        #         hidden_states,
+        #         use_reentrant=self.config.recompute_use_reentrant,
+        #     )
+        # else:
+        #     hidden_states = self.mlp(hidden_states)
+        
+        # 原始代码
+        # hidden_states = self.mlp(hidden_states)
 
         # enter sp region
         if self.config.sequence_parallel:
@@ -899,7 +931,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         self.next_pp_stage_indexes = []
         for i in range(config.num_hidden_layers):
             pp_stage_id, input_need_reshard = get_layer_pp_info(i)
-            decoder_layers.append(LlamaDecoderLayerAuto(config, i not in self.no_recompute_layers, pp_stage_id))
+            decoder_layers.append(LlamaDecoderLayerAuto(config, i not in self.no_recompute_layers, pp_stage_id, layer_idx=i))
             if input_need_reshard:
                 self.next_pp_stage_indexes.append(i)
 

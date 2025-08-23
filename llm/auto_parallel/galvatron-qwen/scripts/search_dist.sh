@@ -7,7 +7,7 @@ ProfileDataParserArgs="
     --hidden_size_list 8192 \
     --layernum_list 80 \
     --seqlen_list 131072 \
-    --profile_gpu_num 32 \
+    --profile_gpu_num 64 \
     --time_profile_data_path ./configs/computation_profiling_bf16_llama_rank[0].json \
     --memory_profile_data_path ./configs/memory_profiling_bf16_llama.json \
     --overlap_coe_path ./configs/overlap_coefficient.json \
@@ -18,9 +18,9 @@ ProfileDataParserArgs="
 
 SearchEngineArgs="
     --search_granularity fine-grained \
-    --world_size 32 \
-    --min_bsz 4 \
-    --max_bsz 4 \
+    --world_size 64 \
+    --min_bsz 8 \
+    --max_bsz 8 \
     --bsz_step 1 \
     --max_tp_size 16 \
     --max_pp_size 4 \
