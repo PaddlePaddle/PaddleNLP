@@ -92,7 +92,7 @@ class TimeCostModel:
         if self.recompute:
             self.bct += self.fct
         
-        # print(f'time cost model, fct:{self.fct}, bct:{self.bct}')
+        # print(f'time cost model, fct:{self.fct/ args.dummy_layernum}, bct:{self.bct/ args.dummy_layernum}')
             
     def estimate_dp_communication_cost(self):
         args = self.args
@@ -188,14 +188,14 @@ class TimeCostModel:
             overlap_part, rest_part, _ = self.bct_dp_overlap(self.dp_message_size, self.bct)
             overall_overhead = self.fct + overlap_part + rest_part + self.tp_communication_time + args.extra_overhead
             result = overall_overhead
-            # if self.tp_size < self.tp_size * self.dp_size // 2:
-            #     overlap_part, rest_part, _ = self.bct_dp_overlap(self.dp_message_size, self.bct)
-            #     overall_overhead = self.fct + overlap_part + rest_part + self.tp_communication_time + args.extra_overhead
-            #     result = overall_overhead
-            # else:
-            #     overlap_part, rest_part, _ = self.bct_dp_overlap(self.dp_message_size, self.bct * 1 / 2)
-            #     overall_overhead = self.fct + 1 / 2 * self.bct + overlap_part + rest_part + self.tp_communication_time + args.extra_overhead
-            #     result = overall_overhead
+            if self.tp_size < self.tp_size * self.dp_size // 2:
+                overlap_part, rest_part, _ = self.bct_dp_overlap(self.dp_message_size, self.bct)
+                overall_overhead = self.fct + overlap_part + rest_part + self.tp_communication_time + args.extra_overhead
+                result = overall_overhead
+            else:
+                overlap_part, rest_part, _ = self.bct_dp_overlap(self.dp_message_size, self.bct * 1 / 2)
+                overall_overhead = self.fct + 1 / 2 * self.bct + overlap_part + rest_part + self.tp_communication_time + args.extra_overhead
+                result = overall_overhead
                 
         if self.sharding_stage == 3:
             result += self.fsdp_allgather_message_size * self.dc

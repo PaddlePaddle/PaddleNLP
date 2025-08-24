@@ -93,7 +93,7 @@ class MemoryCostModel:
         result['model_states'] = self.model_states_size
         result['activation'] = self.activation_size
         result['enc_total'] = self.model_states_size + self.activation_size
-        # print(f'result: {result}')
+        print(f'result: {result}')
         return result
     
 @dataclass
@@ -158,6 +158,8 @@ class OtherMemoryCostModel:
                 # print("other cost model states", args.other_memory_pp_off['model_states'][tp_size] * self.zero_ratio(dp_size))
                 # print("other cost model activation", args.other_memory_pp_off['activation'][tp_size] * other_layers_bsz)
                 tp_other_memory_cost[0] = model_states_adjust * args.other_memory_pp_off['model_states'][model_tp] * zero_ratio_value + args.other_memory_pp_off['activation'][tp_size] * other_layers_bsz
+                print(f'other_model_states {model_states_adjust * args.other_memory_pp_off["model_states"][model_tp] * zero_ratio_value}')
+                print(f'other_activation {args.other_memory_pp_off["activation"][tp_size] * other_layers_bsz}')
             else: # pp -> 0:first stage, -1:last stage (here we assume accumulation_steps is greater than pp_size, which holds true in industrial practice. )
                 other_layers_bsz_first = other_layers_bsz * args.pp_size
                 other_layers_bsz_last = other_layers_bsz * 1

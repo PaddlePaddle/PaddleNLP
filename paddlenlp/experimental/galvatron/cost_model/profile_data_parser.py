@@ -126,6 +126,7 @@ class ProfileDataParser:
                 popt, _ = curve_fit(quadratic_func, x_data, y_data)
                 print("\tFitted popt for transformer layers:", popt)
                 self.time_profiled_list.append(quadratic_func(self.seqlen_list[i], *popt))
+                print(f'\tforward_time is {quadratic_func(self.seqlen_list[i], *popt)}')
             
             # process other layers, like embedding layer, classifier layer, etc.
             for i in range(args.num_layertype):
@@ -140,6 +141,7 @@ class ProfileDataParser:
                 popt, _ = curve_fit(linear_func, x_data, y_data)
                 print("\tFitted popt for other layers:", popt)
                 self.other_time_profiled_list.append(linear_func(self.seqlen_list[i], *popt))
+                print(f'\tother forward_time is {linear_func(self.seqlen_list[i], *popt)}')
                 
         else:
             raise ValueError(f"Unsupported time profile mode: {args.time_profile_mode}")

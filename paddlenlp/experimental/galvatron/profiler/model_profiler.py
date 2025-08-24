@@ -29,6 +29,8 @@ class ModelProfilerArguments:
     num_layertype: int = field(default=1, metadata={"help": "1:decoder-only and encoder-only, 2:encoder-decoder"})
     
     max_tp_deg: int = field(default=1, metadata={"help": "The maximum tensor parallel degree."})
+    
+    max_per_device_train_batch_size: int =  field(default=4, metadata={'help':''})
 
     def initialize(self, args_dict:dict):
         self.profile_type = args_dict.pop('--profile_type', 'memory')
@@ -45,6 +47,7 @@ class ModelProfilerArguments:
         self.profile_min_seq_length = int(args_dict.pop('--profile_min_seq_length', 1024))
         self.profile_max_seq_length = int(args_dict.pop('--profile_max_seq_length', 2048))
         self.profile_seq_length_step = int(args_dict.pop('--profile_seq_length_step', 1024))
+        self.max_per_device_train_batch_size = int(args_dict.pop('--max_per_device_train_batch_size', 4))
 
 class ModelProfiler:
     def __init__(self, args:ModelProfilerArguments, args_dict:dict):
@@ -104,9 +107,9 @@ class ModelProfiler:
             print(CMD)
                         
         print(f'[auto-parallel] Please run the following commands to get the time profiling data:')
-        for CMD in CMD_LIST:
-            print("[auto-parallel] run command: ", CMD)
-            os.system(CMD)               
+        # for CMD in CMD_LIST:
+        #     print("[auto-parallel] run command: ", CMD)
+        #     os.system(CMD)               
                     
     def _process_computation_data(self) -> None:
         time_config_path = self.get_time_profiling_path()
@@ -166,6 +169,7 @@ class ModelProfiler:
                             ARGS['--seq_length'] = seq_tuple[0]
                             
                             ARGS['--per_device_train_batch_size'] = args.profile_fixed_batch_size // ARGS['--sharding_parallel_degree']
+                            ARGS['--per_device_train_batch_size'] = min(ARGS['--per_device_train_batch_size'], self.args.max_per_device_train_batch_size)
                             ARGS['--gradient_accumulation_steps'] = 1
                             
                             LAUNCHER = os.getenv('LAUNCHER')
@@ -196,6 +200,7 @@ class ModelProfiler:
                         ARGS['--seq_length'] = seq_tuple[0]
                         
                         ARGS['--per_device_train_batch_size'] = args.profile_fixed_batch_size // ARGS['--sharding_parallel_degree']
+                        ARGS['--per_device_train_batch_size'] = min(ARGS['--per_device_train_batch_size'], self.args.max_per_device_train_batch_size)
                         ARGS['--gradient_accumulation_steps'] = 1
                         
                         LAUNCHER = os.getenv('LAUNCHER')
@@ -209,9 +214,9 @@ class ModelProfiler:
             print(CMD)
         
         print(f'[auto-parallel] Please run the following commands to get the memory profiling data:')
-        for CMD in CMD_LIST:
-            print("[auto-parallel] run command: ", CMD)
-            os.system(CMD)
+        # for CMD in CMD_LIST:
+        #     print("[auto-parallel] run command: ", CMD)
+        #     os.system(CMD)
     
     def _process_memory_data(self):
         args = self.args
@@ -262,11 +267,12 @@ class ModelProfiler:
                     layernum_key_0 = layernum_list_base 
                     layernum_key_1 = layernum_lists_other[i]
                     
+                    bsz_adjust = self.adjust_bsz(gbsz=bsz, dp_deg=dp_deg)
                     # Calculate parameter memory per layer
                     model_states_divide_param = 9 # when use dynamic and O2 and zero3 and accumulation_steps is 1, model_states = param * 9
                     param_per_layer = (
-                                        (re[self.key_format(layernum_key_1, bsz, seq_tuple[0], 'first', 'ms')] 
-                                        - re[self.key_format(layernum_key_0, bsz, seq_tuple[0], 'first', 'ms')]) 
+                                        (re[self.key_format(layernum_key_1, bsz_adjust, seq_tuple[0], 'first', 'ms')] 
+                                        - re[self.key_format(layernum_key_0, bsz_adjust, seq_tuple[0], 'first', 'ms')]) 
                                         / layernum_diff
                                         * fixed_pp_deg # this is unnessary
                                         / model_states_divide_param 
@@ -275,11 +281,11 @@ class ModelProfiler:
             
                     # Calculate activation memory per sample
                     act_per_layer_per_sample = (
-                                                (re[self.key_format(layernum_key_1, bsz, seq_tuple[0], 'first', 'act')] 
-                                                - re[self.key_format(layernum_key_0, bsz, seq_tuple[0], 'first', 'act')]) 
+                                                (re[self.key_format(layernum_key_1, bsz_adjust, seq_tuple[0], 'first', 'act')] 
+                                                - re[self.key_format(layernum_key_0, bsz_adjust, seq_tuple[0], 'first', 'act')]) 
                                                 / layernum_diff
                                             )
-                    act_per_layer_per_sample *= dp_deg / bsz  # namely, act_per_layer_per_sample /= (bsz / dp_deg) 
+                    act_per_layer_per_sample *= dp_deg / bsz_adjust  # namely, act_per_layer_per_sample /= (bsz / dp_deg) 
 
                     # store the results
                     param_result_list[i][tp_deg] = param_per_layer
@@ -307,22 +313,23 @@ class ModelProfiler:
                     layernum_key_0 = layernum_list_base
                     layernum_key_1 = layernum_lists_other[i]
                     
+                    bsz_adjust = self.adjust_bsz(gbsz=bsz, dp_deg=dp_deg)
                     # Calculate activation memory with checkpointing
                     act_per_layer_per_sample = (
-                                                (re[self.key_format(layernum_key_1, bsz, seq_tuple[0], 'first', 'act')]
-                                                - re[self.key_format(layernum_key_0, bsz, seq_tuple[0], 'first', 'act')])
+                                                (re[self.key_format(layernum_key_1, bsz_adjust, seq_tuple[0], 'first', 'act')]
+                                                - re[self.key_format(layernum_key_0, bsz_adjust, seq_tuple[0], 'first', 'act')])
                                                 / layernum_diff
                                                 * tp_deg
                                             )
-                    act_per_layer_per_sample *= dp_deg / bsz  # namely, act_per_layer_per_sample /= (bsz / dp_deg)
+                    act_per_layer_per_sample *= dp_deg / bsz_adjust  # namely, act_per_layer_per_sample /= (bsz / dp_deg)
                     
                     act_per_layer_per_sample_max = (
-                                                (re[self.key_format(layernum_key_1, bsz, seq_tuple[0], 'first', 'act_peak')]
-                                                - re[self.key_format(layernum_key_0, bsz, seq_tuple[0], 'first', 'act_peak')])
+                                                (re[self.key_format(layernum_key_1, bsz_adjust, seq_tuple[0], 'first', 'act_peak')]
+                                                - re[self.key_format(layernum_key_0, bsz_adjust, seq_tuple[0], 'first', 'act_peak')])
                                                 / layernum_diff
                                                 * tp_deg
                                             )
-                    act_per_layer_per_sample_max *= dp_deg / bsz  # namely, act_per_layer_per_sample /= (bsz / dp_deg)
+                    act_per_layer_per_sample_max *= dp_deg / bsz_adjust  # namely, act_per_layer_per_sample /= (bsz / dp_deg)
                     
                     print(f'layertype {i} with checkpoint, tp_deg {tp_deg}: act_per_layer_per_sample = {act_per_layer_per_sample}')
                     act_dict_c_list[i][tp_deg] = max(act_per_layer_per_sample, act_per_layer_per_sample_max)
@@ -370,19 +377,23 @@ class ModelProfiler:
                     # other_ms_last = re[self.key_format(layernum_list, bsz, seq_tuple[0], 'last', "ms")] - layer_ms_costs_last
                     
                     # Adjust for ZeRO-3 (default use zero3)
-                    other_ms_first = (re[self.key_format(layernum_list, bsz, seq_tuple[0], 'first', "ms")] - layer_ms_costs_first / dp_deg) * dp_deg
-                    other_ms_last = (re[self.key_format(layernum_list, bsz, seq_tuple[0], 'last', "ms")] - layer_ms_costs_last / dp_deg) * dp_deg
+                    bsz_adjust = self.adjust_bsz(gbsz=bsz, dp_deg=dp_deg)
+                    other_ms_first = (re[self.key_format(layernum_list, bsz_adjust, seq_tuple[0], 'first', "ms")] - layer_ms_costs_first / dp_deg) * dp_deg
+                    other_ms_last = (re[self.key_format(layernum_list, bsz_adjust, seq_tuple[0], 'last', "ms")] - layer_ms_costs_last / dp_deg) * dp_deg
 
                     # Calculate activation memory peaks
                     if pp_deg != 1:
-                        act_peak_first = max(re[self.key_format(layernum_list, bsz, seq_tuple[0], 'first', "act_peak")], re[self.key_format(layernum_list, bsz, seq_tuple[0], 'first', "act")])
-                        act_peak_last = max(re[self.key_format(layernum_list, bsz, seq_tuple[0], 'last', "act_peak")], re[self.key_format(layernum_list, bsz, seq_tuple[0], 'last', "act")])
+                        act_peak_first = max(re[self.key_format(layernum_list, bsz_adjust, seq_tuple[0], 'first', "act_peak")], re[self.key_format(layernum_list, bsz_adjust, seq_tuple[0], 'first', "act")])
+                        act_peak_last = max(re[self.key_format(layernum_list, bsz_adjust, seq_tuple[0], 'last', "act_peak")], re[self.key_format(layernum_list, bsz_adjust, seq_tuple[0], 'last', "act")])
                     else:
-                        act_peak_first = re[self.key_format(layernum_list, bsz, seq_tuple[0], 'first', "act")]
-                        act_peak_last = re[self.key_format(layernum_list, bsz, seq_tuple[0], 'last', "act")]
+                        # 这个地方好像写错了
+                        act_peak_first = re[self.key_format(layernum_list, bsz_adjust, seq_tuple[0], 'first', "act")]
+                        act_peak_last = re[self.key_format(layernum_list, bsz_adjust, seq_tuple[0], 'last', "act")]
+                        # act_peak_first = max(re[self.key_format(layernum_list, bsz_adjust, seq_tuple[0], 'first', "act_peak")], re[self.key_format(layernum_list, bsz_adjust, seq_tuple[0], 'first', "act")])
+                        # act_peak_last = max(re[self.key_format(layernum_list, bsz_adjust, seq_tuple[0], 'last', "act_peak")], re[self.key_format(layernum_list, bsz_adjust, seq_tuple[0], 'last', "act")])
                         
-                    other_act_first = (act_peak_first - layer_act_costs_first * bsz / dp_deg) / (bsz / dp_deg)
-                    other_act_last = (act_peak_last - layer_act_costs_last * bsz / dp_deg) / (bsz / dp_deg)
+                    other_act_first = (act_peak_first - layer_act_costs_first * bsz_adjust / dp_deg) / (bsz_adjust / dp_deg)
+                    other_act_last = (act_peak_last - layer_act_costs_last * bsz_adjust / dp_deg) / (bsz_adjust / dp_deg)
                     
                     # Ensure non-negative memory costs
                     other_ms_first = max(other_ms_first, 0)
@@ -560,3 +571,10 @@ class ModelProfiler:
         end_idx = int(np.sum(pp_divide[: stage_idx + 1]))
         return np.sum(layer_costs[start_idx:end_idx])
         
+    def adjust_bsz(self, gbsz, dp_deg):
+        fixed_accumulation_steps = 1
+        per_device_train_batch_size = gbsz // fixed_accumulation_steps // dp_deg
+        if per_device_train_batch_size <= self.args.max_per_device_train_batch_size:
+            return gbsz
+        else:
+            return self.args.max_per_device_train_batch_size * dp_deg * fixed_accumulation_steps

@@ -101,6 +101,7 @@ class RuntimeProfiler:
         self.max_profile_memory_iter = max_profile_memory_iter
         self.mem_dict = {}
         self.current_device = framework._current_expected_place_()
+        print(f'[linguangming] pp_rank={self.args.pp_rank},  tp_rank={self.args.tp_rank},  dp_rank={self.args.dp_rank}')
         self.first_rank = True if self.args.pp_rank == 0 and self.args.tp_rank == 0 and self.args.dp_rank == 0 else False
         self.last_rank = True if self.args.pp_rank == self.args.pp_degree - 1 and self.args.tp_rank == self.args.tp_degree - 1 and self.args.dp_rank == self.args.dp_degree - 1 else False
 
@@ -161,21 +162,27 @@ class RuntimeProfiler:
                 
                 args = self.args
                 strategy_info = f'{args.pp_degree}_{args.tp_degree}_{args.dp_degree}_{args.runtime_profiler_recompute}'
+                print(f'[linguangming] strategy_info is {strategy_info}')
                 layernum_info = num2str(self.args.layernum, "layernum")
                 seq_info = num2str(self.args.seq_len, "seq")
 
                 if strategy_info not in config:
+                    print(f'[linguangming] init empty')
                     config[strategy_info] = {}
                 
                 if self.first_rank:
+                    print(f'[linguangming] this is first_rank')
                     config[strategy_info][f'{layernum_info}_bsz{args.global_batch_size}_{seq_info}_first_ms'] = mem_dict["model_states"]
                     config[strategy_info][f'{layernum_info}_bsz{args.global_batch_size}_{seq_info}_first_act'] = mem_dict["activation"]
                     config[strategy_info][f'{layernum_info}_bsz{args.global_batch_size}_{seq_info}_first_act_peak'] = mem_dict["peak_activation"]
                 elif self.last_rank:
+                    print(f'[linguangming] this is last_rank')
                     config[strategy_info][f'{layernum_info}_bsz{args.global_batch_size}_{seq_info}_last_ms'] = mem_dict["model_states"]
                     config[strategy_info][f'{layernum_info}_bsz{args.global_batch_size}_{seq_info}_last_act'] = mem_dict["activation"]
                     config[strategy_info][f'{layernum_info}_bsz{args.global_batch_size}_{seq_info}_last_act_peak'] = mem_dict["peak_activation"]
-                    
+                
+                
+                print(f'[linguangming] config is {config}')
                 write_json_config(memory_path, config)
                 print(f"Already written profiled memory into config file {memory_path}!\n")
     
