@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # 环境变量（保持与项目一致的最小必要项）
-export PYTHONPATH=../../../:$PYTHONPATH
+export PYTHONPATH=../:$PYTHONPATH
 export FLAGS_call_stack_level=3
 export NVIDIA_TF32_OVERRIDE=0
 export FLAGS_cudnn_deterministic=True
@@ -23,8 +23,8 @@ export CUDA_DEVICE_MAX_CONNECTIONS=1
 export FLAGS_embedding_deterministic=1
 
 # 输出与日志目录
-case_out_dir="./dy_outputs/model_output"
-case_log_dir="./dy_outputs/qwen3_pretrain_dy_log"
+case_out_dir="./qwen3_moe_outputs/model_output"
+case_log_dir="./qwen3_moe_outputs/qwen3_pretrain_dy_log"
 
 # 清理旧目录（可按需注释掉）
 rm -rf "$case_out_dir"
@@ -36,7 +36,7 @@ rm -rf "$case_log_dir"
 python -u -m paddle.distributed.launch \
     --gpus "0,1" \
     --log_dir "$case_log_dir" \
-    ../../run_pretrain.py \
+    run_pretrain.py \
     --model_name_or_path "./qwen3-moe" \
     --tokenizer_name_or_path "./qwen3-moe" \
     --input_dir "./data" \
