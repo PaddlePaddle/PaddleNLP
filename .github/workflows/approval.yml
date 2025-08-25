@@ -14,8 +14,7 @@ env:
 jobs:
   check-approvers:
     name: Check approval
-    runs-on:
-      group: ernie-cpu
+    runs-on: [self-hosted, ernie-cpu]
     steps:
       - name: Cleanup
         run: |
