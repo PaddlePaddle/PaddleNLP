@@ -36,5 +36,6 @@ jobs:
       - name: Display Required Approvers
         if: steps.check-bypass.outputs.can-skip != 'true'
         run: |
+          set -x
           cd PaddleNLP/scripts/ci_approval
-          bash run_ci_approval.sh
+          bash -x run_ci_approval.sh
