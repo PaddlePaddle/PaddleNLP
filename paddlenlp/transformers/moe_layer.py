@@ -180,7 +180,7 @@ class MoELayer(nn.Layer):
             if moe_group == "data":
                 self.moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
             elif moe_group == "expert":
-                self.moe_group = dist.fleet.get_hybrid_communicate_group().expert_parallel_group
+                self.moe_group = dist.fleet.get_hybrid_communicate_group().expert_parallel_group()
             else:
                 assert NotImplementedError("moe_group can only be data or expert, but given {}".format(self.moe_group))
             self.moe_rank = dist.get_rank(self.moe_group)

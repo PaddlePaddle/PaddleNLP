@@ -1246,6 +1246,7 @@ class TrainingArguments:
             self.data_parallel_degree = world_size // (
                 sharding_parallel_degree * tensor_parallel_degree * sep_parallel_degree * pipeline_parallel_degree
             )
+            print(f"world_size:{world_size}, sharding_degree:{sharding_parallel_degree}, tp_degree:{tensor_parallel_degree}, pp_degree:{pipeline_parallel_degree}, sep_degree:{sep_parallel_degree}, ep_degree:{expert_parallel_degree}")
 
             if expert_parallel_degree > 1:
                 moe_sharding_parallel_degree = world_size // (pipeline_parallel_degree * expert_parallel_degree)
@@ -1584,8 +1585,11 @@ class TrainingArguments:
                     hybrid_configs["pp_configs"] = dygraph_pp_configs
                     logger.info(f"using pipeline configs:{dygraph_pp_configs}")
 
+                print(f"==== ep_degree:{self.expert_parallel_degree}, use_expert_parallel:{self.use_expert_parallel}, moe_sharding_degree:{self.moe_sharding_parallel_degree}")
+                print(f"=== hybrid_configs before setting:{hybrid_configs}")
                 # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
                 strategy.hybrid_configs = hybrid_configs
+                print(f"=== strategy.hybrid_configs:{strategy.hybrid_configs}")
 
                 if self.sharding_parallel_degree > 1:
                     sharding_parallel_config = split_parallel_config(self.sharding_parallel_config)
@@ -1696,11 +1700,12 @@ class TrainingArguments:
                 if self.nccl_comm_group_config is not None:
                     strategy = init_nccl_config(self.nccl_comm_group_config, strategy)
 
+                print(f"==== strategy.hybrid_configs before init:{strategy.hybrid_configs}")
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
 
-                if self.expert_parallel_degree > 1:
-                    self.add_moe_comm_group()
+                # if self.expert_parallel_degree > 1:
+                #     self.add_moe_comm_group()
 
         elif self.enable_auto_parallel:
             self.tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
