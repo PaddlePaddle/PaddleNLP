@@ -54,9 +54,6 @@ class SearchEngine:
         parser_data_args = ProfileDataParserArguments()
         parser_data_args.initialize(args_dict)
         self.parser = ProfileDataParser(parser_data_args)
-        
-        # self.generate_strategies()
-        # self.set_searching_bsz()
 
     def generate_strategies(self):
         args = self.args
@@ -398,7 +395,7 @@ class SearchEngine:
                                             optimal_sp_search = sp_search
                                             optimal_pp_stage_dict = pp_stage_dict 
         if max_throughput > 0:
-            print('\nFinal results of max memory %d MB:'%self.args.memory_upper_limit)
+            print('\nFinal results of max memory %d GB:'%self.args.memory_upper_limit)
             re = results[optimal_bsz][optimal_chunk][optimal_min_tp][optimal_max_tp][optimal_vsp][optimal_embed_sdp][optimal_sp_search]
             re['vsp'] = optimal_vsp
             re['embed_sdp'] = optimal_embed_sdp
@@ -412,11 +409,45 @@ class SearchEngine:
                     for sub_item in item:
                         print(sub_item)
                 # print(item)
+            config = {}
+            config['pp_size'] = re['min_pp_deg']
+            config['vtp'] =  re['vtp']
+            config['vsp_flag'] = re['vsp']
+            config['embed_sdp'] = re['embed_sdp']
+            config['global_batch_size'] = optimal_bsz
+            config['gradient_accumulation_steps'] = optimal_chunk
             
-            # TODO 以下进行store
-            # print_strategies(re['min_res_list'])
+            dp_size_list, sharding_stage_list, tp_size_list, usp_flag_list, recompute_list = [], [], [], [], []
+            for item in re['min_res_list']:
+                if isinstance(item, List):
+                    for sub_item in item:
+                        dp_size_list.append(sub_item.dp_size)
+                        sharding_stage_list.append(sub_item.sharding_stage)
+                        tp_size_list.append(sub_item.tp_size)
+                        usp_flag_list.append(sub_item.use_ulysses)
+                        recompute_list.append(sub_item.recompute)
+            config['dp_size_list'] = ','.join(str(dp_size) for dp_size in dp_size_list)
+            config['sharding_stage_list'] = ','.join(str(sharding_stage) for sharding_stage in sharding_stage_list)
+            config['tp_size_list'] = ','.join(str(tp_size) for tp_size in tp_size_list)
+            config['usp_flag_list'] = ','.join(str(usp_flag) for usp_flag in usp_flag_list)
+            config['recompute_list'] = ','.join(str(recompute) for recompute in recompute_list)
             
-            # self.save_results(re, optimal_bsz, optimal_chunk, optimal_pp_stage_dict)
+            ave_num_layer = self.args.layernum // config['pp_size']
+            last_num_layer = self.args.layernum - (config['pp_size'] - 1) * ave_num_layer
+            pp_stage_idx_list = []
+            for i in range(config['pp_size']):
+                if i == config['pp_size'] - 1:
+                    pp_stage_idx_list.extend([i] * last_num_layer)
+                else:
+                    pp_stage_idx_list.extend([i] * ave_num_layer)
+            config['pp_stage_idx_list'] = ','.join(str(pp_stage_idx) for pp_stage_idx in pp_stage_idx_list)
+            
+            store_path = './configs/fine_grained_config.json'
+            import os, json
+            if os.path.exists(os.path.dirname(store_path)) == False:
+                os.makedirs(os.path.dirname(store_path))
+            with open(store_path, 'w') as fp:
+                json.dump(config, fp, indent=4)
         else:
             print("No valid configuration found.")
         
