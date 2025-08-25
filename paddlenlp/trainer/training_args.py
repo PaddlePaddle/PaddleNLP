@@ -59,6 +59,7 @@ except Exception:
         return False
 
 
+print(111)
 __all__ = [
     "default_logdir",
     "TrainingArguments",
