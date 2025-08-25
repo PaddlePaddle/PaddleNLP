@@ -212,7 +212,8 @@ class ProfileDataParser:
         self.allreduce_coe = {}
         allreduce_size = args.profile_gpu_num
         while allreduce_size >= 2:
-            self.allreduce_coe[allreduce_size] = 1 / config[f'allreduce_size_{allreduce_size}']
+            if f'allreduce_size_{allreduce_size}' in config.keys():
+                self.allreduce_coe[allreduce_size] = 1 / config[f'allreduce_size_{allreduce_size}']
             allreduce_size //= 2
         self.allreduce_coe[1] = 0
         print(f'\tAllreduce coefficient: {self.allreduce_coe}')

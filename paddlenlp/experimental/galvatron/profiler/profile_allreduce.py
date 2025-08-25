@@ -206,7 +206,7 @@ def train(args):
         for event in traceEvents:
             if "name" in event:
                 event_name = event["name"]
-                if "ncclKernel_AllReduce" in event_name:
+                if "AllReduce" in event_name:
                     comm_num += 1
                     start_time = timestr2timenum(event["args"]["start_time"])
                     end_time = timestr2timenum(event["args"]["end_time"])
@@ -237,7 +237,7 @@ def train(args):
         per_comm_time = comm_time / comm_num
         per_comm_time = paddle.to_tensor([per_comm_time], dtype='float32', place=f"gpu:{local_rank}")
         dist.all_reduce(per_comm_time, group=tp_group, op=paddle.distributed.ReduceOp.SUM)
-        comm_coe = comm_coe.numpy()[0] / tp_group.world_size
+        comm_coe = per_comm_time.numpy()[0] / tp_group.world_size
         
         if rank == 0:
             save_file_name = args.save_file_name

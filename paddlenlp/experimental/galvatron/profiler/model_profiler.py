@@ -107,9 +107,9 @@ class ModelProfiler:
             print(CMD)
                         
         print(f'[auto-parallel] Please run the following commands to get the time profiling data:')
-        # for CMD in CMD_LIST:
-        #     print("[auto-parallel] run command: ", CMD)
-        #     os.system(CMD)               
+        for CMD in CMD_LIST:
+            print("[auto-parallel] run command: ", CMD)
+            os.system(CMD)               
                     
     def _process_computation_data(self) -> None:
         time_config_path = self.get_time_profiling_path()
@@ -214,9 +214,9 @@ class ModelProfiler:
             print(CMD)
         
         print(f'[auto-parallel] Please run the following commands to get the memory profiling data:')
-        # for CMD in CMD_LIST:
-        #     print("[auto-parallel] run command: ", CMD)
-        #     os.system(CMD)
+        for CMD in CMD_LIST:
+            print("[auto-parallel] run command: ", CMD)
+            os.system(CMD)
     
     def _process_memory_data(self):
         args = self.args

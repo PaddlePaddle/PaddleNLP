@@ -1,0 +1,8 @@
+{
+    "allreduce_size_32": 118.50048065185547,
+    "allreduce_size_16": 120.07427215576172,
+    "allreduce_size_8": 163.41685485839844,
+    "allreduce_size_4": 159.07696533203125,
+    "allreduce_size_2": 230.26303100585938,
+    "allreduce_size_64": 112.51239776611328
+}

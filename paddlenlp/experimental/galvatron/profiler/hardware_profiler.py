@@ -352,8 +352,8 @@ class HardwareProfiler():
                     f.write(f'echo "Running: {script}"\n')
                     f.write(f'{script}\n')
                     f.write("sleep 1\n")
-                    buffer_size /= 2
-                allreduce_size /= 2
+                    buffer_size //= 2
+                allreduce_size //= 2
             
             f.write(f'rm -r ./profiler_log')
                 
@@ -380,8 +380,8 @@ class HardwareProfiler():
                     f.write(f'echo "Running: {script}"\n')
                     f.write(f'{script}\n')
                     f.write("sleep 1\n")
-                    buffer_size /= 2
-                all2all_size /= 2
+                    buffer_size //= 2
+                all2all_size //= 2
         
                     
     # =============== remove some files after profiling ===============
