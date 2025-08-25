@@ -16,7 +16,7 @@
 
 failed_num=0
 echo_list=()
-approval_line=`curl -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/PaddlePaddle/PaddleNLP/pulls/${GIT_PR_ID}/reviews?per_page=10000`
+approval_line=`curl -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/PaddlePaddle/PaddleNLP/pulls/${PR_ID}/reviews?per_page=10000`
 
 function add_failed(){
     failed_num=`expr $failed_num + 1`
