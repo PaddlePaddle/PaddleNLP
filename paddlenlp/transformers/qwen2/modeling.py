@@ -33,6 +33,9 @@ from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.recompute.recompute import recompute
+from paddle.distributed.flex_checkpoint.dcp.sharded_weight import (
+    build_sharded_state_dict,
+)
 
 from paddlenlp.transformers.contrastive_loss import SimpleContrastiveLoss
 from paddlenlp.transformers.refined_recompute import (
@@ -1491,6 +1494,14 @@ class Qwen2LMHead(nn.Layer):
             hidden_states, self.weight, transpose_y=self.transpose_y, tensor_parallel_output=tensor_parallel_output
         )
         return logits
+
+    def sharded_state_dict(
+        self,
+        structured_name_prefix: str = "",
+    ):
+        axis = 0 if self.transpose_y else 1
+        state_dict = self.state_dict(structured_name_prefix="")
+        return build_sharded_state_dict(state_dict, {"weight": axis}, structured_name_prefix)
 
 
 class Qwen2ForCausalLM(Qwen2PretrainedModel):
