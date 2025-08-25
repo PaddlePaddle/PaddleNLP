@@ -9,6 +9,7 @@ class HardwareProfilerArgs:
     num_nodes: int = 1
     num_gpus_per_node: int = 8
     max_pp_deg: int = 8
+    max_tp_deg: int = 8
     start_mb: int = 1
     end_mb: int = 1024
     scale: int = 2
@@ -28,6 +29,7 @@ class HardwareProfilerArgs:
         self.hostfile = args_dict.get("--hostfile", self.hostfile)
         self.avg_or_min_or_first = args_dict.get("--avg_or_min_or_first", self.avg_or_min_or_first)
         self.backend = args_dict.get('--backend', self.backend)
+        self.max_tp_deg = int(args_dict.get('--max_tp_deg'))
 
 class HardwareProfiler():
     """Hardware profiler for analyzing communication bandwidth and other hardware characteristics"""
@@ -249,11 +251,22 @@ class HardwareProfiler():
     # =============== For Launching Scripts for Profiling Overlap Slowdown Coefficient ===============
     def profile_overlap(self):
         print("Profiling overlap slowdown coefficient...")
-        CMD = "python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 --log_dir output/profile_overlap "
+        interpreter = os.getenv('INTERPRETER')
+        CMD = f'{interpreter} -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 --log_dir output/profile_overlap '
         script_path = os.path.join(self.path, "profile_overlap.py")
-        CMD += f'{script_path} '
-        os.system(CMD)
-        # os.system("bash %s" % (os.path.join(self.path, "scripts/profile_overlap.sh")))
+        CMD += f'{script_path} --output_dir "./output"'
+        
+        scripts_path = './scripts/profile_overlap.sh'
+        with open(scripts_path, 'w') as f:
+            NCCL_IB_HCA = os.getenv('NCCL_IB_HCA')
+            NCCL_IB_DISABLE = os.getenv('NCCL_IB_DISABLE')
+            f.write(f'export NCCL_IB_HCA={NCCL_IB_HCA}\n')
+            f.write(f'export NCCL_IB_DISABLE={NCCL_IB_DISABLE}\n')
+            f.write(f'echo "Running {CMD}"\n')
+            f.write(f'{CMD}\n')
+            f.write('sleep 1\n')
+            
+            f.write(f'rm -r ./profiler_log')
     
     def profile_allreduce(self):
         args = self.args
@@ -261,16 +274,27 @@ class HardwareProfiler():
         save_file_name = os.path.join(self.execution_path, f"configs/allreduce_bandwidth_{args.num_nodes}nodes_{args.num_gpus_per_node}gpus_per_node.json" )
         tp_limit = self.args.num_gpus_per_node
         CMD_LIST = []
-        gpus = {2:'0,1', 4:'0,1,2,3', 8:'0,1,2,3,4,5,6,7'}
         while tp_limit > 1:
-            CMD = f"python -m paddle.distributed.launch --gpus={gpus[tp_limit]} --log_dir output/profile_allreduce "
-            script_path = os.path.join(self.path, "profile_allreduce.py")
-            CMD += f'{script_path} --mp_degree {tp_limit} --save_file_name {save_file_name} '
+            CMD = os.getenv('LAUNCHER')
+            CMD += f' --log_dir output/profile_allreduce '
+            script_path = os.path.join(self.path, "profile_allreduce.py ")
+            CMD += f'{script_path} --output_dir "./output" '
+            CMD += f'--profile_time 0 --tp_deg {tp_limit} --save_file_name {save_file_name} '
             CMD_LIST.append(CMD)
             tp_limit //= 2
-        for cmd in CMD_LIST:
-            print("Running command:", cmd)
-            os.system(cmd)
+        
+        scripts_path = './scripts/profile_allreduce.sh'
+        with open(scripts_path, 'w') as f:
+            NCCL_IB_HCA = os.getenv('NCCL_IB_HCA')
+            NCCL_IB_DISABLE = os.getenv('NCCL_IB_DISABLE')
+            f.write(f'export NCCL_IB_HCA={NCCL_IB_HCA}\n')
+            f.write(f'export NCCL_IB_DISABLE={NCCL_IB_DISABLE}\n')
+            for cmd in CMD_LIST:
+                f.write(f'echo "Running {cmd}"\n')
+                f.write(f'{cmd}\n')
+                f.write('sleep 1\n')
+            
+            f.write(f'rm -r ./profiler_log')
     
     def profile_p2p(self):
         args = self.args
@@ -278,17 +302,88 @@ class HardwareProfiler():
         save_file_name = os.path.join(self.execution_path, f"configs/p2p_bandwidth_{args.num_nodes}nodes_{args.num_gpus_per_node}gpus_per_node.json")
         pp_deg = 2
         CMD_LIST = []
-        gpus = {2:'0,1', 4:'0,1,2,3', 8:'0,1,2,3,4,5,6,7'}
         while pp_deg <= args.max_pp_deg:
-            CMD = f"python -m paddle.distributed.launch --gpus={gpus[args.num_gpus_per_node]} --log_dir output/profile_p2p "
+            CMD = os.getenv('LAUNCHER')
+            CMD += ' --log_dir /output/profile_p2p '
             script_path = os.path.join(self.path, "profile_p2p.py")
-            CMD += f'{script_path} --save_file_name {save_file_name} '
+            CMD += f'{script_path} --output_dir "./output" '
+            CMD += f'--pp_deg {pp_deg} --save_file_name {save_file_name} '
             CMD_LIST.append(CMD)
             pp_deg *= 2
-        for cmd in CMD_LIST:
-            print("Running command:", cmd)
-            os.system(cmd)
-    
+            
+        scripts_path = './scripts/profile_p2p.sh'
+        with open(scripts_path, 'w') as f:
+            NCCL_IB_HCA = os.getenv('NCCL_IB_HCA')
+            NCCL_IB_DISABLE = os.getenv('NCCL_IB_DISABLE')
+            f.write(f'export NCCL_IB_HCA={NCCL_IB_HCA}\n')
+            f.write(f'export NCCL_IB_DISABLE={NCCL_IB_DISABLE}\n')
+            for cmd in CMD_LIST:
+                f.write(f'echo "Running {cmd}"\n')
+                f.write(f'{cmd}\n')
+                f.write('sleep 1\n')
+
+            f.write(f'rm -r ./profiler_log')
+            
+    def profile_sp(self):
+        print("Profiling sp bandwidth...")
+        args = self.args
+        save_file_name = os.path.join(self.execution_path, f"configs/sp_time_{args.num_nodes}nodes_{args.num_gpus_per_node}gpus_per_node.json" )
+        
+        def allreduce_script(allreduce_size, buffer_size):
+            CMD = os.getenv('LAUNCHER')
+            CMD += ' --log_dir /output/profile_allreduce_sp '
+            script_path = os.path.join(self.path, "profile_allreduce.py ")
+            CMD += f'{script_path} --output_dir "./output" '
+            CMD += f'--profile_time 1 --tp_deg {allreduce_size} --save_file_name {save_file_name} --local_batch_size {buffer_size}'
+            return CMD
+            
+        scripts_path = './scripts/profile_allreduce_sp.sh'
+        with open(scripts_path, 'w') as f:
+            NCCL_IB_HCA = os.getenv('NCCL_IB_HCA')
+            NCCL_IB_DISABLE = os.getenv('NCCL_IB_DISABLE')
+            f.write(f'export NCCL_IB_HCA={NCCL_IB_HCA}\n')
+            f.write(f'export NCCL_IB_DISABLE={NCCL_IB_DISABLE}\n')
+
+            allreduce_size = min(self.args.num_nodes * self.args.num_gpus_per_node, self.args.max_tp_deg)
+            while allreduce_size > 1:
+                buffer_size = 1024
+                while buffer_size >= 1:
+                    script = allreduce_script(allreduce_size, buffer_size)
+                    f.write(f'echo "Running: {script}"\n')
+                    f.write(f'{script}\n')
+                    f.write("sleep 1\n")
+                    buffer_size /= 2
+                allreduce_size /= 2
+            
+            f.write(f'rm -r ./profiler_log')
+                
+        def all2all_script(all2all_size, buffer_size):
+            CMD = os.getenv('LAUNCHER')
+            CMD += ' --log_dir /output/profile_all2all '
+            script_path = os.path.join(self.path, "profile_all2all.py ")
+            CMD += f'{script_path} --output_dir "./output" '
+            CMD += f'--tp_deg {all2all_size} --save_file_name {save_file_name} --local_batch_size {buffer_size}'
+            return CMD
+        
+        scripts_path = './scripts/profile_all2all.sh'
+        with open(scripts_path, "w") as f:
+            NCCL_IB_HCA = os.getenv('NCCL_IB_HCA')
+            NCCL_IB_DISABLE = os.getenv('NCCL_IB_DISABLE')
+            f.write(f'export NCCL_IB_HCA={NCCL_IB_HCA}\n')
+            f.write(f'export NCCL_IB_DISABLE={NCCL_IB_DISABLE}\n')
+            
+            all2all_size = min(self.args.num_nodes * self.args.num_gpus_per_node, self.args.max_tp_deg)
+            while all2all_size > 1:
+                buffer_size = 1024
+                while buffer_size >= 1:
+                    script = all2all_script(all2all_size, buffer_size)
+                    f.write(f'echo "Running: {script}"\n')
+                    f.write(f'{script}\n')
+                    f.write("sleep 1\n")
+                    buffer_size /= 2
+                all2all_size /= 2
+        
+                    
     # =============== remove some files after profiling ===============
     def remove_files(self):
         cmd_list = [

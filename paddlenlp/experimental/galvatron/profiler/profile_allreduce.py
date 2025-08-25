@@ -8,6 +8,7 @@ import argparse
 import paddle.profiler
 import json
 import os
+import paddle.distributed as dist
 
 def read_json_config(path):
     if os.path.exists(path) == False:
@@ -77,7 +78,6 @@ class allreduce_block(nn.Layer):
     def __init__(self, mp_group):
         super().__init__()
         self.mp_group = mp_group
-        # self.linear = nn.Linear(1024, 1024)
         
     def forward(self, hidden_states):
         hidden_states = copy_to_model_parallel_region(hidden_states, self.mp_group)
@@ -87,7 +87,7 @@ class allreduce_block(nn.Layer):
 
 class RandomDataset(Dataset):
     def __init__(self, local_batch_size, profile_time):
-        self.dataset_size = local_batch_size * 11
+        self.dataset_size = local_batch_size * 11 # total 11 iteration
         self.input = np.random.rand(*(self.dataset_size, 512, 1024))
         self.profile_time = profile_time
 
@@ -114,9 +114,15 @@ def set_seed(rank):
     random.seed(seed)
     paddle.seed(seed)
 
-def generate_mp_groups(world_size, rank, mp_size):
+def get_tp_groups(tp_deg):
+    world_size = dist.get_world_size()
+    total_ranks = list(range(0, world_size))
+    assert world_size % tp_deg == 0
     
-    pass
+    num = world_size // tp_deg
+    all_tp_groups =  [total_ranks[i *  tp_deg : (i +  1) * tp_deg] for i in range(num)]
+    all_tp_groups = [dist.new_group(ranks=tp_groups) for tp_groups in all_tp_groups]
+    return all_tp_groups
 
 def train(args):
     paddle.distributed.init_parallel_env()
@@ -124,9 +130,7 @@ def train(args):
     rank = paddle.distributed.get_rank()
     local_rank = paddle.distributed.ParallelEnv().local_rank
     set_seed(rank)
-    
-    world_size = paddle.distributed.get_world_size()
-    
+        
     args.num_layers = 24
     train_batch_size_input = args.local_batch_size
     print(f'local_batch_size: {train_batch_size_input}')
@@ -134,18 +138,18 @@ def train(args):
     dataset = RandomDataset(train_batch_size_input, args.profile_time)
     dataloader = paddle.io.DataLoader(dataset, batch_size=train_batch_size_input)    
     
-    tp_group = paddle.distributed.new_group(ranks=[i for i in range(world_size)])  
+    all_tp_groups = get_tp_groups(args.tp_deg)
+    tp_group = None
+    for group in all_tp_groups:
+        if rank in group.ranks:
+            tp_group = group
+            break
     print(f"tp_group.nranks: {tp_group.nranks}")
-    
-    # tp_groups = []
-    # for i in range(args.num_layers):
-    #     tp_groups.append(paddle.distributed.new_group(ranks=[i for i in range(world_size)]))  
-    
+
     model = nn.Sequential()
     model.add_sublayer('pre_sync_module', pre_sync_module())
     model.add_sublayer('pre_mlp', pre_mlp())
     for i in range(args.num_layers):
-        # module = allreduce_block(tp_groups[i]) 
         module = allreduce_block(tp_group)
         model.add_sublayer(f'mlp_{i}', module)
 
@@ -155,12 +159,10 @@ def train(args):
     optimizer = paddle.optimizer.Adam(learning_rate=0.001, parameters=model.parameters())
     
     # Calculate theoretical communication message size
-    mp_size = args.mp_degree
-    pp_size = args.pp_degree
-    dp_size = world_size // pp_size // mp_size
+    tp_deg = args.tp_deg
     local_batch_size = args.local_batch_size
-    allreduce_message_size_per_layer = 2 * (mp_size - 1) / mp_size * (local_batch_size * 512 * 1024 * 2 * 4 / 1024 / 1024)
-    allreduce_message_size_total = allreduce_message_size_per_layer * 24 / pp_size
+    allreduce_message_size_per_layer = 2 * (tp_deg - 1) / tp_deg * (local_batch_size * 512 * 1024 * 2 * 4 / 1024 / 1024) # Multiply by 2 for bfloat16 size in bytes, multiply by 4 for 4 communications per forward-backward pass.
+    allreduce_message_size_total = allreduce_message_size_per_layer * args.num_layers
     print(f"allreduce_message_size_per_layer: {allreduce_message_size_per_layer} MB")
     print(f"allreduce_message_size_total: {allreduce_message_size_total} MB")
     
@@ -210,32 +212,53 @@ def train(args):
                     end_time = timestr2timenum(event["args"]["end_time"])
                     comm_time += end_time - start_time
     print((f'comm_time: {comm_time} ms'))
-    allreduce_time_24_layer = comm_time / 10 # [note] because we have 10 iterations in the dataloader
-    comm_coe = allreduce_message_size_total / allreduce_time_24_layer
-    comm_coe = paddle.to_tensor([comm_coe], dtype='float32', place=f"gpu:{local_rank}")
-    paddle.distributed.all_reduce(comm_coe, group=tp_group, op=paddle.distributed.ReduceOp.SUM)
-    comm_coe = comm_coe.numpy()[0] / tp_group.world_size
-    print(f"comm_coe: {comm_coe} MB/ms")
     
-    if rank == 0:
-        save_file_name = args.save_file_name
-        if os.path.exists(os.path.dirname(save_file_name)) == False:
-            os.makedirs(os.path.dirname(save_file_name), exist_ok=True)
-        if os.path.exists(save_file_name) == False:
-            with open(save_file_name, 'w') as f:
-                pass
-        config = read_json_config(save_file_name)
-        key = f'allreduce_size_{args.mp_degree}'
-        config[key] = comm_coe
-        write_json_config(config, save_file_name)
+    if args.profile_time == 0:  
+        allreduce_time_24_layer = comm_time / 10 # [note] because we have 10 iterations in the dataloader
+        comm_coe = allreduce_message_size_total / allreduce_time_24_layer
+        comm_coe = paddle.to_tensor([comm_coe], dtype='float32', place=f"gpu:{local_rank}")
+        paddle.distributed.all_reduce(comm_coe, group=tp_group, op=paddle.distributed.ReduceOp.SUM)
+        comm_coe = comm_coe.numpy()[0] / tp_group.world_size
+        print(f"comm_coe: {comm_coe} MB/ms")
+        
+        if rank == 0:
+            save_file_name = args.save_file_name
+            if os.path.exists(os.path.dirname(save_file_name)) == False:
+                os.makedirs(os.path.dirname(save_file_name), exist_ok=True)
+            if os.path.exists(save_file_name) == False:
+                with open(save_file_name, 'w') as f:
+                    tmp = {}
+                    json.dump(tmp, f, indent=4)
+            config = read_json_config(save_file_name)
+            key = f'allreduce_size_{args.tp_deg}'
+            config[key] = comm_coe
+            write_json_config(config, save_file_name)
+    else:
+        per_comm_time = comm_time / comm_num
+        per_comm_time = paddle.to_tensor([per_comm_time], dtype='float32', place=f"gpu:{local_rank}")
+        dist.all_reduce(per_comm_time, group=tp_group, op=paddle.distributed.ReduceOp.SUM)
+        comm_coe = comm_coe.numpy()[0] / tp_group.world_size
+        
+        if rank == 0:
+            save_file_name = args.save_file_name
+            if os.path.exists(os.path.dirname(save_file_name)) == False:
+                os.makedirs(os.path.dirname(save_file_name), exist_ok=True)
+            if os.path.exists(save_file_name) == False:
+                with open(save_file_name, 'w') as f:
+                    tmp = {}
+                    json.dump(tmp, f, indent=4)
+            config = read_json_config(save_file_name)
+            key = f'allreduce_size_{args.tp_deg}_{args.local_batch_size}MB_time'
+            config[key] = comm_coe
+            write_json_config(config, save_file_name)
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Profiler allreduce")
-    parser.add_argument("--local_batch_size", type=int, default=1, help="local batch size")
+    parser.add_argument('--output_dir', type=str,)
+    parser.add_argument("--local_batch_size", type=int, default=64, help="local batch size")
     parser.add_argument("--profile_time", type=int, default=0, help="profile time")
-    parser.add_argument("--mp_degree", type=int, default=1, help="model parallel degree")
-    parser.add_argument("--pp_degree", type=int, default=1, help="pipeline parallel degree")
     parser.add_argument("--save_file_name", type=str, default='./configs/', help="save file name")
+    parser.add_argument('--tp_deg', type=int, default=1)
     
     args = parser.parse_args()
     

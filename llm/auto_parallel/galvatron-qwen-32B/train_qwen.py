@@ -210,14 +210,15 @@ class WikiTextDataset(Dataset):
     
     def __getitem__(self, idx):
         if idx >= len(self.input_ids_list):
-            raise IndexError("Index out of range")
+            idx = idx % self.input_ids_list
+            # raise IndexError("Index out of range")
         return {
             "input_ids": self.input_ids_list[idx], 
             "labels": self.labels_list[idx]
         }
     
     def __len__(self):
-        return len(self.input_ids_list)
+        return len(self.input_ids_list) * 512
 
 def get_tokenizer():
     """获取并初始化tokenizer"""

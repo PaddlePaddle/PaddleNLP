@@ -264,9 +264,10 @@ def use_dist_send_recv(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="PaddlePaddle P2P Communication Profiler")
+    parser.add_argument('--output_dir', type=str,)
     parser.add_argument("--local_batch_size", type=int, default=32, help="local batch size for each rank" )
     parser.add_argument("--save_file_name", type=str, default='./configs/', help="save file name")
+    parser.add_argument('--pp_deg', type=int)
     args = parser.parse_args()
-    # train(args)
-    # test(args)
+
     use_dist_send_recv(args)

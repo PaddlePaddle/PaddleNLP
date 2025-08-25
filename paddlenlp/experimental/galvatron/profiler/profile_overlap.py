@@ -167,6 +167,7 @@ def profile(args):
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Profiler")
+    parser.add_argument('--output_dir', type=str)
     parser.add_argument('--overlap_time_multiply', type=int, default=4, help='Overlap time multiply factor')
     args = parser.parse_args()
     profile(args)
