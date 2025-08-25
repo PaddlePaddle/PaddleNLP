@@ -183,6 +183,7 @@ class DeepseekV2Config(PretrainedConfig):
         send_mtp_embed=False,
         using_post_norm_recompute=False,
         recompute_fwd_gate_up=0,
+        recompute_fa3=0,
         is_split_group_gemm=False,
         fakse_gate_restrict_balance=False,
         adaptive_remained_O1_recompute_ratio=0,
@@ -243,6 +244,7 @@ class DeepseekV2Config(PretrainedConfig):
         self.send_mtp_embed = send_mtp_embed
         self.using_post_norm_recompute = using_post_norm_recompute
         self.recompute_fwd_gate_up = recompute_fwd_gate_up
+        self.recompute_fa3 = recompute_fa3
         self.is_split_group_gemm = is_split_group_gemm
         self.fakse_gate_restrict_balance = fakse_gate_restrict_balance
         self.adaptive_remained_O1_recompute_ratio = adaptive_remained_O1_recompute_ratio

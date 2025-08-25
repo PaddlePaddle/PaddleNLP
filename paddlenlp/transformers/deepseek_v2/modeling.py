@@ -212,6 +212,45 @@ def assign_kv_heads(num_kv_heads: int, num_gpus: int):
     return assignment_list
 
 
+class LMHeadFunction(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, x, weight, transpose_y):
+        out = paddle.matmul(x, weight, transpose_y=transpose_y)
+
+        ctx.save_for_backward(x, weight, transpose_y)
+        return out
+
+    @staticmethod
+    def backward(ctx, dout):
+        if dout.dtype == paddle.float32:
+            dout = dout.cast(paddle.bfloat16)
+
+        x, weight, transpose_y = ctx.saved_tensor()
+
+        dx = paddle.matmul(dout, weight, transpose_y=not transpose_y)
+        if transpose_y:
+            with paddle.amp.auto_cast(False):
+                paddle._C_ops.fused_linear_param_grad_add(
+                    dout.reshape([-1, dout.shape[-1]]),
+                    x.reshape([-1, x.shape[-1]]),
+                    weight.main_grad,
+                    None,
+                    True,
+                    False,
+                )
+        else:
+            with paddle.amp.auto_cast(False):
+                paddle._C_ops.fused_linear_param_grad_add(
+                    x.reshape([-1, x.shape[-1]]),
+                    dout.reshape([-1, dout.shape[-1]]),
+                    weight.main_grad,
+                    None,
+                    True,
+                    False,
+                )
+        return dx, None
+
+
 def parallel_matmul(x: Tensor, y: Tensor, transpose_y=False, tensor_parallel_output=True):
     is_fleet_init = True
     tensor_parallel_degree = 1
@@ -238,7 +277,7 @@ def parallel_matmul(x: Tensor, y: Tensor, transpose_y=False, tensor_parallel_out
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
 
     else:
-        logits = paddle.matmul(x, y, transpose_y=transpose_y)
+        logits = LMHeadFunction.apply(x, y, transpose_y=transpose_y)
         return logits
 
 
@@ -601,34 +640,37 @@ class DeepseekV2YarnRotaryEmbedding(DeepseekV2RotaryEmbedding):
         super().__init__(dim, max_position_embeddings, base)
 
     def _set_cos_sin_cache(self, seq_len):
-        self.max_seq_len_cached = seq_len
-        dim = self.dim
+        with paddle.amp.auto_cast(False):
+            self.max_seq_len_cached = seq_len
+            dim = self.dim
 
-        freq_extra = 1.0 / (self.base ** (paddle.arange(0, dim, 2, dtype=paddle.float32) / dim))
-        freq_inter = 1.0 / (self.scaling_factor * self.base ** (paddle.arange(0, dim, 2, dtype=paddle.float32) / dim))
+            freq_extra = 1.0 / (self.base ** (paddle.arange(0, dim, 2, dtype=paddle.float32) / dim))
+            freq_inter = 1.0 / (
+                self.scaling_factor * self.base ** (paddle.arange(0, dim, 2, dtype=paddle.float32) / dim)
+            )
 
-        low, high = yarn_find_correction_range(
-            self.beta_fast,
-            self.beta_slow,
-            dim,
-            self.base,
-            self.original_max_position_embeddings,
-        )
-        inv_freq_mask = 1.0 - yarn_linear_ramp_mask(low, high, dim // 2)
-        self.inv_freq = freq_inter * (1 - inv_freq_mask) + freq_extra * inv_freq_mask
+            low, high = yarn_find_correction_range(
+                self.beta_fast,
+                self.beta_slow,
+                dim,
+                self.base,
+                self.original_max_position_embeddings,
+            )
+            inv_freq_mask = 1.0 - yarn_linear_ramp_mask(low, high, dim // 2)
+            self.inv_freq = freq_inter * (1 - inv_freq_mask) + freq_extra * inv_freq_mask
 
-        t = paddle.arange(seq_len, dtype=paddle.float32)
+            t = paddle.arange(seq_len, dtype=paddle.float32)
 
-        freqs = paddle.outer(t, paddle.cast(self.inv_freq, dtype="float32"))
+            freqs = paddle.outer(t, paddle.cast(self.inv_freq, dtype="float32"))
 
-        _mscale = float(
-            yarn_get_mscale(self.scaling_factor, self.mscale)
-            / yarn_get_mscale(self.scaling_factor, self.mscale_all_dim)
-        )
+            _mscale = float(
+                yarn_get_mscale(self.scaling_factor, self.mscale)
+                / yarn_get_mscale(self.scaling_factor, self.mscale_all_dim)
+            )
 
-        emb = paddle.concat((freqs, freqs), axis=-1)
-        self.cos_cached = emb.cos() * _mscale
-        self.sin_cached = emb.sin() * _mscale
+            emb = paddle.concat((freqs, freqs), axis=-1)
+            self.cos_cached = emb.cos() * _mscale
+            self.sin_cached = emb.sin() * _mscale
 
 
 def rotate_half(x):
@@ -1031,7 +1073,7 @@ class DeepseekV2MoE(MoELayer):
                 )
             set_parameter_color([self.shared_experts.w1, self.shared_experts.w2], "shared_expert")
 
-    def fp8_quant_weight(self, batch_mode=False):
+    def fp8_quant_weight(self, batch_mode=False, quant_transpose=True):
         """Quantize weights in FP8 format.
 
         Args:
@@ -1039,7 +1081,7 @@ class DeepseekV2MoE(MoELayer):
                     If False, quantize each expert's weights individually.
         """
 
-        def quantize_weights(weight_list, weight_obj=None):
+        def quantize_weights(weight_list, weight_obj=None, quant_transpose=True):
             """Helper function to quantize a list of weights."""
             if weight_obj is None:
                 weight_obj = weight_list[0]
@@ -1053,12 +1095,13 @@ class DeepseekV2MoE(MoELayer):
             setattr(weight_obj, "fp8_weight_stacked", fp8_weight)
             setattr(weight_obj, "fp8_scale_stacked", fp8_scale)
 
-            # Quantize with transpose
-            fp8_weight_t, fp8_scale_t = paddle.incubate.nn.functional.fused_stack_transpose_quant(
-                weight_list, transpose=True
-            )
-            setattr(weight_obj, "fp8_weight_stacked_transpose", fp8_weight_t)
-            setattr(weight_obj, "fp8_scale_stacked_transpose", fp8_scale_t)
+            if quant_transpose:
+                # Quantize with transpose
+                fp8_weight_t, fp8_scale_t = paddle.incubate.nn.functional.fused_stack_transpose_quant(
+                    weight_list, transpose=True
+                )
+                setattr(weight_obj, "fp8_weight_stacked_transpose", fp8_weight_t)
+                setattr(weight_obj, "fp8_scale_stacked_transpose", fp8_scale_t)
 
         if batch_mode:
             # Batch mode: process all experts' weights together
@@ -1066,18 +1109,18 @@ class DeepseekV2MoE(MoELayer):
             expert_w2_list = [expert.w2 for expert in self.experts if expert is not None]
 
             if expert_w1_list:
-                quantize_weights(expert_w1_list, expert_w1_list[0])
+                quantize_weights(expert_w1_list, expert_w1_list[0], quant_transpose)
             if expert_w2_list:
-                quantize_weights(expert_w2_list, expert_w2_list[0])
+                quantize_weights(expert_w2_list, expert_w2_list[0], quant_transpose)
         else:
             # Individual mode: process each expert's weights separately
             for expert in self.experts:
                 if expert is not None:
-                    quantize_weights([expert.w1])
-                    quantize_weights([expert.w1])
+                    quantize_weights([expert.w1], quant_transpose=quant_transpose)
+                    quantize_weights([expert.w2], quant_transpose=quant_transpose)
 
         if self.config.n_shared_experts is not None:
-            self.shared_experts.fp8_quant_weight()
+            self.shared_experts.fp8_quant_weight(quant_transpose)
 
     def forward(self, hidden_states):
         if self.using_post_norm_recompute:
@@ -1291,6 +1334,7 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
         eps,
         kv_lora_rank,
         softmax_scale,
+        recompute_fa3=False,
     ):
 
         bsz = q_init.shape[0]
@@ -1396,26 +1440,50 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
                 softmax_scale,
             )
         elif FA_VERSION == 3:
-            ctx.save_for_backward(
-                q_init,
-                kv_init,
-                attn_out,
-                softmax_lse,
-                q_ln_weight,
-                kv_ln_weight,
-                q_up_weight,
-                kv_up_weight,
-                rotary_emb,
-                num_heads,
-                q_head_dim,
-                qk_nope_head_dim,
-                v_head_dim,
-                qk_rope_head_dim,
-                position_ids,
-                eps,
-                kv_lora_rank,
-                softmax_scale,
-            )
+            if recompute_fa3:
+                ctx.save_for_backward(
+                    q_init,
+                    kv_init,
+                    None,
+                    None,
+                    q_ln_weight,
+                    kv_ln_weight,
+                    q_up_weight,
+                    kv_up_weight,
+                    rotary_emb,
+                    num_heads,
+                    q_head_dim,
+                    qk_nope_head_dim,
+                    v_head_dim,
+                    qk_rope_head_dim,
+                    position_ids,
+                    eps,
+                    kv_lora_rank,
+                    softmax_scale,
+                    recompute_fa3,
+                )
+            else:
+                ctx.save_for_backward(
+                    q_init,
+                    kv_init,
+                    attn_out,
+                    softmax_lse,
+                    q_ln_weight,
+                    kv_ln_weight,
+                    q_up_weight,
+                    kv_up_weight,
+                    rotary_emb,
+                    num_heads,
+                    q_head_dim,
+                    qk_nope_head_dim,
+                    v_head_dim,
+                    qk_rope_head_dim,
+                    position_ids,
+                    eps,
+                    kv_lora_rank,
+                    softmax_scale,
+                    recompute_fa3,
+                )
         else:
             assert False, f"invalid {FA_VERSION=}"
 
@@ -1465,9 +1533,16 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
                 eps,
                 kv_lora_rank,
                 softmax_scale,
+                recompute_fa3,
             ) = ctx.saved_tensor()
         else:
             assert False, f"invalid {FA_VERSION=}"
+
+        if FA_VERSION == 2:
+            assert not recompute_fa3
+            assert attn_out is not None and softmax_lse is not None
+        if FA_VERSION == 3 and not recompute_fa3:
+            assert attn_out is not None and softmax_lse is not None
 
         q_ln_t, q_ln_invar = fused_ln.fused_rms_norm(q_init, q_ln_weight, eps)
 
@@ -1548,6 +1623,27 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
                 v_grad = v_grad[..., :v_head_dim]
                 q_grad = q_grad * softmax_scale
         elif FA_VERSION == 3:
+            # recompute fa3
+            if recompute_fa3:
+                logger.info("Enable fa3 recomputation")
+                attn_out, softmax_lse = _C_ops.flash_attn_v3(
+                    query_states,
+                    key_states,
+                    value_states,
+                    None,  # q_v_
+                    None,  # q_descale_
+                    None,  # k_descale_
+                    None,  # v_descale_
+                    softmax_scale,
+                    True,
+                    -1,  # window_size_left
+                    -1,  # window_size_right
+                    0.0,  # softcap
+                    1,  # num_splits
+                    False,  # manual_set_pack_gqa
+                    False,  # pack_gqa_
+                    0,  # sm_margin
+                )
             with paddle.no_grad():
                 q_grad, k_grad, v_grad = _C_ops.flash_attn_v3_grad(
                     query_states,
@@ -1685,6 +1781,7 @@ class MemroyRecomputeAttn(paddle.nn.Layer):
         eps,
         kv_lora_rank,
         softmax_scale,
+        recompute_fa3=False,
     ) -> None:
         super().__init__()
         self._dtype = self._helper.get_default_dtype()
@@ -1721,6 +1818,7 @@ class MemroyRecomputeAttn(paddle.nn.Layer):
             self.eps,
             self.kv_lora_rank,
             self.softmax_scale,
+            self.recompute_fa3,
         ) = (
             rotary_emb,
             num_heads,
@@ -1731,12 +1829,13 @@ class MemroyRecomputeAttn(paddle.nn.Layer):
             eps,
             kv_lora_rank,
             softmax_scale,
+            recompute_fa3,
         )
         set_parameter_color([self.q_up_weight, self.kv_up_weight], "memory_attn")
 
-    def fp8_quant_weight(self):
-        cache_fp8_weight(self.q_up_weight)
-        cache_fp8_weight(self.kv_up_weight)
+    def fp8_quant_weight(self, quant_transpose=True):
+        cache_fp8_weight(self.q_up_weight, quant_transpose=quant_transpose)
+        cache_fp8_weight(self.kv_up_weight, quant_transpose=quant_transpose)
 
     def forward(self, q_init, kv_init, position_ids):
 
@@ -1762,6 +1861,7 @@ class MemroyRecomputeAttn(paddle.nn.Layer):
             self.eps,
             self.kv_lora_rank,
             self.softmax_scale,
+            recompute_fa3=self.recompute_fa3,
         )
 
 
@@ -1862,8 +1962,8 @@ class FusedRMSLinear(paddle.nn.Layer):
         self.eps = eps
         set_parameter_color([self.q_down_weight], "rms_linear")
 
-    def fp8_quant_weight(self):
-        cache_fp8_weight(self.q_down_weight)
+    def fp8_quant_weight(self, quant_transpose=True):
+        cache_fp8_weight(self.q_down_weight, quant_transpose=quant_transpose)
 
     def forward(self, x):
 
@@ -1919,7 +2019,7 @@ class FusedRMSLinearSingle(paddle.nn.Layer):
 class DeepseekV2Attention(nn.Layer):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(self, config: DeepseekV2Config, layerwise_recompute: bool = False):
+    def __init__(self, config: DeepseekV2Config, layerwise_recompute: bool = False, recompute_fa3: bool = False):
         super().__init__()
         self.config = config
         self.attention_dropout = config.attention_dropout
@@ -1943,6 +2043,8 @@ class DeepseekV2Attention(nn.Layer):
         else:
             self.seq_length = config.seq_length
         self.sequence_parallel = config.sequence_parallel
+
+        self.recompute_fa3 = recompute_fa3
 
         self.input_layernorm = DeepseekV2RMSNorm(config)
 
@@ -1995,7 +2097,7 @@ class DeepseekV2Attention(nn.Layer):
             if DSV3_USE_ATTEN_RECOMPUTE:
                 self.fused_rms_norm_linear = FusedRMSLinear(self.hidden_size, config.q_lora_rank, config.kv_lora_rank + config.qk_rope_head_dim, 1e-6)
                 kv_up_dim = self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim)
-                self.memory_recompute_att = MemroyRecomputeAttn(config.q_lora_rank, config.kv_lora_rank, config.q_lora_rank, self.num_heads * self.q_head_dim, config.kv_lora_rank, kv_up_dim, self.rotary_emb, self.num_heads, self.q_head_dim, self.qk_nope_head_dim, self.v_head_dim, self.qk_rope_head_dim, 1e-6, self.kv_lora_rank, self.softmax_scale)
+                self.memory_recompute_att = MemroyRecomputeAttn(config.q_lora_rank, config.kv_lora_rank, config.q_lora_rank, self.num_heads * self.q_head_dim, config.kv_lora_rank, kv_up_dim, self.rotary_emb, self.num_heads, self.q_head_dim, self.qk_nope_head_dim, self.v_head_dim, self.qk_rope_head_dim, 1e-6, self.kv_lora_rank, self.softmax_scale, recompute_fa3=self.recompute_fa3)
                 self.o_proj = FP8KeepXLinear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
             else:
 
@@ -2025,12 +2127,12 @@ class DeepseekV2Attention(nn.Layer):
 
         self.attn_func = scaled_dot_product_attention
 
-    def fp8_quant_weight(self):
+    def fp8_quant_weight(self, quant_transpose=True):
 
         if DSV3_USE_ATTEN_RECOMPUTE:
-            self.o_proj.fp8_quant_weight()
-            self.memory_recompute_att.fp8_quant_weight()
-            self.fused_rms_norm_linear.fp8_quant_weight()
+            self.o_proj.fp8_quant_weight(quant_transpose=quant_transpose)
+            self.memory_recompute_att.fp8_quant_weight(quant_transpose=quant_transpose)
+            self.fused_rms_norm_linear.fp8_quant_weight(quant_transpose=quant_transpose)
 
     def _init_rope(self):
         if self.config.rope_scaling is None:
@@ -2220,7 +2322,9 @@ class DeepseekV2Attention(nn.Layer):
 
 
 class DeepseekV2DecoderLayer(nn.Layer):
-    def __init__(self, config: DeepseekV2Config, layer_idx: int, layerwise_recompute: bool = False):
+    def __init__(
+        self, config: DeepseekV2Config, layer_idx: int, layerwise_recompute: bool = False, recompute_fa3: bool = False
+    ):
         super().__init__()
         self.config = config
         self.layer_idx = layer_idx
@@ -2231,7 +2335,9 @@ class DeepseekV2DecoderLayer(nn.Layer):
 
         self.hidden_size = config.hidden_size
 
-        self.self_attn = DeepseekV2Attention(config=config, layerwise_recompute=layerwise_recompute)
+        self.self_attn = DeepseekV2Attention(
+            config=config, layerwise_recompute=layerwise_recompute, recompute_fa3=recompute_fa3
+        )
 
         DeepseekV2MLPClass = FP8Mlp if DSV3_USE_FP8_GEMM else DeepseekV2MLP
 
@@ -2251,16 +2357,16 @@ class DeepseekV2DecoderLayer(nn.Layer):
                 else DeepseekV2MoE(config)
             )
         else:
-            self.mlp = DeepseekV2MLPClass(config)
+            self.mlp = DeepseekV2MLPClass(config, recompute_fwd_gate_up=True)
 
-    def fp8_quant_weight(self, batch_mode=False):
+    def fp8_quant_weight(self, batch_mode=False, quant_transpose=True):
         """fp8_quant_weight"""
         if isinstance(self.mlp, DeepseekV2MoE):
             # logger.info(f"fp8 quant weight for mlp {type(self.mlp)}")
-            self.mlp.fp8_quant_weight(batch_mode)
-            self.self_attn.fp8_quant_weight()
+            self.mlp.fp8_quant_weight(batch_mode, quant_transpose=quant_transpose)
+            self.self_attn.fp8_quant_weight(quant_transpose=quant_transpose)
         elif isinstance(self.mlp, FP8Mlp):
-            self.self_attn.fp8_quant_weight()
+            self.self_attn.fp8_quant_weight(quant_transpose=quant_transpose)
 
     def forward(
         self,
@@ -2469,7 +2575,8 @@ class DeepseekV2MTPLayer(DeepseekV2DecoderLayer):
         hidden_states = self.hnorm(hidden_states)
         nextn_hidden_state = self.enorm(nextn_hidden_state)
 
-        hidden_states = self.eh_proj(paddle.concat([hidden_states, nextn_hidden_state], axis=-1))
+        concat_h = paddle.concat([hidden_states, nextn_hidden_state], axis=-1)
+        hidden_states = LMHeadFunction.apply(concat_h, self.eh_proj.weight, False)
 
         layer_outputs = super(DeepseekV2MTPLayer, self).forward(
             hidden_states,

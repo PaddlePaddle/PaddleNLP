@@ -16,7 +16,11 @@
 
 import numpy as np
 import paddle
-import TokenDispatcherUtils as TDU
+
+try:
+    import TokenDispatcherUtils as TDU
+except ImportError:
+    TDU = None
 
 from .fp8_utils import FP8LinearFunctionBase
 

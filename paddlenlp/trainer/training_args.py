@@ -885,6 +885,10 @@ class TrainingArguments:
         default=None,
         metadata={"help": "The path to a folder with a valid checkpoint for your model."},
     )
+    resume_from_huggingface_ckpt: Optional[str] = field(
+        default=None,
+        metadata={"help": "The path to a folder with a valid huggingface checkpoint for your model."},
+    )
     auto_parallel_resume_form_hybrid_parallel: Optional[bool] = field(
         default=False,
         metadata={"help": "Wether hybrid paralle checkpoints be loaded in auto parallel mode."},

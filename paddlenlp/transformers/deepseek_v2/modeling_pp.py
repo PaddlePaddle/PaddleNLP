@@ -155,6 +155,7 @@ class PostProcessNode(ScheduleNode):
         config,
         shared_experts=None,
         using_post_norm_recompute=False,
+        output_mtp_embed_first=False,
         name="PostProcessNode",
     ):
         self.send_mtp_embed = send_mtp_embed
@@ -163,6 +164,7 @@ class PostProcessNode(ScheduleNode):
         self.config = config
         self.alpha = alpha
         self.using_post_norm_recompute = using_post_norm_recompute
+        self.output_mtp_embed_first = output_mtp_embed_first
         self.name = name
 
         if self.using_post_norm_recompute:
@@ -205,6 +207,7 @@ class PostProcessNode(ScheduleNode):
         hidden_states.stop_gradient = False
 
         if self.send_mtp_embed:
+            assert not self.output_mtp_embed_first, "forward_without_residual doesn't support output_mtp_embed_first"
             hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp], axis=-1)
             self.mtp_embed_shape = inputs_embeds_mtp.shape  # 保存mtp_embed的shape用于反向传播
 
@@ -245,7 +248,10 @@ class PostProcessNode(ScheduleNode):
         hidden_states = residual + final_hidden_states
 
         if self.send_mtp_embed:
-            hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp], axis=-1)
+            if self.output_mtp_embed_first:
+                hidden_states = paddle.concat([inputs_embeds_mtp, hidden_states], axis=-1)
+            else:
+                hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp], axis=-1)
             self.mtp_embed_shape = inputs_embeds_mtp.shape  # 保存mtp_embed的shape用于反向传播
 
         return return_args(hidden_states)
@@ -257,8 +263,12 @@ class PostProcessNode(ScheduleNode):
         if self.send_mtp_embed:
             # 分割梯度：do3的前部分对应hidden_states，后部分对应inputs_embeds_mtp
             hidden_size = do3.shape[-1] - self.mtp_embed_shape[-1]
-            hidden_states_grad = do3[..., :hidden_size]
-            inputs_embeds_mtp_grad = do3[..., hidden_size:]
+            if self.output_mtp_embed_first:
+                hidden_states_grad = do3[..., hidden_size:]
+                inputs_embeds_mtp_grad = do3[..., :hidden_size]
+            else:
+                hidden_states_grad = do3[..., :hidden_size]
+                inputs_embeds_mtp_grad = do3[..., hidden_size:]
         else:
             hidden_states_grad = do3
             inputs_embeds_mtp_grad = None
@@ -1154,9 +1164,7 @@ class OverlapedDenseFusionScheduleNode:
         assert isinstance(forward_node, FusionFp8DecoderLayerNode) or isinstance(
             backward_node, FusionFp8DecoderLayerNode
         )
-        assert isinstance(forward_node, DenseDecoderLayerNode) or isinstance(
-            backward_node, DenseDecoderLayerNode
-        )
+        assert isinstance(forward_node, DenseDecoderLayerNode) or isinstance(backward_node, DenseDecoderLayerNode)
         self.forward_node = forward_node
         self.backward_node = backward_node
         self.name = name
@@ -1221,9 +1229,7 @@ class OverlapedDenseFusionScheduleNode:
             paddle.base.core.nvprof_nvtx_pop()  # moe_mlp
 
             paddle.base.core.nvprof_nvtx_push("dense_attn_moe_combine")
-            inputs = self.forward_node.combine_forward(
-                inputs, async_finish=True, allocate_on_comm_stream=True
-            )
+            inputs = self.forward_node.combine_forward(inputs, async_finish=True, allocate_on_comm_stream=True)
             combine_fw_event = deep_ep.get_event_from_comm_stream(self.forward_node.moe_group.id)
             output_grad = self.backward_node.attn_node.backward(output_grad)
             combine_fw_event.calc_stream_wait(self.forward_node.moe_group.id)
@@ -1242,7 +1248,7 @@ class OverlapedDenseFusionScheduleNode:
 def build_overlapped_nodes(forward_chunk, backward_chunk):
     overlap_element_class = (
         FusionFp8DecoderLayerNode if DSV3_USE_FP8_GEMM else DecoderLayerNode,
-        DenseDecoderLayerNode
+        DenseDecoderLayerNode,
     )
     forward_decoder_layer_num = 0
     backward_decoder_layer_num = 0
@@ -1682,7 +1688,8 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
                         self.config,
                         self.mlp.shared_experts,
                         self.config.using_post_norm_recompute,
-                        "post_process_node",
+                        output_mtp_embed_first=isinstance(self, DeepseekV2MTPLayer),
+                        name="post_process_node",
                     )
                     return FusionFp8DecoderLayerNode(
                         attn_and_gate_node=attn_and_gate_node,
@@ -1780,7 +1787,64 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
         hidden_states = paddle.concat(output_list, axis=-1)
         return return_args(hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids)
 
+    def attn_compute_for_fusion(self, args):
+        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
+        assert attention_mask is None
+        assert attn_mask_startend_row_indices is None
+        assert position_ids is None
+        assert self.config.num_nextn_predict_layers == 1
+
+        if self.config.send_mtp_embed:
+            hidden_states_list = paddle.split(hidden_states, self.config.num_nextn_predict_layers + 1, axis=-1)
+            hidden_states_main_model = hidden_states_list[0]
+            inputs_embeds_cur_depth_list = hidden_states_list[1:]
+        else:
+            hidden_states_main_model = hidden_states
+            global global_inputs_embeds_mtp_queue
+            inputs_embeds_cur_depth_list = global_inputs_embeds_mtp_queue.get()
+
+        hidden_states = hidden_states_main_model
+        nextn_hidden_state = inputs_embeds_cur_depth_list[0]
+
+        # mtp compute
+        hidden_states = self.hnorm(hidden_states)
+        nextn_hidden_state = self.enorm(nextn_hidden_state)
+
+        hidden_states = self.eh_proj(paddle.concat([hidden_states, nextn_hidden_state], axis=-1))
+
+        # attention compute
+        hidden_states, residual = self.self_attn_compute(hidden_states)
+
+        if self.using_post_norm_recompute:
+            probs, routing_map, l_aux, _, norm_out = self.mlp.router(hidden_states)
+        else:
+            probs, routing_map, l_aux, _ = self.mlp.router(hidden_states)
+
+        # common return values
+        ret = (
+            hidden_states_main_model,
+            hidden_states,
+            residual,
+            probs,
+            routing_map,
+            l_aux,
+        )
+        ret = (*ret, norm_out) if self.using_post_norm_recompute else ret
+
+        return ret
+
     def build_schedule_node(self):
+        if isinstance(self.mlp, DeepseekV2MoE):
+            self.mlp.update_flex_token()
+            if self.mlp.using_flex_token and DSV3_USE_FP8_GEMM and self.config.num_nextn_predict_layers == 1:
+                prev_send_mtp_embed = self.config.send_mtp_embed
+                self.config.send_mtp_embed = True  # must be True in MTP node
+
+                node = DeepseekV2DecoderLayerPipe.build_schedule_node(self)
+                assert isinstance(node, FusionFp8DecoderLayerNode)
+
+                self.config.send_mtp_embed = prev_send_mtp_embed
+                return node
         return ScheduleNode(self.forward, name="DeepseekV2MTPLayerPipe")
 
 
@@ -1959,6 +2023,27 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                     ret.append(recompute_fwd_gate_up_list[i] + k)
             return ret
 
+        def compute_recompute_fa3_list(pp_nums, all_dl_nums, recompute_fa3):
+            all_layers_nums = all_dl_nums + 4  # embedding, rms, lm_head, mtp
+            segment_size = all_layers_nums // pp_nums
+            recompute_fa3_list = [0]
+            for idx in range(segment_size - 1, all_dl_nums, segment_size):
+                recompute_fa3_list.append(idx)
+
+            # If `recompute_fa3` is a Boolean value and is True, means all O1 will be recomputed.
+            # Otherwise `recompute_fa3` should be an integer representing how many O1 are recomputed.
+            assert isinstance(recompute_fa3, (int, bool))
+            if type(recompute_fa3) is bool:
+                enable_k_o1_rc = segment_size if recompute_fa3 is True else 0
+            else:
+                enable_k_o1_rc = recompute_fa3
+
+            ret = []
+            for i in range(len(recompute_fa3_list)):
+                for k in range(min(segment_size, enable_k_o1_rc)):
+                    ret.append(recompute_fa3_list[i] + k)
+            return ret
+
         pp_nums = (
             self.config["pipeline_parallel_degree"] * 2
             if self.config.use_dualpipev
@@ -1970,7 +2055,11 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             self.config.first_k_dense_replace,
             self.config.recompute_fwd_gate_up,
         )
+        recompute_fa3_list = compute_recompute_fa3_list(
+            pp_nums, self.config.num_hidden_layers, self.config.recompute_fa3
+        )
 
+        logger.info(f"recompute_fa3_list: {recompute_fa3_list}")
         logger.info(f"recompute_fwd_gate_up_list: {recompute_fwd_gate_up_list}")
         config.recompute_fwd_gate_up_list = recompute_fwd_gate_up_list
 
@@ -1981,6 +2070,7 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                     config=config,
                     layer_idx=i,
                     layerwise_recompute=i not in self.no_recompute_layers,
+                    recompute_fa3=i in recompute_fa3_list,
                 ),
                 f"{self._base_model.base_model_prefix}.layers.{i}",
             )
@@ -2036,7 +2126,7 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         # DON'T init PipelinePretrainedModel
         # PipelinePretrainedModel.__init__(self.super(), config=config)
 
-    def fp8_quant_weight(self, batch_mode=False):
+    def fp8_quant_weight(self, batch_mode=False, quant_transpose=True):
         """fp8_quant_weight"""
         with paddle.no_grad():
             for i, layer in self._sub_layers.items():
@@ -2045,9 +2135,9 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                 ):
                     for i, sub_layer in layer.named_sublayers():
                         if isinstance(sub_layer, DeepseekV2DecoderLayer) and hasattr(sub_layer, "fp8_quant_weight"):
-                            sub_layer.fp8_quant_weight(batch_mode)
+                            sub_layer.fp8_quant_weight(batch_mode, quant_transpose)
                 if isinstance(layer, DeepseekV2DecoderLayer) and hasattr(layer, "fp8_quant_weight"):
-                    layer.fp8_quant_weight(batch_mode)
+                    layer.fp8_quant_weight(batch_mode, quant_transpose)
 
     def get_loss_fn(self, config):
         return DeepseekV2PretrainingCriterionPipe(config)
