@@ -38,6 +38,8 @@ from .trainer_utils import (
     ShardingOption,
 )
 
+print(111)
+
 __all__ = [
     "default_logdir",
     "TrainingArguments",
