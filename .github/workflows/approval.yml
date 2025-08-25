@@ -34,9 +34,11 @@ jobs:
           git checkout -b test_pr upstream/${BRANCH}
           git merge --no-edit origin_pr
           git log --pretty=oneline -10
+          pwd
 
       - name: Display Required Approvers
         if: steps.check-bypass.outputs.can-skip != 'true'
         run: |
+          pwd
           cd scripts/ci_approval
           bash run_ci_approval.sh
