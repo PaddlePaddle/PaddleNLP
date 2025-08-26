@@ -1814,7 +1814,7 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
         hidden_states = self.hnorm(hidden_states)
         nextn_hidden_state = self.enorm(nextn_hidden_state)
 
-        hidden_states = self.eh_proj(paddle.concat([hidden_states, nextn_hidden_state], axis=-1))
+        hidden_states = self.eh_proj(paddle.concat([nextn_hidden_state, hidden_states], axis=-1))
 
         # attention compute
         hidden_states, residual = self.self_attn_compute(hidden_states)

@@ -2572,7 +2572,7 @@ class DeepseekV2MTPLayer(DeepseekV2DecoderLayer):
         hidden_states = self.hnorm(hidden_states)
         nextn_hidden_state = self.enorm(nextn_hidden_state)
 
-        concat_h = paddle.concat([hidden_states, nextn_hidden_state], axis=-1)
+        concat_h = paddle.concat([nextn_hidden_state, hidden_states], axis=-1)
         hidden_states = LMHeadFunction.apply(concat_h, self.eh_proj.weight, False)
 
         layer_outputs = super(DeepseekV2MTPLayer, self).forward(
