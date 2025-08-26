@@ -1,6 +1,6 @@
-name: Codestyle Check
+name: Unittest CPU CI
 
-on: [push, pull_request]
+on: [pull_request]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -10,12 +10,21 @@ env:
   PR_ID: ${{ github.event.pull_request.number }}
   COMMIT_ID: ${{ github.event.pull_request.head.sha }}
   BRANCH: ${{ github.event.pull_request.base.ref }}
-  TASK: PaddleNLP-CI-Lint-${{ github.event.pull_request.number }}
+  TASK: PaddleNLP-CI-${{ github.event.pull_request.number }}-unittest-cpu
+  HF_ENDPOINT: https://hf-mirror.com
+  STUDIO_GIT_HOST: http://git.prod.idc-to-cloud.aistudio.baidu-int.com
+  PPNLP_HOME: /home/disk1/cache
+  HF_DATASETS_CACHE: /home/disk1/cache/huggingface/datasets
+  TRANSFORMERS_CACHE: /home/disk1/cache/huggingface
 
 jobs:
-  Lint:
-    name: Lint
+  unittest-cpu-ci:
+    name:   unittest-cpu-ci
     runs-on: [self-hosted, ernie-cpu]
+    permissions:
+      pull-requests: write
+      contents: read
+      id-token: write
     steps:
       - name: Run Container
         env:
@@ -29,12 +38,18 @@ jobs:
             -v $work_dir/../../..:$work_dir/../../.. \
             -v $work_dir:/workspace \
             -v /home/.cache/pip:/home/.cache/pip \
+            -v /home/disk1/cache:/home/disk1/cache \
             -e BRANCH \
             -e PR_ID \
             -e COMMIT_ID \
             -e work_dir \
             -e no_proxy \
             -e python_version \
+            -e HF_ENDPOINT \
+            -e STUDIO_GIT_HOST \
+            -e PPNLP_HOME \
+            -e HF_DATASETS_CACHE \
+            -e TRANSFORMERS_CACHE \
             -w /workspace ${docker_image}
 
       - name: Download Code
@@ -64,38 +79,39 @@ jobs:
             echo "Not in a pull_request event. Skipping PR-specific operations."
           fi
           git log --pretty=oneline -10
-
-          if ! git show-ref --quiet refs/heads/develop; then \
-              echo "local develop branch is missing, creating local develop branch that tracks remote develop branch"
-              git fetch origin develop
-              git branch develop --track origin/develop
-          else
-            echo "local develop branch exist, skipping"
-          fi
           '
-          
+
       - name: Setup Environment
         run: |
           docker exec -t $container_name /bin/bash -c '
-          unlink /usr/local/bin/python
-          ln -sf $(which python${python_version}) /usr/local/bin/python
+          unlink /usr/bin/python3
+          ln -sf $(which python${python_version}) /usr/bin/python3
           set -e
           python -m pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
           python -m pip config set global.cache-dir "/home/.cache/pip"
           source $work_dir/../../../proxy
           python -m pip install --upgrade pip
           cd /workspace/PaddleNLP && git config --global --add safe.directory $PWD
+          pip install -r tests/requirements.txt
           make install
           '
 
       - name: Test
         run: |
           docker exec -t $container_name /bin/bash -c '
-          set -e
           source $work_dir/../../../proxy
           cd /workspace/PaddleNLP
-          make lint
+          set -e
+          make test
           '
+
+      # - name: Upload Coverage To Codecov
+      #   uses: codecov/codecov-action@v3
+      #   env:
+      #     CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }}
+      #     files: ./PaddleNLP/coverage.xml
       
       - name: Terminate And Delete the Container
         if: always()
