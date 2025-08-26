@@ -1191,7 +1191,11 @@ class OverlapedDenseFusionScheduleNode:
             paddle.base.core.nvprof_nvtx_pop()  # dense_attn_moe_combine
 
             paddle.base.core.nvprof_nvtx_push("moe_mlp")
+            assert WeightGradStore.funcs_queue.empty()
+            WeightGradStore.enabled = True
             output_grad = self.backward_node.mlp_backward(output_grad)
+            WeightGradStore.enabled = False
+            WeightGradStore.flush()
             paddle.base.core.nvprof_nvtx_pop()  # moe_mlp
 
             paddle.base.core.nvprof_nvtx_push("dense_mlp_moe_dispatch")
@@ -1199,6 +1203,10 @@ class OverlapedDenseFusionScheduleNode:
                 output_grad, async_finish=True, allocate_on_comm_stream=True
             )
             dispatch_bw_event = deep_ep.get_event_from_comm_stream(self.backward_node.moe_group.id)
+            paddle.base.core.nvprof_nvtx_push("dispatch_backward_dw")
+            WeightGradStore.pop()
+            assert WeightGradStore.funcs_queue.empty()
+            paddle.base.core.nvprof_nvtx_pop()
             inputs = self.forward_node.mlp_node.forward(inputs)
             dispatch_bw_event.calc_stream_wait(self.backward_node.moe_group.id)
             paddle.base.core.nvprof_nvtx_pop()  # dense_mlp_moe_dispatch
@@ -1307,17 +1315,13 @@ def build_overlapped_nodes(forward_chunk, backward_chunk):
     overlap_node = OverlapedScheduleChunk(forward_overlap_layers, backward_overlap_layers, use_fuion=DSV3_USE_FP8_GEMM)
     return forward_pre_node, backward_pre_node, overlap_node, forward_post_node, backward_post_node
 
+
 class EmbeddingFunction(paddle.autograd.PyLayer):
     @staticmethod
-    def forward(ctx, x, weight):        
-        out =  paddle.nn.functional.embedding(
-            x,
-            weight=weight,
-            padding_idx=None,
-            max_norm=None,
-            norm_type=2.0,
-            sparse=False,
-            scale_grad_by_freq=False )
+    def forward(ctx, x, weight):
+        out = paddle.nn.functional.embedding(
+            x, weight=weight, padding_idx=None, max_norm=None, norm_type=2.0, sparse=False, scale_grad_by_freq=False
+        )
 
         ctx.save_for_backward(x, weight)
         return out
@@ -1325,14 +1329,14 @@ class EmbeddingFunction(paddle.autograd.PyLayer):
     @staticmethod
     def backward(ctx, dout):
         x, weight = ctx.saved_tensor()
-        
-        if hasattr( weight, "main_grad" ):
-            paddle.incubate.nn.functional.embedding_grad_add_to_(x, weight.main_grad, dout)            
+
+        if hasattr(weight, "main_grad"):
+            paddle.incubate.nn.functional.embedding_grad_add_to_(x, weight.main_grad, dout)
         else:
             paddle.incubate.nn.functional.embedding_grad_add_to_(x, weight.grad, dout)
 
-        
         return None, None
+
 
 class DeepseekV2EmbeddingPipe(nn.Layer):
     def __init__(self, config: DeepseekV2Config):
@@ -1363,7 +1367,7 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
             _type_: _description_
         """
         input_ids, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
-        inputs_embeds = EmbeddingFunction.apply( input_ids, self.embed_tokens.weight )
+        inputs_embeds = EmbeddingFunction.apply(input_ids, self.embed_tokens.weight)
 
         batch_size, seq_length = input_ids.shape
         if self.config.num_nextn_predict_layers > 0:
