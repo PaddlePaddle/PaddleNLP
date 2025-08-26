@@ -540,6 +540,20 @@ class OverlapedScheduleChunk:
         return inputs, output_grad, None
 
 
+class DecoderBackwardScheduleChunk:
+    def __init__(self, nodes):
+        self.nodes = nodes
+
+    def backward(self, output_grad, combine_bw_event_to_wait=None, pp_stream=None):
+        event_to_wait = combine_bw_event_to_wait
+        for i, n in enumerate(self.nodes):
+            pp_stream_t = pp_stream if i + 1 == len(self.nodes) else None
+            output_grad, event_to_wait = n.backward_for_fusion(
+                output_grad, combine_bw_event_to_wait=event_to_wait, pp_stream=pp_stream_t
+            )
+        return output_grad
+
+
 class OverlapedScheduleNode:
     def __init__(self, forward_node, backward_node, name=""):
         assert isinstance(forward_node, DecoderLayerNode) and isinstance(backward_node, DecoderLayerNode)
@@ -972,6 +986,77 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
             output_grad = self.attn_and_gate_node.backward(output_grad)
         return output_grad
 
+    def backward_for_fusion(self, output_grad, combine_bw_event_to_wait=None, pp_stream=None):
+        paddle.base.core.nvprof_nvtx_push("backward")
+        if combine_bw_event_to_wait is None:
+            combine_bw_event_to_wait = deep_ep.get_event_from_calc_stream(self.moe_group.id)
+
+        paddle.base.core.nvprof_nvtx_push("post_process_backward")
+        output_grad = self.post_process_backward(output_grad, combine_bw_event_to_wait)
+        paddle.base.core.nvprof_nvtx_pop()
+
+        paddle.base.core.nvprof_nvtx_push("combine_backward")
+        output_grad = self.combine_backward(
+            output_grad, previous_event=combine_bw_event_to_wait, async_finish=True, allocate_on_comm_stream=True
+        )
+        combine_backward_event = deep_ep.get_event_from_comm_stream(self.moe_group.id)
+        combine_backward_event.calc_stream_wait(self.moe_group.id)
+        paddle.base.core.nvprof_nvtx_pop()
+
+        if WeightGradStore.enabled:
+            paddle.base.core.nvprof_nvtx_push("mlp_backward")
+            output_grad = self.mlp_backward(output_grad)
+            paddle.base.core.nvprof_nvtx_pop()
+
+            paddle.base.core.nvprof_nvtx_push("dispatch_backward")
+            output_grad = self.dispatch_backward(output_grad)
+            paddle.base.core.nvprof_nvtx_pop()
+
+            paddle.base.core.nvprof_nvtx_push("attn_backward")
+            output_grad = self.attn_backward(output_grad)
+            paddle.base.core.nvprof_nvtx_pop()
+
+            event_to_wait = None
+
+        else:
+            paddle.base.core.nvprof_nvtx_push("mlp_backward_dx")
+            assert WeightGradStore.funcs_queue.empty()
+            WeightGradStore.enabled = True
+            output_grad = self.mlp_backward(output_grad)
+            WeightGradStore.enabled = False
+            WeightGradStore.flush()
+            output_grad_event = deep_ep.get_event_from_calc_stream(self.moe_group.id)
+            paddle.base.core.nvprof_nvtx_pop()
+
+            paddle.base.core.nvprof_nvtx_push("dispatch_backward")
+            output_grad = self.dispatch_backward(
+                output_grad, async_finish=True, previous_event=output_grad_event, allocate_on_comm_stream=True
+            )
+            dispatch_backward_event = deep_ep.get_event_from_comm_stream(self.moe_group.id)
+            paddle.base.core.nvprof_nvtx_pop()
+
+            paddle.base.core.nvprof_nvtx_push("mlp_backward_dw")
+            WeightGradStore.pop()
+            assert WeightGradStore.funcs_queue.empty()
+            paddle.base.core.nvprof_nvtx_pop()
+
+            paddle.base.core.nvprof_nvtx_push("attn_backward_dx")
+            dispatch_backward_event.calc_stream_wait(self.moe_group.id)
+            WeightGradStore.enabled = True
+            output_grad = self.attn_backward(output_grad)
+            WeightGradStore.enabled = False
+            WeightGradStore.flush()
+            event_to_wait = deep_ep.get_event_from_calc_stream(self.moe_group.id)
+            paddle.base.core.nvprof_nvtx_pop()
+
+            paddle.base.core.nvprof_nvtx_push("attn_backward_dw")
+            WeightGradStore.pop()
+            assert WeightGradStore.funcs_queue.empty()
+            paddle.base.core.nvprof_nvtx_pop()
+
+        paddle.base.core.nvprof_nvtx_pop()
+        return output_grad, event_to_wait
+
     def forward(self, inputs):
         inputs = self.attn_forward(inputs)
         inputs = self.dispatch_forward(inputs)
@@ -1303,6 +1388,11 @@ def build_overlapped_nodes(forward_chunk, backward_chunk):
 
     backward_pre_node = ScheduleChunk(list(reversed(backward_pre_overlap_layers)))
     backward_post_node = ScheduleChunk(list(reversed(backward_post_overlap_layers)))
+
+    if not forward_chunk.nodes and all(
+        isinstance(n, FusionFp8DecoderLayerNode) for n in backward_chunk.nodes
+    ):
+        backward_post_node = DecoderBackwardScheduleChunk(backward_post_overlap_layers)
 
     overlap_node = OverlapedScheduleChunk(forward_overlap_layers, backward_overlap_layers, use_fuion=DSV3_USE_FP8_GEMM)
     return forward_pre_node, backward_pre_node, overlap_node, forward_post_node, backward_post_node
