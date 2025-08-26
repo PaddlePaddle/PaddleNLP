@@ -1118,7 +1118,11 @@ class OverlapedFUsionScheduleNode:
                 combine_forward_event.current_stream_wait()
                 final_out_event.current_stream_wait()
 
-                inputs = final_out + combine_fwd_out
+                if final_out.shape[-1] != combine_fwd_out.shape[-1]:
+                    final_out[:, :, : combine_fwd_out.shape[-1]] += combine_fwd_out  # 直接广播并相加
+                else:
+                    final_out += combine_fwd_out
+                inputs = final_out
 
                 final_out._record_stream()
                 combine_fwd_out._record_stream()

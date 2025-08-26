@@ -904,24 +904,21 @@ class FusionMlpNode:
         self.dispatched_indices = dispatched_indices.to(paddle.int32)
 
         total_zipped_tokens = extract_first_if_tuple(hs_2d_dispatched).shape[0]
-        if DSV3_USE_FP8_DISPATCH:
-            (
-                unzipped_tokens,
-                zipped_expertwise_rowmap,
-                unzipped_probs,
-                unzipped_tokens_scale,
-            ) = self.unzip_node.forward(
-                hs_2d_dispatched,
-                self.dispatched_indices,
-                dispatched_probs,
-                topk=self.router_topk,
-                num_experts=num_experts,
-                tokens_per_expert=self.tokens_per_expert,
-            )
-            record_stream_for_multi_input(hs_2d_dispatched)
-            dispatched_indices._record_stream()
-            dispatched_probs._record_stream()
+        (unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_tokens_scale,) = self.unzip_node.forward(
+            hs_2d_dispatched,
+            self.dispatched_indices,
+            dispatched_probs,
+            topk=self.router_topk,
+            num_experts=num_experts,
+            tokens_per_expert=self.tokens_per_expert,
+        )
+        record_stream_for_multi_input(hs_2d_dispatched)
+        dispatched_indices._record_stream()
+        dispatched_probs._record_stream()
 
+        self.unzipped_probs = unzipped_probs.unsqueeze(-1)
+
+        if DSV3_USE_FP8_DISPATCH:
             total_unzipped_tokens = extract_first_if_tuple(unzipped_tokens).shape[0]
             # If adaptive O1 recompute is enabled, determine whether to enable recompute O1 based on the degree of imbalance
             if self.recompute_fwd_gate_up == -1:
@@ -934,8 +931,6 @@ class FusionMlpNode:
                 else:
                     # logger.debug(f"recompute_fwd_gate_up changed to False, Because the receives {unzipped_tokens.shape[0]} Tensors less then {self.seq_length*self.num_experts_per_tok*self.adaptive_remained_O1_recompute_ratio}.")
                     self.set_recompute_fwd_gate_up(False)
-
-            self.unzipped_probs = unzipped_probs.unsqueeze(-1)
 
             # if use_mlp_subbatch is enabled, then split the unzipped_tokens into subbatches
             if self.mlp_fwd_subbatch_rows != 0 and total_unzipped_tokens > self.mlp_fwd_subbatch_rows * 2:
@@ -990,18 +985,6 @@ class FusionMlpNode:
                 (unzipped_tokens, unzipped_tokens_scale), unzipped_probs, padding_token_per_experts
             )
         else:
-            (unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, _,) = self.unzip_node.forward(
-                hs_2d_dispatched,
-                self.dispatched_indices,
-                dispatched_probs,
-                topk=self.router_topk,
-                num_experts=num_experts,
-                tokens_per_expert=self.tokens_per_expert,
-            )
-            hs_2d_dispatched._record_stream()
-            dispatched_indices._record_stream()
-            dispatched_probs._record_stream()
-
             # If adaptive O1 recompute is enabled, determine whether to enable recompute O1 based on the degree of imbalance
             if self.recompute_fwd_gate_up == -1:
                 if (

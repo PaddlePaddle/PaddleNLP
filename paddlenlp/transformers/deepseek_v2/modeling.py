@@ -1538,10 +1538,7 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
         else:
             assert False, f"invalid {FA_VERSION=}"
 
-        if FA_VERSION == 2:
-            assert not recompute_fa3
-            assert attn_out is not None and softmax_lse is not None
-        if FA_VERSION == 3 and not recompute_fa3:
+        if (FA_VERSION == 3 and not recompute_fa3) or FA_VERSION == 2:
             assert attn_out is not None and softmax_lse is not None
 
         q_ln_t, q_ln_invar = fused_ln.fused_rms_norm(q_init, q_ln_weight, eps)

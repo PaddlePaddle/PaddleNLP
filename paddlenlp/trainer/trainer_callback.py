@@ -644,7 +644,7 @@ class FP8QuantWeightCallback(TrainerCallback):
         optimizer = kwargs["optimizer"]
         global skip_count
 
-        if not g_shard_bypass_dygraph_optimizer or skip_count == 0:
+        if (not g_shard_bypass_dygraph_optimizer or skip_count == 0) and hasattr(model, "fp8_quant_weight"):
             model.fp8_quant_weight(True, quant_transpose=False)
             optimizer.clear_param_storage("moe_expert")
             optimizer.clear_param_storage("rms_linear")
@@ -664,6 +664,10 @@ class FP8QuantWeightCallback(TrainerCallback):
         skip_count += 1
 
     def on_optimizer_begin(self, args, state, control, **kwargs):
+        model = kwargs["model"]
         optimizer = kwargs["optimizer"]
-        for name in self.moe_weights_name:
-            reload(optimizer._master_weights[name])
+        global skip_count
+
+        if (not g_shard_bypass_dygraph_optimizer) and hasattr(model, "fp8_quant_weight"):
+            for name in self.moe_weights_name:
+                reload(optimizer._master_weights[name])
