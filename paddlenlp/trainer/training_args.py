@@ -1807,6 +1807,9 @@ class TrainingArguments:
                         # DP use hybrid group
                         strategy = fleet.DistributedStrategy()
                         fleet.init(is_collective=True, strategy=strategy)
+                    elif self.using_flex_checkpoint:
+                        strategy = fleet.DistributedStrategy()
+                        fleet.init(is_collective=True, strategy=strategy)
                     else:
                         paddle.distributed.init_parallel_env()
 

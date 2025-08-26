@@ -2816,7 +2816,12 @@ class Trainer:
                             or "remove_master_weight" not in self.args.unified_checkpoint_config
                         ):
                             paddle.save(global_rank, os.path.join(signal_dir, f".master_weight.done.{global_rank}"))
-            if self.args.should_save or self.args.use_expert_parallel:
+
+            if (
+                self.args.should_save
+                or self.args.use_expert_parallel
+                or (self.args.data_parallel_degree > 1 and not self.args.use_hybrid_parallel)
+            ):
                 if not self.args.use_hybrid_parallel:
                     logger.info("Saving optimizer files.")
                     if self.args.unified_checkpoint:
