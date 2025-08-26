@@ -28,7 +28,7 @@ export llm_gpt_data_path=/llm_gpt_data
 unset CUDA_VISIBLE_DEVICES
 
 function is_cuda123() {
-    if [ $(nvidia-smi|grep "CUDA Version: 12.3" |wc -l)  -ne 0 ];then
+    if [ $(nvcc -V|grep "cuda_12.3" |wc -l)  -ne 0 ];then
         echo 1
     else
         echo 0
