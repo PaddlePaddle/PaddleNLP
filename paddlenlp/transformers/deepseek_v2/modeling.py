@@ -1073,7 +1073,7 @@ class DeepseekV2MoE(MoELayer):
                 )
             set_parameter_color([self.shared_experts.w1, self.shared_experts.w2], "shared_expert")
 
-    def fp8_quant_weight(self, batch_mode=False, quant_transpose=True):
+    def fp8_quant_weight(self, batch_mode=False, quant_transpose=None):
         """Quantize weights in FP8 format.
 
         Args:
@@ -1081,27 +1081,41 @@ class DeepseekV2MoE(MoELayer):
                     If False, quantize each expert's weights individually.
         """
 
-        def quantize_weights(weight_list, weight_obj=None, quant_transpose=True):
+        def quantize_weights(weight_list, weight_obj=None, quant_transpose=None):
             """Helper function to quantize a list of weights."""
             if weight_obj is None:
                 weight_obj = weight_list[0]
-            if hasattr(weight_obj, "fp8_weight_stacked"):
+            if hasattr(weight_obj, "fp8_weight_stacked") or hasattr(weight_obj, "fp8_weight_stacked_transpose"):
                 return
 
-            # Quantize without transpose
-            fp8_weight, fp8_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(
-                weight_list, transpose=False
-            )
-            setattr(weight_obj, "fp8_weight_stacked", fp8_weight)
-            setattr(weight_obj, "fp8_scale_stacked", fp8_scale)
+            if quant_transpose is None:
+                fp8_weight, fp8_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(
+                    weight_list, transpose=False
+                )
+                setattr(weight_obj, "fp8_weight_stacked", fp8_weight)
+                setattr(weight_obj, "fp8_scale_stacked", fp8_scale)
 
-            if quant_transpose:
-                # Quantize with transpose
                 fp8_weight_t, fp8_scale_t = paddle.incubate.nn.functional.fused_stack_transpose_quant(
                     weight_list, transpose=True
                 )
                 setattr(weight_obj, "fp8_weight_stacked_transpose", fp8_weight_t)
                 setattr(weight_obj, "fp8_scale_stacked_transpose", fp8_scale_t)
+            elif quant_transpose is False:
+                # Only quantize without transpose
+                fp8_weight, fp8_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(
+                    weight_list, transpose=False
+                )
+                setattr(weight_obj, "fp8_weight_stacked", fp8_weight)
+                setattr(weight_obj, "fp8_scale_stacked", fp8_scale)
+            elif quant_transpose is True:
+                # Only quantize with transpose
+                fp8_weight_t, fp8_scale_t = paddle.incubate.nn.functional.fused_stack_transpose_quant(
+                    weight_list, transpose=True
+                )
+                setattr(weight_obj, "fp8_weight_stacked_transpose", fp8_weight_t)
+                setattr(weight_obj, "fp8_scale_stacked_transpose", fp8_scale_t)
+            else:
+                raise ValueError("Invalid value for `quant_transpose`.")
 
         if batch_mode:
             # Batch mode: process all experts' weights together
@@ -1830,7 +1844,7 @@ class MemroyRecomputeAttn(paddle.nn.Layer):
         )
         set_parameter_color([self.q_up_weight, self.kv_up_weight], "memory_attn")
 
-    def fp8_quant_weight(self, quant_transpose=True):
+    def fp8_quant_weight(self, quant_transpose=None):
         cache_fp8_weight(self.q_up_weight, quant_transpose=quant_transpose)
         cache_fp8_weight(self.kv_up_weight, quant_transpose=quant_transpose)
 
@@ -1959,7 +1973,7 @@ class FusedRMSLinear(paddle.nn.Layer):
         self.eps = eps
         set_parameter_color([self.q_down_weight], "rms_linear")
 
-    def fp8_quant_weight(self, quant_transpose=True):
+    def fp8_quant_weight(self, quant_transpose=None):
         cache_fp8_weight(self.q_down_weight, quant_transpose=quant_transpose)
 
     def forward(self, x):
@@ -2124,7 +2138,7 @@ class DeepseekV2Attention(nn.Layer):
 
         self.attn_func = scaled_dot_product_attention
 
-    def fp8_quant_weight(self, quant_transpose=True):
+    def fp8_quant_weight(self, quant_transpose=None):
 
         if DSV3_USE_ATTEN_RECOMPUTE:
             self.o_proj.fp8_quant_weight(quant_transpose=quant_transpose)
@@ -2356,7 +2370,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
         else:
             self.mlp = DeepseekV2MLPClass(config, recompute_fwd_gate_up=True)
 
-    def fp8_quant_weight(self, batch_mode=False, quant_transpose=True):
+    def fp8_quant_weight(self, batch_mode=False, quant_transpose=None):
         """fp8_quant_weight"""
         if isinstance(self.mlp, DeepseekV2MoE):
             # logger.info(f"fp8 quant weight for mlp {type(self.mlp)}")
