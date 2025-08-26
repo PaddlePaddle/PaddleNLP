@@ -500,7 +500,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         return_dict: bool = True,
         return_length: bool = False,
         verbose: bool = True,
-        split_special_tokens: bool = False,
+        split_special_tokens: bool = None,
         **kwargs
     ) -> BatchEncoding:
         if not isinstance(batch_text_or_text_pairs, (tuple, list)):
@@ -518,7 +518,9 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
             padding_side=padding_side,
         )
 
-        if self._tokenizer.encode_special_tokens != split_special_tokens:
+        # NOTE(gongenlei): Same as slow_tokenizer from config.split_special_tokens
+        # https://github.com/PaddlePaddle/PaddleNLP/blob/release/3.0-beta3/paddlenlp/transformers/tokenizer_utils_fast.py#L153
+        if split_special_tokens is not None:
             self._tokenizer.encode_special_tokens = split_special_tokens
 
         encodings = self._tokenizer.encode_batch(
@@ -593,7 +595,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         return_offsets_mapping: bool = False,
         return_length: bool = False,
         verbose: bool = True,
-        split_special_tokens: bool = False,
+        split_special_tokens: bool = None,
         **kwargs,
     ) -> BatchEncoding:
         batched_input = [(text, text_pair)] if text_pair else [text]
