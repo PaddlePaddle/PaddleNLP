@@ -3163,6 +3163,28 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
         )
 
 
+class FastCrossEntropyFunction(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, preds, labels):
+
+        softmax_val, loss = paddle._C_ops.cross_entropy_with_softmax(preds, labels, False, True, False, -100, -1)
+
+        # print("softmax val", softmax_val.dtype)
+
+        ctx.save_for_backward(labels, softmax_val)
+        return loss
+
+    @staticmethod
+    def backward(ctx, dout):
+        labels, softmax_val = ctx.saved_tensor()
+
+        preds_grad = paddle.incubate.nn.functional.cross_entropy_with_softmax_bwd_w_downcast(
+            labels, softmax_val.cast(paddle.float32), dout.cast(paddle.float32)
+        )
+
+        return preds_grad, None
+
+
 class DeepseekV2PretrainingCriterion(nn.Layer):
     """
     Criterion for Mixtral.
@@ -3190,7 +3212,7 @@ class DeepseekV2PretrainingCriterion(nn.Layer):
 
         def compute_loss(preds, labels):
             with paddle.amp.auto_cast(False):
-                masked_lm_loss = self.loss_func(preds.astype("float32"), labels.unsqueeze(2))
+                masked_lm_loss = FastCrossEntropyFunction.apply(preds, labels.unsqueeze(2))
                 binary_sequence = paddle.where(
                     masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
                 )
