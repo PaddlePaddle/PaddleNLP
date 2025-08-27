@@ -1707,7 +1707,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
                         mlp_layer=self.mlp,
                         send_mtp_embed=self.config.send_mtp_embed,
                         using_post_norm_recompute=self.config.using_post_norm_recompute,
-                        stepped_recompute_fwd_gate_up=self.config.stepped_recompute_fwd_gate_up
+                        stepped_recompute_fwd_gate_up=self.config.stepped_recompute_fwd_gate_up,
                         name="FusionFp8DecoderLayerNode",
                     )
                 else:
