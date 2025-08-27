@@ -1179,7 +1179,6 @@ class OverlapedFUsionScheduleNode:
         paddle.base.core.nvprof_nvtx_push("mlp_forward")
         inputs = self.forward_node.mlp_forward(inputs)
         paddle.base.core.nvprof_nvtx_pop()
-        mlp_fwd_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
 
         if pp_stream is not None:
             paddle.base.core.nvprof_nvtx_push("post_process_forward")
@@ -1191,7 +1190,7 @@ class OverlapedFUsionScheduleNode:
 
         paddle.base.core.nvprof_nvtx_push("combine_forward")
         inputs = self.forward_node.combine_forward(
-            inputs, previous_event=mlp_fwd_event, async_finish=True, allocate_on_comm_stream=True
+            inputs, previous_event=final_out_event, async_finish=True, allocate_on_comm_stream=True
         )
         paddle.base.core.nvprof_nvtx_pop()
 
@@ -1201,9 +1200,6 @@ class OverlapedFUsionScheduleNode:
 
         if pp_stream is not None:
             send_recv_stream = paddle.device.Stream(stream_base=pp_stream)
-
-            # combine_forward_event.custom_stream_wait( pp_stream)
-            # final_out_event.custom_stream_wait(pp_stream)
 
             paddle.base.core.nvprof_nvtx_push("pp stream add")
 
@@ -1321,6 +1317,8 @@ class OverlapedDenseFusionScheduleNode:
             paddle.base.core.nvprof_nvtx_pop()  # moe_attn
 
             paddle.base.core.nvprof_nvtx_push("dense_mlp_moe_dispatch")
+            if combine_bw_event_to_wait is not None:
+                combine_bw_event_to_wait.calc_stream_wait(self.forward_node.moe_group.id)
             output_grad = self.backward_node.mlp_node.backward(output_grad)
             inputs = self.forward_node.dispatch_forward(
                 inputs, previous_event=attn_fw_event, async_finish=True, allocate_on_comm_stream=True
