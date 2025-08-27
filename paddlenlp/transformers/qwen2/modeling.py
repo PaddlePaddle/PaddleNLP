@@ -1601,6 +1601,7 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         attn_mask_startend_row_indices=None,
+        **kwargs,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
         r"""
         Args:
