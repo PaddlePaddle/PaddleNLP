@@ -33,6 +33,12 @@ try:
     from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import EventStore
 except ImportError:
     EventStore = None
+
+try:
+    from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import StepEvent
+except ImportError:
+    StepEvent = None
+
 from paddle.distributed.fleet.recompute.recompute import recompute
 from paddle.distributed.fleet.utils.sequence_parallel_utils import ScatterOp
 
@@ -1058,6 +1064,8 @@ class FusionFp8DecoderLayerNode(ScheduleNode):
         return output_grad, event_to_wait
 
     def forward(self, inputs):
+        if StepEvent is not None and StepEvent.need_rc_o1:
+            self.fp8_fusion_moe_node.mlp_node.set_recompute_fwd_gate_up(True)
         inputs = self.attn_forward(inputs)
         inputs = self.dispatch_forward(inputs)
         inputs = self.mlp_forward(inputs)
