@@ -30,7 +30,10 @@ except ImportError:
         return F.silu(x) * y
 
 
-from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import WeightGradStore
+from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import (
+    SMNumStore,
+    WeightGradStore,
+)
 
 USE_DS_GEMM = os.getenv("USE_DS_GEMM", "False").lower() == "true"
 
@@ -48,6 +51,12 @@ __all__ = [
     "FP8Linear",
     "FP8GroupGemmMlpFunctionNode",
 ]
+
+
+def get_sm_num():
+    if SMNumStore.sms_num != -1:
+        return 128
+    return 112
 
 
 def set_parameter_color(
@@ -159,7 +168,7 @@ class FP8LinearFunctionBase:
             tensor_t_fp8, tensor_t_scale = paddle.incubate.nn.functional.fp8_quant_blockwise(
                 tensor,
                 output_scale_transpose=True,
-                tquant_method="1x128",
+                quant_method="1x128",
                 input_transpose=True,
                 return_transpose_only=True,
             )
@@ -178,7 +187,7 @@ class FP8LinearFunctionBase:
             if out is None:
                 out = paddle.zeros([x_fp8.shape[0], w_fp8.shape[0]], rtn_dtype)
             if numpy.prod(x_fp8.shape) != 0 and numpy.prod(w_fp8.shape) != 0:
-                deep_gemm.wgrad_gemm_fp8_fp8_fp32_nt((x_fp8, x_scale), (w_fp8, w_scale), out, num_sms=118)
+                deep_gemm.wgrad_gemm_fp8_fp8_fp32_nt((x_fp8, x_scale), (w_fp8, w_scale), out, num_sms=get_sm_num())
             return out
 
         if out is not None:
@@ -261,7 +270,9 @@ class FP8LinearFunctionBase:
         if out is None:
             out = paddle.empty([input_fp8.shape[0], weight_fp8.shape[0]], dtype=weight.dtype)
 
-        deep_gemm.gemm_fp8_fp8_bf16_nt((input_fp8, input_scale.T), (weight_fp8, weight_scale), out, num_sms=118)
+        deep_gemm.gemm_fp8_fp8_bf16_nt(
+            (input_fp8, input_scale.T), (weight_fp8, weight_scale), out, num_sms=get_sm_num()
+        )
 
         # Return outputs
         if return_mode == "output_only":
@@ -351,7 +362,7 @@ class FP8LinearFunctionBase:
             # Recompute o1 using deep_gemm(x_fp8, w1_t_fp8)
             w1_fp8, w1_scale = weight_quant(w1, True)
             o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=do3.dtype)
-            deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1, num_sms=118)
+            deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1, num_sms=get_sm_num())
 
         # ===== [recompute] o2 = swiglu(o1) =====
         o2 = swiglu(o1)
@@ -838,7 +849,7 @@ def split_group_gemm(x_fp8, x_scale, w_fp8, w_scale, tokens_per_expert, gemm_out
             (x_fp8[start_idx:end_idx], x_scale_tma_align),
             (w_fp8[i], w_scale[i]),
             gemm_out[start_idx:end_idx],
-            num_sms=118,
+            num_sms=get_sm_num(),
         )
 
         start_idx = end_idx
@@ -927,7 +938,7 @@ class FP8GroupGemmMlpFunctionNode:
                     (w1_t_quant, w1_t_scale),
                     o1,
                     m_indices=self.m_indices if m_indices is None else m_indices,
-                    num_sms=118,
+                    num_sms=get_sm_num(),
                 )
 
         if m_indices is None:
@@ -981,7 +992,7 @@ class FP8GroupGemmMlpFunctionNode:
                     (w2_quant, w2_scale),
                     o3,
                     m_indices=m_indices if self.fwd_subbatch else self.m_indices,
-                    num_sms=118,
+                    num_sms=get_sm_num(),
                 )
 
         return o3
@@ -1022,7 +1033,7 @@ class FP8GroupGemmMlpFunctionNode:
                     (bw_w2_quant, bw_w2_scale),
                     do2_s,
                     m_indices=m_indices if self.bwd_subbatch else self.m_indices,
-                    num_sms=118,
+                    num_sms=get_sm_num(),
                 )
 
         with paddle.amp.auto_cast(False):
@@ -1068,7 +1079,7 @@ class FP8GroupGemmMlpFunctionNode:
                     (bw_w1_quant, bw_w1_scale),
                     dx,
                     m_indices=m_indices if self.bwd_subbatch else self.m_indices,
-                    num_sms=118,
+                    num_sms=get_sm_num(),
                 )
 
         return dx
