@@ -197,7 +197,12 @@ class DistDataLoader(paddle.io.DataLoader):
                 data = nested_copy_place(data, place=paddle.framework._current_expected_place())
             except Exception as e:
                 logger.debug(e)
-        data = self._broadcast_data(data)
+        # data = self._broadcast_data(data)
+        if data is None:
+            data = {
+                "input_ids": paddle.empty([1, 4097], paddle.int64),
+                "labels": paddle.empty([1, 4097], paddle.int64),
+            }
         return data
 
 
