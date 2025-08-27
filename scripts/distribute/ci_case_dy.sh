@@ -27,6 +27,16 @@ export llm_gpt_data_path=/llm_gpt_data
 
 unset CUDA_VISIBLE_DEVICES
 
+function is_cuda123() {
+    if [ $(nvidia-smi|grep "CUDA Version: 12.3" |wc -l)  -ne 0 ];then
+        echo 1
+    else
+        echo 0
+    fi
+}
+
+IS_CUDA123=$(is_cuda123)
+
 function track_case_status() {  
     local case_name="$1"  
     local prefix="$2"  
@@ -536,7 +546,11 @@ function llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1() {
     ips=`cat $log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
     mem=`cat $log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'gpu_max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=8.93362617
+    if [ $IS_CUDA123 -ne 0 ];then
+        loss_base=8.93676758
+    else
+        loss_base=8.93362617
+    fi
     ips_base=64.75564390065037
     mem_base=8904
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -561,7 +575,7 @@ function check_result() {
         echo -e "loss_base: $2 loss_test: $3 loss_diff: $diff_loss%" | tee -a ${log_path}/result.log
         if [ $2 != $3 ];then
             echo -e "\033[31m $1 loss diff check failed! \033[0m" | tee -a ${log_path}/result.log
-            return 0
+            exit 2
         fi
         
         diff_ips=$(echo $4 $5|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
@@ -573,7 +587,7 @@ function check_result() {
         fi
         if [[ $v2 == 0 ]];then
             echo -e "\033[31m $1 IPS diff check failed! \033[0m" | tee -a $log_path/result.log
-            return 0
+            exit 2
         fi
 
         diff_mem=$(echo $6 $7|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
@@ -582,7 +596,7 @@ function check_result() {
         w2=$(echo $diff_mem -5.0|awk '{print($1<=$2)?"0":"1"}')
         if [[ $w1 == 0 ]];then
             echo -e "\033[31m $1 MEM diff check failed! \033[0m" | tee -a $log_path/result.log
-            return 0
+            exit 2
         fi
         if [[ $w2 == 0 ]];then
             echo -e "$1 MEM decreases greater than 5%, not exit " | tee -a $log_path/result.log

@@ -45,5 +45,5 @@ class YuanTokenizationTest(unittest.TestCase):
                 context_data=context_data,
             )
             for idx, round in enumerate(conversation_result["conversations"]):
-                self.assertEquals(tokenizer.decode(round[0]), decode_outputs[idx][0])
-                self.assertEquals(tokenizer.decode(round[1]), decode_outputs[idx][1])
+                self.assertEqual(tokenizer.decode(round[0]), decode_outputs[idx][0])
+                self.assertEqual(tokenizer.decode(round[1]), decode_outputs[idx][1])

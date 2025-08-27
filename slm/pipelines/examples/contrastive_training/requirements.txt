@@ -1,2 +1,4 @@
 mteb==1.12.80
 typer==0.9.0
+h11==0.16.0
+requests[socks]

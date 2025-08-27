@@ -599,7 +599,7 @@ class RLHFPPOMixedLoss(nn.Layer):
 
 @merge_fwd_labels
 class RLHFValueLoss(nn.Layer):
-    def __init__(self, config, clip_range_value=5.0):
+    def __init__(self, config, clip_range_value=5.0, use_fp32_compute=False):
         """
         Initializes the `ClipRewardRange` object.
 
@@ -617,6 +617,7 @@ class RLHFValueLoss(nn.Layer):
         super().__init__()
         self.clip_range_value = clip_range_value
         self.config = config
+        self.use_fp32_compute = use_fp32_compute
 
     def critic_loss_fn(
         self,
@@ -636,54 +637,48 @@ class RLHFValueLoss(nn.Layer):
         vf_loss2 = paddle.square(values_clipped - returns)
         return 0.5 * paddle.sum(paddle.maximum(vf_loss1, vf_loss2) * mask) / mask.sum()
 
-    def forward(self, reward_values, old_reward_values, reward_returns, sequence_mask):
-        """
-        计算奖励值的损失函数。
-        如果输入的奖励值和旧奖励值的长度相同，则使用给定的序列掩码来确定有效长度。
-        如果输入的奖励值的长度比旧奖励值少一个，则将最后一个元素视为与输入IDs一致的填充，并删除它。
-        否则，奖励值只有tgt长度。
+    def forward(
+        self,
+        reward_values,
+        old_reward_values,
+        reward_returns,
+        sequence_mask,
+        response_start=0,
+        # for varlen flaskmask
+        pad_size=0,
+        raw_input_ids=None,
+        indices=None,
+        raw_input_shape=None,
+        input_ids_rmpad_rolled=None,
+    ):
+        """ """
+        reward_values = reward_values[0].squeeze(0)
+        if self.config.sequence_parallel:
+            from paddle.distributed.fleet.utils.sequence_parallel_utils import GatherOp
 
-        Args:
-            reward_values (paddle.Tensor, list of paddle.Tensor or None, optional): 奖励值，可以是单个张量或列表中的多个张量。默认为None。
-            old_reward_values (paddle.Tensor, optional): 旧奖励值。
-            reward_returns (paddle.Tensor, optional): 奖励返回值。
-            sequence_mask (paddle.Tensor, optional): 序列掩码。
+            reward_values = GatherOp.apply(reward_values)
 
-        Returns:
-            paddle.Tensor, float32: 奖励值的损失函数。
+        use_remove_padding = indices is not None
+        if use_remove_padding:
+            if pad_size > 0:
+                reward_values = reward_values[:-pad_size, :]
 
-        Raises:
-            ValueError: 当奖励值和旧奖励值的长度不匹配时引发。
-        """
-        reward_values = reward_values if isinstance(reward_values, paddle.Tensor) else reward_values[0]
-        reward_values = reward_values.squeeze(axis=-1)[:, :-1]
-        if reward_values.shape[1] == old_reward_values.shape[1]:
-            # labels (old_reward_values, reward_returns, sequence_mask) has
-            # src+tgt-1 length, valid length is determined by sequence_mask
-            pass
-        elif reward_values.shape[1] < old_reward_values.shape[1]:
-            # labels (old_reward_values, reward_returns, sequence_mask) has
-            # src+tgt length and the last one is a padding to be consistent
-            # with input_ids
-            assert reward_values.shape[1] == old_reward_values.shape[1] - 1
-            reward_values = paddle.concat(
-                [
-                    reward_values,
-                    paddle.zeros([reward_values.shape[0], 1], dtype=reward_values.dtype),
-                ],
-                -1,
-            )
-        else:
-            # labels (old_reward_values, reward_returns, sequence_mask) has
-            # tgt length
-            reward_values = reward_values[:, -old_reward_values.shape[1] :]
+            from ..utils.bert_padding import pad_input
+
+            reward_values = pad_input(
+                reward_values.squeeze(0), indices, batch=raw_input_shape[0], seqlen=raw_input_shape[1]
+            ).contiguous()
+
+        if self.use_fp32_compute and reward_values.dtype != paddle.float32:
+            reward_values = reward_values.cast(paddle.float32)
+
+        reward_values = reward_values.squeeze(axis=-1)[:, response_start:-1]
         reward_critic_loss = self.critic_loss_fn(
             reward_values,
             old_reward_values,
             reward_returns,
             sequence_mask,
         )
-
         return reward_critic_loss
 
 
