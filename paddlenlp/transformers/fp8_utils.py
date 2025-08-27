@@ -30,10 +30,7 @@ except ImportError:
         return F.silu(x) * y
 
 
-from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import (
-    SMNumStore,
-    WeightGradStore,
-)
+from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import WeightGradStore
 
 USE_DS_GEMM = os.getenv("USE_DS_GEMM", "False").lower() == "true"
 
@@ -54,8 +51,6 @@ __all__ = [
 
 
 def get_sm_num():
-    if SMNumStore.sms_num != -1:
-        return 128
     return 112
 
 
