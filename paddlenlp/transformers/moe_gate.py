@@ -565,14 +565,25 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             top_gate, top_idx = self._topk_noaux_tc(
                 gates, k=self.top_k, n_group=self.n_group, topk_group=self.topk_group
             )
+
             # norm gate to sum 1
-        if self.top_k > 1 and self.norm_topk_prob:
-            denominator = top_gate.sum(axis=-1, keepdim=True) + 1e-20
-            top_gate = top_gate / denominator
-        top_gate = top_gate * self.routed_scaling_factor
+        # if self.top_k > 1 and self.norm_topk_prob:
+        #     denominator = top_gate.sum(axis=-1, keepdim=True) + 1e-20
+        #     top_gate = top_gate / denominator
+        # top_gate = top_gate * self.routed_scaling_factor
 
         # get topk mask
         mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.ones([], dtype="float32"), axis=1)
+
+        gates_masked = gates * mask
+        # if self.training:
+        gates_s = paddle.sum(gates_masked, axis=-1, keepdim=True)
+        denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
+
+        if self.norm_topk_prob:
+            gates_masked = gates_masked / denom_s
+        
+        gates_masked *= self.routed_scaling_factor
 
         if hasattr(self.config, "seq_aux") and self.config.seq_aux:
             l_aux = self._cal_seq_aux_loss(gates_ori, self.top_k, top_idx)
@@ -580,5 +591,5 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             l_aux = self._cal_aux_loss(gates, mask)
 
         exp_counts = paddle.sum(mask.cast(paddle.int64), axis=0)
-        topk_masked_gates = paddle.zeros_like(gates).put_along_axis(top_idx, top_gate, axis=1)
-        return topk_masked_gates, mask, exp_counts, l_aux, l_zloss
+        # topk_masked_gates = paddle.zeros_like(gates).put_along_axis(top_idx, top_gate, axis=1)
+        return gates_masked, mask, exp_counts, l_aux, l_zloss
