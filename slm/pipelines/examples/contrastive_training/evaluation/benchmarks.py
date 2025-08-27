@@ -21,7 +21,7 @@ from typing import Dict, List, cast
 
 from datasets import load_dataset
 from mteb.abstasks import AbsTaskRetrieval
-from prediction import Eval_modle
+from prediction import Eval_model
 
 csv.field_size_limit(500 * 1024 * 1024)
 
@@ -51,7 +51,7 @@ class PaddleModel:
         pooling_mode="mean_tokens",
         **kwargs,
     ):
-        self.query_model = Eval_modle(
+        self.query_model = Eval_model(
             model=query_model,
             max_seq_len=max_seq_len,
             batch_size=batch_size,

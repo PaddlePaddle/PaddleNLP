@@ -183,14 +183,18 @@ def reload_and_offload_scope(trainer, *args):
     offload_map = {
         trainer.actor_model: "train_model",
         trainer.reference_model: "freeze_model",
-        **({trainer.reward_model: "freeze_model"} if not trainer.args.use_rm_server else {}),
+        **(
+            {trainer.reward_model: "freeze_model"}
+            if not trainer.args.use_rm_server and not trainer.args.use_rule_reward
+            else {}
+        ),
         trainer.actor_trainer.optimizer: "optimizer",
     }
 
     if trainer.args.rl_algorithm == "ppo":
         offload_map.update(
             {
-                trainer.reward_critic_model: "train_model",
+                trainer.critic_model: "train_model",
                 trainer.critic_trainer.optimizer: "optimizer",
             }
         )
@@ -201,8 +205,8 @@ def reload_and_offload_scope(trainer, *args):
             # NOTE(gongenlei): for export_evaluate_model
             objs.append((trainer.actor_model, offload_map.get(trainer.actor_model, "")))
     if trainer.args.rl_algorithm == "ppo":
-        if trainer.reward_critic_model not in [i for i, _ in objs]:
+        if trainer.critic_model not in [i for i, _ in objs]:
             if getattr(trainer.critic_trainer, "_inner_eval_model", None) is not None:
                 # NOTE(gongenlei): for export_evaluate_model
-                objs.append((trainer.reward_critic_model, offload_map.get(trainer.reward_critic_model, "")))
+                objs.append((trainer.critic_model, offload_map.get(trainer.critic_model, "")))
     return OffloadController(objs)

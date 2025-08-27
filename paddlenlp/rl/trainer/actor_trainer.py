@@ -164,6 +164,7 @@ class ActorReferenceTrainerBase(RLTrainer):
             {key: paddle.concat(log_probs_list, axis=0)}, meta_info={"temperature": self.args.temperature}
         )
 
+    @paddle.no_grad()
     def compute_fused_logprob(
         self, input_ids: paddle.Tensor, key, position_ids: paddle.Tensor = None, prompt=None, loop_chunk_size=1024
     ) -> DataProto:
@@ -421,7 +422,7 @@ class ActorReferenceTrainer(ActorReferenceTrainerBase):
         if repeat_num > 1:
             input_ids = input_ids.repeat_interleave(repeat_num, axis=0)
 
-        if self.args.use_rm_server:
+        if self.args.use_rm_server or self.args.use_rule_reward:
             label_ids = prompt_only_batch.batch["label_ids"]
             if repeat_num > 1:
                 label_ids = label_ids.repeat_interleave(repeat_num, axis=0)
@@ -437,7 +438,7 @@ class ActorReferenceTrainer(ActorReferenceTrainerBase):
                     "input_ids": seq,
                     **(
                         {"label_ids": label_ids[idx * len(seq) : (idx + 1) * len(seq)]}
-                        if self.args.use_rm_server
+                        if self.args.use_rm_server or self.args.use_rule_reward
                         else {}
                     ),  # tgt response
                     "index": np.array([str(uuid.uuid4())] * len(seq), dtype=object),

@@ -34,6 +34,7 @@ from ...trainer.trainer import (
 )
 from ...transformers import PretrainedModel, PretrainedTokenizer
 from ..models.ppo_model_utils import create_startend_row_indices
+from ..models.reward_utils import extract_solution
 from .rl_trainer import RLTrainer
 from .trainer_utils import batch_retokenize
 
@@ -56,7 +57,10 @@ class RewardTrainer(RLTrainer):
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
         reward_server: str = None,
     ):
-        if args.use_rm_server:
+        if args.use_rule_reward:
+            self.args = args
+            self.tokenizer = tokenizer
+        elif args.use_rm_server:
             assert isinstance(model, str), "reward trainer need a str (http://xxx:port) for request"
             self.args = args
             self.tokenizer = tokenizer
@@ -87,7 +91,20 @@ class RewardTrainer(RLTrainer):
         position_ids = batch.batch["position_ids"]
         label_ids = batch.batch["label_ids"]
         prompt = batch.batch["prompt"]
-        if not self.args.use_rm_server:
+
+        if self.args.use_rule_reward:
+            prompt_len = prompt.shape[-1]
+            if label_ids is None:
+                raise ValueError("Rule-based reward needs labels.")
+            tgt = input_ids_tokenizer.batch_decode(label_ids, skip_special_tokens=False)
+            response = input_ids_tokenizer.batch_decode(input_ids[:, prompt_len:], skip_special_tokens=False)
+            ground_truth = [i.replace(self.tokenizer.pad_token, "") for i in tgt]
+            response = [i.replace(self.tokenizer.pad_token, "") for i in response]
+            reward_score = self.compute_score(
+                solution=response,
+                ground_truth=ground_truth,
+            )
+        elif not self.args.use_rm_server:
             if self.tokenizer is not input_ids_tokenizer:
                 # right padding
                 reward_tokenize_output = batch_retokenize(
@@ -124,8 +141,6 @@ class RewardTrainer(RLTrainer):
         reward_score = reward_score.squeeze(axis=-1)
 
         return reward_score
-        # if self.args.rl_algorithm in ["grpo", "reinforce_plus_plus"]:
-        #     return {"rewards": reward_score}
 
     def request_reward_server(self, src, tgt, response):
         data = {"src": src, "tgt": tgt, "response": response}
@@ -167,4 +182,30 @@ class RewardTrainer(RLTrainer):
             paddle.distributed.barrier(tp_group)
             paddle.distributed.broadcast(reward_score, src=tp_group.ranks[0], group=tp_group)
 
-        return reward_score.unsqueeze(-1)
+        reward_score = reward_score.unsqueeze(-1)
+        return reward_score
+
+    def compute_score(self, solution, ground_truth, method="strict", format_score=0.0, score=1.0):
+        """The scoring function for GSM8k.
+
+        Reference: Trung, Luong, et al. "Reft: Reasoning with reinforced fine-tuning." Proceedings of the 62nd Annual
+        Meeting of the Association for Computational Linguistics (Volume 1: Long Papers). 2024.
+
+        Args:
+            solution: the solution text
+            ground_truth: the ground truth
+            method: the method to extract the solution, choices are 'strict' and 'flexible'
+            format_score: the score for the format
+            score: the score for the correct answer
+        """
+        reward_tensor = paddle.zeros((len(solution), 1), dtype=paddle.float32)
+        for i in range(len(solution)):
+            answer = extract_solution(solution_str=solution[i], method=method)
+            if answer is None:
+                reward_tensor[i] = 0
+            else:
+                if answer == ground_truth[i]:
+                    reward_tensor[i] = score
+                else:
+                    reward_tensor[i] = format_score
+        return reward_tensor

@@ -295,7 +295,7 @@ class GenerationInferenceModel(GenerationMixin):
             model_inputs = self.prepare_inputs_for_generation(input_ids, cache_kvs, **args)
             return self(**model_inputs)
 
-        def _post_process_(outputs, top_p, temperature, step_idx_ori, model_kwargs):
+        def _post_process_(logits, top_p, temperature, step_idx_ori, model_kwargs):
             cache = model_kwargs.get("cache", None)
             just_decoder = model_kwargs["seq_len_encoder"] == 0
             if cache is None:  # first decoder
@@ -314,7 +314,6 @@ class GenerationInferenceModel(GenerationMixin):
                 step_idx,
                 model_kwargs["stop_flags"],
             )
-            logits = outputs[0] if isinstance(outputs, tuple) else outputs
 
             logits = paddle.cast(logits, paddle.float32)
             logits = logits_processors(model_kwargs["all_input_ids"], logits, decoding_step=step_idx_ori)
@@ -373,7 +372,7 @@ class GenerationInferenceModel(GenerationMixin):
         outputs = _forward_(**model_kwargs)
         # first decoder
         next_tokens, model_kwargs = _post_process_(
-            outputs,
+            outputs[0] if isinstance(outputs, tuple) else outputs,
             top_p,
             temperature,
             step_idx_ori,
@@ -389,8 +388,9 @@ class GenerationInferenceModel(GenerationMixin):
             paddle.sum(paddle.cast(model_kwargs["stop_flags"], "int64")),
             model_kwargs["stop_nums"],
         ):
+            outputs = _forward_(**model_kwargs)
             next_tokens, model_kwargs = _post_process_(
-                _forward_(**model_kwargs),
+                outputs[0] if isinstance(outputs, tuple) else outputs,
                 top_p,
                 temperature,
                 step_idx_ori,
@@ -692,7 +692,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             return self(**model_inputs)
 
         def _post_process_(
-            outputs,
+            logits,
             top_k,
             top_p,
             penalty_score,
@@ -702,7 +702,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             model_kwargs,
         ):
             step_idx = model_kwargs["step_idx"]
-            logits = paddle.cast(outputs, paddle.float32)
+            logits = paddle.cast(logits, paddle.float32)
 
             from paddlenlp_ops import set_preids_token_penalty_multi_scores
 
@@ -777,7 +777,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
         outputs = _forward_(**model_kwargs)  # [bs, 1, dim_embed]
         # first decoder
         next_tokens = _post_process_(
-            outputs,
+            outputs[0] if isinstance(outputs, tuple) else outputs,
             top_k,
             top_p,
             penalty_score,
@@ -806,7 +806,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             return self(**model_inputs)
 
         def _post_process_(
-            outputs,
+            logits,
             top_k,
             top_p,
             penalty_score,
@@ -816,7 +816,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             model_kwargs,
         ):
             step_idx = model_kwargs["step_idx"]
-            logits = paddle.cast(outputs, paddle.float32)
+            logits = paddle.cast(logits, paddle.float32)
 
             from paddlenlp_ops import speculate_get_token_penalty_multi_scores
 
@@ -959,7 +959,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             return self(**model_inputs)
 
         def _post_process_(
-            outputs,
+            logits,
             top_k,
             top_p,
             penalty_score,
@@ -968,7 +968,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             temperature,
             model_kwargs,
         ):
-            logits = paddle.cast(outputs, paddle.float32)
+            logits = paddle.cast(logits, paddle.float32)
 
             probs = F.softmax(logits)
 
@@ -1191,7 +1191,7 @@ class GenerationAvxInferenceModel(GenerationMixin):
             model_inputs = self.prepare_inputs_for_generation(input_ids, **args)
             return self(**model_inputs)
 
-        def _post_process_(outputs, top_p, temperature, step_idx_ori, model_kwargs):
+        def _post_process_(logits, top_p, temperature, step_idx_ori, model_kwargs):
             cache = model_kwargs.get("cache", None)
             just_decoder = model_kwargs["seq_len_encoder"] == 0
             if cache is None:  # first decoder
@@ -1211,7 +1211,6 @@ class GenerationAvxInferenceModel(GenerationMixin):
                 step_idx,
                 model_kwargs["stop_flags"],
             )
-            logits = outputs[0] if isinstance(outputs, tuple) else outputs
             logits = paddle.cast(logits, paddle.float32)
             logits = logits_processors(model_kwargs["all_input_ids"], logits, decoding_step=step_idx_ori)
 
