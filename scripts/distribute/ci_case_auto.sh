@@ -106,9 +106,9 @@ function llama_case_list_auto() {
         # be used for tracking the execution status of the case.
         llama_dygraph_auto_bs4_bf16_SD2
         llama_dygraph_auto_bs8_fp32_DP2
-        # llama_dygraph_auto_bs8_fp32_DP2-MP2
+        llama_dygraph_auto_bs8_fp32_DP2-MP2
         llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
-        # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
+        llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
         llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2
         llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2_intermediate
         llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp
@@ -634,7 +634,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
         if [ $IS_CUDA123 -ne 0 ];then
             loss_base=9.39367676
         else
-            loss_base=9.39368534
+            loss_base=9.3936882
         fi
     fi
     ips_base=-1
@@ -780,7 +780,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2() {
         if [ $IS_CUDA123 -ne 0 ];then
             loss_base=9.38431835
         else
-            loss_base=9.38429451
+            loss_base=9.38430595
         fi
         ips_base=-1
         mem_base=-1
@@ -856,7 +856,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2_intermediate() {
         if [ $IS_CUDA123 -ne 0 ];then
             loss_base=9.38431835
         else
-            loss_base=9.38429451
+            loss_base=9.38430595
         fi
         ips_base=-1
         mem_base=-1
@@ -933,7 +933,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
         if [ $IS_CUDA123 -ne 0 ];then
             loss_base=9.57173729
         else
-            loss_base=9.57178879
+            loss_base=9.57199001
         fi
         ips_base=-1
         mem_base=-1
@@ -1306,13 +1306,13 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP() {
                     if [ $IS_CUDA123 -ne 0 ];then
                         loss_base=9.38023453
                     else
-                        loss_base=9.37966919
+                        loss_base=9.37972641
                     fi
                 elif [ $IS_A100 -ne 0 ] && [ $to_static -eq 1 ];then
                     if [ $IS_CUDA123 -ne 0 ];then
                         loss_base=9.38023453
                     else
-                        loss_base=9.38012543
+                        loss_base=9.37989655
                     fi
                 fi
                 ips=-1
@@ -1583,13 +1583,13 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP() {
             if [ $IS_CUDA123 -ne 0 ];then
                 loss_base=9.44244614
             else
-                loss_base=9.44203949
+                loss_base=9.44203339
             fi
         elif [ $IS_A100 -ne 0 ] && [ $to_static -eq 1 ];then
             if [ $IS_CUDA123 -ne 0 ];then
                 loss_base=9.44244614
             else
-                loss_base=9.44225311
+                loss_base=9.44231415
             fi
         fi
         ips_base=-1
