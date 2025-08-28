@@ -242,7 +242,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
                     position_ids=position_ids,
                     attention_mask=attention_mask,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
-                    use_reentrant=False,
+                    use_reentrant=self.config.recompute_use_reentrant,
                 )
             else:
                 # for pretrain
@@ -300,7 +300,7 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
                         position_ids=position_ids,
                         attention_mask=attention_mask,
                         attn_mask_startend_row_indices=attn_mask_startend_row_indices,
-                        use_reentrant=False,
+                        use_reentrant=self.config.recompute_use_reentrant,
                     )
                 else:
                     # for pretrain
