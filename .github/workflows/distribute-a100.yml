@@ -2,20 +2,9 @@ name: Distribute CI (A100)
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
-    branches: [develop]
-  schedule:
-    - cron: "1 0 * * *"
-  workflow_call:
-    inputs:
-      run_downstream:
-        required: true
-        type: string
-      image_name:
-        required: true
-        type: string
+    branches: incubate/paddlenlp-fleety_20250421
+  workflow_dispatch:
   
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
