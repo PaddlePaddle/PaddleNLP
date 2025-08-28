@@ -1,19 +1,20 @@
-name: Unittest GPU CI
+# Disabled unittest GPU workflow - manually enabled when needed
+name: Unittest GPU CI (DISABLED)
 
-on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    branches: [develop]
-  schedule:
-    - cron: "3 0 * * *"
-  workflow_call:
-    inputs:
-      run_downstream:
-        required: true
-        type: string
-      image_name:
-        required: true
-        type: string
+#on:
+#  pull_request:
+#    types: [opened, synchronize, reopened]
+#    branches: [develop]
+#  schedule:
+#    - cron: "3 0 * * *"
+#  workflow_call:
+#    inputs:
+#      run_downstream:
+#        required: true
+#        type: string
+#      image_name:
+#        required: true
+#        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -40,9 +41,9 @@ defaults:
   run:
     shell: bash
 
-jobs:
-  unittest-gpu-ci:
-    name: unittest-gpu-ci
+#jobs:
+#  unittest-gpu-ci:
+#    name: unittest-gpu-ci (DISABLED)
     runs-on: [self-hosted, ernie-8gpu]
     steps:
       - name: Determine Image Name

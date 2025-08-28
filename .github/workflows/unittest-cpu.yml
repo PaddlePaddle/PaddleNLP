@@ -19,7 +19,7 @@ env:
 
 jobs:
   unittest-cpu-ci:
-    name:   unittest-cpu-ci
+    name: unittest-cpu-ci
     runs-on: [self-hosted, ernie-cpu]
     permissions:
       pull-requests: write
