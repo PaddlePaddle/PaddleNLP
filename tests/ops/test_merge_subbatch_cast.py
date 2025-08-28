@@ -15,7 +15,7 @@
 import numpy as np
 import paddle
 import TokenDispatcherUtils as TDU
-from ..testing_utils import assert_allclose
+from ..testing_utils import require_gpu
 
 subbatch_rows = 30
 remainder_row = 0
