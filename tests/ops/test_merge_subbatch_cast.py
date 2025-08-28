@@ -12,16 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import unittest
+
 import numpy as np
 import paddle
 import TokenDispatcherUtils as TDU
-from ..testing_utils import require_gpu
+
+from paddlenlp.utils.import_utils import is_paddle_cuda_available
 
 subbatch_rows = 30
 remainder_row = 0
 left_shape = [100, 200]
 
-@require_gpu(min_gpus=1)
+
+@unittest.skipIf(not is_paddle_cuda_available(), "TokenDispatcherUtils only support on gpu")
 def test_merge_subbatch_cast():
     for num in range(33):
         for dtype in [paddle.bfloat16, paddle.float32]:
@@ -29,7 +33,9 @@ def test_merge_subbatch_cast():
             for i in range(num - 1):
                 x.append(paddle.randn([subbatch_rows] + left_shape, dtype=paddle.float32))
             x.append(
-                paddle.randn([subbatch_rows if remainder_row == 0 else remainder_row] + left_shape, dtype=paddle.float32)
+                paddle.randn(
+                    [subbatch_rows if remainder_row == 0 else remainder_row] + left_shape, dtype=paddle.float32
+                )
             )
 
             y1 = paddle.concat(x, axis=0).astype(dtype)

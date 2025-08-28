@@ -13,11 +13,14 @@
 # limitations under the License.
 
 import random
+import unittest
 
 import numpy as np
 import paddle
 import TokenDispatcherUtils as TDU
-from ..testing_utils import require_gpu
+
+from paddlenlp.utils.import_utils import is_paddle_cuda_available
+
 
 def tokens_zip_unique_add_with_subbatch(zipped, unzipped, index_unzipped, zipped_rows, subbatch_rows=None):
     if subbatch_rows is None or subbatch_rows <= 0 or zipped_rows <= 0:
@@ -45,7 +48,8 @@ def generate_index_unzipped(zipped_rows, unzipped_rows):
     assert len(index) == len(set(index))
     return paddle.to_tensor(index, dtype=paddle.int64)
 
-@require_gpu(min_gpus=1)
+
+@unittest.skipIf(not is_paddle_cuda_available(), "TokenDispatcherUtils only support on gpu")
 def main():
     seed = 2048
     hidden_size = 7168
