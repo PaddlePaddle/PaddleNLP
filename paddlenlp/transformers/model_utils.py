@@ -3175,7 +3175,7 @@ class PipelinePretrainedModel(PretrainedModel):
 
         for k in list(sharded_state_dict.keys()):
             v = sharded_state_dict.pop(k)
-            v.tensor_key = self._pp_to_single_mapping[k]
+            v.key = self._pp_to_single_mapping[k]
             sharded_state_dict[self._pp_to_single_mapping[k]] = v
 
         return sharded_state_dict

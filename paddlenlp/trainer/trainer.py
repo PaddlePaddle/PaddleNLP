@@ -1616,8 +1616,8 @@ class Trainer:
 
             logs["learning_rate"] = float("{0:.3e}".format(self._get_learning_rate()))
             logs["global_step"] = int(self.state.global_step)
-            if in_auto_parallel_align_mode():
-                logs["loss_md5"] = avg_loss._md5sum()
+            # if in_auto_parallel_align_mode():
+            logs["loss_md5"] = avg_loss._md5sum()
 
             divisor = 2**30
             # TODO(@gexiao): replace these codes with unified APIs in Paddle
