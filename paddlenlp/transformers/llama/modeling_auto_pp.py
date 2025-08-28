@@ -247,9 +247,7 @@ class LlamaRMSNormAutoPP(nn.Layer):
     def forward(self, args):
         hidden_states, attention_mask, position_ids, alibi = parse_args(args)
         if self.config.use_fused_rms_norm:
-            hidden_states = fusion_ops.fusion_rms_norm(
-                hidden_states, self.weight, self.variance_epsilon, self.config.use_fast_layer_norm
-            )
+            hidden_states = fusion_ops.fusion_rms_norm(hidden_states, self.weight, self.variance_epsilon)
             return return_args(hidden_states, attention_mask, position_ids, alibi)
 
         with paddle.amp.auto_cast(False):
