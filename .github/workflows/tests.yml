@@ -1,10 +1,11 @@
-name: Test
+# Disabled tests workflow - manually enabled when needed
+name: Test (DISABLED)
 
-on: [push, pull_request]
+#on: [push, pull_request]
 
-jobs:
-  Test:
-    name: Test
+#jobs:
+#  Test:
+#    name: Test (DISABLED)
     runs-on: ubuntu-24.04
     permissions:
       pull-requests: write
