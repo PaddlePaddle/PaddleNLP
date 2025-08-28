@@ -15,22 +15,25 @@
 import numpy as np
 import paddle
 import TokenDispatcherUtils as TDU
+from ..testing_utils import assert_allclose
 
 subbatch_rows = 30
 remainder_row = 0
 left_shape = [100, 200]
 
-for num in range(33):
-    for dtype in [paddle.bfloat16, paddle.float32]:
-        x = []
-        for i in range(num - 1):
-            x.append(paddle.randn([subbatch_rows] + left_shape, dtype=paddle.float32))
-        x.append(
-            paddle.randn([subbatch_rows if remainder_row == 0 else remainder_row] + left_shape, dtype=paddle.float32)
-        )
+@require_gpu(min_gpus=1)
+def test_merge_subbatch_cast():
+    for num in range(33):
+        for dtype in [paddle.bfloat16, paddle.float32]:
+            x = []
+            for i in range(num - 1):
+                x.append(paddle.randn([subbatch_rows] + left_shape, dtype=paddle.float32))
+            x.append(
+                paddle.randn([subbatch_rows if remainder_row == 0 else remainder_row] + left_shape, dtype=paddle.float32)
+            )
 
-        y1 = paddle.concat(x, axis=0).astype(dtype)
-        y2 = TDU.merge_subbatch_cast(x, dtype)
+            y1 = paddle.concat(x, axis=0).astype(dtype)
+            y2 = TDU.merge_subbatch_cast(x, dtype)
 
-        diff = np.abs(y1.numpy() - y2.numpy()).max()
-        assert diff == 0, diff
+            diff = np.abs(y1.numpy() - y2.numpy()).max()
+            assert diff == 0, diff

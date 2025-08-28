@@ -46,7 +46,8 @@ unit-test:
 
 .PHONY: install
 install:
-	pip install --pre paddlepaddle -i https://www.paddlepaddle.org.cn/packages/nightly/cpu/
+	wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/TempBuild-Training-Linux-Gpu-Cuda129-Cudnn99-Mkl-Avx-Gcc11-Cp310-Incubate/latest/paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl
+	pip install -U paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl
 	pip install -r requirements-dev.txt
 	pip install -r requirements.txt
 	pip install -r paddlenlp/experimental/autonlp/requirements.txt
