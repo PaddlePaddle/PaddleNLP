@@ -47,13 +47,22 @@ fi
 export PYTHONPATH=../:$PYTHONPATH
 export CUDA_PATH=/usr/local/cuda-12.9
 
+# Flags for best performance
 export DSV3_USE_FP8_GEMM=true
 export DSV3_USE_ATTEN_RECOMPUTE=true
 export FA_VERSION=3
 export FLAGS_share_tensor_for_grad_tensor_holder=1
 export FLAGS_use_default_stream=false
 export DSV3_USE_FP8_DISPATCH=true
-export USE_DS_GEMM=false
+export USE_DS_GEMM=true
+
+# Flags for allocator
+export FLAGS_large_pool_auto_growth_chunk_size_in_mb=500
+export FLAGS_small_pool_auto_growth_chunk_size_in_mb=20
+export FLAGS_small_pool_size_in_mb=10
+export FLAGS_samll_pool_pre_alloc_in_mb=500
+export FLAGS_large_pool_pre_alloc_in_mb=61440
+export FLAGS_deep_ep_comm_prealloc_in_mb=1000
 
 
 bash script/kill_process.sh 

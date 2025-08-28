@@ -85,6 +85,7 @@ from paddle.distributed.fleet.meta_parallel.zero_bubble_utils import WeightGradS
 from ..fp8_utils import (
     FP8KeepXLinear,
     FP8Linear,
+    FP8LinearFunction,
     FP8LinearFunctionBase,
     FP8Mlp,
     cache_fp8_weight,
@@ -1552,7 +1553,10 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
         else:
             assert False, f"invalid {FA_VERSION=}"
 
-        if (FA_VERSION == 3 and not recompute_fa3) or FA_VERSION == 2:
+        if FA_VERSION == 2:
+            assert not recompute_fa3
+            assert attn_out is not None and softmax_lse is not None
+        if FA_VERSION == 3 and not recompute_fa3:
             assert attn_out is not None and softmax_lse is not None
 
         q_ln_t, q_ln_invar = fused_ln.fused_rms_norm(q_init, q_ln_weight, eps)
@@ -1636,25 +1640,25 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
         elif FA_VERSION == 3:
             # recompute fa3
             if recompute_fa3:
-                logger.info("Enable fa3 recomputation")
-                attn_out, softmax_lse = _C_ops.flash_attn_v3(
-                    query_states,
-                    key_states,
-                    value_states,
-                    None,  # q_v_
-                    None,  # q_descale_
-                    None,  # k_descale_
-                    None,  # v_descale_
-                    softmax_scale,
-                    True,
-                    -1,  # window_size_left
-                    -1,  # window_size_right
-                    0.0,  # softcap
-                    1,  # num_splits
-                    False,  # manual_set_pack_gqa
-                    False,  # pack_gqa_
-                    0,  # sm_margin
-                )
+                with paddle.no_grad():
+                    attn_out, softmax_lse = _C_ops.flash_attn_v3(
+                        query_states,
+                        key_states,
+                        value_states,
+                        None,  # q_v_
+                        None,  # q_descale_
+                        None,  # k_descale_
+                        None,  # v_descale_
+                        softmax_scale,
+                        True,
+                        -1,  # window_size_left
+                        -1,  # window_size_right
+                        0.0,  # softcap
+                        1,  # num_splits
+                        False,  # manual_set_pack_gqa
+                        False,  # pack_gqa_
+                        0,  # sm_margin
+                    )
             with paddle.no_grad():
                 q_grad, k_grad, v_grad = _C_ops.flash_attn_v3_grad(
                     query_states,
@@ -2587,7 +2591,7 @@ class DeepseekV2MTPLayer(DeepseekV2DecoderLayer):
         nextn_hidden_state = self.enorm(nextn_hidden_state)
 
         concat_h = paddle.concat([nextn_hidden_state, hidden_states], axis=-1)
-        hidden_states = LMHeadFunction.apply(concat_h, self.eh_proj.weight, False)
+        hidden_states = FP8LinearFunction.apply(concat_h, self.eh_proj)
 
         layer_outputs = super(DeepseekV2MTPLayer, self).forward(
             hidden_states,
@@ -3180,10 +3184,7 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
 class FastCrossEntropyFunction(paddle.autograd.PyLayer):
     @staticmethod
     def forward(ctx, preds, labels):
-
         softmax_val, loss = paddle._C_ops.cross_entropy_with_softmax(preds, labels, False, True, False, -100, -1)
-
-        # print("softmax val", softmax_val.dtype)
 
         ctx.save_for_backward(labels, softmax_val)
         return loss

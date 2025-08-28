@@ -67,7 +67,7 @@ from paddlenlp.transformers.fused_a2a import (
 )
 from paddlenlp.transformers.moe_layer import FusionMoeNode
 
-from ..fp8_utils import FP8LinearFunctionBase
+from ..fp8_utils import FP8LinearFunction, FP8LinearFunctionBase
 
 __all__ = [
     "DeepseekV2ForCausalLMPipe",
@@ -1204,11 +1204,12 @@ class OverlapedFUsionScheduleNode:
                 combine_forward_event.current_stream_wait()
                 final_out_event.current_stream_wait()
 
-                if final_out.shape[-1] != combine_fwd_out.shape[-1]:
-                    final_out[:, :, : combine_fwd_out.shape[-1]] += combine_fwd_out  # 直接广播并相加
-                else:
-                    final_out += combine_fwd_out
-                inputs = final_out
+                # TODO: check correct
+                # if final_out.shape[-1] != combine_fwd_out.shape[-1]:
+                #     final_out[:, :, : combine_fwd_out.shape[-1]] += combine_fwd_out  # 直接广播并相加
+                # else:
+                #     final_out += combine_fwd_out
+                inputs = final_out + combine_fwd_out
 
                 final_out._record_stream()
                 combine_fwd_out._record_stream()
@@ -1400,9 +1401,7 @@ def build_overlapped_nodes(forward_chunk, backward_chunk):
     backward_pre_node = ScheduleChunk(list(reversed(backward_pre_overlap_layers)))
     backward_post_node = ScheduleChunk(list(reversed(backward_post_overlap_layers)))
 
-    if not forward_chunk.nodes and all(
-        isinstance(n, FusionFp8DecoderLayerNode) for n in backward_chunk.nodes
-    ):
+    if not forward_chunk.nodes and all(isinstance(n, FusionFp8DecoderLayerNode) for n in backward_chunk.nodes):
         backward_post_node = DecoderBackwardScheduleChunk(backward_post_overlap_layers)
 
     overlap_node = OverlapedScheduleChunk(forward_overlap_layers, backward_overlap_layers, use_fuion=DSV3_USE_FP8_GEMM)
@@ -1938,7 +1937,8 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
         hidden_states = self.hnorm(hidden_states)
         nextn_hidden_state = self.enorm(nextn_hidden_state)
 
-        hidden_states = self.eh_proj(paddle.concat([nextn_hidden_state, hidden_states], axis=-1))
+        concat_h = paddle.concat([nextn_hidden_state, hidden_states], axis=-1)
+        hidden_states = FP8LinearFunction.apply(concat_h, self.eh_proj)
 
         # attention compute
         hidden_states, residual = self.self_attn_compute(hidden_states)

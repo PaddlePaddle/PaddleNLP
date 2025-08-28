@@ -59,15 +59,20 @@
     "v_head_dim": 128,
     "vocab_size": 129280,
     "using_flex_token": true,
-    "using_fake_gate": true,
+    "using_fake_gate": false,
     "use_fused_rms_norm": true,
     "fuse_attention_ffn": true,
     "use_fused_rope": true,
     "token_drop_steps": 0,
     "recompute_fwd_gate_up": true,
-    "adaptive_remained_O1_recompute_ratio": 2.0,
+    "adaptive_remained_O1_recompute_ratio": 0,
     "using_post_norm_recompute": true,
     "is_split_group_gemm": false,
     "use_dualpipev": true,
-    "send_mtp_embed": false
+    "send_mtp_embed": false,
+    "mlp_fwd_subbatch_rows": 0,
+    "mlp_bwd_subbatch_rows": 65536,    
+    "output_subbatch_rows": 2048,
+    "recompute_fa3": true,
+    "stepped_recompute_fwd_gate_up": true
   }

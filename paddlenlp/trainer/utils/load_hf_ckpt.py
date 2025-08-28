@@ -207,7 +207,7 @@ def _get_hf_prefix(segment_id: int, id_in_segment: int) -> str:
     # special_cases = {(0, 0): "model", (28, 2): "model.layers.61", (28, 3): "model"}
     # special_cases = {(0, 0): "model", (28, 2): "model.layers.61", (4, 1): "model"}
     # special_cases = {(0, 0): "model",  (28, 2): "model", (28,3): "lm_head"}
-    special_cases = {(0, 0): "model", (60, 2): "model", (60, 3): "lm_head"}
+    special_cases = {(0, 0): "model", (60, 2): "model.layers.61", (60, 3): "model", (60, 4): "lm_head"}
 
     if (segment_id, id_in_segment) in special_cases:
         return special_cases[(segment_id, id_in_segment)]
