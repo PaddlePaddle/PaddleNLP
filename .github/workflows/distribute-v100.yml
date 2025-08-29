@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: incubate/paddlenlp-fleety_20250421
   workflow_dispatch:
-  
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -38,7 +38,7 @@ jobs:
           if [[ -n "${IMAGE_NAME}" ]]; then
             echo "IMAGE_NAME=${IMAGE_NAME}" >> "$GITHUB_ENV"
           else
-            echo "IMAGE_NAME=ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:cuda129-dev-latest" >> "$GITHUB_ENV"
+            echo "IMAGE_NAME=ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:cuda129-dev" >> "$GITHUB_ENV"
           fi
 
       - name: Run Container
