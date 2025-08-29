@@ -72,14 +72,14 @@ def parse_args(args):
 
 
 def return_args(hidden_states, attention_mask=None, attn_mask_startend_row_indices=None, position_ids=None):
-    ret = (hidden_states,)
+    ret = (hidden_states.contiguous(),)
 
     if attention_mask is not None:
-        ret += (attention_mask.clone(),)
+        ret += (attention_mask.contiguous().clone(),)
     if attn_mask_startend_row_indices is not None:
-        ret += (attn_mask_startend_row_indices.clone(),)
+        ret += (attn_mask_startend_row_indices.contiguous().clone(),)
     if position_ids is not None:
-        ret += (position_ids.clone(),)
+        ret += (position_ids.contiguous().clone(),)
     if len(ret) == 1:
         ret = ret[0]
 
@@ -210,8 +210,8 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
         if self.config.num_nextn_predict_layers > 0:
             hidden_size = hidden_states.shape[-1]
             batch_size_mtp = hidden_size // (self.config.num_nextn_predict_layers + 1)
-            inputs_embeds_mtp = hidden_states[..., -batch_size_mtp:]
-            hidden_states = hidden_states[..., :batch_size_mtp]
+            inputs_embeds_mtp = hidden_states[..., -batch_size_mtp:].contiguous()
+            hidden_states = hidden_states[..., :batch_size_mtp].contiguous()
 
         has_gradient = not hidden_states.stop_gradient
 

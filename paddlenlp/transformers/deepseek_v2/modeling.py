@@ -1227,6 +1227,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
             past_key_value,
             use_cache,
             attn_mask_startend_row_indices,
+            **offload_kwargs,
         )
 
         hidden_states = attn_outputs[0]
@@ -1236,22 +1237,22 @@ class DeepseekV2DecoderLayer(nn.Layer):
 
         assert len(hidden_states.shape) == 3
         sub_seq_len = self.config.moe_subbatch_token_num
-        seq_len = hidden_states.shape[1]
+        seq_axis = 0 if self.config.sequence_parallel else 1
+        seq_len = hidden_states.shape[seq_axis]
         assert seq_len % sub_seq_len == 0
         num_chunks = seq_len // sub_seq_len
         split_list = [sub_seq_len] * num_chunks
-        input_list = paddle.split(hidden_states, split_list, axis=1)
+        input_list = paddle.split(hidden_states, split_list, axis=seq_axis)
         output_list = []
+
         for chunk in input_list:
-            offload_kwargs = {}
-            offload_kwargs["offload_indices"] = [0]
             out = recompute(
                 self.mlp.forward,
                 chunk,
                 **offload_kwargs,
             )
             output_list.append(out)
-        hidden_states = paddle.concat(output_list, axis=1)
+        hidden_states = paddle.concat(output_list, axis=seq_axis)
         outputs = recompute(
             self.post_process,
             hidden_states,
@@ -1929,7 +1930,7 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
             if attention_mask is not None:
                 attention_mask = attention_mask[
                     :, :, : -self.config.num_nextn_predict_layers, : -self.config.num_nextn_predict_layers
-                ]
+                ].contiguous()
 
             # attn_mask_startend_row_indices: [b, num_head, seq_len] or [b, num_head, seq_len, C], C is 2 or 4
             if attn_mask_startend_row_indices is not None:
@@ -1938,11 +1939,11 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
                         :,
                         :,
                         : -self.config.num_nextn_predict_layers,
-                    ]
+                    ].contiguous()
                 elif attn_mask_startend_row_indices.ndim == 4:
                     attn_mask_startend_row_indices = attn_mask_startend_row_indices[
                         :, :, : -self.config.num_nextn_predict_layers, :
-                    ]
+                    ].contiguous()
                 else:
                     raise ValueError("attn_mask_startend_row_indices must be 3D or 4D tensor")
 
@@ -2004,7 +2005,7 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
             inputs_embeds = ScatterOp.apply(inputs_embeds)
 
         # embed positions
-        hidden_states = inputs_embeds
+        hidden_states = inputs_embeds.contiguous()
 
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
@@ -2167,10 +2168,18 @@ class DeepseekV2PretrainingCriterion(nn.Layer):
                     masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
                 )
                 count = paddle.sum(binary_sequence)
+
+                if self.config.sequence_parallel:
+                    dist.all_reduce(count, op=ReduceOp.SUM, group=self.mp_group)
+
                 if count == 0:
                     loss = paddle.sum(masked_lm_loss * binary_sequence)
                 else:
                     loss = paddle.sum(masked_lm_loss * binary_sequence) / count
+
+                if self.config.sequence_parallel:
+                    dist.all_reduce(loss, op=ReduceOp.SUM, group=self.mp_group)
+
                 return loss
 
         def add_loss(main_loss, loss):
@@ -2187,10 +2196,6 @@ class DeepseekV2PretrainingCriterion(nn.Layer):
                 masked_lm_labels = ScatterOp.apply(masked_lm_labels)
 
             loss = compute_loss(prediction_scores, masked_lm_labels)
-
-            if self.config.sequence_parallel:
-                loss = loss * self.seq_para_scale
-                dist.all_reduce(loss, op=ReduceOp.SUM, group=self.mp_group)
 
             mtp_loss_res = []
             for depth in range(self.config.num_nextn_predict_layers):
