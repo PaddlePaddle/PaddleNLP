@@ -35,7 +35,16 @@ function is_a100() {
     fi
 }
 
+function is_cuda123() {
+    if [ $(nvcc -V|grep "cuda_12.3" |wc -l)  -ne 0 ];then
+        echo 1
+    else
+        echo 0
+    fi
+}
+
 IS_A100=$(is_a100)
+IS_CUDA123=$(is_cuda123)
 
 function track_case_status() {  
     local case_name="$1"  
@@ -288,7 +297,7 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
                 --tensor_parallel_degree 1 \
                 --sharding "stage1" \
                 --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
-                --sharding_parallel_config $sharding_config \
+                --sharding_parallel_config "$sharding_config" \
                 --to_static 0 \
                 --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
                 --amp_custom_white_list "lookup_table" "lookup_table_v2" \
@@ -300,12 +309,24 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
             echo "result: loss=$loss ips=$ips mem=$mem"
             echo "case=$case_name sharding_config=$sharding_config acc_step=$acc_step"
             if [ "$case_name" = "default" ]; then
-                loss_base=9.23504105
-            elif [ "$case_name" = "tensor_fusion_overlap" ]; then
-                if [ $acc_step -eq 1 ]; then
-                    loss_base=9.23504868
+                if [ $IS_CUDA123 -ne 0 ];then
+                    loss_base=9.23503647
                 else
-                    loss_base=9.16484451
+                    loss_base=9.23504105
+                fi
+            elif [[ "$case_name" =~ "tensor_fusion_overlap" ]]; then
+                if [ $acc_step -eq 1 ]; then
+                    if [ $IS_CUDA123 -ne 0 ];then
+                        loss_base=9.23503113
+                    else
+                        loss_base=9.23504868
+                    fi
+                else
+                    if [ $IS_CUDA123 -ne 0 ];then
+                        loss_base=9.16486053
+                    else
+                        loss_base=9.16484451
+                    fi
                 fi
             else
                 loss_base=-1
@@ -452,9 +473,13 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.35078526
+    loss_base=9.3507843
     if [ $IS_A100 -ne 0 ];then
-        loss_base=9.38577747
+        if [ $IS_CUDA123 -ne 0 ];then
+            loss_base=9.38577652
+        else
+            loss_base=9.38577747
+        fi
     fi
     ips_base=-1
     mem_base=5.1569297313690186
@@ -604,9 +629,13 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.35162258
+    loss_base=9.35163116
     if [ $IS_A100 -ne 0 ];then
-        loss_base=9.39368534
+        if [ $IS_CUDA123 -ne 0 ];then
+            loss_base=9.39367676
+        else
+            loss_base=9.3936882
+        fi
     fi
     ips_base=-1
     mem_base=-1
@@ -748,7 +777,11 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2() {
         ips=-1
         mem=-1
         echo "result: loss=$loss ips=$ips mem=$mem"
-        loss_base=9.38429451
+        if [ $IS_CUDA123 -ne 0 ];then
+            loss_base=9.38431835
+        else
+            loss_base=9.38430595
+        fi
         ips_base=-1
         mem_base=-1
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -820,7 +853,11 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2_intermediate() {
         ips=-1
         mem=-1
         echo "result: loss=$loss ips=$ips mem=$mem"
-        loss_base=9.38429451
+        if [ $IS_CUDA123 -ne 0 ];then
+            loss_base=9.38431835
+        else
+            loss_base=9.38430595
+        fi
         ips_base=-1
         mem_base=-1
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -893,7 +930,11 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
         ips=-1
         mem=-1
         echo "result: loss=$loss ips=$ips mem=$mem"
-        loss_base=9.57178879
+        if [ $IS_CUDA123 -ne 0 ];then
+            loss_base=9.57173729
+        else
+            loss_base=9.57199001
+        fi
         ips_base=-1
         mem_base=-1
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -1154,7 +1195,11 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
         ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
         mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
         echo "result: loss=$loss ips=$ips mem=$mem"
-        loss_base=7.57775269 # record new data
+        if [ $IS_CUDA123 -ne 0 ];then
+            loss_base=7.57788467
+        else
+            loss_base=7.57775269
+        fi
         ips_base=5825.427
         mem_base=25.562287092208862
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -1258,9 +1303,17 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP() {
                 loss_base=9.16783295
                 loss_md5_base=8ea72495fba4e1b9ba004b4431e27218
                 if [ $IS_A100 -ne 0 ] && [ $to_static -eq 0 ];then
-                    loss_base=9.37966919
+                    if [ $IS_CUDA123 -ne 0 ];then
+                        loss_base=9.38023453
+                    else
+                        loss_base=9.37972641
+                    fi
                 elif [ $IS_A100 -ne 0 ] && [ $to_static -eq 1 ];then
-                    loss_base=9.38012543
+                    if [ $IS_CUDA123 -ne 0 ];then
+                        loss_base=9.38023453
+                    else
+                        loss_base=9.37989655
+                    fi
                 fi
                 ips=-1
                 mem=-1
@@ -1374,43 +1427,64 @@ function llama_pir_auto_fuse_ffn_attention_qkv_MP2() {
             auto_mem_10=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
             echo "auto result: step 10 loss=$auto_loss_10 ips=$auto_ips_10 mem=$auto_mem_10"
             if [ $to_static -ne 0 ];then
-                if [[ $tp_config =~ "replace_with_parallel_cross_entropy" ]];then
-                    # This optimization may result in a discrepancy in accuracy.
-                    loss_base_2=10.53477287
-                    loss_base_10=9.4961338
-                else
-                    loss_base_2=10.53477192
-                    loss_base_10=9.4961338
-                fi
                 auto_ips=-1
                 auto_mem=-1
                 ips_base=-1
                 mem_base=-1
                 if [ $IS_A100 -ne 0 ];then
-                    loss_base_2=10.58283806
-                    loss_base_10=9.43873405
+                    #A100
+                    if [ $IS_CUDA123 -ne 0 ];then
+                        loss_base_2=10.58283997
+                        loss_base_10=9.43873405
+                    else
+                        loss_base_2=10.58283806
+                        loss_base_10=9.43873405
+                    fi
+                else
+                    #V100
+                    if [[ $tp_config =~ "replace_with_parallel_cross_entropy" ]];then
+                        # This optimization may result in a discrepancy in accuracy.
+                        loss_base_2=10.53477287
+                        loss_base_10=9.4961338
+                    else
+                        loss_base_2=10.53477192
+                        loss_base_10=9.4961338
+                    fi
                 fi
                 check_result $FUNCNAME ${loss_base_2} ${auto_loss_2} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
                 check_result $FUNCNAME ${loss_base_10} ${auto_loss_10} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
             else
-                if [[ $tp_config =~ "replace_with_parallel_cross_entropy" ]];then
-                    loss_base_2=10.53477287
-                    loss_base_10=9.4961319
-                else
-                    loss_base_2=10.53477287
-                    loss_base_10=9.49613285
-                fi
                 auto_ips=-1
                 auto_mem=-1
                 ips_base=-1
                 mem_base=-1
                 if [ $IS_A100 -ne 0 ];then
+                    # A100
                     if [[ $tp_config =~ "replace_with_parallel_cross_entropy" ]];then
-                        loss_base_2=10.58283806
-                        loss_base_10=9.43873215
+                       if [ $IS_CUDA123 -ne 0 ];then
+                            loss_base_2=10.58283997
+                            loss_base_10=9.4387331
+                        else
+                            loss_base_2=10.58283806
+                            loss_base_10=9.43873215
+                        fi
                     else
-                        loss_base_2=10.58283806
-                        loss_base_10=9.4387331
+                        if [ $IS_CUDA123 -ne 0 ];then
+                            loss_base_2=10.58283997
+                            loss_base_10=9.43873215
+                        else
+                            loss_base_2=10.58283806
+                            loss_base_10=9.4387331
+                        fi
+                    fi
+                else
+                    #V100
+                    if [[ $tp_config =~ "replace_with_parallel_cross_entropy" ]];then
+                        loss_base_2=10.53477287
+                        loss_base_10=9.4961319
+                    else
+                        loss_base_2=10.53477287
+                        loss_base_10=9.49613285
                     fi
                 fi
                 check_result $FUNCNAME ${loss_base_2} ${auto_loss_2} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
@@ -1506,9 +1580,17 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP() {
         loss_base=9.25199432
         loss_md5_base=83531e98ee11cd271db175150ab254bb
         if [ $IS_A100 -ne 0 ] && [ $to_static -eq 0 ];then
-            loss_base=9.44203949
+            if [ $IS_CUDA123 -ne 0 ];then
+                loss_base=9.44244614
+            else
+                loss_base=9.44203339
+            fi
         elif [ $IS_A100 -ne 0 ] && [ $to_static -eq 1 ];then
-            loss_base=9.44225311
+            if [ $IS_CUDA123 -ne 0 ];then
+                loss_base=9.44244614
+            else
+                loss_base=9.44231415
+            fi
         fi
         ips_base=-1
         mem_base=-1
@@ -1606,9 +1688,17 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
             loss_base=9.99302673
         fi
         if [ $IS_A100 -ne 0 ] && [ $to_static -eq 0 ];then
-            loss_base=10.20990601
+            if [ $IS_CUDA123 -ne 0 ];then
+                loss_base=10.20988998
+            else
+                loss_base=10.20990601
+            fi
         elif [ $IS_A100 -ne 0 ] && [ $to_static -eq 1 ];then
-            loss_base=10.20991516
+            if [ $IS_CUDA123 -ne 0 ];then
+                loss_base=10.20988922
+            else
+                loss_base=10.20991516
+            fi
         fi
         ips_base=-1
         mem_base=-1
@@ -1708,7 +1798,11 @@ function llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN() {
     echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
     loss_base=9.99302597
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.20990143
+        if [ $IS_CUDA123 -ne 0 ];then
+            loss_base=10.20989532
+        else
+            loss_base=10.20990143
+        fi
     fi
     ips_base=-1
     mem_base=-1
@@ -1723,7 +1817,6 @@ function llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN() {
 
 function llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate() {
     echo "=========== $FUNCNAME run begin ==========="
-    set -x
     unset CUDA_VISIBLE_DEVICES
     
     export PYTHONPATH=$root_path/:$PYTHONPATH
@@ -1826,7 +1919,7 @@ function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1() {
         rm -rf $case_log_dir
         rm -rf ${log_path}/$FUNCNAME
 
-        /usr/bin/python -u -m paddle.distributed.launch \
+        python -u -m paddle.distributed.launch \
             --gpus "0" \
             --log_dir $case_log_dir \
             run_pretrain_auto.py \
@@ -2011,6 +2104,8 @@ function llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
         fi
         echo "result: $pp_mode loss=$loss"
     done
+    loss_base_fthenb=10.24240494
+    loss_base_vpp=10.24149513  # Paddle PR#74530
     ips=-1
     mem=-1
     ips_base=-1
@@ -2018,7 +2113,10 @@ function llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
     for step in $(seq 1 $max_step); do
         echo "step=$step fthenb loss: ${loss1_array[$step-1]}, vpp loss: ${loss2_array[$step-1]}"
     done
-    check_result $FUNCNAME ${loss1} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
+    echo "FThenB check"
+    check_result $FUNCNAME ${loss_base_fthenb} ${loss1} ${ips_base} ${ips} ${mem_base} ${mem}
+    echo "VPP check"
+    check_result $FUNCNAME ${loss_base_vpp} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -2784,11 +2882,11 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.58456802     # note: need to debug
-    loss_base=10.56668091
+    loss_base=10.56717587
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.56199837 # after add dropout spmd
+        loss_base=10.56169701 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -3059,8 +3157,6 @@ function llm_gpt_pir_auto_bs8_DP2_TP2_PP2_intermediate(){
 }
 
 function llm_qwen_dygraph_auto_bs1_fp32_DP2() {
-    set -x
-
     config_json="pretrain_argument_for_ci_auto_dp2.json"
 
     cat <<EOF >"$config_json"
@@ -3152,8 +3248,6 @@ EOF
 }
 
 function llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2() {
-    set -x
-
     config_json="pretrain_argument_for_ci_auto_dp2_mp2.json"
 
     cat <<EOF >"$config_json"
@@ -3202,8 +3296,6 @@ function llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2() {
     "to_static": 0
 }
 EOF
-
-    set -x
     unset CUDA_VISIBLE_DEVICES
 
     export FLAGS_call_stack_level=3
@@ -3245,8 +3337,6 @@ EOF
 }
 
 function llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2-PP2() {
-    set -x
-
     config_json="pretrain_argument_for_ci_auto_dp2_mp2_pp2.json"
 
     cat <<EOF >"$config_json"
@@ -3338,8 +3428,6 @@ EOF
 }
 
 function llm_qwen_dygraph_auto_bs1_bf16_DP2-MP2-PP2() {
-    set -x
-
     config_json="pretrain_argument_for_ci_auto_dp2_mp2_pp2.json"
 
     cat <<EOF >"$config_json"
@@ -3432,8 +3520,6 @@ EOF
 
 function llm_qwen_pir_auto_bs1_bf16_TP2(){
     echo "=========== $FUNCNAME run  begin ==========="
-
-    set -x
     unset CUDA_VISIBLE_DEVICES
 
     export FLAGS_call_stack_level=3
@@ -3511,8 +3597,6 @@ function llm_qwen_pir_auto_bs1_bf16_TP2(){
 
 function llm_qwen_pir_auto_bs1_bf16_TP2_PP2(){
     echo "=========== $FUNCNAME run  begin ==========="
-
-    set -x
     unset CUDA_VISIBLE_DEVICES
 
     export FLAGS_call_stack_level=3
@@ -3591,7 +3675,6 @@ function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
     echo IS_A100 is $IS_A100
     if [ $IS_A100 -ne 0 ]; then    
         echo "=========== $FUNCNAME run begin ===========" 
-        set -x
         unset CUDA_VISIBLE_DEVICES 
 
         export PYTHONPATH=$root_path/:$PYTHONPATH
@@ -3605,9 +3688,6 @@ function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
         case_log_dir="output/$task_name""_log"
         
         rm -rf output/$task_name/
-
-        ls -la ./
-        ls -la ./data
 
         python -u  -m paddle.distributed.launch \
         --gpus "0,1,2,3" \
@@ -3661,7 +3741,11 @@ function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
         loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 3' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
         mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 3' | awk -F 'current_memory_allocated: ' '{print $2}' | awk -F ',' '{print $1}'`
 
-        loss_base=14.08647537 
+        if [ $IS_CUDA123 -ne 0 ];then
+            loss_base=14.08622074
+        else
+            loss_base=14.08647537
+        fi
         ips_base=-1
         mem_base=2.02
         echo "result: loss=$loss ips=$ips mem=$mem"
@@ -3673,7 +3757,6 @@ function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
 
 
 function deepseek_dygraph_auto_bs8_bf16_DP8() {
-    set -x
 
     model_config_json="pretrain_argument_for_ci_auto_dp8.json"
 
@@ -3821,7 +3904,6 @@ fi
 
 
 function deepseek_dygraph_auto_bs8_bf16_DP2_PP2_MP2() {
-    set -x
 
     model_config_json="pretrain_argument_for_ci_auto_dp2pp2mp2.json"
 

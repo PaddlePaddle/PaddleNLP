@@ -346,7 +346,7 @@ class TrainingArguments(TrainingArguments):
         self._post_init_parallel_degree()
 
         if self.global_mini_batch_size < 0:
-            self.global_mini_batch_size = self.global_batch_size // self.dataset_world_size
+            self.global_mini_batch_size = self.global_batch_size
 
         if (
             self.global_batch_size % self.dataset_world_size != 0

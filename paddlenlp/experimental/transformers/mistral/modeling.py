@@ -1,4 +1,4 @@
-# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from __future__ import annotations
 
 import json
@@ -50,29 +51,33 @@ from paddlenlp.experimental.transformers.utils import (
     infererence_model_from_config,
     infererence_model_from_pretrained,
 )
-from paddlenlp.transformers import Qwen2Config, Qwen2PretrainedModel
+from paddlenlp.transformers import MistralConfig, MistralPreTrainedModel
 from paddlenlp.transformers.conversion_utils import split_param_func
+from paddlenlp.transformers.mistral.modeling import (
+    MistralLMHead,
+    MistralPretrainingCriterion,
+)
 from paddlenlp.transformers.model_outputs import (  # CausalLMOutputWithCrossAttentions,
     BaseModelOutputWithPast,
+    BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithPast,
 )
 from paddlenlp.transformers.model_utils import (
     dy2st_nocheck_guard_context,
     register_base_model,
 )
-from paddlenlp.transformers.qwen2.modeling import Qwen2LMHead, Qwen2PretrainingCriterion
 from paddlenlp.utils.download import resolve_file_path
 from paddlenlp.utils.log import logger
 
 __all__ = [
-    "Qwen2ForCausalLMInferenceModel",
-    "Qwen2ForCausalLMBlockInferenceModel",
-    "Qwen2VLForConditionalGenerationBlockInferenceModel",
-    "Qwen2_5_VLForConditionalGenerationBlockInferenceModel",
+    "MistralForCausalLMInferenceModel",
+    "MistralForCausalLMBlockInferenceModel",
+    "MistralVLForConditionalGenerationBlockInferenceModel",
+    "Mistral_5_VLForConditionalGenerationBlockInferenceModel",
 ]
 
 
-class FusedQwen2RMSNorm(nn.Layer):
+class FusedMistralRMSNorm(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.eps = config.rms_norm_eps
@@ -87,9 +92,9 @@ class FusedQwen2RMSNorm(nn.Layer):
 
 
 @register_base_model
-class Qwen2InferenceModel(Qwen2PretrainedModel):
-    def __init__(self, config: Qwen2Config, base_model_prefix: str):
-        super(Qwen2PretrainedModel, self).__init__(config)
+class MistralInferenceModel(MistralPreTrainedModel):
+    def __init__(self, config: MistralConfig, base_model_prefix: str):
+        super(MistralPreTrainedModel, self).__init__(config)
         self.base_model_prefix = base_model_prefix
 
         self.vocab_size = config.vocab_size
@@ -180,111 +185,111 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         ffn1_weight_attrs = None
         ffn2_weight_attrs = None
 
-        ln_scale_attrs = [paddle.ParamAttr(name="fuseqwen2.{}.ln_scale".format(i)) for i in range(self.num_layers)]
+        ln_scale_attrs = [paddle.ParamAttr(name="fuseMistral.{}.ln_scale".format(i)) for i in range(self.num_layers)]
         qkv_weight_attrs = [
             paddle.ParamAttr(
-                name="fuseqwen2.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                name="fuseMistral.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
             )
             for i in range(self.num_layers)
         ]
-        qkv_bias_attrs = [paddle.ParamAttr(name="fuseqwen2.{}.qkv_bias".format(i)) for i in range(self.num_layers)]
+        qkv_bias_attrs = [paddle.ParamAttr(name="fuseMistral.{}.qkv_bias".format(i)) for i in range(self.num_layers)]
         out_proj_weight_attrs = [
             paddle.ParamAttr(
-                name="fuseqwen2.{}.out_proj_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                name="fuseMistral.{}.out_proj_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
             )
             for i in range(self.num_layers)
         ]
         ffn_ln_scale_attrs = [
-            paddle.ParamAttr(name="fuseqwen2.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
+            paddle.ParamAttr(name="fuseMistral.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
         ]
         if "fp8" in self.quant_type:
             ffn1_0_weight_attrs = [
                 paddle.ParamAttr(
-                    name="fuseqwen2.{}.ffn1_0_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                    name="fuseMistral.{}.ffn1_0_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
                 )
                 for i in range(self.num_layers)
             ]
             ffn1_1_weight_attrs = [
                 paddle.ParamAttr(
-                    name="fuseqwen2.{}.ffn1_1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                    name="fuseMistral.{}.ffn1_1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
                 )
                 for i in range(self.num_layers)
             ]
         else:
             ffn1_weight_attrs = [
                 paddle.ParamAttr(
-                    name="fuseqwen2.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                    name="fuseMistral.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
                 )
                 for i in range(self.num_layers)
             ]
         ffn2_weight_attrs = [
             paddle.ParamAttr(
-                name="fuseqwen2.{}.ffn2_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                name="fuseMistral.{}.ffn2_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
             )
             for i in range(self.num_layers)
         ]
 
         if "a8w8" in self.quant_type:
             qkv_out_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2.{}.qkv_out_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseMistral.{}.qkv_out_scale".format(i)) for i in range(self.num_layers)
             ]
             linear_out_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2.{}.linear_out_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseMistral.{}.linear_out_scale".format(i)) for i in range(self.num_layers)
             ]
             ffn1_out_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2.{}.ffn1_out_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseMistral.{}.ffn1_out_scale".format(i)) for i in range(self.num_layers)
             ]
             ffn2_out_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2.{}.ffn2_out_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseMistral.{}.ffn2_out_scale".format(i)) for i in range(self.num_layers)
             ]
 
             if self.shift_smooth_all_linears:
                 linear_shift_attrs = [
-                    paddle.ParamAttr(name="fuseqwen2.{}.linear_shift".format(i)) for i in range(self.num_layers)
+                    paddle.ParamAttr(name="fuseMistral.{}.linear_shift".format(i)) for i in range(self.num_layers)
                 ]
                 linear_smooth_attrs = [
-                    paddle.ParamAttr(name="fuseqwen2.{}.linear_smooth".format(i)) for i in range(self.num_layers)
+                    paddle.ParamAttr(name="fuseMistral.{}.linear_smooth".format(i)) for i in range(self.num_layers)
                 ]
                 ffn2_shift_attrs = [
-                    paddle.ParamAttr(name="fuseqwen2.{}.ffn2_shift".format(i)) for i in range(self.num_layers)
+                    paddle.ParamAttr(name="fuseMistral.{}.ffn2_shift".format(i)) for i in range(self.num_layers)
                 ]
                 ffn2_smooth_attrs = [
-                    paddle.ParamAttr(name="fuseqwen2.{}.ffn2_smooth".format(i)) for i in range(self.num_layers)
+                    paddle.ParamAttr(name="fuseMistral.{}.ffn2_smooth".format(i)) for i in range(self.num_layers)
                 ]
 
             if self.shift:
                 ln_bias_attrs = [
-                    paddle.ParamAttr(name="fuseqwen2.{}.ln_bias".format(i)) for i in range(self.num_layers)
+                    paddle.ParamAttr(name="fuseMistral.{}.ln_bias".format(i)) for i in range(self.num_layers)
                 ]
                 ffn_ln_bias_attrs = [
-                    paddle.ParamAttr(name="fuseqwen2.{}.ffn_ln_bias".format(i)) for i in range(self.num_layers)
+                    paddle.ParamAttr(name="fuseMistral.{}.ffn_ln_bias".format(i)) for i in range(self.num_layers)
                 ]
                 qkv_bias_attrs = [
-                    paddle.ParamAttr(name="fuseqwen2.{}.qkv_bias".format(i)) for i in range(self.num_layers)
+                    paddle.ParamAttr(name="fuseMistral.{}.qkv_bias".format(i)) for i in range(self.num_layers)
                 ]
                 ffn1_bias_attrs = [
-                    paddle.ParamAttr(name="fuseqwen2.{}.ffn1_bias".format(i)) for i in range(self.num_layers)
+                    paddle.ParamAttr(name="fuseMistral.{}.ffn1_bias".format(i)) for i in range(self.num_layers)
                 ]
                 if self.shift_smooth_all_linears:
                     out_proj_bias_attrs = [
-                        paddle.ParamAttr(name="fuseqwen2.{}.out_proj_bias".format(i)) for i in range(self.num_layers)
+                        paddle.ParamAttr(name="fuseMistral.{}.out_proj_bias".format(i)) for i in range(self.num_layers)
                     ]
                     ffn2_bias_attrs = [
-                        paddle.ParamAttr(name="fuseqwen2.{}.ffn2_bias".format(i)) for i in range(self.num_layers)
+                        paddle.ParamAttr(name="fuseMistral.{}.ffn2_bias".format(i)) for i in range(self.num_layers)
                     ]
 
         if self.use_weight_only:
             qkv_weight_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2.{}.qkv_weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseMistral.{}.qkv_weight_scale".format(i)) for i in range(self.num_layers)
             ]
             out_proj_weight_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2.{}.out_proj_weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseMistral.{}.out_proj_weight_scale".format(i)) for i in range(self.num_layers)
             ]
             ffn1_weight_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2.{}.ffn1_weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseMistral.{}.ffn1_weight_scale".format(i)) for i in range(self.num_layers)
             ]
             ffn2_weight_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2.{}.ffn2_weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseMistral.{}.ffn2_weight_scale".format(i)) for i in range(self.num_layers)
             ]
 
         cache_k_scale_attrs = None
@@ -293,16 +298,16 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         cache_v_out_scale_attrs = None
         if config.cachekv_int8_type == "static":
             cache_k_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2.{}.cache_k_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseMistral.{}.cache_k_scale".format(i)) for i in range(self.num_layers)
             ]
             cache_v_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2.{}.cache_v_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseMistral.{}.cache_v_scale".format(i)) for i in range(self.num_layers)
             ]
             cache_k_out_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2.{}.cache_k_out_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseMistral.{}.cache_k_out_scale".format(i)) for i in range(self.num_layers)
             ]
             cache_v_out_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2.{}.cache_v_out_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseMistral.{}.cache_v_out_scale".format(i)) for i in range(self.num_layers)
             ]
 
         transformer_config = FusedMultiTransformerConfig(
@@ -359,7 +364,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
 
         self.set_transformer_block(transformer_config)
 
-        self.norm = FusedQwen2RMSNorm(config)
+        self.norm = FusedMistralRMSNorm(config)
 
         self.cache_kvs = None
         self.head_dim_shape_tensor = paddle.ones((self.hidden_size // self.num_attention_heads), dtype="int8")
@@ -684,27 +689,28 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             else:
                 self.transformer_block.qkv_weights[idx].copy_(qkv_weight, False)
 
-            if f"{model_prefix}.self_attn.qkv_proj.bias" in state_dict.keys():
-                qkv_bias = paddle.to_tensor(
-                    concat(
-                        split_fn(
-                            state_dict[f"{model_prefix}.self_attn.qkv_proj.bias"],
-                            is_qkv=True,
-                            num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
-                            num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
-                        ),
-                        axis=-1,
-                    )
-                )
-            else:
-                q_bias = state_dict[f"{model_prefix}.self_attn.q_proj.bias"]
-                k_bias = state_dict[f"{model_prefix}.self_attn.k_proj.bias"]
-                v_bias = state_dict[f"{model_prefix}.self_attn.v_proj.bias"]
-                concated_qkv_biases = concat([q_bias, k_bias, v_bias], axis=-1)
-                qkv_bias = paddle.to_tensor(concated_qkv_biases)
-            self.transformer_block.qkv_biases[idx].copy_(
-                qkv_bias.cast(self.transformer_block.qkv_biases[idx].dtype), False
-            )
+            # mistral model has no bias
+            # if f"{model_prefix}.self_attn.qkv_proj.bias" in state_dict.keys():
+            #     qkv_bias = paddle.to_tensor(
+            #         concat(
+            #             split_fn(
+            #                 state_dict[f"{model_prefix}.self_attn.qkv_proj.bias"],
+            #                 is_qkv=True,
+            #                 num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+            #                 num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
+            #             ),
+            #             axis=-1,
+            #         )
+            #     )
+            # else:
+            #     q_bias = state_dict[f"{model_prefix}.self_attn.q_proj.bias"]
+            #     k_bias = state_dict[f"{model_prefix}.self_attn.k_proj.bias"]
+            #     v_bias = state_dict[f"{model_prefix}.self_attn.v_proj.bias"]
+            #     concated_qkv_biases = concat([q_bias, k_bias, v_bias], axis=-1)
+            #     qkv_bias = paddle.to_tensor(concated_qkv_biases)
+            # self.transformer_block.qkv_biases[idx].copy_(
+            #     qkv_bias.cast(self.transformer_block.qkv_biases[idx].dtype), False
+            # )
 
             linear_weight = paddle.to_tensor(state_dict[f"{model_prefix}.self_attn.o_proj.weight"]).cast(
                 paddle.get_default_dtype()
@@ -1087,18 +1093,18 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         )
 
 
-class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedModel):
-    def __init__(self, config: Qwen2Config, base_model_prefix: str = "qwen2"):
+class MistralForCausalLMInferenceModel(GenerationInferenceModel, MistralPreTrainedModel):
+    def __init__(self, config: MistralConfig, base_model_prefix: str = "mistral"):
         super().__init__(config)
         self.base_model_prefix = base_model_prefix
 
-        self.qwen2 = Qwen2InferenceModel(config, base_model_prefix)
+        self.Mistral = MistralInferenceModel(config, base_model_prefix)
         if config.tie_word_embeddings:
-            self.lm_head = Qwen2LMHead(config, embedding_weights=self.qwen2.embed_tokens.weight, transpose_y=True)
+            self.lm_head = MistralLMHead(config, embedding_weights=self.Mistral.embed_tokens.weight, transpose_y=True)
             self.tie_weights()
         else:
-            self.lm_head = Qwen2LMHead(config)
-        self.criterion = Qwen2PretrainingCriterion(config)
+            self.lm_head = MistralLMHead(config)
+        self.criterion = MistralPretrainingCriterion(config)
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -1116,7 +1122,7 @@ class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedMo
 
     @classmethod
     def get_cache_kvs_shape(
-        cls, config: Qwen2Config, max_batch_size: int = None, max_length: int = None
+        cls, config: MistralConfig, max_batch_size: int = None, max_length: int = None
     ) -> list[list[int]]:
         """get cache_kvs tensor for qwen model
 
@@ -1205,7 +1211,7 @@ class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedMo
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        outputs = self.qwen2(
+        outputs = self.Mistral(
             input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
@@ -1252,12 +1258,12 @@ class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedMo
         if "lm_head.weight" in state_dict:
             lm_head_weight = paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype)
             self.lm_head.weight.copy_(lm_head_weight, False)
-        self.qwen2.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
+        self.Mistral.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
 
 
 @register_base_model
-class Qwen2BlockInferenceModel(Qwen2InferenceModel):
-    def __init__(self, config: Qwen2Config, base_model_prefix: str):
+class MistralBlockInferenceModel(MistralInferenceModel):
+    def __init__(self, config: MistralConfig, base_model_prefix: str):
         self.append_attn = config.append_attn
         super().__init__(config, base_model_prefix)
         self.max_seq_len = config.max_seq_len
@@ -1324,7 +1330,7 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
                 inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
 
         with dy2st_nocheck_guard_context():
-            hidden_states, full_hidden_states = self.transformer_block(
+            hidden_states, _ = self.transformer_block(
                 input_ids=input_ids,
                 src=inputs_embeds,
                 cum_offsets=cum_offsets,
@@ -1336,36 +1342,40 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
             )
         hidden_states = self.norm(hidden_states)
 
-        return hidden_states, full_hidden_states
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=hidden_states,
+            past_key_values=None,
+            hidden_states=None,
+            attentions=None,
+        )
 
 
-class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2PretrainedModel):
+class MistralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, MistralPreTrainedModel):
     """
-    Dynamic Batching for Qwen2 Model with pretraining tasks on top.
+    Dynamic Batching for Mistral Model with pretraining tasks on top.
     """
 
     _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
 
-    def __init__(self, config: Qwen2Config, base_model_prefix: str = "qwen2"):
+    def __init__(self, config: MistralConfig, base_model_prefix: str = "mistral"):
         super().__init__(config)
         self.base_model_prefix = base_model_prefix
 
         self.max_candidate_len = config.get("speculate_max_candidate_len", 5)
         self.verify_window = config.get("speculate_verify_window", 2)
         self.max_seq_len = config.max_seq_len
-        self.return_full_hidden_states = config.get("return_full_hidden_states", False)
 
-        self.qwen2 = Qwen2BlockInferenceModel(config, base_model_prefix)
+        self.Mistral = MistralBlockInferenceModel(config, base_model_prefix)
         if config.tie_word_embeddings:
-            self.lm_head = Qwen2LMHead(config, embedding_weights=self.qwen2.embed_tokens.weight, transpose_y=True)
+            self.lm_head = MistralLMHead(config, embedding_weights=self.Mistral.embed_tokens.weight, transpose_y=True)
             self.tie_weights()
         else:
-            self.lm_head = Qwen2LMHead(config)
+            self.lm_head = MistralLMHead(config)
 
     @classmethod
-    def _get_tensor_parallel_mappings(cls, config: Qwen2Config, is_split=True):
+    def _get_tensor_parallel_mappings(cls, config: MistralConfig, is_split=True):
 
-        logger.info("Qwen2 inference model _get_tensor_parallel_mappings")
+        logger.info("Mistral inference model _get_tensor_parallel_mappings")
 
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
@@ -1455,9 +1465,9 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
 
     @classmethod
     def get_cache_kvs_shape(
-        cls, config: Qwen2Config, max_batch_size: int = None, max_length: int = None
+        cls, config: MistralConfig, max_batch_size: int = None, max_length: int = None
     ) -> list[list[int]]:
-        """get cache_kvs tensor for Qwen2 model
+        """get cache_kvs tensor for Mistral model
 
         Args:
             max_batch_size (int): the max batch size
@@ -1550,7 +1560,7 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
         draft_tokens=None,
         output_padding_offset=None,
     ):
-        hidden_states, full_hidden_states = self.qwen2(
+        outputs = self.Mistral(
             input_ids,
             inputs_embeds=inputs_embeds,
             src_mask=src_mask,
@@ -1570,15 +1580,13 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
             output_padding_offset=output_padding_offset,
         )
 
+        hidden_states = outputs[0]
         logits = self.lm_head(
             hidden_states,
             tensor_parallel_output=False,
         )
 
-        if self.return_full_hidden_states:
-            return logits, full_hidden_states
-        else:
-            return logits
+        return logits
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
@@ -1586,28 +1594,28 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
             self.lm_head.weight.copy_(
                 paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype), False
             )
-        self.qwen2.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
+        self.Mistral.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
 
 
-class Qwen2VLForConditionalGenerationBlockInferenceModel(Qwen2ForCausalLMBlockInferenceModel):
+class MistralVLForConditionalGenerationBlockInferenceModel(MistralForCausalLMBlockInferenceModel):
     """
-    NOTE: (changwenbin) This class inherits from Qwen2ForCausalLMBlockInferenceModel.
-    Used only for QWen2-VL's second part.
+    NOTE: (changwenbin) This class inherits from MistralForCausalLMBlockInferenceModel.
+    Used only for Mistral-VL's second part.
     """
 
-    # NOTE: (changwenbin) This function corresponds to QWen2-VL's second part, only used for QWen2-VL.
-    def __init__(self, config: Qwen2Config):
+    # NOTE: (changwenbin) This function corresponds to Mistral-VL's second part, only used for Mistral-VL.
+    def __init__(self, config: MistralConfig):
         super().__init__(config)
-        self.qwen2.base_model_prefix = "model"
+        self.Mistral.base_model_prefix = "model"
 
 
-class Qwen2_5_VLForConditionalGenerationBlockInferenceModel(Qwen2ForCausalLMBlockInferenceModel):
+class Mistral_5_VLForConditionalGenerationBlockInferenceModel(MistralForCausalLMBlockInferenceModel):
     """
-    NOTE: (changwenbin) This class inherits from Qwen2ForCausalLMBlockInferenceModel.
-    Used only for QWen2-5-VL's second part.
+    NOTE: (changwenbin) This class inherits from MistralForCausalLMBlockInferenceModel.
+    Used only for Mistral-5-VL's second part.
     """
 
-    # NOTE: (changwenbin) This function corresponds to QWen2-5-VL's second part, only used for QWen2-5-VL.
-    def __init__(self, config: Qwen2Config):
+    # NOTE: (changwenbin) This function corresponds to Mistral-5-VL's second part, only used for Mistral-5-VL.
+    def __init__(self, config: MistralConfig):
         super().__init__(config)
-        self.qwen2.base_model_prefix = "model"
+        self.Mistral.base_model_prefix = "model"
