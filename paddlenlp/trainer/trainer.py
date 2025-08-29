@@ -189,6 +189,7 @@ from .utils.helper import (  # nested_truncate,
     nested_numpify,
     nested_truncate,
 )
+from .utils.load_utils import load_paddle_model_from_safetensors
 from .utils.sharding_io import ShardingIO
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
@@ -1108,6 +1109,13 @@ class Trainer:
         if self.args.ignore_data_skip:
             self.timers and self.timers("read-data").start()
 
+        if self.args.hf_ckpt_dir is not None:
+            print("Start loading the Hugging Face model with warm start")
+            weight_map_path = os.path.join(self.args.hf_ckpt_dir, "model.safetensors.index.json")
+            ckpt_pre = self.args.hf_ckpt_dir
+
+            load_paddle_model_from_safetensors(model, weight_map_path, ckpt_pre, verbose=True)
+
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
                 train_dataloader.batch_sampler, DistributedBatchSampler
@@ -1343,8 +1351,28 @@ class Trainer:
                                 f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
                             )
                     elif isinstance(self.optimizer, HybridParallelOptimizer):
+                        # print("hack for moe grad")
+                        # for p in parameters_list:
+                        #     if getattr(p, 'is_moe_param', False):
+                        #         if p.grad is not None:
+                        #             # print(p.name, p.grad)
+                        #             p.grad /= 8
+                        #         if p.main_grad is not None:
+                        #             # print(p.name, p.main_grad)
+                        #             p.main_grad /= 8
+
                         self.optimizer._step(parameters_list)
                     else:
+                        # print("hack for moe gradr")
+                        # for p in parameters_list:
+                        #     if getattr(p, 'is_moe_param', False):
+                        #         if p.grad is not None:
+                        #             print(p.name, p.grad)
+                        #             p.grad /= 4
+                        #         if p.main_grad is not None:
+                        #             print(p.name, p.main_grad)
+                        #             p.main_grad /= 4
+
                         self.optimizer.step()
 
                     if self.args.offload_optim:
