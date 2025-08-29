@@ -578,11 +578,19 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         # get topk mask
         mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=1)
 
+        # hongyu fix start
+        gates_masked = gates * mask
+        gates_s = paddle.sum(gates_masked, axis=-1, keepdim=True)
+        denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
+
+        if self.norm_topk_prob:
+            gates_masked = gates_masked / denom_s
+        gates_masked *= self.routed_scaling_factor
+        # hongyu fix end
         if hasattr(self.config, "seq_aux") and self.config.seq_aux:
             l_aux = self._cal_seq_aux_loss(gates_ori, self.top_k, top_idx)
         else:
             l_aux = self._cal_aux_loss(gates, mask)
-
         exp_counts = paddle.sum(mask.cast(paddle.int64), axis=0)
-        topk_masked_gates = paddle.zeros_like(gates).put_along_axis(top_idx, top_gate, axis=1)
-        return topk_masked_gates, mask, exp_counts, l_aux, l_zloss
+        # topk_masked_gates = paddle.zeros_like(gates).put_along_axis(top_idx, top_gate, axis=1)
+        return gates_masked, mask, exp_counts, l_aux, l_zloss

@@ -33,8 +33,8 @@ import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.communication.reduce import ReduceOp
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.recompute.recompute import recompute
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
@@ -799,7 +799,7 @@ class DeepseekV2MoE(MoELayer):
 
         for p in self.experts.parameters():
             setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
-
+            setattr(p, "is_moe_param", True)
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
             intermediate_size = config.moe_intermediate_size * config.n_shared_experts
@@ -851,6 +851,7 @@ class DeepseekV2MoEFlexToken(MoEFlexTokenLayer):
 
         for p in self.experts.parameters():
             setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
+            setattr(p, "is_moe_param", True)
 
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
@@ -895,7 +896,9 @@ class DeepseekV2Attention(nn.Layer):
         self.num_heads = config.num_attention_heads
         self.num_local_heads = self.num_heads
         if config.tensor_parallel_degree > 1:
-            assert self.num_heads % config.tensor_parallel_degree == 0, f"Attention head num ({self.num_heads}) is not divisible by tensor_parallel_degree ({config.tensor_parallel_degree})."
+            assert (
+                self.num_heads % config.tensor_parallel_degree == 0
+            ), f"Attention head num ({self.num_heads}) is not divisible by tensor_parallel_degree ({config.tensor_parallel_degree})."
             self.num_local_heads = self.num_heads // config.tensor_parallel_degree
 
         self.max_position_embeddings = config.max_position_embeddings
@@ -1067,7 +1070,12 @@ class DeepseekV2Attention(nn.Layer):
 
         if self.sequence_parallel:
             target_query_shape = [bsz, self.seq_length, self.num_local_heads, self.q_head_dim]
-            target_key_value_shape = [bsz, self.seq_length, self.num_local_heads, self.qk_nope_head_dim + self.v_head_dim]
+            target_key_value_shape = [
+                bsz,
+                self.seq_length,
+                self.num_local_heads,
+                self.qk_nope_head_dim + self.v_head_dim,
+            ]
         else:
             target_query_shape = [0, 0, self.num_heads, self.q_head_dim]
             target_key_value_shape = [0, 0, self.num_heads, self.qk_nope_head_dim + self.v_head_dim]
@@ -1152,7 +1160,6 @@ class DeepseekV2Attention(nn.Layer):
         attn_output = self.o_proj(attn_output)
         if attn_output.shape != ori_shape:
             attn_output = attn_output.reshape(ori_shape)
-
 
         if not output_attentions:
             attn_weights = None
@@ -1511,7 +1518,7 @@ class DeepseekV2MTPLayer(DeepseekV2DecoderLayer):
         hidden_states = self.hnorm(hidden_states)
         nextn_hidden_state = self.enorm(nextn_hidden_state)
 
-        hidden_states = self.eh_proj(paddle.concat([hidden_states, nextn_hidden_state], axis=-1))
+        hidden_states = self.eh_proj(paddle.concat([nextn_hidden_state, hidden_states], axis=-1))
 
         layer_outputs = super(DeepseekV2MTPLayer, self).forward(
             hidden_states,
@@ -1711,9 +1718,12 @@ class DeepseekV2PretrainedModel(PretrainedModel):
 
             return final_actions
 
-        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers + 2)
 
         return mappings
+
+    def get_tensor_parallel_mappings(self, is_split=True):
+        return type(self)._get_tensor_parallel_mappings(self.config, is_split)
 
     def _init_weights(self, layer):
         return
@@ -1988,7 +1998,7 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
         if self.config.sequence_parallel:
             # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
             bs, seq_len, hidden_size = inputs_embeds.shape
-            inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2]) # [B, S, H] --> [S, B, H]
+            inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])  # [B, S, H] --> [S, B, H]
             # inputs_embeds = paddle.reshape(inputs_embeds, [bs * seq_len, hidden_size])
             # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
             inputs_embeds = ScatterOp.apply(inputs_embeds)
@@ -2071,7 +2081,7 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
 
                 if self.config.sequence_parallel:
                     hidden_states = GatherOp.apply(hidden_states)
-                    hidden_states = paddle.transpose(hidden_states, [1, 0, 2]) # [S, B, H] --> [B, S, H]
+                    hidden_states = paddle.transpose(hidden_states, [1, 0, 2])  # [S, B, H] --> [B, S, H]
                     # hidden_states = hidden_states.reshape([-1, seq_length, hidden_states.shape[-1]])
 
                 inputs_embeds_cur_depth = paddle.concat(
@@ -2173,7 +2183,7 @@ class DeepseekV2PretrainingCriterion(nn.Layer):
             seq_length = masked_lm_labels.shape[1]
 
             if self.config.sequence_parallel:
-                masked_lm_labels = masked_lm_labels.transpose([1, 0]) # [B, S] --> [S, B]
+                masked_lm_labels = masked_lm_labels.transpose([1, 0])  # [B, S] --> [S, B]
                 masked_lm_labels = ScatterOp.apply(masked_lm_labels)
 
             loss = compute_loss(prediction_scores, masked_lm_labels)
@@ -2188,15 +2198,14 @@ class DeepseekV2PretrainingCriterion(nn.Layer):
                 masked_lm_labels_cur_depth = masked_lm_labels_ori[:, (depth + 1) : (depth + 1 + seq_length)]
 
                 if self.config.sequence_parallel:
-                    masked_lm_labels_cur_depth = masked_lm_labels_cur_depth.transpose([1, 0]) # [B, S] --> [S, B]
+                    masked_lm_labels_cur_depth = masked_lm_labels_cur_depth.transpose([1, 0])  # [B, S] --> [S, B]
                     masked_lm_labels_cur_depth = ScatterOp.apply(masked_lm_labels_cur_depth)
 
                 res_cur_depth = compute_loss(prediction_scores_cur_depth, masked_lm_labels_cur_depth)
-                
+
                 if self.config.sequence_parallel:
                     res_cur_depth = res_cur_depth * self.seq_para_scale
                     dist.all_reduce(res_cur_depth, op=ReduceOp.SUM, group=self.mp_group)
-
 
                 mtp_loss_res.append(res_cur_depth)
             loss = add_loss(loss, self.config.num_nextn_predict_lambda * sum([x for x in mtp_loss_res]) / len(mtp_loss_res))  # fmt: skip
@@ -2245,9 +2254,9 @@ class DeepseekV2LMHead(nn.Layer):
     def forward(self, hidden_states, tensor_parallel_output=None):
 
         # if self.config.sequence_parallel:
-            # hidden_states = GatherOp.apply(hidden_states)
-            # hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
-            # hidden_states = paddle.reshape_(hidden_states, [-1, self.seq_length, self.config.hidden_size])
+        # hidden_states = GatherOp.apply(hidden_states)
+        # hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
+        # hidden_states = paddle.reshape_(hidden_states, [-1, self.seq_length, self.config.hidden_size])
 
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
