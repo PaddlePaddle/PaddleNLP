@@ -196,6 +196,7 @@ class PredictorArgument:
     )
     dynamic_insert: bool = field(default=False, metadata={"help": "whether use dynamic insert"})
     total_request_num: int = field(default=None, metadata={"help": "The total number of request data"})
+    kv_cache_reuse: int = field(default=0)
 
     def __post_init__(self):
         if self.speculate_method is not None:
@@ -1155,6 +1156,11 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             for cache_k_shape, cache_v_shape in zip(self.cache_k_shapes, self.cache_v_shapes):
                 self.cache_kvs.append(paddle.zeros(cache_k_shape, dtype=cachekv_dtype))
                 self.cache_kvs.append(paddle.zeros(cache_v_shape, dtype=cachekv_dtype))
+                if self.config.kv_cache_reuse:
+                    logger.warning(
+                        f"self.config.kv_cache_reuse = {self.config.kv_cache_reuse}, break, len(self.cache_kvs) = {len(self.cache_kvs)}"
+                    )
+                    break
         else:
             # for mla's absorption
             assert self.cache_v_shapes is None

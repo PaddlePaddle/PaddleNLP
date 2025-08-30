@@ -1952,8 +1952,10 @@ class Trainer:
                     return x in decay_parameters
 
             optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
-            if self.args.optim == OptimizerNames.AdamW_Qweight:
+            if self.args.optim == OptimizerNames.ADAMW_CUSTOM:
                 optimizer_kwargs["quantization_config"] = self.model.config.quantization_config
+                optimizer_kwargs["use_lowprecision_moment"] = self.args.use_lowprecision_moment
+                optimizer_kwargs["tensorwise_offload_optimizer"] = self.args.tensorwise_offload_optimizer
 
             if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
                 optimizer_kwargs["multi_precision"] = True
@@ -2106,16 +2108,6 @@ class Trainer:
             from ..utils import AdamWCustom
 
             optimizer_cls = AdamWCustom
-            optimizer_kwargs.update(adam_kwargs)
-        elif args.optim == OptimizerNames.ADAMW_16BIT_MOMENT:
-            from ..utils import AdamW_16Bit
-
-            optimizer_cls = AdamW_16Bit
-            optimizer_kwargs.update(adam_kwargs)
-        elif args.optim == OptimizerNames.AdamW_Qweight:
-            from ..utils import AdamWQweight
-
-            optimizer_cls = AdamWQweight
             optimizer_kwargs.update(adam_kwargs)
         else:
             raise ValueError(f"Trainer cannot instantiate unsupported optimizer: {args.optim}")
@@ -2665,7 +2657,7 @@ class Trainer:
                         filter_optimzier_state_dict[op_k] = op_v
         return filter_optimzier_state_dict
 
-    def _ordered_save(self, state_dict, save_path):
+    def _ordered_save(self, state_dict, save_path, signal_path=None):
         group_size = self.args.ordered_save_group_size
         hcg = fleet.get_hybrid_communicate_group()
         if hcg.get_sharding_parallel_world_size() > 1 or hcg.get_model_parallel_world_size() <= 1:
@@ -2684,6 +2676,10 @@ class Trainer:
             if dist.get_rank() in group:
                 paddle.save(state_dict, save_path)
             dist.barrier(mp_group)
+
+        if signal_path is not None:
+            with open(signal_path, mode="w+") as f:
+                f.write("1")
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
@@ -2756,7 +2752,7 @@ class Trainer:
             optimizer_name = _add_variant(PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             saved_signal_path = os.path.join(output_dir, f"saved_signal_{dist.get_rank()}")
 
-            if self.args.unified_checkpoint and self.args.offload_optim:
+            if self.args.unified_checkpoint and (self.args.offload_optim or self.args.tensorwise_offload_optimizer):
                 self._reload_optimizer()
 
             if self.args.use_hybrid_parallel:
@@ -2839,7 +2835,7 @@ class Trainer:
                         ):
                             paddle.save(global_rank, os.path.join(signal_dir, f".master_weight.done.{global_rank}"))
 
-            if self.args.unified_checkpoint and self.args.offload_optim:
+            if self.args.unified_checkpoint and (self.args.offload_optim or self.args.tensorwise_offload_optimizer):
                 self._offload_optimizer()
 
         self.runtime_timer.stop()

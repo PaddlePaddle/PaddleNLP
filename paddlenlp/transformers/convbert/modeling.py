@@ -322,6 +322,7 @@ class ConvBertDiscriminatorPredictions(nn.Layer):
         self.act = get_activation(hidden_act)
 
     def forward(self, discriminator_hidden_states):
+        discriminator_hidden_states = discriminator_hidden_states[0]
         hidden_states = self.dense(discriminator_hidden_states)
         hidden_states = self.act(hidden_states)
         logits = self.dense_prediction(hidden_states).squeeze()

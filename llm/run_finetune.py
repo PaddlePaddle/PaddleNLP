@@ -166,6 +166,13 @@ def main():
         qlora_weight_blocksize=model_args.qlora_weight_blocksize,
         qlora_weight_double_quant=model_args.qlora_weight_double_quant,
         qlora_weight_double_quant_block_size=model_args.qlora_weight_double_quant_block_size,
+        apply_hadamard=model_args.apply_hadamard,
+        hadamard_block_size=model_args.hadamard_block_size,
+        quant_input_grad=model_args.quant_input_grad,
+        quant_weight_grad=model_args.quant_weight_grad,
+        apply_online_actscale_step=model_args.apply_online_actscale_step,
+        actscale_moving_rate=model_args.actscale_moving_rate,
+        fp8_format_type=model_args.fp8_format_type,
     )
 
     model_config = AutoConfig.from_pretrained(
@@ -447,7 +454,9 @@ def main():
         gen_args=gen_args,
         data_args=data_args,
     )
-    trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
+    trainable_parameters = [
+        p for p in model.parameters() if not p.stop_gradient or ("quantization_linear" in p.name and "w_1" in p.name)
+    ]
     trainer.set_optimizer_grouped_parameters(trainable_parameters)
     if model_args.lorapro:
         optimizer = AdamWLoRAPro(

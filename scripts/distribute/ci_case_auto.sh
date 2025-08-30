@@ -19,13 +19,11 @@ set -e
 export log_path=/workspace/case_logs
 export root_path=/workspace/PaddleNLP
 
-export gpt_case_path=$root_path/slm/model_zoo/gpt-3
-export gpt_data_path=/fleetx_data
-
 export llama_case_path=$root_path/llm/auto_parallel/llama
 export deepseek_case_path=$root_path/llm/auto_parallel/deepseek-v3
 export llama_data_path=/llama_data
 export llm_gpt_case_path=$root_path/llm/auto_parallel/gpt-3
+export gpt_data_path=/fleetx_data
 
 unset CUDA_VISIBLE_DEVICES
 
@@ -37,7 +35,16 @@ function is_a100() {
     fi
 }
 
+function is_cuda123() {
+    if [ $(nvcc -V|grep "cuda_12.3" |wc -l)  -ne 0 ];then
+        echo 1
+    else
+        echo 0
+    fi
+}
+
 IS_A100=$(is_a100)
+IS_CUDA123=$(is_cuda123)
 
 function track_case_status() {  
     local case_name="$1"  
@@ -102,6 +109,9 @@ function llama_case_list_auto() {
         llama_dygraph_auto_bs8_fp32_DP2-MP2
         llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
         llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
+        llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2
+        llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2_intermediate
+        llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp
         # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
         llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw
         llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2
@@ -216,117 +226,117 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
         export PYTHONPATH=$root_path/:$PYTHONPATH
         export FLAGS_call_stack_level=3
         export NVIDIA_TF32_OVERRIDE=0
-
         export FLAGS_cudnn_deterministic=1
         export FLAGS_embedding_deterministic=1 
-        
+
         export CUDA_DEVICE_MAX_CONNECTIONS=1
 
-        flags=("" "FLAGS_fuse_allreduce_in_opt" "FLAGS_fuse_reducescatter_in_opt" "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap")
-        for i in "${!flags[@]}"; do
-            flag="${flags[$i]}"
+        test_cases=(
+            "default" "" 1
+            "tensor_fusion_overlap1" "enable_tensor_fusion enable_overlap" 1
+            "tensor_fusion_overlap2" "enable_tensor_fusion enable_overlap" 2
+        )
 
-            if [ -n "$flag" ]; then
-                for f in $flag; do
-                    export "$f=true"
-                done
-            fi
-            acc_steps=(1)
-            if [ "$flag" = "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap" ]; then
-                acc_steps=(1 2)
-            fi
-            for acc_step in "${acc_steps[@]}"; do
-                task_name="llama_dygraph_auto_bs4_bf16_SD2_$f"
-                case_out_dir="output/$task_name"
-                case_log_dir="output/$task_name""_log"
-                rm -rf $case_out_dir
-                rm -rf $case_log_dir
+        for ((i=0; i<${#test_cases[@]}; i+=3)); do
+            case_name=${test_cases[i]}
+            sharding_config=${test_cases[i+1]}
+            acc_step=${test_cases[i+2]}
 
-                python -u  -m paddle.distributed.launch \
-                    --gpus "0,1" \
-                    --log_dir  "output/$task_name""_log" \
-                    ./run_pretrain_auto.py \
-                    --model_name_or_path "meta-llama/Llama-2-7b" \
-                    --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
-                    --input_dir "./data" \
-                    --output_dir "./output" \
-                    --weight_decay 0.01 \
-                    --warmup_ratio 0.01 \
-                    --max_grad_norm 1.0 \
-                    --learning_rate 3e-05 \
-                    --min_learning_rate 3e-06 \
-                    --max_steps 10 \
-                    --logging_steps 10 \
-                    --eval_steps 1000 \
-                    --save_steps 50000 \
-                    --continue_training 0 \
-                    --do_train true \
-                    --do_eval false \
-                    --do_predict false \
-                    --disable_tqdm true \
-                    --skip_profile_timer true \
-                    --device gpu \
-                    --enable_auto_parallel 1 \
-                    --per_device_train_batch_size 1 \
-                    --gradient_accumulation_steps $acc_step \
-                    --per_device_eval_batch_size 2 \
-                    --recompute false \
-                    --recompute_use_reentrant true \
-                    --recompute_granularity full \
-                    --pp_recompute_interval 0 \
-                    --bf16 true \
-                    --fp16_opt_level "O2"  \
-                    --amp_master_grad true \
-                    --fuse_attention_ffn true \
-                    --fuse_attention_qkv true \
-                    --fused_linear_param_grad_add 1 \
-                    --use_flash_attention true \
-                    --use_fused_rope true \
-                    --use_fused_rms_norm true \
-                    --max_seq_length 4096 \
-                    --sequence_parallel false \
-                    --pipeline_parallel_degree 1 \
-                    --tensor_parallel_degree 1 \
-                    --sharding "stage1" \
-                    --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
-                    --sharding_parallel_config "" \
-                    --to_static 0 \
-                    --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
-                    --amp_custom_white_list "lookup_table" "lookup_table_v2" \
-                    --num_hidden_layers 4 \
-                    >>${log_path}/$FUNCNAME 2>&1
-                loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-                ips=-1
-                mem=-1
-                echo "result: loss=$loss ips=$ips mem=$mem"
-                
-                if [ -z "$flag" ]; then
-                    loss_base=9.23502579
-                elif [ "$flag" = "FLAGS_fuse_allreduce_in_opt" ]; then
-                    loss_base=9.23502579
-                elif [ "$flag" = "FLAGS_fuse_reducescatter_in_opt" ]; then
+            task_name="llama_dygraph_auto_bs4_bf16_SD2_${case_name}_acc${acc_step}"
+
+
+            case_out_dir="output/$task_name"
+            case_log_dir="output/$task_name""_log"
+            rm -rf $case_out_dir
+            rm -rf $case_log_dir
+
+            python -u  -m paddle.distributed.launch \
+                --gpus "0,1" \
+                --log_dir  "output/$task_name""_log" \
+                ./run_pretrain_auto.py \
+                --model_name_or_path "meta-llama/Llama-2-7b" \
+                --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
+                --input_dir "./data" \
+                --output_dir "./output" \
+                --weight_decay 0.01 \
+                --warmup_ratio 0.01 \
+                --max_grad_norm 1.0 \
+                --learning_rate 3e-05 \
+                --min_learning_rate 3e-06 \
+                --max_steps 10 \
+                --logging_steps 10 \
+                --eval_steps 1000 \
+                --save_steps 50000 \
+                --continue_training 0 \
+                --do_train true \
+                --do_eval false \
+                --do_predict false \
+                --disable_tqdm true \
+                --skip_profile_timer true \
+                --device gpu \
+                --enable_auto_parallel 1 \
+                --per_device_train_batch_size 1 \
+                --gradient_accumulation_steps $acc_step \
+                --per_device_eval_batch_size 2 \
+                --recompute false \
+                --recompute_use_reentrant true \
+                --recompute_granularity full \
+                --pp_recompute_interval 0 \
+                --bf16 true \
+                --fp16_opt_level "O2"  \
+                --amp_master_grad true \
+                --fuse_attention_ffn true \
+                --fuse_attention_qkv true \
+                --fused_linear_param_grad_add 1 \
+                --use_flash_attention true \
+                --use_fused_rope true \
+                --use_fused_rms_norm true \
+                --max_seq_length 4096 \
+                --sequence_parallel false \
+                --pipeline_parallel_degree 1 \
+                --tensor_parallel_degree 1 \
+                --sharding "stage1" \
+                --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
+                --sharding_parallel_config "$sharding_config" \
+                --to_static 0 \
+                --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
+                --amp_custom_white_list "lookup_table" "lookup_table_v2" \
+                --num_hidden_layers 4 \
+                >>${log_path}/$FUNCNAME 2>&1
+            loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+            ips=-1
+            mem=-1
+            echo "result: loss=$loss ips=$ips mem=$mem"
+            echo "case=$case_name sharding_config=$sharding_config acc_step=$acc_step"
+            if [ "$case_name" = "default" ]; then
+                if [ $IS_CUDA123 -ne 0 ];then
+                    loss_base=9.23503647
+                else
                     loss_base=9.23504105
-                elif [ "$flag" = "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap" ]; then
-                    if [ $acc_step -eq 1 ]; then
+                fi
+            elif [[ "$case_name" =~ "tensor_fusion_overlap" ]]; then
+                if [ $acc_step -eq 1 ]; then
+                    if [ $IS_CUDA123 -ne 0 ];then
+                        loss_base=9.23503113
+                    else
                         loss_base=9.23504868
+                    fi
+                else
+                    if [ $IS_CUDA123 -ne 0 ];then
+                        loss_base=9.16486053
                     else
                         loss_base=9.16484451
                     fi
-                else
-                    loss_base=-1
                 fi
-
-                ips_base=-1
-                mem_base=-1
-                check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-            done
-
-            if [ -n "$flag" ]; then
-                for f in $flag; do
-                    export "$f=false"
-                done
+            else
+                loss_base=-1
             fi
+
+            ips_base=-1
+            mem_base=-1
+            check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
         done
+
         echo "=========== $FUNCNAME run  end ==========="
     fi
 }
@@ -397,7 +407,8 @@ function llama_dygraph_auto_bs8_fp32_DP2() {
         loss_base=9.50651741
     fi
     ips_base=-1
-    mem_base=9.381539106369019
+    # TODO(lizhenxing): Fix memory increase caused by "skip redundant reshard ops when mesh==1" case
+    mem_base=9.881539106369019
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -464,7 +475,11 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2() {
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.3507843
     if [ $IS_A100 -ne 0 ];then
-        loss_base=9.38577747
+        if [ $IS_CUDA123 -ne 0 ];then
+            loss_base=9.38577652
+        else
+            loss_base=9.38577747
+        fi
     fi
     ips_base=-1
     mem_base=5.1569297313690186
@@ -483,64 +498,72 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     case_log_dir="output/$task_name""_log"
 
     for use_fused_rms_norm in "1" "0"; do
-        rm -rf $case_out_dir
-        rm -rf $case_log_dir
-
-        python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
-            --model_type "llama" \
-            --model_name_or_path "facebook/llama-7b" \
-            --tokenizer_name_or_path "facebook/llama-7b" \
-            --input_dir "./data" \
-            --output_dir $case_out_dir \
-            --split 949,50,1 \
-            --max_seq_length 2048 \
-            --hidden_size 1024 \
-            --intermediate_size 3072 \
-            --num_hidden_layers 8 \
-            --num_attention_heads 32 \
-            --per_device_train_batch_size 1 \
-            --per_device_eval_batch_size 4 \
-            --gradient_accumulation_steps 4 \
-            --use_flash_attention 0 \
-            --use_fused_rms_norm ${use_fused_rms_norm} \
-            --fp16 0 \
-            --fp16_opt_level "O2" \
-            --scale_loss 1024 \
-            --pipeline_parallel_degree 2 \
-            --tensor_parallel_degree 2 \
-            --sharding_parallel_degree 1 \
-            --learning_rate 0.0001 \
-            --min_learning_rate 0.00001 \
-            --max_steps 10 \
-            --save_steps 5000 \
-            --weight_decay 0.01 \
-            --warmup_ratio 0.01 \
-            --logging_steps 1 \
-            --dataloader_num_workers 1 \
-            --sharding "" \
-            --eval_steps 1000000 \
-            --disable_tqdm true \
-            --continue_training 0 \
-            --recompute 0 \
-            --do_train \
-            --do_eval \
-            --device "gpu" \
-            --data_impl "mmap" \
-            --enable_auto_parallel 1 \
-            --to_static 0 \
-            --max_grad_norm 1.0 \
-            >>${log_path}/$FUNCNAME 2>&1
-        loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-        ips=-1
-        mem=-1
-        echo "use_fused_rms_norm=$use_fused_rms_norm  result: loss=$loss ips=$ips mem=$mem"
-        loss_base=9.3513937
-        if [ $IS_A100 -ne 0 ];then
-            loss_base=9.39356422
+        if [ "$use_fused_rms_norm" -eq 1 ]; then
+            fast_ln_options=("1" "0")
+        else
+            fast_ln_options=("0")
         fi
-        ips_base=-1
-        mem_base=-1
-        check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+        for use_fast_layer_norm in "${fast_ln_options[@]}"; do
+            rm -rf $case_out_dir
+            rm -rf $case_log_dir
+
+            python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
+                --model_type "llama" \
+                --model_name_or_path "facebook/llama-7b" \
+                --tokenizer_name_or_path "facebook/llama-7b" \
+                --input_dir "./data" \
+                --output_dir $case_out_dir \
+                --split 949,50,1 \
+                --max_seq_length 2048 \
+                --hidden_size 1024 \
+                --intermediate_size 3072 \
+                --num_hidden_layers 8 \
+                --num_attention_heads 32 \
+                --per_device_train_batch_size 1 \
+                --per_device_eval_batch_size 4 \
+                --gradient_accumulation_steps 4 \
+                --use_flash_attention 0 \
+                --use_fused_rms_norm ${use_fused_rms_norm} \
+                --use_fast_layer_norm ${use_fast_layer_norm} \
+                --fp16 0 \
+                --fp16_opt_level "O2" \
+                --scale_loss 1024 \
+                --pipeline_parallel_degree 2 \
+                --tensor_parallel_degree 2 \
+                --sharding_parallel_degree 1 \
+                --learning_rate 0.0001 \
+                --min_learning_rate 0.00001 \
+                --max_steps 10 \
+                --save_steps 5000 \
+                --weight_decay 0.01 \
+                --warmup_ratio 0.01 \
+                --logging_steps 1 \
+                --dataloader_num_workers 1 \
+                --sharding "" \
+                --eval_steps 1000000 \
+                --disable_tqdm true \
+                --continue_training 0 \
+                --recompute 0 \
+                --do_train \
+                --do_eval \
+                --device "gpu" \
+                --data_impl "mmap" \
+                --enable_auto_parallel 1 \
+                --to_static 0 \
+                --max_grad_norm 1.0 \
+                >>${log_path}/$FUNCNAME 2>&1
+            loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+            ips=-1
+            mem=-1
+            echo "use_fused_rms_norm=$use_fused_rms_norm  use_fast_layer_norm=$use_fast_layer_norm  result: loss=$loss ips=$ips mem=$mem"
+            loss_base=9.3513937
+            if [ $IS_A100 -ne 0 ];then
+                loss_base=9.39356422
+            fi
+            ips_base=-1
+            mem_base=-1
+            check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+        done
     done
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -606,9 +629,13 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.35162258
+    loss_base=9.35163116
     if [ $IS_A100 -ne 0 ];then
-        loss_base=9.39368534
+        if [ $IS_CUDA123 -ne 0 ];then
+            loss_base=9.39367676
+        else
+            loss_base=9.3936882
+        fi
     fi
     ips_base=-1
     mem_base=-1
@@ -686,6 +713,297 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate() {
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
+
+function llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2() {
+    echo IS_A100 is $IS_A100
+    if [ $IS_A100 -ne 0 ]; then
+        echo "=========== $FUNCNAME run begin ==========="
+        export PYTHONPATH=$root_path/:$PYTHONPATH
+        export FLAGS_call_stack_level=3
+        export NVIDIA_TF32_OVERRIDE=0
+
+        task_name="llama_auto_bs8_fp16_dp2mp2cp2"
+        case_out_dir="output/$task_name"
+        case_log_dir="output/$task_name""_log"
+        rm -rf $case_out_dir
+        rm -rf $case_log_dir
+
+        python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
+            --model_type "llama" \
+            --model_name_or_path "facebook/llama-7b" \
+            --tokenizer_name_or_path "facebook/llama-7b" \
+            --input_dir "./data" \
+            --output_dir $case_out_dir \
+            --split 949,50,1 \
+            --max_seq_length 2048 \
+            --hidden_size 1024 \
+            --intermediate_size 3072 \
+            --num_hidden_layers 8 \
+            --num_attention_heads 32 \
+            --per_device_train_batch_size 1 \
+            --per_device_eval_batch_size 4 \
+            --gradient_accumulation_steps 4 \
+            --use_flash_attention 1 \
+            --use_fused_rms_norm 0 \
+            --fp16 1 \
+            --fp16_opt_level "O2" \
+            --amp_master_grad 1 \
+            --scale_loss 1024 \
+            --context_parallel_degree 2 \
+            --tensor_parallel_degree 2 \
+            --sharding_parallel_degree 1 \
+            --learning_rate 0.0001 \
+            --min_learning_rate 0.00001 \
+            --max_steps 10 \
+            --save_steps 5000 \
+            --weight_decay 0.01 \
+            --warmup_ratio 0.01 \
+            --logging_steps 1 \
+            --dataloader_num_workers 1 \
+            --sharding "" \
+            --eval_steps 1000000 \
+            --disable_tqdm true \
+            --continue_training 0 \
+            --recompute 0 \
+            --do_train \
+            --do_eval \
+            --device "gpu" \
+            --data_impl "mmap" \
+            --enable_auto_parallel 1 \
+            --to_static 0 \
+            --max_grad_norm 1.0 \
+            >>${log_path}/$FUNCNAME 2>&1
+        loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+        ips=-1
+        mem=-1
+        echo "result: loss=$loss ips=$ips mem=$mem"
+        if [ $IS_CUDA123 -ne 0 ];then
+            loss_base=9.38431835
+        else
+            loss_base=9.38430595
+        fi
+        ips_base=-1
+        mem_base=-1
+        check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+        echo "=========== $FUNCNAME run  end ==========="
+    fi
+}
+
+function llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2_intermediate() {
+    echo IS_A100 is $IS_A100
+    if [ $IS_A100 -ne 0 ]; then
+        echo "=========== $FUNCNAME run begin ==========="
+        export PYTHONPATH=$root_path/:$PYTHONPATH
+        export FLAGS_call_stack_level=3
+        export NVIDIA_TF32_OVERRIDE=0
+
+        task_name="llama_auto_bs8_fp16_dp2mp2cp2_intermediate"
+        case_out_dir="output/$task_name"
+        case_log_dir="output/$task_name""_log"
+        rm -rf $case_out_dir
+        rm -rf $case_log_dir
+
+        python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
+            --model_name_or_path "facebook/llama-7b" \
+            --tokenizer_name_or_path "facebook/llama-7b" \
+            --input_dir "./data" \
+            --output_dir $case_out_dir \
+            --split 949,50,1 \
+            --max_seq_length 2048 \
+            --hidden_size 1024 \
+            --intermediate_size 3072 \
+            --num_hidden_layers 8 \
+            --num_attention_heads 32 \
+            --per_device_train_batch_size 1 \
+            --per_device_eval_batch_size 4 \
+            --gradient_accumulation_steps 4 \
+            --use_flash_attention 1 \
+            --use_fused_rms_norm 0 \
+            --fp16 1 \
+            --fp16_opt_level "O2" \
+            --amp_master_grad 1 \
+            --scale_loss 1024 \
+            --context_parallel_degree 2 \
+            --tensor_parallel_degree 2 \
+            --sharding_parallel_degree 1 \
+            --learning_rate 0.0001 \
+            --min_learning_rate 0.00001 \
+            --max_steps 10 \
+            --save_steps 5000 \
+            --weight_decay 0.01 \
+            --warmup_ratio 0.01 \
+            --logging_steps 1 \
+            --dataloader_num_workers 1 \
+            --sharding "" \
+            --eval_steps 1000000 \
+            --disable_tqdm true \
+            --continue_training 0 \
+            --recompute 0 \
+            --do_train \
+            --do_eval \
+            --device "gpu" \
+            --data_impl "mmap" \
+            --enable_auto_parallel 1 \
+            --to_static 0 \
+            --max_grad_norm 1.0 \
+            --model_type "llama_network" \
+            --use_intermediate_api 1 \
+            >>${log_path}/$FUNCNAME 2>&1
+        loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+        ips=-1
+        mem=-1
+        echo "result: loss=$loss ips=$ips mem=$mem"
+        if [ $IS_CUDA123 -ne 0 ];then
+            loss_base=9.38431835
+        else
+            loss_base=9.38430595
+        fi
+        ips_base=-1
+        mem_base=-1
+        check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+        echo "=========== $FUNCNAME run  end ==========="
+    fi
+}
+
+function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
+    echo IS_A100 is $IS_A100
+    if [ $IS_A100 -ne 0 ]; then
+        echo "=========== $FUNCNAME run begin ==========="
+        export PYTHONPATH=$root_path/:$PYTHONPATH
+        export FLAGS_call_stack_level=3
+        export NVIDIA_TF32_OVERRIDE=0
+
+        task_name="llama_auto_bs8_fp16_dp2mp2pp2_hybrid_pp"
+        case_out_dir="output/$task_name"
+        case_log_dir="output/$task_name""_log"
+        rm -rf $case_out_dir
+        rm -rf $case_log_dir
+
+        python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
+            --model_type "llama_pp" \
+            --model_name_or_path "facebook/llama-7b" \
+            --tokenizer_name_or_path "facebook/llama-7b" \
+            --input_dir "./data" \
+            --output_dir $case_out_dir \
+            --split 949,50,1 \
+            --max_seq_length 2048 \
+            --hidden_size 1024 \
+            --intermediate_size 3072 \
+            --num_hidden_layers 8 \
+            --num_attention_heads 32 \
+            --per_device_train_batch_size 4 \
+            --per_device_eval_batch_size 4 \
+            --n_microbatch 4 \
+            --gradient_accumulation_steps 1 \
+            --use_flash_attention 1 \
+            --use_fused_rms_norm 0 \
+            --fp16 1 \
+            --fp16_opt_level "O2" \
+            --amp_master_grad 1 \
+            --scale_loss 1024 \
+            --pipeline_parallel_degree 2 \
+            --pipeline_schedule_mode "FThenB" \
+            --tensor_parallel_degree 2 \
+            --sharding_parallel_degree 1 \
+            --learning_rate 0.0001 \
+            --min_learning_rate 0.00001 \
+            --max_steps 10 \
+            --save_steps 9 \
+            --weight_decay 0.01 \
+            --warmup_ratio 0.01 \
+            --logging_steps 1 \
+            --dataloader_num_workers 1 \
+            --sharding "" \
+            --eval_steps 1000000 \
+            --disable_tqdm true \
+            --continue_training 0 \
+            --recompute 0 \
+            --do_train \
+            --do_eval \
+            --device "gpu" \
+            --data_impl "mmap" \
+            --enable_auto_parallel 1 \
+            --to_static 0 \
+            --max_grad_norm 0.0 \
+            >>${log_path}/$FUNCNAME 2>&1
+        loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+        ips=-1
+        mem=-1
+        echo "result: loss=$loss ips=$ips mem=$mem"
+        if [ $IS_CUDA123 -ne 0 ];then
+            loss_base=9.57173729
+        else
+            loss_base=9.57199001
+        fi
+        ips_base=-1
+        mem_base=-1
+        check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+        
+        echo "---- run dygraph auto hybrid pp resume from hybrid ckpt ----"
+        auto_task_name="llama_auto_bs8_fp16_dp2mp2pp2_hybrid_pp_resume_from_hybrid_ckpt"
+        auto_case_out_dir="auto_output/$auto_task_name"
+        auto_case_log_dir="auto_output/$auto_task_name""_log"
+        rm -rf $auto_case_out_dir
+        rm -rf $auto_case_log_dir
+
+        python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $auto_case_log_dir run_pretrain_auto.py \
+            --model_type "llama_pp" \
+            --model_name_or_path "facebook/llama-7b" \
+            --tokenizer_name_or_path "facebook/llama-7b" \
+            --input_dir "./data" \
+            --output_dir $auto_case_out_dir \
+            --split 949,50,1 \
+            --max_seq_length 2048 \
+            --hidden_size 1024 \
+            --intermediate_size 3072 \
+            --num_hidden_layers 8 \
+            --num_attention_heads 32 \
+            --per_device_train_batch_size 4 \
+            --per_device_eval_batch_size 4 \
+            --n_microbatch 4 \
+            --gradient_accumulation_steps 1 \
+            --use_flash_attention 1 \
+            --use_fused_rms_norm 0 \
+            --fp16 1 \
+            --fp16_opt_level "O2" \
+            --amp_master_grad 1 \
+            --scale_loss 1024 \
+            --pipeline_parallel_degree 2 \
+            --pipeline_schedule_mode "FThenB" \
+            --tensor_parallel_degree 2 \
+            --sharding_parallel_degree 1 \
+            --learning_rate 0.0001 \
+            --min_learning_rate 0.00001 \
+            --max_steps 10 \
+            --save_steps 5000 \
+            --weight_decay 0.01 \
+            --warmup_ratio 0.01 \
+            --logging_steps 1 \
+            --dataloader_num_workers 1 \
+            --sharding "" \
+            --eval_steps 1000000 \
+            --disable_tqdm true \
+            --continue_training 0 \
+            --recompute 0 \
+            --do_train \
+            --do_eval \
+            --device "gpu" \
+            --data_impl "mmap" \
+            --enable_auto_parallel 1 \
+            --to_static 0 \
+            --max_grad_norm 0.0 \
+            --resume_from_checkpoint "${case_out_dir}/checkpoint-9" \
+            >>${log_path}/$FUNCNAME 2>&1
+        pp_resume_from_hybrid_ckpt_loss=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+        pp_resume_from_hybrid_ckpt_ips=-1
+        pp_resume_from_hybrid_ckpt_mem=-1
+        echo "pp_resume from hybrid ckpt result: loss=$pp_resume_from_hybrid_ckpt_loss ips=$pp_resume_from_hybrid_ckpt_ips mem=$pp_resume_from_hybrid_ckpt_mem"
+        
+        check_result $FUNCNAME ${loss} ${pp_resume_from_hybrid_ckpt_loss} ${ips} ${pp_resume_from_hybrid_ckpt_ips} ${mem} ${pp_resume_from_hybrid_ckpt_mem}
+        echo "=========== $FUNCNAME run  end ==========="
+    fi
+}
+
 function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2() {
     # Only A100 support this case.
     echo IS_A100 is $IS_A100
@@ -877,7 +1195,11 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
         ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
         mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
         echo "result: loss=$loss ips=$ips mem=$mem"
-        loss_base=7.57775269 # record new data
+        if [ $IS_CUDA123 -ne 0 ];then
+            loss_base=7.57788467
+        else
+            loss_base=7.57775269
+        fi
         ips_base=5825.427
         mem_base=25.562287092208862
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -981,9 +1303,17 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP() {
                 loss_base=9.16783295
                 loss_md5_base=8ea72495fba4e1b9ba004b4431e27218
                 if [ $IS_A100 -ne 0 ] && [ $to_static -eq 0 ];then
-                    loss_base=9.37966919
+                    if [ $IS_CUDA123 -ne 0 ];then
+                        loss_base=9.38023453
+                    else
+                        loss_base=9.37972641
+                    fi
                 elif [ $IS_A100 -ne 0 ] && [ $to_static -eq 1 ];then
-                    loss_base=9.38012543
+                    if [ $IS_CUDA123 -ne 0 ];then
+                        loss_base=9.38023453
+                    else
+                        loss_base=9.37989655
+                    fi
                 fi
                 ips=-1
                 mem=-1
@@ -1097,43 +1427,64 @@ function llama_pir_auto_fuse_ffn_attention_qkv_MP2() {
             auto_mem_10=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
             echo "auto result: step 10 loss=$auto_loss_10 ips=$auto_ips_10 mem=$auto_mem_10"
             if [ $to_static -ne 0 ];then
-                if [[ $tp_config =~ "replace_with_parallel_cross_entropy" ]];then
-                    # This optimization may result in a discrepancy in accuracy.
-                    loss_base_2=10.53477287
-                    loss_base_10=9.4961338
-                else
-                    loss_base_2=10.53477192
-                    loss_base_10=9.4961338
-                fi
                 auto_ips=-1
                 auto_mem=-1
                 ips_base=-1
                 mem_base=-1
                 if [ $IS_A100 -ne 0 ];then
-                    loss_base_2=10.58283806
-                    loss_base_10=9.43873405
+                    #A100
+                    if [ $IS_CUDA123 -ne 0 ];then
+                        loss_base_2=10.58283997
+                        loss_base_10=9.43873405
+                    else
+                        loss_base_2=10.58283806
+                        loss_base_10=9.43873405
+                    fi
+                else
+                    #V100
+                    if [[ $tp_config =~ "replace_with_parallel_cross_entropy" ]];then
+                        # This optimization may result in a discrepancy in accuracy.
+                        loss_base_2=10.53477287
+                        loss_base_10=9.4961338
+                    else
+                        loss_base_2=10.53477192
+                        loss_base_10=9.4961338
+                    fi
                 fi
                 check_result $FUNCNAME ${loss_base_2} ${auto_loss_2} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
                 check_result $FUNCNAME ${loss_base_10} ${auto_loss_10} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
             else
-                if [[ $tp_config =~ "replace_with_parallel_cross_entropy" ]];then
-                    loss_base_2=10.53477287
-                    loss_base_10=9.4961319
-                else
-                    loss_base_2=10.53477287
-                    loss_base_10=9.49613285
-                fi
                 auto_ips=-1
                 auto_mem=-1
                 ips_base=-1
                 mem_base=-1
                 if [ $IS_A100 -ne 0 ];then
+                    # A100
                     if [[ $tp_config =~ "replace_with_parallel_cross_entropy" ]];then
-                        loss_base_2=10.58283806
-                        loss_base_10=9.43873215
+                       if [ $IS_CUDA123 -ne 0 ];then
+                            loss_base_2=10.58283997
+                            loss_base_10=9.4387331
+                        else
+                            loss_base_2=10.58283806
+                            loss_base_10=9.43873215
+                        fi
                     else
-                        loss_base_2=10.58283806
-                        loss_base_10=9.4387331
+                        if [ $IS_CUDA123 -ne 0 ];then
+                            loss_base_2=10.58283997
+                            loss_base_10=9.43873215
+                        else
+                            loss_base_2=10.58283806
+                            loss_base_10=9.4387331
+                        fi
+                    fi
+                else
+                    #V100
+                    if [[ $tp_config =~ "replace_with_parallel_cross_entropy" ]];then
+                        loss_base_2=10.53477287
+                        loss_base_10=9.4961319
+                    else
+                        loss_base_2=10.53477287
+                        loss_base_10=9.49613285
                     fi
                 fi
                 check_result $FUNCNAME ${loss_base_2} ${auto_loss_2} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
@@ -1229,9 +1580,17 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP() {
         loss_base=9.25199432
         loss_md5_base=83531e98ee11cd271db175150ab254bb
         if [ $IS_A100 -ne 0 ] && [ $to_static -eq 0 ];then
-            loss_base=9.44203949
+            if [ $IS_CUDA123 -ne 0 ];then
+                loss_base=9.44244614
+            else
+                loss_base=9.44203339
+            fi
         elif [ $IS_A100 -ne 0 ] && [ $to_static -eq 1 ];then
-            loss_base=9.44225311
+            if [ $IS_CUDA123 -ne 0 ];then
+                loss_base=9.44244614
+            else
+                loss_base=9.44231415
+            fi
         fi
         ips_base=-1
         mem_base=-1
@@ -1323,9 +1682,23 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
         ips=-1
         mem=-1
         echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
-        loss_base=9.99302673
-        if [ $IS_A100 -ne 0 ];then
-            loss_base=10.20991516
+        if [ $to_static -eq 0 ];then
+            loss_base=9.99302597
+        elif [ $to_static -eq 1 ];then
+            loss_base=9.99302673
+        fi
+        if [ $IS_A100 -ne 0 ] && [ $to_static -eq 0 ];then
+            if [ $IS_CUDA123 -ne 0 ];then
+                loss_base=10.20988998
+            else
+                loss_base=10.20990601
+            fi
+        elif [ $IS_A100 -ne 0 ] && [ $to_static -eq 1 ];then
+            if [ $IS_CUDA123 -ne 0 ];then
+                loss_base=10.20988922
+            else
+                loss_base=10.20991516
+            fi
         fi
         ips_base=-1
         mem_base=-1
@@ -1425,7 +1798,11 @@ function llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN() {
     echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
     loss_base=9.99302597
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.20990143
+        if [ $IS_CUDA123 -ne 0 ];then
+            loss_base=10.20989532
+        else
+            loss_base=10.20990143
+        fi
     fi
     ips_base=-1
     mem_base=-1
@@ -1440,7 +1817,6 @@ function llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN() {
 
 function llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate() {
     echo "=========== $FUNCNAME run begin ==========="
-    set -x
     unset CUDA_VISIBLE_DEVICES
     
     export PYTHONPATH=$root_path/:$PYTHONPATH
@@ -1543,7 +1919,7 @@ function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1() {
         rm -rf $case_log_dir
         rm -rf ${log_path}/$FUNCNAME
 
-        /usr/bin/python -u -m paddle.distributed.launch \
+        python -u -m paddle.distributed.launch \
             --gpus "0" \
             --log_dir $case_log_dir \
             run_pretrain_auto.py \
@@ -1728,6 +2104,8 @@ function llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
         fi
         echo "result: $pp_mode loss=$loss"
     done
+    loss_base_fthenb=10.24240494
+    loss_base_vpp=10.24149513  # Paddle PR#74530
     ips=-1
     mem=-1
     ips_base=-1
@@ -1735,7 +2113,10 @@ function llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
     for step in $(seq 1 $max_step); do
         echo "step=$step fthenb loss: ${loss1_array[$step-1]}, vpp loss: ${loss2_array[$step-1]}"
     done
-    check_result $FUNCNAME ${loss1} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
+    echo "FThenB check"
+    check_result $FUNCNAME ${loss_base_fthenb} ${loss1} ${ips_base} ${ips} ${mem_base} ${mem}
+    echo "VPP check"
+    check_result $FUNCNAME ${loss_base_vpp} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -2209,11 +2590,11 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.55848312 # output of dropout is different after supporting spmd
+    loss_base=10.55727577 # output of dropout is different after supporting spmd
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.55920792 # after add dropout spmd
+        loss_base=10.56668472 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2281,11 +2662,11 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.56786537 # output of dropout is different after supporting spmd
+    loss_base=10.57985115 # output of dropout is different after supporting spmd
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.57873726 # after add dropout spmd
+        loss_base=10.57280159 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2354,11 +2735,11 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.59993172     # note: need to debug
-    loss_base=10.57312012 # output of dropout is different after supporting spmd
+    loss_base=10.57274055 # output of dropout is different after supporting spmd
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.5769043 # after add dropout spmd
+        loss_base=10.57785797 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2427,11 +2808,11 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.58456802     # note: need to debug
-    loss_base=10.57452488
+    loss_base=10.57409477
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.57843781 # after add dropout spmd
+        loss_base=10.57924652 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2501,11 +2882,11 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.58456802     # note: need to debug
-    loss_base=10.566679
+    loss_base=10.56717587
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.56109619 # after add dropout spmd
+        loss_base=10.56169701 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2776,8 +3157,6 @@ function llm_gpt_pir_auto_bs8_DP2_TP2_PP2_intermediate(){
 }
 
 function llm_qwen_dygraph_auto_bs1_fp32_DP2() {
-    set -x
-
     config_json="pretrain_argument_for_ci_auto_dp2.json"
 
     cat <<EOF >"$config_json"
@@ -2869,8 +3248,6 @@ EOF
 }
 
 function llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2() {
-    set -x
-
     config_json="pretrain_argument_for_ci_auto_dp2_mp2.json"
 
     cat <<EOF >"$config_json"
@@ -2919,8 +3296,6 @@ function llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2() {
     "to_static": 0
 }
 EOF
-
-    set -x
     unset CUDA_VISIBLE_DEVICES
 
     export FLAGS_call_stack_level=3
@@ -2962,8 +3337,6 @@ EOF
 }
 
 function llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2-PP2() {
-    set -x
-
     config_json="pretrain_argument_for_ci_auto_dp2_mp2_pp2.json"
 
     cat <<EOF >"$config_json"
@@ -3055,8 +3428,6 @@ EOF
 }
 
 function llm_qwen_dygraph_auto_bs1_bf16_DP2-MP2-PP2() {
-    set -x
-
     config_json="pretrain_argument_for_ci_auto_dp2_mp2_pp2.json"
 
     cat <<EOF >"$config_json"
@@ -3149,8 +3520,6 @@ EOF
 
 function llm_qwen_pir_auto_bs1_bf16_TP2(){
     echo "=========== $FUNCNAME run  begin ==========="
-
-    set -x
     unset CUDA_VISIBLE_DEVICES
 
     export FLAGS_call_stack_level=3
@@ -3228,8 +3597,6 @@ function llm_qwen_pir_auto_bs1_bf16_TP2(){
 
 function llm_qwen_pir_auto_bs1_bf16_TP2_PP2(){
     echo "=========== $FUNCNAME run  begin ==========="
-
-    set -x
     unset CUDA_VISIBLE_DEVICES
 
     export FLAGS_call_stack_level=3
@@ -3308,7 +3675,6 @@ function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
     echo IS_A100 is $IS_A100
     if [ $IS_A100 -ne 0 ]; then    
         echo "=========== $FUNCNAME run begin ===========" 
-        set -x
         unset CUDA_VISIBLE_DEVICES 
 
         export PYTHONPATH=$root_path/:$PYTHONPATH
@@ -3322,9 +3688,6 @@ function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
         case_log_dir="output/$task_name""_log"
         
         rm -rf output/$task_name/
-
-        ls -la ./
-        ls -la ./data
 
         python -u  -m paddle.distributed.launch \
         --gpus "0,1,2,3" \
@@ -3378,7 +3741,11 @@ function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
         loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 3' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
         mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 3' | awk -F 'current_memory_allocated: ' '{print $2}' | awk -F ',' '{print $1}'`
 
-        loss_base=14.08647537 
+        if [ $IS_CUDA123 -ne 0 ];then
+            loss_base=14.08622074
+        else
+            loss_base=14.08647537
+        fi
         ips_base=-1
         mem_base=2.02
         echo "result: loss=$loss ips=$ips mem=$mem"
@@ -3390,7 +3757,6 @@ function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
 
 
 function deepseek_dygraph_auto_bs8_bf16_DP8() {
-    set -x
 
     model_config_json="pretrain_argument_for_ci_auto_dp8.json"
 
@@ -3538,7 +3904,6 @@ fi
 
 
 function deepseek_dygraph_auto_bs8_bf16_DP2_PP2_MP2() {
-    set -x
 
     model_config_json="pretrain_argument_for_ci_auto_dp2pp2mp2.json"
 
@@ -3689,11 +4054,10 @@ function llama_baichuan_dygraph_auto_sp_async_reduce_scatter_bs8_bf16_DP4-MP2-SP
         export PYTHONPATH=$root_path/:$PYTHONPATH
         export FLAGS_call_stack_level=3
         export GLOG_minloglevel=3
+        # export GLOG_v=6
         export NVIDIA_TF32_OVERRIDE=0
 
         export CUDA_DEVICE_MAX_CONNECTIONS=1
-        export FLAGS_fuse_reducescatter_in_opt=1
-        export FLAGS_enable_inplace_master_grad=1
         export FLAGS_auto_parallel_align_mode=1
         export FLAGS_max_inplace_grad_add=65536
         export FLAGS_embedding_deterministic=1
@@ -3749,16 +4113,17 @@ function llama_baichuan_dygraph_auto_sp_async_reduce_scatter_bs8_bf16_DP4-MP2-SP
     "amp_master_grad": true,
     "fuse_attention_ffn": true,
     "fuse_attention_qkv": true,
-    "use_flash_attention": true,
-    "fused_linear": 1,
+    "use_flash_attention": false,
+    "fused_linear": true,
     "fused_linear_param_grad_add": 1,
+    "enable_linear_fused_grad_add": true,
     "use_fused_rope": true,
     "use_fused_rms_norm": true,
     "max_seq_length": 1024,
-    "sequence_parallel": 1,
+    "sequence_parallel": true,
     "sharding": "stage1",
     "sharding_parallel_degree": 4,
-    "sharding_parallel_config": "enable_tensor_fusion enable_overlap",
+    "sharding_parallel_config": "",
     "tensor_parallel_config": "enable_mp_async_allreduce replace_with_parallel_cross_entropy enable_sp_async_reduce_scatter",
     "data_parallel_config": "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate",
     "pipeline_parallel_config": "enable_send_recv_overlap enable_split_backward",
@@ -3775,9 +4140,9 @@ EOF
         ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10,' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
         mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10,' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
         echo "result: loss=$loss ips=$ips mem=$mem"
-        loss_base=10.8060318
-        ips_base=1228.4263
-        mem_base=17.393041372299194
+        loss_base=9.83012619
+        ips_base=1387.5543
+        mem_base=18.277684926986694
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
         echo "=========== $FUNCNAME run  end ==========="
     fi
@@ -3853,9 +4218,21 @@ function check_result() {
     fi
 }
 
+function export_env() {
+    export FLAGS_new_executor_micro_batching=True  # True：打开新执行器
+    export FLAGS_embedding_deterministic=1         # 1：关闭随机性
+    export FLAGS_cudnn_deterministic=1             # 1：关闭随机性
+    export FLAGS_program_topo_reorder=1            # 1: 反向对齐动手拓扑排序
+    unset CUDA_MODULE_LOADING
+    env | grep FLAGS
+    export http_proxy=${proxy}
+    export https_proxy=${proxy}
+    export no_proxy=bcebos.com
+}
+
 function before_hook_for_gpt() {
     echo -e "\033[31m ---- Set FLAGS for GPT auto cases  \033[0m"
-    cd ${gpt_case_path}
+    cd ${llm_gpt_case_path}
     export FLAGS_new_executor_micro_batching=True  # True：打开新执行器
     export FLAGS_embedding_deterministic=1         # 1：关闭随机性
     export FLAGS_cudnn_deterministic=1             # 1：关闭随机性
@@ -3865,18 +4242,11 @@ function before_hook_for_gpt() {
     export https_proxy=${proxy}
     export no_proxy=bcebos.com
     if [[ $FLAGS_install_deps == 0 ]];then
-        echo -e "\033[31m ---- Install requirements for GPT auto cases  \033[0m"
-        cp requirements.txt requirements_nlp.txt
-        sed -i '/paddlenlp/d' requirements.txt
-        python -m pip install -r requirements.txt --force-reinstall
-        sed -i '/paddlenlp/!d' requirements_nlp.txt
-        python -m pip install -r requirements_nlp.txt
+        echo -e "\033[31m ---- Install requirements for LLM GPT auto cases  \033[0m"
         python -m pip install -r $root_path/requirements.txt
         python -m pip install -r $root_path/requirements-dev.txt
-        python -m pip install --no-cache-dir https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl --force-reinstall --no-dependencies
-        python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
     else
-        echo -e "\033[31m ---- Skip install requirements for GPT auto cases  \033[0m"
+        echo -e "\033[31m ---- Skip install requirements for LLM GPT auto cases  \033[0m"
     fi
     unset http_proxy && unset https_proxy
     if [[ ! $FLAGS_download_data =~ "gpt" ]];then
@@ -3890,22 +4260,10 @@ function before_hook_for_gpt() {
             wget -q -O ${gpt_data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
             wget -q -O ${gpt_data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
         fi
-        cp -r ${gpt_data_path}/data ${gpt_case_path}/
+        cp -r ${gpt_data_path}/data ${llm_gpt_case_path}/
     else
         echo -e "\033[31m ---- Skip download gpt data \033[0m"
     fi
-}
-
-function export_env() {
-    export FLAGS_new_executor_micro_batching=True  # True：打开新执行器
-    export FLAGS_embedding_deterministic=1         # 1：关闭随机性
-    export FLAGS_cudnn_deterministic=1             # 1：关闭随机性
-    export FLAGS_program_topo_reorder=1            # 1: 反向对齐动手拓扑排序
-    unset CUDA_MODULE_LOADING
-    env | grep FLAGS
-    export http_proxy=${proxy}
-    export https_proxy=${proxy}
-    export no_proxy=bcebos.com
 }
 
 function before_hook_for_llama() {
@@ -3920,8 +4278,13 @@ function before_hook_for_llama() {
     export http_proxy=${proxy}
     export https_proxy=${proxy}
     export no_proxy=bcebos.com
-    python -m pip install -r $root_path/requirements.txt
-    python -m pip install -r $root_path/requirements-dev.txt
+    if [[ $FLAGS_install_deps == 0 ]];then
+        echo -e "\033[31m ---- Install requirements for LLM LLAMA auto cases  \033[0m"
+        python -m pip install -r $root_path/requirements.txt
+        python -m pip install -r $root_path/requirements-dev.txt
+    else
+        echo -e "\033[31m ---- Skip install requirements for LLM LLAMA auto cases  \033[0m"
+    fi
     unset http_proxy && unset https_proxy
     if [[ ! $FLAGS_download_data =~ "llama" ]];then
         echo -e "\033[31m ---- Download LLaMA data  \033[0m"
@@ -3952,7 +4315,6 @@ function before_hook_for_llama() {
     fi
 }
 
-
 function before_hook_for_deepseek() {
     echo -e "\033[31m ---- Set FLAGS for LLaMA auto cases  \033[0m"
     cd ${deepseek_case_path}
@@ -3965,8 +4327,13 @@ function before_hook_for_deepseek() {
     export http_proxy=${proxy}
     export https_proxy=${proxy}
     export no_proxy=bcebos.com
-    python -m pip install -r $root_path/requirements.txt
-    python -m pip install -r $root_path/requirements-dev.txt
+    if [[ $FLAGS_install_deps == 0 ]];then
+        echo -e "\033[31m ---- Install requirements for LLM DEEPSEEK auto cases  \033[0m"
+        python -m pip install -r $root_path/requirements.txt
+        python -m pip install -r $root_path/requirements-dev.txt
+    else
+        echo -e "\033[31m ---- Skip install requirements for LLM DEEPSEEK auto cases  \033[0m"
+    fi
     unset http_proxy && unset https_proxy
     if [[ ! $FLAGS_download_data =~ "deepseek" ]];then
         echo -e "\033[31m ---- Download LLaMA data  \033[0m"

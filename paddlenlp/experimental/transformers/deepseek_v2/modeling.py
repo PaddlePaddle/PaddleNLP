@@ -47,9 +47,6 @@ from paddlenlp.transformers.deepseek_v2.modeling import (
     yarn_get_mscale,
     yarn_linear_ramp_mask,
 )
-from paddlenlp.transformers.model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
-)
 from paddlenlp.transformers.model_utils import (
     dy2st_nocheck_guard_context,
     register_base_model,
@@ -266,7 +263,6 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         self.weight_block_size = config.weight_block_size
         self.moe_quant_type = config.moe_quant_type
         self.rope_theta = config.rope_theta
-        self.return_full_hidden_states = config.get("return_full_hidden_states", False)
 
         self.use_weight_only = False
         self.weightonly_group_size = -1
@@ -591,7 +587,6 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         speculate_config = SpeculateConfig(
             speculate_method=config.get("speculate_method", None),
             speculate_max_draft_token_num=config.get("speculate_max_draft_token_num", 5),
-            return_full_hidden_states=config.get("return_full_hidden_states", False),
         )
 
         transformer_config = FusedMultiTransformerConfig(
@@ -622,9 +617,9 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             rotary_emb=self.rotary_emb,
             norm_type="rmsnorm",
             rank_id=config.tensor_parallel_rank,
+            append_attn=config.append_attn,
             moe_config=moe_config,
             mla_config=mla_config,
-            append_attn=config.append_attn,
             speculate_config=speculate_config,
         )
 
@@ -1289,7 +1284,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                 inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
 
         with dy2st_nocheck_guard_context():
-            hidden_states, _ = self.transformer_block(
+            hidden_states, full_hidden_states = self.transformer_block(
                 input_ids=input_ids,
                 src=inputs_embeds,
                 cum_offsets=cum_offsets,
@@ -1301,13 +1296,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             )
         hidden_states = self.norm(hidden_states)
 
-        return BaseModelOutputWithPastAndCrossAttentions(
-            last_hidden_state=hidden_states,
-            past_key_values=None,
-            hidden_states=None,
-            attentions=None,
-            cum_offsets=cum_offsets,
-        )
+        return hidden_states, full_hidden_states
 
 
 @register_base_model
@@ -1967,7 +1956,7 @@ class MTPDeepseekV2BlockInferenceModel(DeepseekV2BlockInferenceModel):
         inputs_embeds = self.eh_proj(inputs_embeds)
 
         with dy2st_nocheck_guard_context():
-            hidden_states, _ = self.transformer_block(
+            hidden_states, full_hidden_states = self.transformer_block(
                 input_ids=input_ids,
                 src=inputs_embeds,
                 cum_offsets=cum_offsets,
@@ -1980,12 +1969,7 @@ class MTPDeepseekV2BlockInferenceModel(DeepseekV2BlockInferenceModel):
             )
         hidden_states = self.norm(hidden_states)
 
-        return BaseModelOutputWithPastAndCrossAttentions(
-            last_hidden_state=hidden_states,
-            past_key_values=None,
-            hidden_states=None,
-            attentions=None,
-        )
+        return hidden_states, full_hidden_states
 
 
 class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, DeepseekV2PretrainedModel):
@@ -2212,7 +2196,7 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
         draft_tokens=None,
         output_padding_offset=None,
     ):
-        outputs = self.deepseek_v2(
+        hidden_states, full_hidden_states = self.deepseek_v2(
             input_ids,
             inputs_embeds=inputs_embeds,
             src_mask=src_mask,
@@ -2230,21 +2214,7 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
             draft_tokens=draft_tokens,
             output_padding_offset=output_padding_offset,
         )
-        if self.return_full_hidden_states:
-            from paddlenlp_ops import rebuild_padding_v2
 
-            full_hidden_states = outputs[0]
-            cum_offsets = outputs[1]
-            hidden_states = rebuild_padding_v2(
-                full_hidden_states,
-                cum_offsets,
-                seq_lens_decoder,
-                seq_lens_encoder,
-                output_padding_offset,
-                self.max_seq_len,
-            )
-        else:
-            hidden_states = outputs[0]
         logits = self.lm_head(
             hidden_states,
             tensor_parallel_output=False,
@@ -2253,8 +2223,6 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
             return logits, full_hidden_states
         else:
             return logits
-
-        return logits
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
@@ -2363,7 +2331,7 @@ class MTPDeepseekV2ForCausalLMBlockInferenceModel(DeepseekV2ForCausalLMBlockInfe
         output_padding_offset=None,
         pre_hidden_states=None,
     ):
-        outputs = self.mtp(
+        hidden_states, _ = self.mtp(
             input_ids,
             src_mask=src_mask,
             caches=caches,
@@ -2381,8 +2349,6 @@ class MTPDeepseekV2ForCausalLMBlockInferenceModel(DeepseekV2ForCausalLMBlockInfe
             output_padding_offset=output_padding_offset,
             pre_hidden_states=pre_hidden_states,
         )
-
-        hidden_states = outputs[0]
 
         logits = self.lm_head(
             hidden_states,
