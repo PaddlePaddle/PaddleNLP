@@ -202,11 +202,11 @@ python -u evaluation/eval_mteb.py \
 | [RocketQA&nbsp;V1](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQA_NAACL2021)    |     512      |
 | [RocketQA&nbsp;V2](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQAv2_EMNLP2021)  |     512      |
 | [BGE‑Large‑en‑v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5)                                    |     512      |
-| [Qwen3-Embedding-8B](https://huggingface.co/Qwen/Qwen3-Embedding-8B)                                  |     8192     |
 | [RepLLaMA‑passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage)                      |     4096     |
 | [NV‑Embed‑v1](https://huggingface.co/nvidia/NV-Embed-v1)                                              |     4096     |
 | [BGE‑EN‑ICL](https://huggingface.co/BAAI/bge-en-icl)                                                  |     4096     |
 | [LLARA‑passage](https://huggingface.co/BAAI/LLARA-passage)                                            |     4096     |
+| [Qwen3-Embedding-8B](https://huggingface.co/Qwen/Qwen3-Embedding-8B)                                  |     32K     |
 
 可支持配置的参数：
 - `base_model_name_or_path`: 模型名称或路径
@@ -244,11 +244,11 @@ MTEB-Retrieval 数据集, MRR@10分数：
 | RocketQA v1                 |  52.24   |  38.46  |    28.73     |        31.39         |  72.10  | 68.70  |  40.52   |  73.07   |  35.72  |  48.43   | 48.44  |     74.23      |  24.93  |  56.48  |   52.54    |   89.79   |
 | RocketQA v2                 |  50.85   |  36.57  |    25.39     |        28.76         |  69.52  | 67.36  |  37.41   |  71.27   |  37.37  |  49.29   | 45.70  |     71.85      |  23.57  |  51.85  |   58.22    |   88.67   |
 | bge‑large‑en‑v1.5           |  61.19   |  57.56  |    43.09     |        41.89         |  77.26  | 85.39  |  52.91   |  84.72   |  35.52  |  56.94   | 48.86  |     88.43      |  38.28  |  71.98  |   44.95    |   90.00   |
-| Qwen3-Embedding-8B          |  69.79    |  70.12  |    61.52     |        52.23         |  81.29  | 93.54  |  69.72   |  89.46    |  37.44  |  61.46   |  59.63   |     88.01      |  49.32  |  74.06  |   59.09    |   100.00  |
 | repllama‑v1‑7b‑lora‑passage |  58.00   |  40.16  |    42.07     |        39.53         |  72.62  | 79.58  |  53.37   |  84.29   |  34.55  |  58.04   | 50.81  |     87.43      |  32.33  |  72.19  |   40.18    |   82.87   |
 | NV‑Embed‑v1                 |  65.24   |  60.28  |    45.17     |        48.14         |  80.19  | 86.78  |  69.24   |  88.36   |  39.73  |  59.40   | 66.70  |     88.35      |  34.27  |  75.17  |   42.50    |   94.33   |
 | bge‑en‑icl (zero‑shot)      |  69.29   |  77.83  |    57.88     |        45.69         |  82.04  | 92.50  |  65.78   |  92.76   |  39.97  |  61.84   | 69.64  |     90.22      |  41.14  |    75.13  |   56.56    |   90.33   |
 | LLARA-passage               |  60.11   |  38.77  |    34.58     |        36.19         |  75.50  | 81.02  |  51.72   |  86.36   |  38.81  |  57.69   | 56.85  |     80.58      |  30.15  |  73.17  |   67.20    |   93.07   |
+| Qwen3-Embedding-8B          |  69.79    |  70.12  |    61.52     |        52.23         |  81.29  | 93.54  |  69.72   |  89.46    |  37.44  |  61.46   |  59.63   |     88.01      |  49.32  |  74.06  |   59.09    |   100.00  |
 
 MTEB-Retrieval 数据集, Recall@10分数：
 | 模型                        | 平均分数 | ArguAna | ClimateFEVER | CQADupstackRetrieval | DBPedia |  FEVER | FiQA2018 | HotpotQA | MSMARCO | NFCorpus |   NQ   | QuoraRetrieval | SCIDOCS | SciFact | Touche2020 | TRECCOVID |
@@ -256,11 +256,11 @@ MTEB-Retrieval 数据集, Recall@10分数：
 | RocketQA v1                 |  46.12   |  75.61  |    25.28     |        41.50         |  22.04  | 83.88  |  39.45   |  56.68   |  62.96  |  14.22   | 73.05  |     88.59      |  14.09  |  73.44  |   19.18    |   1.79    |
 | RocketQA v2                 |  44.45   |  71.19  |    24.28     |        38.53         |  21.45  | 82.86  |  36.80   |  55.21   |  64.68  |  13.43   | 68.88  |     87.09      |  13.27  |  68.44  |   18.88    |   1.76    |
 | bge‑large‑en‑v1.5           |  54.59   |  90.26  |    39.13     |        55.23         |  26.44  | 93.39  |  51.45   |  76.87   |  63.54  |  19.37   | 76.32  |     95.74      |  24.92  |  88.49  |   15.65    |   2.03    |
-| Qwen3-Embedding-8B          |  60.96     |  97.51  |    52.34     |        67.80         |  28.99  | 96.01  |  71.33   |   79.05    |  67.43  |  19.95   | 84.87  |     96.16      |  34.57  |  93.50  |   22.41    |   2.50    |
 | repllama‑v1‑7b‑lora‑passage |  52.95   |  78.88  |    40.03     |        52.53         |  25.89  | 92.01  |  52.19   |  69.54   |  63.60  |  19.04   | 78.50  |     95.38      |  19.91  |  88.27  |   16.62    |   1.82    |
 | NV‑Embed‑v1                 |  58.78   |  93.95  |    41.07     |        64.66         |  28.67  | 95.24  |  70.62   |  85.19   |  69.15  |  18.45   | 89.16  |     95.92      |  21.27  |  90.02  |   15.94    |   2.36    |
 | bge‑en‑icl (zero‑shot)      |  60.62   |  97.08  |    52.19     |        60.38         |  29.81  | 96.92  |  67.42   |  88.33   |  69.53  |  20.42   | 90.96  |     97.02      |  27.33  |   91.05   |   18.81    |   2.11    |
 | LLARA-passage               |  52.30   |  76.17  |    32.52     |        47.91         |  26.33  | 90.48  |  51.09   |  71.16   |  67.82  |  17.67   | 81.89  |     92.54      |  18.12  |  86.80  |   21.81    |   2.23    |
+| Qwen3-Embedding-8B          |  60.96     |  97.51  |    52.34     |        67.80         |  28.99  | 96.01  |  71.33   |   79.05    |  67.43  |  19.95   | 84.87  |     96.16      |  34.57  |  93.50  |   22.41    |   2.50    |
 
 MTEB-Retrieval 数据集, NDCG@10分数：
 | 模型                        | 平均分数 | ArguAna | ClimateFEVER | CQADupstackRetrieval | DBPedia |  FEVER | FiQA2018 | HotpotQA | MSMARCO | NFCorpus |   NQ   | QuoraRetrieval | SCIDOCS | SciFact | Touche2020 | TRECCOVID |
@@ -268,11 +268,11 @@ MTEB-Retrieval 数据集, NDCG@10分数：
 | RocketQA v1                 |  44.74   |  47.16  |    21.02     |        32.12         |  37.53  | 70.30  |  32.89   |  55.21   |  41.93  |  29.65   | 53.26  |     76.44      |  13.63  |  59.85  |   30.37    |   69.75   |
 | RocketQA v2                 |  43.09   |  44.66  |    19.15     |        29.51         |  35.75  | 69.00  |  30.34   |  53.56   |  43.59  |  29.38   | 50.16  |     74.22      |  12.82  |  55.08  |   30.60    |   68.56   |
 | bge‑large‑en‑v1.5           |  53.68   |  65.17  |    32.75     |        43.05         |  43.69  | 85.09  |  44.69   |  72.57   |  41.90  |  38.35   | 54.42  |     89.14      |  23.37  |  75.50  |   23.01    |   72.48   |
-| Qwen3-Embedding-8B          |   62.36     |  76.63  |    47.13     |        54.01         |  48.86  | 91.82  |  62.14   | 76.28    |  44.29  |  41.31   | 64.63  |     89.03      |  32.22  |  78.48  |   34.99    |   93.54   |
 | repllama‑v1‑7b‑lora‑passage |  51.81   |  49.19  |    32.57     |        40.75         |  41.80  | 81.27  |  45.47   |  67.27   |  41.23  |  37.77   | 59.24  |     88.15      |  18.93  |  75.74  |   23.90    |   73.88   |
 | NV‑Embed‑v1                 |  58.86   |  68.30  |    34.37     |        50.27         |  48.29  | 86.58  |  62.90   |  79.92   |  46.48  |  37.98   | 71.22  |     89.20      |  20.16  |  78.30  |   23.98    |   84.91   |
 | bge‑en‑icl (zero‑shot)      |  61.62   |  82.34  |    45.33     |        47.27         |  50.60  | 91.91  |  59.13   |  84.90   |  46.78  |  40.66   | 73.85  |     91.03      |  25.46  |  77.91  |   30.71    |   76.38   |
 | LLARA-passage               |  52.48   |  47.51  |    26.13     |        37.26         |  44.12  | 81.09  |  43.98   |  69.17   |  45.49  |  37.07   | 61.76  |     82.29      |  17.30  |  76.07  |   36.73    |   81.30   |
+| Qwen3-Embedding-8B          |   62.36     |  76.63  |    47.13     |        54.01         |  48.86  | 91.82  |  62.14   | 76.28    |  44.29  |  41.31   | 64.63  |     89.03      |  32.22  |  78.48  |   34.99    |   93.54   |
 
 
 ## 压缩
@@ -297,7 +297,7 @@ python shortgpt_prune.py \
 ```bash
 python shortgpt_prune.py \
     --model_name_or_path nvidia/NV-Embed-v1 \
-    --output_model_path /pruned-NV-Embed-v1_pruned_26 \
+    --output_model_path ./pruned-NV-Embed-v1_pruned_26 \
     --n_prune_layers 6 \
     --layers_path "layers"
 ```
@@ -307,13 +307,26 @@ python shortgpt_prune.py \
 - `--n_prune_layers`: 希望移除的层数。脚本会自动找出最不重要的 N 层。
 - `--layers_path`: 模型对象中指向 transformer 层列表的点分隔路径（例如 repllama 为`"llama.layers"`, llama 为`"model.layers"`）。
 
-可用 output_model_path 路径中的模型跑评估[评估部分的代码](#评估)
+#### 性能评估
+剪枝完成后，可以使用 output_model_path 路径下的新模型进行[MTEB 评估](#评估)。
+
+我们在多个检索任务上评估了`RepLLaMA`模型剪枝前后的性能和推理速度。所有实验均在单张 80G A100 GPU 上进行。我们通过为每个模型（剪枝前与剪枝后）配置足以占满显存的最大批处理大小（Batch Size），来保证硬件利用率的一致性。
+
+
+| 模型 | 指标 | MSMARCO-Title<br>(MRR@10) | SciFact<br>(NDCG@10) | FiQA2018<br>(NDCG@10)| QuoraRetrieval<br>(NDCG@10) | NFCorpus<br>(NDCG@10) |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **RepLLaMA** | Batchsize | 7 | 22 | 8 | 320 | 15 |
+| | 时间 (s) | 109681.75 | 302.80 | 1634.18 | 1593.45 | 201.11 |
+| | 性能 | 37.75 | 76.31 | 45.93 | 88.13 | 38.22 |
+| **+shortgpt** | Batchsize | 7 | 24 | 9 | 410 | 15 |
+| | 时间 (s) | 90496.24 | 215.12 | 1142.58 | 1318.72 | 165.23 |
+| | 性能 | 36.37 | 74.50 | 45.31 | 87.82 | 37.48 |
 
 ### 模型量化
 支持对向量模型进行量化加载，以降低显存占用和推理延迟。
 
 #### 使用方法
-```python
+```bash
 model_path=rocketqa-zh-base-query-encoder-duretrieval
 python -u evaluation/eval_mteb.py \
     --base_model_name_or_path castorini/repllama-v1-7b-lora-passage \
