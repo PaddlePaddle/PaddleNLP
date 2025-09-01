@@ -16,7 +16,7 @@
 
 set -e
 
-export log_path=/workspace/case_logs
+export log_path=/workspace/case_logs 
 export root_path=/workspace/PaddleNLP
 
 export gpt_case_path=$root_path/slm/model_zoo/gpt-3

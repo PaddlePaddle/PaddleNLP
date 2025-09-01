@@ -16,7 +16,7 @@
 
 set -e
 
-export log_path=/workspace/case_logs
+export log_path=/workspace/case_logs 
 export root_path=/workspace/PaddleNLP
 
 export llama_case_path=$root_path/llm/auto_parallel/llama
