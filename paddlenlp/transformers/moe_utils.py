@@ -96,8 +96,13 @@ def unpermute(
     # Create an output tensor filled with zeros
     output_tokens = paddle.zeros(restore_shape, dtype=permuted_tokens.dtype)
     # Scatter add the permuted_input back to the original positions
-    if scatter_add_ is not None:
-        scatter_add_(output_tokens, sorted_indices, permuted_tokens)
-    else:
-        output_tokens.scatter_(index=sorted_indices, updates=permuted_tokens, overwrite=False)
+    # if scatter_add_ is not None:
+    #     # NOTE: this expand will cause a big memory usage, so disable this method
+    #     sorted_indices = sorted_indices.unsqueeze(1).expand(-1, hidden)
+    #     output_tokens.scatter_add_(0, sorted_indices, permuted_tokens)
+    # else:
+    # NOTE: Calling multiple times of scatter_ will not accumulate,
+    # Instead, it reset to zero and then accumulated again.
+    # so can't do subbatch here.
+    output_tokens.scatter_(index=sorted_indices, updates=permuted_tokens, overwrite=False)
     return output_tokens
