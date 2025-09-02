@@ -629,7 +629,7 @@ function before_hook_for_gpt() {
     cd ppfleetx/ops && python setup_cuda.py install && cd ../..
 
     unset http_proxy && unset https_proxy
-    if [[ ! $FLAGS_download_data =~ "gpt" ]];then
+    if [[ $FLAGS_download_data =~ "gpt" ]];then
         echo -e "\033[31m ---- download data for GPT dygraph cases  \033[0m"
         rm -rf data
         if [[ -e ${gpt_data_path}/data ]]; then
