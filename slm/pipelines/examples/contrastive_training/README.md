@@ -310,7 +310,7 @@ python shortgpt_prune.py \
 #### 性能评估
 剪枝完成后，可以使用 output_model_path 路径下的新模型进行[MTEB 评估](#评估)。
 
-我们在多个检索任务上评估了`RepLLaMA`模型剪枝前后的性能和推理速度。所有实验均在单张 80G A100 GPU 上进行。我们通过为每个模型（剪枝前与剪枝后）配置足以占满显存的最大批处理大小（Batch Size），来保证硬件利用率的一致性。
+在多个检索任务上评估了`RepLLaMA`模型剪枝前后的性能和推理速度。所有实验均在单张 80G A100 GPU 上进行。
 
 
 | 模型 | 指标 | MSMARCO-Title<br>(MRR@10) | SciFact<br>(NDCG@10) | FiQA2018<br>(NDCG@10)| QuoraRetrieval<br>(NDCG@10) | NFCorpus<br>(NDCG@10) |
@@ -327,18 +327,17 @@ python shortgpt_prune.py \
 
 #### 使用方法
 ```bash
-model_path=rocketqa-zh-base-query-encoder-duretrieval
 python -u evaluation/eval_mteb.py \
     --base_model_name_or_path castorini/repllama-v1-7b-lora-passage \
     --output_folder eval_results/repllama-v1-7b-lora-passage \
-    --task_name 'DuRetrieval' \
+    --task_name 'SciFact' \
     --eval_batch_size 8 \
     --max_seq_length 2048 \
     --task_split dev \
     --quant_type weight_only_int8 \
     --kv_cache_reuse 1
 ```
-新增可配置参数包括：
+可配置参数包括：
 * `--quant_type`：是否使用量化加载，可选项包括 weight_only_int8，weight_only_int4，no，默认为 no，即不进行量化
 * `--kv_cache_reuse`: 量化加载时，是否仅预分配首层 kv_cache 并重复利用，0 表示不复用，1 表示复用，默认为 0，此策略可降低量化加载时显存占用
 

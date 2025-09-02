@@ -200,6 +200,7 @@ if __name__ == "__main__":
                 normalized=True,
                 sentence_pooling_method=args.pooling_method,
                 query_instruction=args.query_instruction,
+                document_instruction=args.document_instruction,
                 tokenizer=tokenizer,
                 eval_batch_size=args.eval_batch_size,
                 max_seq_length=args.max_seq_length,
