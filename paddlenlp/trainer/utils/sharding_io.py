@@ -635,7 +635,7 @@ class ShardingIO:
             for gid in gids:
                 sub_opt_state = optimzier_state_dict.get(gid, {})
                 param_names_in_master_weights = list(sub_opt_state.get("master_weights", {}).keys())
-                state_dict[gid] = exclude_paramters_in_state_dict(
+                state_dict[gid] = exclude_parameters_in_state_dict(
                     state_dict.get(gid, {}),
                     param_names_in_master_weights,
                     group_getter.get_group_by_id(gid),
