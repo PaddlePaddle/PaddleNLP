@@ -33,7 +33,7 @@ def safe_import(import_path: str, classname: str, dep_group: str):
 
     Therefore, in case of an ImportError, the class to import is replaced by
     a hollow MissingDependency function, which will throw an error when
-    inizialized.
+    initialized.
     """
     try:
         module = importlib.import_module(import_path)

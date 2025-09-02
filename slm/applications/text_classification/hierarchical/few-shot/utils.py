@@ -30,7 +30,7 @@ def load_local_dataset(data_path, splits, label_list):
         splits (list):
             Which file(s) to load, such as ['train', 'dev', 'test'].
         label_list (dict):
-            The dictionary that maps labels to indeces.
+            The dictionary that maps labels to indices.
     """
 
     def _reader(data_file, label_list):

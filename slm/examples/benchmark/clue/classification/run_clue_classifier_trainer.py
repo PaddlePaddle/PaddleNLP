@@ -89,7 +89,7 @@ class ModelArguments:
     )
 
 
-# Data pre-process function for clue benchmark datatset
+# Data pre-process function for clue benchmark dataset
 def convert_clue(example, label_list, tokenizer=None, max_seq_length=512, **kwargs):
     """convert a glue example into necessary features"""
     is_test = False

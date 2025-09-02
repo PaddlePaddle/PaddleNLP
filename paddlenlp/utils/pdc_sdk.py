@@ -534,7 +534,7 @@ class PDCTools:
         # step 2: copy persistent data to flash device
         try:
             copy_tree(persistent_path, flash_device_path)
-            logger.info(f"backup {persistent_path} to {flash_device_path} successed.")
+            logger.info(f"backup {persistent_path} to {flash_device_path} succeeded.")
         except Exception as e:
             logger.error(f"[Error] [pdc_sdk] copy tree {persistent_path} to {flash_device_path} failed, error: {e}")
             self._pdc_backup_failed_directory(flash_device_path)

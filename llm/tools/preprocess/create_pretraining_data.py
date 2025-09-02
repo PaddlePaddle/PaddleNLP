@@ -176,7 +176,7 @@ def get_whole_word_mask_tokens(tokens, words, max_word_length=6):
             i += 1
             continue
 
-        # add "##" mark on the middel tokens of Chinese words
+        # add "##" mark on the middle tokens of Chinese words
         # such as ["通过", "利用"] -> ["通", "##过"， "利", "##用"]
         has_add = False
         for length in range(max_word_length, 0, -1):

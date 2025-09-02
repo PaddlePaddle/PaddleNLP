@@ -1146,7 +1146,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])
 
         if self.config.context_parallel_degree > 1 and (attention_mask is not None or self.config.alibi):
-            raise NotImplementedError("Ring FlashAttention dosen't support attention_mask or alibi")
+            raise NotImplementedError("Ring FlashAttention doesn't support attention_mask or alibi")
 
         global_mesh = global_mesh_starts_with_pp()
         if position_ids is None and self.config.sep_parallel_degree > 1:

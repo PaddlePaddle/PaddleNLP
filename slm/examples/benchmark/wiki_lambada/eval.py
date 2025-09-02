@@ -123,7 +123,7 @@ class LM_Eval_Dataset(paddle.io.Dataset):
         labels = tokens[1:]
         tokens = tokens[:-1]
         seq_length = len(tokens)
-        # attention mask for the attention calulate
+        # attention mask for the attention calculate
         attention_mask = np.tri(seq_length, seq_length).reshape((1, seq_length, seq_length))
 
         # the pad and eos tokens do not contribute the loss
@@ -168,7 +168,7 @@ class Lambada_Eval_Dataset(paddle.io.Dataset):
         tokens = tokens[:-1]
 
         seq_length = len(tokens)
-        # attention mask for the attention calulate
+        # attention mask for the attention calculate
         attention_mask = np.tri(seq_length, seq_length).reshape((1, seq_length, seq_length))
 
         # the pad and eos tokens do not contribute the loss

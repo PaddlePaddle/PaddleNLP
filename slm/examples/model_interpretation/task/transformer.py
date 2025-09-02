@@ -430,7 +430,7 @@ class TransformerEncoderLayer(Layer):
             in MHA to drop some attention target. If None, use the value of
             `dropout`. Default None
         act_dropout (float, optional): The dropout probability used after FFN
-            activition.  If None, use the value of `dropout`. Default None
+            activation.  If None, use the value of `dropout`. Default None
         normalize_before (bool, optional): Indicate whether to put layer normalization
             into preprocessing of MHA and FFN sub-layers. If True, pre-process is layer
             normalization and post-precess includes dropout, residual connection.
@@ -723,7 +723,7 @@ class TransformerDecoderLayer(Layer):
             in MHA to drop some attention target. If None, use the value of
             `dropout`. Default None
         act_dropout (float, optional): The dropout probability used after FFN
-            activition.  If None, use the value of `dropout`. Default None
+            activation.  If None, use the value of `dropout`. Default None
         normalize_before (bool, optional): Indicate whether to put layer normalization
             into preprocessing of MHA and FFN sub-layers. If True, pre-process is layer
             normalization and post-precess includes dropout, residual connection.
@@ -1086,7 +1086,7 @@ class Transformer(Layer):
             in MHA to drop some attention target. If None, use the value of
             `dropout`. Default None
         act_dropout (float, optional): The dropout probability used after FFN
-            activition.  If None, use the value of `dropout`. Default None
+            activation.  If None, use the value of `dropout`. Default None
         normalize_before (bool, optional): Indicate whether to put layer normalization
             into preprocessing of MHA and FFN sub-layers. If True, pre-process is layer
             normalization and post-precess includes dropout, residual connection.

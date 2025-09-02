@@ -172,7 +172,7 @@ def forward_pre_hook(layer, input):
     ipp = id2ipp[id(layer)]
 
 
-def forward_post_hook(layer, input, ouput):
+def forward_post_hook(layer, input, output):
     paddle.nn.functional.linear = paddle_nn_functional_linear
     if is_fused_matmul_bias_supported():
         paddle.incubate.nn.functional.fused_linear = paddle_incubate_nn_functional_fused_linear

@@ -157,7 +157,7 @@ class ErnieSageV2Conv(nn.Layer):
 
         Args:
             graph (Graph): Graph object.
-            feature (Tensor): node feture.
+            feature (Tensor): node feature.
             act (str, optional): activation function. Defaults to 'relu'.
 
         Returns:

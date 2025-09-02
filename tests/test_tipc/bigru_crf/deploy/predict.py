@@ -64,7 +64,7 @@ def normalize_token(token, normlize_vocab):
 
 
 def convert_tokens_to_ids(tokens, vocab, oov_replace_token=None, normlize_vocab=None):
-    """Convert tokens to token indexs"""
+    """Convert tokens to token indexes"""
     token_ids = []
     oov_replace_token = vocab.get(oov_replace_token) if oov_replace_token else None
     for token in tokens:
