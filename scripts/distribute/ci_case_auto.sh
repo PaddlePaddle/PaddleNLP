@@ -589,7 +589,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.35162258
     if [ $IS_A100 -ne 0 ];then
-        loss_base=9.39368534
+        loss_base=9.39367676
     fi
     ips_base=-1
     mem_base=-1
@@ -962,7 +962,7 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP() {
                 loss_base=9.16783295
                 loss_md5_base=8ea72495fba4e1b9ba004b4431e27218
                 if [ $IS_A100 -ne 0 ] && [ $to_static -eq 0 ];then
-                    loss_base=9.37966919
+                    loss_base=9.38023453
                 elif [ $IS_A100 -ne 0 ] && [ $to_static -eq 1 ];then
                     loss_base=9.38012543
                 fi
@@ -1089,7 +1089,7 @@ function llama_pir_auto_fuse_ffn_attention_qkv_MP2() {
         ips_base=-1
         mem_base=-1
         if [ $IS_A100 -ne 0 ];then
-            loss_base_2=10.58283806
+            loss_base_2=10.58283997
             loss_base_10=9.43873405
         fi
         check_result $FUNCNAME ${loss_base_2} ${auto_loss_2} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
@@ -1183,7 +1183,7 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP() {
         loss_base=9.25199432
         loss_md5_base=83531e98ee11cd271db175150ab254bb
         if [ $IS_A100 -ne 0 ] && [ $to_static -eq 0 ];then
-            loss_base=9.44203949
+            loss_base=9.44244614
         elif [ $IS_A100 -ne 0 ] && [ $to_static -eq 1 ];then
             loss_base=9.44225311
         fi
@@ -1279,7 +1279,7 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
         echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
         loss_base=9.99302673
         if [ $IS_A100 -ne 0 ];then
-            loss_base=10.20991516
+            loss_base=10.20988922
         fi
         ips_base=-1
         mem_base=-1
