@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logger
+from paddle.distributed.fleet.utils.log_util import logger
 import paddle
 import paddle.distributed as dist
 from paddle.autograd import no_grad
