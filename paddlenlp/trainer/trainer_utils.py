@@ -28,7 +28,6 @@ import os
 import random
 import threading
 import time
-from collections import defaultdict
 from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
