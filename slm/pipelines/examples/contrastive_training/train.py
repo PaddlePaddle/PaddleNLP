@@ -109,6 +109,7 @@ def main():
             use_inbatch_neg=training_args.use_inbatch_neg,
             matryoshka_dims=training_args.matryoshka_dims if training_args.use_matryoshka else None,
             matryoshka_loss_weights=training_args.matryoshka_loss_weights if training_args.use_matryoshka else None,
+            dtype=dtype,
         )
 
     if training_args.fix_position_embedding:
@@ -129,13 +130,13 @@ def main():
     if training_args.fine_tune_type == "lora":
         if any([x in model_args.model_name_or_path for x in ["llama", "baichuan", "NV-Embed"]]):
             target_modules = [
-                ".*q_proj.*",
-                ".*k_proj.*",
-                ".*v_proj.*",
-                ".*o_proj.*",
-                ".*down_proj.*",
-                ".*up_proj.*",
-                ".*gate_proj.*",
+                ".*q_proj$",
+                ".*k_proj$",
+                ".*v_proj$",
+                ".*o_proj$",
+                ".*down_proj$",
+                ".*up_proj$",
+                ".*gate_proj$",
             ]
         else:
             raise ValueError("need to specify the target modules for LoRA fine-tuning.")

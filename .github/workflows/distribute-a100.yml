@@ -1,11 +1,11 @@
-name: Distribute CI (V100)
+name: Distribute CI (A100)
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [develop]
   schedule:
-    - cron: "2 0 * * *"
+    - cron: "1 0 * * *"
   workflow_call:
     inputs:
       run_downstream:
@@ -23,7 +23,7 @@ concurrency:
 env:
   PR_ID: ${{ github.event.pull_request.number }}
   COMMIT_ID: ${{ github.event.pull_request.head.sha }}
-  TASK: paddlenlp-CI-${{ github.event.pull_request.number }}-Distribut-V100
+  TASK: paddlenlp-CI-${{ github.event.pull_request.number }}-Distribut-A100
   ci_scripts: /workspace/PaddleNLP/scripts/distribute
   BRANCH: ${{ github.event.pull_request.base.ref }}
   AGILE_COMPILE_BRANCH: ${{ github.event.pull_request.base.ref }}
@@ -37,10 +37,10 @@ defaults:
     shell: bash
 
 jobs:
-  distribute-v100-ci:
-    name: distribute-v100-ci
+  distribute-a100-ci:
+    name: distribute-a100-ci
     runs-on:
-      group: Auto-Parallel
+      group: Distribute
     steps:
       - name: Determine Image Name
         env:
@@ -49,7 +49,7 @@ jobs:
           if [[ -n "${IMAGE_NAME}" ]]; then
             echo "IMAGE_NAME=${IMAGE_NAME}" >> "$GITHUB_ENV"
           else
-            echo "IMAGE_NAME=registry.baidubce.com/paddlepaddle/paddle:latest-dev-cuda11.8-cudnn8.6-trt8.5-gcc82-latest" >> "$GITHUB_ENV"
+            echo "IMAGE_NAME=registry.baidubce.com/paddlepaddle/paddle:latest-dev-cuda11.8-cudnn8.6-trt8.5-gcc82" >> "$GITHUB_ENV"
           fi
 
       - name: Run Container
@@ -57,6 +57,7 @@ jobs:
           work_dir: ${{ github.workspace }}
           CACHE_DIR: /home/data/cfs/.cache
           FLAGS_dynamic_static_unified_comm: "True"
+          FLAGS_dataloader_use_file_descriptor: "False"
           python_version: "3.10"
           paddle_whl: https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuSome-LinuxCentos-Gcc82-Cuda118-Cudnn86-Trt85-Py310-CINN-Compile/latest/paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl
         run: |
@@ -65,7 +66,11 @@ jobs:
           if [[ "$RUN_DOWNSTREAM" == "false" ]]; then
             echo "Not in a pull_request or test_build event. Skipping..."
           else
-            nvidia-docker run -d -t --name ${container_name} --net=host -v /dev/shm:/dev/shm --shm-size=32G \
+            export CUDA_SO="$(\ls -d /usr/lib64/libcuda* | xargs -I{} echo '-v {}:{}') $(\ls -d /usr/lib64/libnvidia* | xargs -I{} echo '-v {}:{}')"
+            export DEVICES="$(\ls -d /dev/nvidia* | xargs -I{} echo "-v {}:{}") $(\ls /dev/nvidia-caps/* | xargs -I{} echo "-v {}:{}")"
+            export SMI="-v /usr/bin/nvidia-smi:/usr/bin/nvidia-smi"
+            docker run -d -t --name ${container_name} ${CUDA_SO} ${DEVICES} ${SMI} --runtime=nvidia --shm-size=32G \
+              --network host -v /dev/shm:/dev/shm \
               -v $work_dir/../../..:$work_dir/../../.. \
               -v $work_dir:/workspace \
               -v /home/.cache/pip:/home/.cache/pip \
@@ -82,8 +87,9 @@ jobs:
               -e CI_name \
               -e paddle_whl \
               -e FLAGS_dynamic_static_unified_comm \
+              -e FLAGS_dataloader_use_file_descriptor \
               -e python_version \
-              -w /workspace --runtime=nvidia $IMAGE_NAME
+              -w /workspace $IMAGE_NAME
           fi
 
       - name: Download Code
@@ -106,7 +112,7 @@ jobs:
             if [ -n "${PR_ID}" ]; then
               git fetch origin pull/${PR_ID}/head
               git checkout -b PR_${PR_ID} FETCH_HEAD
-              git remote add upstream https://github.com/PaddlePaddle/PaddleFormers.git
+              git remote add upstream https://github.com/PaddlePaddle/PaddleNLP.git
               git fetch upstream ${BRANCH}
               git merge ${BRANCH} --no-edit
               git diff --numstat ${BRANCH} -- | awk "{print \$NF}"
@@ -161,8 +167,8 @@ jobs:
             cd /workspace/case_logs
             for FILE in /workspace/case_logs/*; do
               file=$(basename "$FILE")
-              python ${{ env.bos_file }} $file paddle-github-action/PR/PaddleNLP/distribute/${bos_prefix}/logs
-              echo "$file: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/distribute/${bos_prefix}/logs/$file"
+              python ${{ env.bos_file }} $file paddle-github-action/PR/PaddleNLP/distribute-a100/${bos_prefix}/logs
+              echo "$file: https://paddle-github-action.bj.bcebos.com/PR/PaddleNLP/distribute-a100/${bos_prefix}/logs/$file"
             done
             '
           fi

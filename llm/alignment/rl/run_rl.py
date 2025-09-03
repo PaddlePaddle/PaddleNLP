@@ -42,6 +42,7 @@ from paddlenlp.trainer import (
 from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
+    AutoModelForTokenClassification,
     AutoTokenizer,
     PretrainedConfig,
 )
@@ -134,7 +135,6 @@ def create_actor_models(
         )
         if not training_args.autotuner_benchmark:
             reference_model.set_state_dict(actor_model.state_dict())
-
     actor_tokenizer = AutoTokenizer.from_pretrained(
         model_args.actor_model_name_or_path,
         model_max_length=data_args.max_length,
@@ -210,46 +210,43 @@ def create_critic_models(
     data_args: DataArgument,
     training_args: TrainingArguments,
     common_config: Dict,
-    reward_model,
 ):
     with timers_scope_runtimer("Critic model loading time"):
-        reward_model_config = reward_model.config
-        if model_args.critic_model_name_or_path is None:
-            model_args.critic_model_name_or_path = model_args.reward_model_name_or_path
-            critic_model = AutoModelForScore.from_config(
-                reward_model_config,
-                dtype=training_args.model_dtype,
-                score_type="critic",
-                do_normalize=False,
-                clip_range_value=training_args.clip_range_value,
-                **common_config,
+        critic_model_config = AutoConfig.from_pretrained(
+            model_args.critic_model_name_or_path,
+            tensor_parallel_output=training_args.tensor_parallel_output,
+            tensor_parallel_degree=training_args.tensor_parallel_degree,
+            tensor_parallel_rank=training_args.tensor_parallel_rank,
+            dtype=training_args.model_dtype,
+            recompute=training_args.critic_recompute,
+            recompute_granularity=model_args.critic_recompute_granularity,
+            recompute_use_reentrant=training_args.recompute_use_reentrant,
+            **common_config,
+        )
+        LlmMetaConfig.set_llm_config(critic_model_config, training_args)
+
+        critic_model_config.max_position_embeddings = data_args.max_length
+        critic_model_config.use_sparse_head_and_loss_fn = False
+        critic_model_config.num_labels = 1
+        critic_model_config.classifier_dropout = 0.0
+        critic_model_config.hidden_dropout = 0.0
+        logger.info(f"Loading Critic model with config:\n\t{critic_model_config}\n")
+
+        if not training_args.autotuner_benchmark:
+            critic_model = AutoModelForTokenClassification.from_pretrained(
+                model_args.critic_model_name_or_path,
+                config=critic_model_config,
             )
-            if not training_args.autotuner_benchmark:
-                critic_model.set_state_dict(reward_model.state_dict())
         else:
-            if not training_args.autotuner_benchmark:
-                critic_model = AutoModelForScore.from_pretrained(
-                    model_args.critic_model_name_or_path,
-                    config=reward_model_config,
-                    score_type="critic",
-                    do_normalize=False,
-                    clip_range_value=training_args.clip_range_value,
-                    **common_config,
-                )
-            else:
-                critic_model = AutoModelForScore.from_config(
-                    reward_model_config,
-                    score_type="critic",
-                    do_normalize=False,
-                    clip_range_value=training_args.clip_range_value,
-                    **common_config,
-                )
+            critic_model = AutoModelForTokenClassification.from_config(
+                critic_model_config,
+            )
 
     critic_tokenizer = AutoTokenizer.from_pretrained(
         model_args.critic_model_name_or_path,
         model_max_length=data_args.max_length,
         padding_side="left",
-        tokenizer_alpha=model_args.reward_critic_tokenizer_alpha,
+        tokenizer_alpha=model_args.critic_tokenizer_alpha,
         use_fast=True,
     )
     if critic_tokenizer.pad_token_id is None:
@@ -261,8 +258,8 @@ def create_critic_models(
         if training_args.eval_mode == "single":
             config.tensor_parallel_degree = -1
             config.tensor_parallel_rank = 0
-        with timers_scope_runtimer("Reward critic eval model loading time"):
-            critic_eval_model = AutoModelForScore.from_config(config)
+        with timers_scope_runtimer("Critic eval model loading time"):
+            critic_eval_model = AutoModelForTokenClassification.from_config(config)
     else:
         critic_eval_model = None
 
@@ -270,7 +267,7 @@ def create_critic_models(
 
 
 def create_rl_dataset(data_args, training_args, tokenizer):
-    requires_label = True if training_args.use_rm_server else False
+    requires_label = True if training_args.use_rm_server or training_args.use_rule_reward else False
     train_ds = RLHFDataset(
         dataset_name_or_path=data_args.train_datasets,
         tokenizer=tokenizer,
@@ -333,15 +330,16 @@ def main():
     actor_model, actor_eval_model, reference_model, actor_tokenizer = create_actor_models(
         model_args, data_args, training_args, common_config, reshard_controller
     )
-
-    if not training_args.use_rm_server and model_args.reward_model_name_or_path is not None:
+    if training_args.use_rule_reward:
+        reward_model, reward_tokenizer = None, actor_tokenizer
+    elif not training_args.use_rm_server and model_args.reward_model_name_or_path is not None:
         reward_model, reward_tokenizer = create_reward_models(model_args, data_args, training_args, common_config)
     else:
         reward_model, reward_tokenizer = model_args.reward_server, actor_tokenizer
 
     if training_args.rl_algorithm == "ppo":
         critic_model, critic_eval_model, critic_tokenizer = create_critic_models(
-            model_args, data_args, training_args, common_config, reward_model
+            model_args, data_args, training_args, common_config
         )
     else:
         critic_model, critic_eval_model, critic_tokenizer = None, None, None
@@ -355,7 +353,8 @@ def main():
         offload_tensor_to_cpu((reference_model, "freeze_model"))
 
         if training_args.rl_algorithm == "ppo":
-            offload_tensor_to_cpu((reward_model, "freeze_model"))
+            if not training_args.use_rm_server and not training_args.use_rule_reward:
+                offload_tensor_to_cpu((reward_model, "freeze_model"))
             if critic_eval_model is not None:
                 offload_tensor_to_cpu((critic_eval_model, "freeze_model"))
 
@@ -363,7 +362,14 @@ def main():
         paddle.device.cuda.empty_cache()
 
     def compute_metrics(eval_preds):
-        accuracy = (eval_preds.predictions == 3).astype("float32").mean().item()
+        '''
+        If "use_rm_server" is TRUE, the score ranges from -3 to 3, with 3 being the only correct score (format + result).
+        If using the "Regularized Matching Function (use_rule_reward=True)" (currently only implemented for the gsm8k dataset), the score ranges from 0 to 1.
+        '''
+        if training_args.use_rule_reward:
+            accuracy = (eval_preds.predictions == 1).astype("float32").mean().item()
+        else:
+            accuracy = (eval_preds.predictions == 3).astype("float32").mean().item()
         return {"accuracy": accuracy}
 
     try:
@@ -389,7 +395,7 @@ def main():
         data_collator=partial(
             collate_fn,
             pad_token_id=actor_tokenizer.pad_token_id,
-            requires_label=True if training_args.use_rm_server else False,
+            requires_label=True if training_args.use_rm_server or training_args.use_rule_reward else False,
             max_prompt_len=data_args.max_prompt_len if training_args.balance_batch else None,
         ),  # NOTE: enforce prompt padding to max_prompt_len when using balance_batch
         compute_metrics=compute_metrics,  # TODO: only used for grpo (kk datasets)

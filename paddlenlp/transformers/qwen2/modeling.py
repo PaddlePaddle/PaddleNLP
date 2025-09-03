@@ -1858,6 +1858,7 @@ class Qwen2ForTokenClassification(Qwen2PretrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
+        attn_mask_startend_row_indices=None,
     ) -> Union[Tuple, SequenceClassifierOutputWithPast]:
         r"""
         labels (`paddle.Tensor` of shape `(batch_size,)`, *optional*):
@@ -1877,6 +1878,7 @@ class Qwen2ForTokenClassification(Qwen2PretrainedModel):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
         )
         sequence_output = outputs[0]
         sequence_output = self.dropout(sequence_output)

@@ -20,9 +20,6 @@ param+="nnodes=4 "
 param+="model_type=qwen_14b "
 param+='dynamic_auto=_dynamic_auto '
 
-export FLAGS_enable_tensor_fusion=1
-export FLAGS_enable_sharding_overlap=1
-
 cd ./tests
 bash ./test_tipc/static/auto_parallel/qwen/benchmark_common/prepare.sh
 

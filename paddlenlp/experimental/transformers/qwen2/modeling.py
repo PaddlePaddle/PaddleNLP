@@ -54,7 +54,6 @@ from paddlenlp.transformers import Qwen2Config, Qwen2PretrainedModel
 from paddlenlp.transformers.conversion_utils import split_param_func
 from paddlenlp.transformers.model_outputs import (  # CausalLMOutputWithCrossAttentions,
     BaseModelOutputWithPast,
-    BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithPast,
 )
 from paddlenlp.transformers.model_utils import (
@@ -1325,7 +1324,7 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
                 inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
 
         with dy2st_nocheck_guard_context():
-            hidden_states, _ = self.transformer_block(
+            hidden_states, full_hidden_states = self.transformer_block(
                 input_ids=input_ids,
                 src=inputs_embeds,
                 cum_offsets=cum_offsets,
@@ -1337,12 +1336,7 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
             )
         hidden_states = self.norm(hidden_states)
 
-        return BaseModelOutputWithPastAndCrossAttentions(
-            last_hidden_state=hidden_states,
-            past_key_values=None,
-            hidden_states=None,
-            attentions=None,
-        )
+        return hidden_states, full_hidden_states
 
 
 class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2PretrainedModel):
@@ -1359,6 +1353,7 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
         self.max_candidate_len = config.get("speculate_max_candidate_len", 5)
         self.verify_window = config.get("speculate_verify_window", 2)
         self.max_seq_len = config.max_seq_len
+        self.return_full_hidden_states = config.get("return_full_hidden_states", False)
 
         self.qwen2 = Qwen2BlockInferenceModel(config, base_model_prefix)
         if config.tie_word_embeddings:
@@ -1555,7 +1550,7 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
         draft_tokens=None,
         output_padding_offset=None,
     ):
-        outputs = self.qwen2(
+        hidden_states, full_hidden_states = self.qwen2(
             input_ids,
             inputs_embeds=inputs_embeds,
             src_mask=src_mask,
@@ -1575,13 +1570,15 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
             output_padding_offset=output_padding_offset,
         )
 
-        hidden_states = outputs[0]
         logits = self.lm_head(
             hidden_states,
             tensor_parallel_output=False,
         )
 
-        return logits
+        if self.return_full_hidden_states:
+            return logits, full_hidden_states
+        else:
+            return logits
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):

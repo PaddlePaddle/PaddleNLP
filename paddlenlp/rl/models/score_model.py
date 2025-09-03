@@ -18,6 +18,7 @@ from typing import Any, Optional
 
 import paddle
 from paddle import nn
+from paddle.distributed.fleet.utils.sequence_parallel_utils import GatherOp
 
 from ...transformers import PretrainedConfig, PretrainedModel
 from ...transformers.auto import AutoModel
@@ -40,10 +41,35 @@ class AutoModelForScore(ScoreModelMixin, PretrainedModel):
             TypeError: If the config is not an instance of `PretrainedConfig`.
         """
         super().__init__(config)
-        self.model = AutoModel.from_config(config)
 
-        # config.architectures = [self.__class__.__name__]
-        self.init_score_head(config, hidden_size=config.hidden_size, **kwargs)
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path: str, *model_args, **kwargs):
+        config = kwargs.pop("config", None)
+        model = cls(config, **kwargs)
+        model.config = config
+        model.model = AutoModel.from_pretrained(pretrained_model_name_or_path, config=config)
+        model.init_score_head(config, hidden_size=config.hidden_size, **kwargs)
+        model.head_init_weights()
+        return model
+
+    def head_init_weights(self):
+        self.score_head.weight.set_value(
+            paddle.tensor.normal(
+                mean=0.0,
+                std=self.config.initializer_range,
+                shape=self.score_head.weight.shape,
+            )
+        )
+        if hasattr(self.score_head, "bias") and isinstance(self.score_head.bias, paddle.Tensor):
+            self.score_head.bias.set_value(paddle.zeros_like(self.score_head.bias))
+
+    @classmethod
+    def from_config(cls, config, **kwargs):
+        model = cls(config, **kwargs)
+        model.model = AutoModel.from_config(config)
+        model.config = config
+        model.init_score_head(config, hidden_size=config.hidden_size, **kwargs)
+        return model
 
     def get_input_embeddings(self) -> Optional[nn.Embedding]:
         """
@@ -91,7 +117,6 @@ class AutoModelForScore(ScoreModelMixin, PretrainedModel):
     def forward(
         self,
         input_ids: paddle.Tensor,
-        attention_mask: paddle.Tensor,
         position_ids: paddle.Tensor | None = None,
         past_key_values: list[paddle.Tensor] | None = None,
         inputs_embeds: paddle.Tensor | None = None,
@@ -99,6 +124,8 @@ class AutoModelForScore(ScoreModelMixin, PretrainedModel):
         output_attentions: bool | None = None,
         output_hidden_states: bool | None = None,
         return_dict: bool | None = None,
+        attn_mask_startend_row_indices: paddle.Tensor | None = None,
+        **kwargs
     ) -> tuple[paddle.Tensor, paddle.Tensor] | ScoreModelOutput:
         """
         Forward pass of the sentence.
@@ -130,7 +157,7 @@ class AutoModelForScore(ScoreModelMixin, PretrainedModel):
             AssertionError:
                 Raised when `attention_mask` is not None.
         """
-        assert attention_mask is not None
+
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -139,19 +166,26 @@ class AutoModelForScore(ScoreModelMixin, PretrainedModel):
 
         outputs = self.model(
             input_ids=input_ids,
-            attention_mask=attention_mask,
             position_ids=position_ids,
             past_key_values=past_key_values,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             return_dict=return_dict,
         )
-        hidden_states = outputs[0]  # size = (B, L, E)
+        critic_hidden_states = outputs[0]  # size = (B, L, E)
+
+        if self.config.sequence_parallel:
+            gather_hidden_states = GatherOp.apply(critic_hidden_states)
+
+        hidden_states = paddle.reshape_(
+            gather_hidden_states, [-1, position_ids.shape[1], gather_hidden_states.shape[-1]]
+        )
+
         return self.get_score(
             hidden_states,
-            attention_mask=attention_mask,
             position_ids=position_ids,
             return_dict=return_dict,
         )
