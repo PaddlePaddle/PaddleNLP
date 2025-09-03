@@ -30,6 +30,11 @@ from paddlenlp.utils.log import logger
 
 from .trainer_utils import IntervalStrategy, has_length
 from .training_args import TrainingArguments
+import paddle
+import paddle.distributed as dist
+from paddle.distributed.fleet import fleet
+
+from paddlenlp.transformers.moe_gate import PretrainedMoEGate
 
 __all__ = [
     "TrainerState",
@@ -40,6 +45,7 @@ __all__ = [
     "ProgressCallback",
     "PrinterCallback",
     "EarlyStoppingCallback",
+    "MoECorrectionBiasAdjustCallback",
 ]
 
 
@@ -609,3 +615,62 @@ class EarlyStoppingCallback(TrainerCallback):
         self.check_metric_value(args, state, control, metric_value)
         if self.early_stopping_patience_counter >= self.early_stopping_patience:
             control.should_training_stop = True
+
+
+class MoECorrectionBiasAdjustCallback(TrainerCallback):
+    """used for moe aux loss free balance"""
+
+    def __init__(self, lr=0.001, use_mp=False):
+        super().__init__()
+        self.update_lr = lr
+        self.use_mp = use_mp
+
+    def on_optimizer_end(self, args, state, control, **kwargs):
+        model = kwargs["model"]
+
+        biases = []
+        usages = []
+
+        def get_stat(layer):
+            if isinstance(layer, PretrainedMoEGate) and layer.topk_method == "noaux_tc":
+                biases.append(layer.e_score_correction_bias)
+                usages.append(layer.expert_usage)
+
+        model.apply(get_stat)
+
+        if not usages:
+            return
+        usages_tensor = paddle.stack(usages, 0)  # [num_layers, num_local_experts]
+        if not hasattr(fleet, "_hcg"):
+            dist.all_reduce(usages_tensor)
+            return
+
+        hcg = fleet.get_hybrid_communicate_group()
+        mp_group = hcg.get_model_parallel_group()
+        dp_group = hcg.get_data_parallel_group()
+        sd_group = hcg.get_sharding_parallel_group()
+
+        if self.use_mp and mp_group.nranks > 1:
+            dist.all_reduce(usages_tensor, group=mp_group)
+        if dp_group.nranks > 1:
+            dist.all_reduce(usages_tensor, group=dp_group)
+        if sd_group.nranks > 1:
+            dist.all_reduce(usages_tensor, group=sd_group)
+
+        usages_mean = usages_tensor.mean(-1, keepdim=True)
+        update = paddle.sign(usages_mean - usages_tensor) * self.update_lr
+        update = update.astype(paddle.float32)
+        update_list = list(update)
+
+        # print('on_optimizer_end bias:', [bias.tolist() for bias in biases])
+        # print('on_optimizer_end usage:', usages_tensor.tolist())
+        # print('on_optimizer_end update:', update.tolist())
+
+        def update_bias(layer):
+            if isinstance(layer, PretrainedMoEGate) and layer.topk_method == "noaux_tc":
+                with paddle.no_grad():
+                    if not layer.weight.stop_gradient:
+                        biases.pop(0).add_(update_list.pop(0))
+                    usages.pop(0).zero_()
+
+        model.apply(update_bias)

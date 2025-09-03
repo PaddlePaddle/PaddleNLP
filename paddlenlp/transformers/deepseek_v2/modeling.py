@@ -706,6 +706,12 @@ class MoEGate(PretrainedMoEGate):
                 default_initializer=nn.initializer.Constant(0.0),
             )
             self.e_score_correction_bias.is_distributed = True
+            self.e_score_correction_bias.stop_gradient = True
+            self.expert_usage = paddle.zeros(
+                shape=[num_experts],
+                dtype=paddle.int64,
+            )
+            self.expert_usage.stop_gradient = True
 
         self.using_flex_token = config.using_flex_token
 
@@ -730,6 +736,8 @@ class MoEGate(PretrainedMoEGate):
 
         if self.using_flex_token:
             scores, routing_map, exp_counts, l_aux, l_zloss = self.topkgating_nodrop(scores)
+            with paddle.no_grad():
+                self.expert_usage += exp_counts
             return scores, routing_map, l_aux, l_zloss
 
         capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.topkgating(scores)
@@ -1518,6 +1526,41 @@ class DeepseekV2MTPLayer(DeepseekV2DecoderLayer):
         self.enorm = DeepseekV2RMSNorm(config)
         self.hnorm = DeepseekV2RMSNorm(config)
         self.eh_proj = nn.Linear(2 * config.hidden_size, config.hidden_size)
+
+    def subbatch_recompute_forward(
+        self,
+        hidden_states: paddle.Tensor,
+        nextn_hidden_state: paddle.Tensor,
+        position_ids: Optional[paddle.Tensor] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        output_attentions: Optional[bool] = False,
+        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
+        use_cache: Optional[bool] = False,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
+        **kwargs,
+    ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
+        hidden_states = self.hnorm(hidden_states)
+        nextn_hidden_state = self.enorm(nextn_hidden_state)
+
+        hidden_states = self.eh_proj(paddle.concat([nextn_hidden_state, hidden_states], axis=-1))
+
+        layer_outputs = super(DeepseekV2MTPLayer, self).subbatch_recompute_forward(
+            hidden_states,
+            position_ids,
+            attention_mask,
+            output_attentions,
+            past_key_value,
+            use_cache,
+            attn_mask_startend_row_indices,
+            **kwargs,
+        )
+
+        if type(layer_outputs) is tuple:
+            hidden_states = layer_outputs[0]
+        else:
+            hidden_states = layer_outputs
+
+        return hidden_states
 
     def forward(
         self,

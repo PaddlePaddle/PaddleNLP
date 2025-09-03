@@ -150,3 +150,4 @@ class ModelConfig:
     moe_subbatch_token_num: int = field(
         default=0, metadata={"help": "moelayer subbatch token num, The smaller the value, the smaller the peak memory"}
     )
+    aux_loss_alpha: float = field(default=0.0001, metadata={"help": "aux_loss_alpha"})

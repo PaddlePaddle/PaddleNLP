@@ -46,7 +46,7 @@ from paddlenlp.peft.reft import (
     ReFTModel,
     intervention_mapping,
 )
-from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed
+from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed, MoECorrectionBiasAdjustCallback
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
     AutoConfig,
@@ -262,6 +262,11 @@ def main():
         if model_args.strategy_name == "YaRNScalingRotaryEmbedding":
             model_config.long_sequence_init_args["original_max_position_embeddings"] = data_args.max_length
 
+
+    model_config.using_flex_token = model_args.using_flex_token
+    model_config.using_fake_gate = model_args.using_fake_gate
+    model_config.moe_subbatch_token_num = model_args.moe_subbatch_token_num
+    model_config.aux_loss_alpha = model_args.aux_loss_alpha
     logger.info(f"Final model config: {model_config}")
 
     logger.info("Creating model")
@@ -272,10 +277,7 @@ def main():
             raise ValueError("Please set eval_with_do_generation to false in pipeline parallel mode.")
 
         model_class = AutoModelForCausalLMPipe
-    model_config.using_flex_token = model_args.using_flex_token
-    model_config.using_fake_gate = model_args.using_fake_gate
-    model_config.moe_subbatch_token_num = model_args.moe_subbatch_token_num
-    print("model_config ", model_config, flush=True)
+
     if model_args.continue_training and not training_args.autotuner_benchmark:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
@@ -467,6 +469,14 @@ def main():
         return_attention_mask=not model_args.flash_mask,
         pad_to_multiple_of=data_args.pad_to_multiple_of,
     )
+    callbacks = []
+    if isinstance(train_ds, ZeroPaddingIterableDataset):
+        callbacks += [ZeroPaddingIterDatasetCallback()]
+    
+    if getattr(model_config, "topk_method", None) == "noaux_tc":
+        callbacks += [MoECorrectionBiasAdjustCallback(lr=0)]
+    
+    print("callbacks:", callbacks, flush=True)
     trainer = SFTTrainer(
         model=model,
         args=training_args,
@@ -476,7 +486,7 @@ def main():
         compute_metrics=metrics,
         data_collator=data_collator_fn if not model_args.reft else ReftDataCollator(data_collator=data_collator_fn),
         do_generation=data_args.eval_with_do_generation,
-        callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
+        callbacks=callbacks,
         gen_args=gen_args,
         data_args=data_args,
     )

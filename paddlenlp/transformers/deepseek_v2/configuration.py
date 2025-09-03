@@ -160,7 +160,7 @@ class DeepseekV2Config(PretrainedConfig):
         first_k_dense_replace=0,
         norm_topk_prob=False,
         scoring_func="softmax",
-        aux_loss_alpha=0.001,
+        aux_loss_alpha=0.0001,
         seq_aux=True,
         hidden_act="silu",
         max_position_embeddings=2048,
