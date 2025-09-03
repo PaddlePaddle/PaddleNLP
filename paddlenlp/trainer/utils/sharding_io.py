@@ -72,7 +72,7 @@ def to_device(tensor, place=None):
     return tensor
 
 
-def filter_sharded_params(state_dict, optimizer, sharding_group):
+def filter_sharded_params(state_dict, optimizer, sharding_group, include_freeze_params=False):
 
     sharding_rank = max(sharding_group.rank, 0)
     sharding_world_size = sharding_group.nranks
@@ -91,7 +91,7 @@ def filter_sharded_params(state_dict, optimizer, sharding_group):
                 if sharded_rank != sharding_rank:
                     continue
                 filtered_state_dict[k] = v
-            else:
+            elif include_freeze_params:
                 if sharding_rank == 0:
                     filtered_state_dict[k] = v
     else:
@@ -102,7 +102,7 @@ def filter_sharded_params(state_dict, optimizer, sharding_group):
         for (k, v) in state_dict.items():
             if v.name in filtered_parameters:
                 filtered_state_dict[k] = v
-            elif v.name not in [p.name for p in parameters]:
+            elif include_freeze_params and (v.name not in [p.name for p in parameters]):
                 if sharding_rank == 0:
                     filtered_state_dict[k] = v
     return filtered_state_dict
