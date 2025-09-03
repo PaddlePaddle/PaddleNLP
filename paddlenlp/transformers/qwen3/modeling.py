@@ -70,7 +70,6 @@ except ImportError:
 
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-        GatherOp,
         ScatterOp,
         mark_as_sequence_parallel_parameter,
     )
@@ -1138,19 +1137,6 @@ class Qwen3ForCausalLM(Qwen3PretrainedModel):
         )
 
         hidden_states = outputs[0]
-
-        # add this for fused_head_and_loss_fn
-        if self.config.use_fused_head_and_loss_fn and self.training:
-            if self.config.tensor_parallel_degree > 1 and self.config.sequence_parallel:
-                hidden_states = GatherOp.apply(hidden_states)
-                hidden_states = hidden_states.reshape(
-                    [
-                        batch_size,
-                        -1,
-                        hidden_states.shape[-1],
-                    ]
-                )
-            return hidden_states, self.lm_head.weight, None, self.lm_head.transpose_y
 
         # if labels is None，means we need full output, instead of tensor_parallel_output
         # tensor_parallel_output is together with ParallelCrossEntropy
