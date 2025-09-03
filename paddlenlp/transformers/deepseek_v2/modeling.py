@@ -797,9 +797,17 @@ class DeepseekV2MoE(MoELayer):
             moe_group="expert",
         )
 
+        self.is_mp_moe = False
+        self.is_ep_moe = True
         for p in self.experts.parameters():
-            setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
             setattr(p, "is_moe_param", True)
+            setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
+            p.no_sync = not self.is_mp_moe
+            p.expert = not self.is_mp_moe
+            logger.info(f"expert no-sync={p.no_sync}-{p.name}")
+            if self.is_mp_moe or self.is_ep_moe:
+                p.is_distributed = True
+
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
             intermediate_size = config.moe_intermediate_size * config.n_shared_experts
@@ -849,9 +857,16 @@ class DeepseekV2MoEFlexToken(MoEFlexTokenLayer):
             moe_group=moe_group,
         )
 
+        self.is_mp_moe = False
+        self.is_ep_moe = True
         for p in self.experts.parameters():
-            setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
             setattr(p, "is_moe_param", True)
+            setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
+            p.no_sync = not self.is_mp_moe
+            p.expert = not self.is_mp_moe
+            logger.info(f"expert no-sync={p.no_sync}-{p.name}")
+            if self.is_mp_moe or self.is_ep_moe:
+                p.is_distributed = True
 
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
