@@ -30,6 +30,12 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy
 
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import GatherOp
+except:
+    pass
+
+
 from ...transformers.llama.modeling import (
     LlamaPretrainingCriterion as PretrainingCriterion,
 )
@@ -446,6 +452,16 @@ class RLHFPPOMixedLoss(nn.Layer):
 
         else:
             hidden_states, weight, bias, transpose_y = logits
+            if self.config.tensor_parallel_degree > 1 and self.config.sequence_parallel:
+                hidden_states = GatherOp.apply(hidden_states)
+                hidden_states = hidden_states.reshape(
+                    [
+                        input_ids.shape[0],
+                        -1,
+                        hidden_states.shape[-1],
+                    ]
+                )
+
             if use_remove_padding:
                 input_ids = raw_input_ids
                 if pad_size > 0:
