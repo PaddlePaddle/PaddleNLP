@@ -66,6 +66,7 @@ class ModelConfig:
     )
     nola: bool = field(default=False, metadata={"help": "Whether to use Nola: https://arxiv.org/pdf/2310.02556"})
     nola_basis_num: int = field(default=1, metadata={"help": "When use nola, the number of basis"})
+    mixer_num: int = field(default=1, metadata={"help": "Num of mixer matrices."})
     use_mora: bool = field(
         default=False, metadata={"help": "Whether to use MoRA: https://arxiv.org/pdf/2405.12130.pdf"}
     )
