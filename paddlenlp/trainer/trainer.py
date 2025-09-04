@@ -2732,8 +2732,8 @@ class Trainer:
         else:
             self.save_model(output_dir)
 
-        model_sharded_state_dict = self.model.sharded_state_dict()
         if self.args.using_flex_checkpoint:
+            model_sharded_state_dict = self.model.sharded_state_dict()
             os.makedirs(output_dir, exist_ok=True)
 
         # Determine the new best metric / best model checkpoint
