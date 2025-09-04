@@ -1,6 +1,7 @@
-name: Unittest CPU CI
+# Disabled unittest CPU workflow - manually enabled when needed
+name: Unittest CPU CI (DISABLED)
 
-on: [pull_request]
+#on: [pull_request]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -17,9 +18,9 @@ env:
   HF_DATASETS_CACHE: /home/disk1/cache/huggingface/datasets
   TRANSFORMERS_CACHE: /home/disk1/cache/huggingface
 
-jobs:
-  unittest-cpu-ci:
-    name:   unittest-cpu-ci
+#jobs:
+#  unittest-cpu-ci:
+#    name: unittest-cpu-ci (DISABLED)
     runs-on: [self-hosted, ernie-cpu]
     permissions:
       pull-requests: write

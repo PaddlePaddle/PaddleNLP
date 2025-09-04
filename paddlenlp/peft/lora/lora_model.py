@@ -487,6 +487,7 @@ class LoRAModel(nn.Layer):
                 bias_attr=False if module.bias is None else None,
                 use_quick_lora=lora_config.use_quick_lora,
                 lora_use_mixer=lora_config.lora_use_mixer,
+                mixer_num=lora_config.mixer_num,
                 use_mora=lora_config.use_mora,
                 mp_moe=getattr(module.weight, "mp_moe", False),
                 is_distributed=getattr(module.weight, "is_distributed", False),

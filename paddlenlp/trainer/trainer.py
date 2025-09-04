@@ -39,6 +39,7 @@ import paddle
 import paddle.amp.auto_cast as autocast
 import paddle.distributed as dist
 import paddle.nn as nn
+import psutil
 from packaging import version
 from paddle import framework
 from paddle.distributed.fleet.meta_parallel import PipelineLayer
@@ -371,7 +372,13 @@ class Trainer:
         self.optimizer_grouped_parameters = None
         self.sharding_io = None
         if self.args.should_save_sharding_stage1_model or self.args.should_load_sharding_stage1_model:
-            self.sharding_io = ShardingIO(self.args, self.model, self.optimizer)
+            self.sharding_io = ShardingIO(
+                self.args,
+                self.model,
+                self.optimizer,
+                remap_parameter_name=self.args.load_sharded_model_remap_parameter_name,
+            )
+
         if self.args.unified_checkpoint:
             self.unified_checkpoint_handler = UnifiedCheckpointHandler(self.args)
 
@@ -804,9 +811,16 @@ class Trainer:
         if resume_from_checkpoint is not None:
             path = _add_variant(PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             path = os.path.join(resume_from_checkpoint, path).replace("optimizer", "ema")
+            if self.args.zcc_save_ema_coef is not None and self.sharding_io is not None:
+                success, err_msg = self.sharding_io.check_same_strategy(resume_from_checkpoint)
+            else:
+                success, err_msg = True, None
             if os.path.exists(path):
-                logger.info(f"ZCC EMA load from {path}")
-                self.zcc_manager.set_ema_state_dict(path)
+                if success:
+                    logger.info(f"ZCC EMA load from {path}")
+                    self.zcc_manager.set_ema_state_dict(path)
+                else:
+                    logger.info(f"ZCC EMA does not load {path} because {err_msg}")
             else:
                 logger.info(f"ZCC EMA state dict not found, in: {path}")
 
@@ -2568,7 +2582,8 @@ class Trainer:
         # for v in self._pp_data_buffer[0].values():
         #     assert isinstance(v, paddle.Tensor), f"Only support tensor as pipeline mode input, got type {type(v)}"
 
-        inputs = model._prepare_pipeline_inputs_func(self._pp_data_buffer)
+        with self.autocast_smart_context_manager():
+            inputs = model._prepare_pipeline_inputs_func(self._pp_data_buffer)
         self._pp_data_buffer = []
 
         model.train()
@@ -3200,6 +3215,14 @@ class Trainer:
 
         if self.state.epoch is not None:
             logs["progress_or_epoch"] = round(self.state.epoch, 4)
+
+        if self.timers:
+            logs.update(self.timers.info(self.timers.timers.keys()))
+
+        mem_info = psutil.virtual_memory()
+        logs["cpu_used_memory"] = round(mem_info.used / (1024**3), 2)
+        logs["cpu_available_memory"] = round(mem_info.available / (1024**3), 2)
+
         self.state.log_history = []
         self.control = self.callback_handler.on_log(self.args, self.state, self.control, logs, **kwargs)
 

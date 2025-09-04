@@ -580,8 +580,12 @@ def create_peft_model(model_args, reft_args, training_args, dtype, model_config,
                 use_quick_lora=model_args.use_quick_lora,
                 lora_use_mixer=model_args.lora_use_mixer,
                 use_mora=model_args.use_mora,
+<<<<<<< HEAD
                 nola=model_args.nola,
                 nola_basis_num=model_args.nola_basis_num,
+=======
+                mixer_num=model_args.mixer_num,
+>>>>>>> upstream/develop
                 lorapro=model_args.lorapro,
             )
             if model_args.lorapro:

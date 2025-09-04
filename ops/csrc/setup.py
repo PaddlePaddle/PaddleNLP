@@ -53,20 +53,6 @@ def run_single(func):
     p.join()
 
 
-def run_multi(func_list):
-    processes = []
-    for func in func_list:
-        processes.append(multiprocessing.Process(target=func))
-        processes.append(multiprocessing.Process(target=func))
-        processes.append(multiprocessing.Process(target=func))
-
-    for p in processes:
-        p.start()
-
-    for p in processes:
-        p.join()
-
-
 cc_flag = get_gencode_flags(compiled_all=False)
 cc = get_sm_version()
 
@@ -251,17 +237,14 @@ def setup_paddle_bwd_ops():
         ext_modules=CUDAExtension(
             include_dirs=paddle_includes,
             sources=sources,
+            extra_compile_args={}
         ),
     )
 
 
 if __name__ == "__main__":
-    run_multi(
-        [
-            setup_fast_ln,
-            setup_fused_ln,
-            setup_causal_conv1d,
-            setup_selective_scan,
-            setup_paddle_bwd_ops,
-        ],
-    )
+    setup_fast_ln()
+    setup_fused_ln()
+    setup_causal_conv1d()
+    setup_selective_scan()
+    setup_paddle_bwd_ops()
