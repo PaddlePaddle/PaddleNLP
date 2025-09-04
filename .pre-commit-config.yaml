@@ -62,3 +62,12 @@ repos:
         language: python
         files: \.(md|markdown|rst)$
         pass_filenames: true
+
+-   repo: local
+    hooks:
+    -   id: clang-format
+        name: clang-format
+        description: Format files with ClangFormat.
+        entry: bash ./tools/codestyle/clang_format.sh -i
+        language: system
+        files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|xpu|kps)$

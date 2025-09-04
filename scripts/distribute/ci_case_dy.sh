@@ -629,21 +629,17 @@ function before_hook_for_gpt() {
     cd ppfleetx/ops && python setup_cuda.py install && cd ../..
 
     unset http_proxy && unset https_proxy
-    if [[ ! $FLAGS_download_data =~ "gpt" ]];then
-        echo -e "\033[31m ---- download data for GPT dygraph cases  \033[0m"
-        rm -rf data
-        if [[ -e ${gpt_data_path}/data ]]; then
-            echo "data downloaded"
-        else
-            # download data for gpt
-            mkdir ${gpt_data_path}/data;
-            wget -q -O ${gpt_data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
-            wget -q -O ${gpt_data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
-        fi
-        cp -r ${gpt_data_path}/data ${gpt_case_path}/
+    echo -e "\033[31m ---- download data for GPT dygraph cases  \033[0m"
+    rm -rf data
+    if [[ -e ${gpt_data_path}/data ]]; then
+        echo "data downloaded"
     else
-        echo -e "\033[31m ---- Skip download data for GPT dygraph cases \033[0m"
+        # download data for gpt
+        mkdir ${gpt_data_path}/data;
+        wget -q -O ${gpt_data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
+        wget -q -O ${gpt_data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
     fi
+    cp -r ${gpt_data_path}/data ${gpt_case_path}/
 
     echo -e "\033[31m ---- download other data  \033[0m"
     rm -rf ckpt
