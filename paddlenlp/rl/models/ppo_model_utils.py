@@ -30,6 +30,7 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy
 
+from ...trainer.trainer import logger
 from ...transformers.llama.modeling import (
     LlamaPretrainingCriterion as PretrainingCriterion,
 )
@@ -372,6 +373,10 @@ class RLHFPPOMixedLoss(nn.Layer):
         entropy_coeff=0.001,
         pg_loss_coeff=1.0,
         use_fp32_compute=False,
+        use_positive_loss=False,
+        mu=0.1,
+        use_rule_reward=False,
+        use_rm_server=False,
     ):
         """
         Args:
@@ -400,6 +405,10 @@ class RLHFPPOMixedLoss(nn.Layer):
         self.entropy_coeff = entropy_coeff
         self.pg_loss_coeff = pg_loss_coeff
         self.use_fp32_compute = use_fp32_compute
+        self.use_positive_loss = use_positive_loss
+        self.mu = mu
+        self.use_rule_reward = use_rule_reward
+        self.use_rm_server = use_rm_server
 
     def forward(
         self,
@@ -411,6 +420,7 @@ class RLHFPPOMixedLoss(nn.Layer):
         sequence_mask,
         ref_log_probs=None,
         response_start=0,
+        rewards=None,
         # for varlen flashmask
         pad_size=0,
         raw_input_ids=None,
@@ -434,6 +444,18 @@ class RLHFPPOMixedLoss(nn.Layer):
         Returns:
             paddle.Tensor: 返回损失函数，如果labels不为None，则为soft target loss；否则为PPO loss。
         """
+        positive_sequence_mask = None
+        if self.use_positive_loss:
+            if self.use_rm_server:
+                rewards = (rewards == 3).astype("float32").unsqueeze(1).expand_as(reward_advantages)
+            elif self.use_rule_reward:
+                rewards = (rewards == 1).astype("float32").unsqueeze(1).expand_as(reward_advantages)
+            else:
+                raise ValueError(
+                    "Please set the reward value of the positive samples. \n We support [use_rm_server: positive_reward=3] and [use_rule_reward: positive_reward=1] by default."
+                )
+            positive_sequence_mask = rewards * sequence_mask
+
         use_remove_padding = indices is not None
         if not self.config.use_fused_head_and_loss_fn:
             logits = logits if isinstance(logits, paddle.Tensor) else logits[0]
@@ -470,6 +492,7 @@ class RLHFPPOMixedLoss(nn.Layer):
                 ref_log_probs,
                 reward_advantages,
                 sequence_mask,
+                positive_sequence_mask=positive_sequence_mask,
                 bias=bias,
                 transpose_y=transpose_y,
                 fused_linear=False,
@@ -487,6 +510,7 @@ class RLHFPPOMixedLoss(nn.Layer):
                 response_start=response_start,
                 use_actor_fused_loss=True,  # currently only support kunbo's fused head loss
                 temperature=self.temperature,
+                mu=self.mu,
             )
             with paddle.no_grad():
                 self.info_buffer["kl_loss"] = (
@@ -619,6 +643,13 @@ class RLHFValueLoss(nn.Layer):
         self.config = config
         self.use_fp32_compute = use_fp32_compute
 
+    def explained_variance(self, value, target_value, epsilon=1e-8):
+        # value, target_value: 1D tensors of same shape
+        diff = target_value - value
+        var_target = paddle.var(target_value)
+        var_diff = paddle.var(diff)
+        return 1.0 - var_diff / (var_target + epsilon)
+
     def critic_loss_fn(
         self,
         values: paddle.Tensor,
@@ -635,6 +666,11 @@ class RLHFValueLoss(nn.Layer):
         )
         vf_loss1 = paddle.square(values - returns)
         vf_loss2 = paddle.square(values_clipped - returns)
+
+        # Pretrain_critic: compute the explained_variance for observation
+        var = self.explained_variance(values, returns)
+        logger.debug(f"explained_variance: {var}")
+
         return 0.5 * paddle.sum(paddle.maximum(vf_loss1, vf_loss2) * mask) / mask.sum()
 
     def forward(
@@ -703,12 +739,14 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
         old_log_probs: paddle.Tensor,
         ref_log_probs: paddle.Tensor,
         advantages: paddle.Tensor,
+        positive_sequence_mask: paddle.Tensor,
         clip_range_ratio: float,
         clip_range_ratio_low: float,
         clip_range_ratio_high: float,
         clip_range_score: float,
         kl_loss_coeff: float,  # KL loss coefficient
         temperature: float,
+        mu: float = 0.0,
         print_entropy_loss: bool = True,
     ):
         """
@@ -736,6 +774,21 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             paddle.Tensor: loss
 
         """
+        # def masked_column_mean(advantage, mask, epsilon=1e-8):
+        #     masked_adv = advantage * mask
+        #     sum_per_column = paddle.sum(masked_adv, axis=0)
+        #     count_per_column = paddle.sum(mask, axis=0)
+        #     mean_per_column = paddle.where(
+        #         count_per_column > 0,
+        #         sum_per_column / count_per_column,
+        #         paddle.zeros_like(count_per_column)
+        #     )
+        #     return mean_per_column
+
+        # column_token_advantage = masked_column_mean(advantages, mask)
+        # nonzero_values = column_token_advantage[paddle.nonzero(column_token_advantage != 0).flatten()]
+        # logger.debug(f"size: {column_token_advantage.shape}  column_token_advantage: {nonzero_values}")
+
         if fused_linear:
             # print("Cannot support fused_linear while using use_fused_head_and_loss_fn now!")
             fused_linear = False
@@ -761,6 +814,8 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             ref_log_probs = ref_log_probs.reshape([-1])
         advantages = advantages.reshape([-1])
         loss_mask = mask.reshape([-1]).astype("float32")  # .astype(dtype)
+        if positive_sequence_mask is not None:
+            positive_loss_mask = positive_sequence_mask.reshape([-1]).astype("float32")
 
         n_tokens = hidden_states.shape[0]
         n_classes = lm_head_weight.shape[0] if transpose_y else lm_head_weight.shape[1]
@@ -787,6 +842,9 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
         total_kl_loss = paddle.zeros([1], dtype=dtype)
         total_entropy_loss = paddle.zeros([1], dtype=dtype)
         divisor = loss_mask.sum()
+        if positive_sequence_mask is not None:
+            positive_loss = paddle.zeros([1], dtype=dtype)
+            positive_divisor = positive_loss_mask.sum()
 
         # initialize grads
         if not lm_head_weight.stop_gradient:
@@ -808,6 +866,8 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             hidden_states_chunk = hidden_states[token_start_idx:token_end_idx]
             labels_chunk = labels[token_start_idx:token_end_idx]
             mask_chunk = loss_mask[token_start_idx:token_end_idx]
+            if positive_sequence_mask is not None:
+                positive_mask_chunk = positive_loss_mask[token_start_idx:token_end_idx]
             old_log_probs_chunk = old_log_probs[token_start_idx:token_end_idx] * mask_chunk
             if kl_loss_coeff > 0:
                 ref_log_chunk = ref_log_probs[token_start_idx:token_end_idx] * mask_chunk
@@ -836,6 +896,8 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
                 softmax_output_chunk = F.softmax(logits_chunk, axis=-1)
 
             log_probs_chunk = -token_loss_chunk.squeeze(axis=-1) * mask_chunk
+            if positive_sequence_mask is not None:
+                positive_loss_chunk = token_loss_chunk.squeeze(axis=-1) * positive_mask_chunk
             # calculate gradient, note sign
             grad_logits_chunk = labels_one_hot.astype("float32") - softmax_output_chunk
             grad_logits_chunk = grad_logits_chunk.astype(dtype)
@@ -851,6 +913,10 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             pg_loss1_chunk = -advantages_chunk * ratio_chunk
             pg_loss2_chunk = -advantages_chunk * clipped_ratio_chunk
             pg_loss_chunk = paddle.maximum(pg_loss1_chunk, pg_loss2_chunk)
+
+            # positive loss
+            if positive_sequence_mask is not None:
+                positive_loss += paddle.sum(positive_loss_chunk)
 
             # mask
             pg_loss_chunk = pg_loss_chunk * mask_chunk
@@ -933,6 +999,9 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
                 grad_lm_head_bias += d_loss_d_logits_chunk.astype("float32").sum(axis=0).astype(dtype)
 
         final_loss = (total_loss + total_kl_loss) / divisor
+        if positive_sequence_mask is not None and positive_divisor > 0:
+            final_loss += mu * positive_loss / positive_divisor
+            # logger.debug("positive loss: {}".format((positive_loss / positive_divisor).detach()))
         ctx.hidden_states_has_grad = grad_hidden_states is not None
         ctx.lm_head_weight_has_grad = grad_lm_head_weight is not None
         ctx.lm_head_bias_has_grad = grad_lm_head_bias is not None
@@ -1327,6 +1396,7 @@ def actor_fused_pg_entropy_kl_loss(
     ref_log_probs: paddle.Tensor,
     advantages: paddle.Tensor,
     sequence_mask: paddle.Tensor,
+    positive_sequence_mask: paddle.Tensor = None,
     bias: paddle.Tensor = None,
     transpose_y: bool = False,
     fused_linear: bool = False,
@@ -1344,6 +1414,7 @@ def actor_fused_pg_entropy_kl_loss(
     loop_chunk_size: int = 1024,
     use_actor_fused_loss: bool = True,
     temperature: float = 1.0,
+    mu: float = 0.0,
 ):
     hidden_next = hidden_states[:, response_start:-1, :]
     labels_next = input_ids[:, response_start + 1 :]
@@ -1363,6 +1434,7 @@ def actor_fused_pg_entropy_kl_loss(
             old_log_probs=old_log_probs,
             ref_log_probs=ref_log_probs,
             advantages=advantages,
+            positive_sequence_mask=positive_sequence_mask,
             tensor_parallel_degree=tensor_parallel_degree,
             tensor_parallel_output=tensor_parallel_output,
             fused_linear=fused_linear,
@@ -1374,6 +1446,7 @@ def actor_fused_pg_entropy_kl_loss(
             kl_loss_coeff=kl_loss_coeff,
             ignore_index=-100,
             temperature=temperature,
+            mu=mu,
         )
 
     return ActorFusedPGEntropyKLLoss.apply(

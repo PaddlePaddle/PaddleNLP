@@ -293,7 +293,11 @@ class TrainingArguments(TrainingArguments):
     )
     rl_algorithm: str = field(
         default="ppo",
-        metadata={"help": "RL algorithm (supports PPO, GRPO and Reinforce++)."},
+        metadata={"help": "RL algorithm (supports PPO, VAPO, GRPO and Reinforce++)."},
+    )
+    pretrain_critic_steps: int = field(
+        default=50,
+        metadata={"help": "VAPO algorithm: Number of steps to pre-train the critic model."},
     )
     use_tgt_len_value: bool = field(
         default=False,
@@ -344,6 +348,9 @@ class TrainingArguments(TrainingArguments):
         # obtain the parallrl degree from the training arguments
         # for auto config the accumulation steps
         self._post_init_parallel_degree()
+
+        if self.use_rm_server and self.use_rule_reward:
+            raise ValueError("use_rm_server and use_rule_reward cannot be true at the same time!")
 
         if self.global_mini_batch_size < 0:
             self.global_mini_batch_size = self.global_batch_size
@@ -439,10 +446,15 @@ class TrainingArguments(TrainingArguments):
             "ppo",
             "grpo",
             "reinforce_plus_plus",
-        ], 'self.rl_algorithm should be one of ["ppo", "grpo", "reinforce_plus_plus"]'
+            "vapo",
+        ], 'self.rl_algorithm should be one of ["ppo", "grpo", "reinforce_plus_plus", "vapo"]'
         if self.rl_algorithm == "grpo":
             self.normalize_reward = False
             self.normalize_advantage = False
+
+        if self.rl_algorithm == "vapo":
+            self.use_positive_loss = True
+            self.mu = 0.1
 
         max_per_device_eval_batch_size = (
             self.global_batch_size * self.rollout_n * self.update_iters // self.dataset_world_size
@@ -509,7 +521,7 @@ class TrainingArguments(TrainingArguments):
 
     @property
     def use_kl_in_reward(self):
-        if self.rl_algorithm in ["ppo", "reinforce_plus_plus"]:
+        if self.rl_algorithm in ["ppo", "reinforce_plus_plus", "vapo"]:
             return True
         else:
             return False

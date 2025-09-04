@@ -191,7 +191,7 @@ def reload_and_offload_scope(trainer, *args):
         trainer.actor_trainer.optimizer: "optimizer",
     }
 
-    if trainer.args.rl_algorithm == "ppo":
+    if trainer.args.rl_algorithm in ["ppo", "vapo"]:
         offload_map.update(
             {
                 trainer.critic_model: "train_model",
@@ -204,7 +204,7 @@ def reload_and_offload_scope(trainer, *args):
         if getattr(trainer.actor_trainer, "_inner_eval_model", None) is not None:
             # NOTE(gongenlei): for export_evaluate_model
             objs.append((trainer.actor_model, offload_map.get(trainer.actor_model, "")))
-    if trainer.args.rl_algorithm == "ppo":
+    if trainer.args.rl_algorithm in ["ppo", "vapo"]:
         if trainer.critic_model not in [i for i, _ in objs]:
             if getattr(trainer.critic_trainer, "_inner_eval_model", None) is not None:
                 # NOTE(gongenlei): for export_evaluate_model
