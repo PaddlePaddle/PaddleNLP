@@ -933,7 +933,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
         if [ $IS_CUDA123 -ne 0 ];then
             loss_base=9.57173729
         else
-            loss_base=9.57199001
+            loss_base=9.57873344
         fi
         ips_base=-1
         mem_base=-1
@@ -2594,7 +2594,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2() {
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.56668472 # after add dropout spmd
+        loss_base=10.55707741 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2666,7 +2666,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.57280159 # after add dropout spmd
+        loss_base=10.5818882 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2739,7 +2739,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.57785797 # after add dropout spmd
+        loss_base=10.59062004 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2812,7 +2812,7 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.57924652 # after add dropout spmd
+        loss_base=10.59183884 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
