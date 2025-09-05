@@ -160,6 +160,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     get_last_checkpoint,
     get_scheduler,
     has_length,
+    init_optimizer,
     set_seed,
     should_skip_data,
     speed_metrics,
@@ -197,7 +198,6 @@ DEFAULT_PROGRESS_CALLBACK = ProgressCallback
 
 if is_datasets_available():
     import datasets
-
 
 try:
     from paddle.distributed.fleet.utils import mix_precision_utils
@@ -928,7 +928,7 @@ class Trainer:
         self._memory_tracker.start()
 
         if not self.args.enable_auto_parallel:
-            if not self.args.should_load_sharding_stage1_model:
+            if not self.args.should_load_sharding_stage1_model and not self.args.using_flex_checkpoint:
                 self._load_from_checkpoint(resume_from_checkpoint)
 
             if self.args.should_load_sharding_stage1_model:
@@ -948,7 +948,7 @@ class Trainer:
                 if delay_optimizer_creation:
                     self.create_optimizer_and_scheduler(num_training_steps=max_steps)
                 self._load_optimizer_and_scheduler(resume_from_checkpoint)
-            else:
+            elif not self.args.using_flex_checkpoint:
                 model = self._wrap_model(self.model_wrapped)
                 # for the rest of this function `model` is the outside model, whether it was wrapped or not
                 if model is not self.model:
@@ -956,6 +956,24 @@ class Trainer:
                 if delay_optimizer_creation:
                     self.create_optimizer_and_scheduler(num_training_steps=max_steps)
                 self._load_optimizer_and_scheduler(resume_from_checkpoint)
+            else:
+                assert self.args.using_flex_checkpoint, "default using flex_checkpoint!"
+
+                model = self._wrap_model(self.model_wrapped)
+                if model is not self.model:
+                    self.model_wrapped = model
+
+                if delay_optimizer_creation:
+                    self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+
+                if resume_from_checkpoint is not None:
+                    model_sharded_state_dict = self.model.sharded_state_dict()
+                    self.optimizer.sharded_state_dict(model_sharded_state_dict)
+                    init_optimizer(self.optimizer)
+                    optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
+                    sharded_state_dict = {**model_sharded_state_dict, **optimizer_sharded_state_dict}
+                    dist.load_state_dict(sharded_state_dict, resume_from_checkpoint, aoa_config=self.args.aoa_config)
+                    self._load_scheduler(resume_from_checkpoint)
         else:
             model = self.model_wrapped
             if delay_optimizer_creation:
@@ -1356,6 +1374,7 @@ class Trainer:
                             logger.warning(
                                 f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
                             )
+
                     elif isinstance(self.optimizer, HybridParallelOptimizer):
                         self.optimizer._step(parameters_list)
                     else:
@@ -1611,8 +1630,8 @@ class Trainer:
 
             logs["learning_rate"] = float("{0:.3e}".format(self._get_learning_rate()))
             logs["global_step"] = int(self.state.global_step)
-            if in_auto_parallel_align_mode():
-                logs["loss_md5"] = avg_loss._md5sum()
+            # if in_auto_parallel_align_mode():
+            logs["loss_md5"] = avg_loss._md5sum()
 
             divisor = 2**30
             # TODO(@gexiao): replace these codes with unified APIs in Paddle
@@ -1982,7 +2001,6 @@ class Trainer:
                 grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm) if self.args.max_grad_norm > 0 else None,
                 **optimizer_kwargs,
             )
-
         return self.optimizer
 
     def _apply_to_optimizer(self, action):
@@ -2248,7 +2266,6 @@ class Trainer:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
                 assert self.optimizer is not None, "optimizer is empty!"
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
-
         # Pipeline mode
         if in_pipeline_parallel_mode:
             if self.args.amp_master_grad:
@@ -2298,7 +2315,6 @@ class Trainer:
             if self.args.amp_master_grad:
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
-
             if (
                 hasattr(self.args, "enable_sharding_comm_overlap")
                 and self.args.enable_sharding_comm_overlap
@@ -2306,7 +2322,6 @@ class Trainer:
                 and "split_param" in split_parallel_config(self.args.sharding_parallel_config)
             ):
                 model.register_sharding_comm_overlap_hook(self.optimizer)
-
         # No pipeline mode, sharding only
         if not in_pipeline_parallel_mode and in_sharding_parallel_mode:
             # Sharded DDP!
@@ -2320,7 +2335,6 @@ class Trainer:
                     model = paddle.distributed.fleet.meta_parallel.TensorParallel(
                         model, hcg, strategy=fleet.fleet._user_defined_strategy
                     )
-
             if ShardingOption.SHARD_OP in self.args.sharding:
                 if self.args.amp_master_grad:
                     mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
@@ -2362,6 +2376,7 @@ class Trainer:
                     offload=cpu_offload,
                     **extra_kwargs,
                 )
+
                 if ShardingOption.SHARD_GRAD_OP in self.args.sharding and self.args.amp_master_grad:
                     assert hasattr(optimizer, "use_main_grad"), (
                         "Current installed paddle doesn't support sharding stage 2 with main grad, "
@@ -2387,7 +2402,6 @@ class Trainer:
             if self.args.amp_master_grad:
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
-
         # stage1 has v1 and v2 version
         if in_sharding_parallel_mode and ShardingOption.SHARD_OP in self.args.sharding:
             if "split_param" in self.args.sharding_parallel_config:
@@ -2402,7 +2416,6 @@ class Trainer:
                     and "enable_stage1_broadcast_overlap" in self.args.sharding_parallel_config
                 ):
                     self.optimizer._set_broadcast_overlap(True, model)
-
         return model
 
     def _prepare_input(self, data: Union[paddle.Tensor, Any]) -> Union[paddle.Tensor, Any]:
@@ -2719,6 +2732,10 @@ class Trainer:
         else:
             self.save_model(output_dir)
 
+        model_sharded_state_dict = self.model.sharded_state_dict()
+        if self.args.using_flex_checkpoint:
+            os.makedirs(output_dir, exist_ok=True)
+
         # Determine the new best metric / best model checkpoint
         if metrics is not None and self.args.metric_for_best_model is not None:
             metric_to_check = self.args.metric_for_best_model
@@ -2782,23 +2799,32 @@ class Trainer:
                             signal_dir,
                         )
                     else:
-                        if self.dp_group.rank > 0:  # this should only work for MoE saving
-                            self._save_ckpt_func(
-                                self._filter_moe_no_sync_optimizer_params(),
-                                os.path.join(output_dir, optimizer_name),
-                                saved_signal_path,
-                            )
-
-                        else:
-                            state_dict = self.optimizer.state_dict()
-                            save_path = os.path.join(output_dir, optimizer_name)
-                            if self.args.use_async_save:
-                                assert not strtobool(os.getenv("FLAG_LLM_PDC", "False")), "Dont support FLAG_LLM_PDC"
-                                self._async_optimizer_saver.run(
-                                    state_dict, save_path, saved_signal_path=saved_signal_path
+                        if not self.args.using_flex_checkpoint:
+                            if self.dp_group.rank > 0:  # this should only work for MoE saving
+                                self._save_ckpt_func(
+                                    self._filter_moe_no_sync_optimizer_params(),
+                                    os.path.join(output_dir, optimizer_name),
+                                    saved_signal_path,
                                 )
+
                             else:
-                                self._save_ckpt_func(state_dict, save_path, saved_signal_path)
+                                state_dict = self.optimizer.state_dict()
+                                save_path = os.path.join(output_dir, optimizer_name)
+                                if self.args.use_async_save:
+                                    assert not strtobool(
+                                        os.getenv("FLAG_LLM_PDC", "False")
+                                    ), "Dont support FLAG_LLM_PDC"
+                                    self._async_optimizer_saver.run(
+                                        state_dict, save_path, saved_signal_path=saved_signal_path
+                                    )
+                                else:
+                                    self._save_ckpt_func(state_dict, save_path, saved_signal_path)
+                        else:
+                            optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
+                            dist.save_state_dict(
+                                {**model_sharded_state_dict, **optimizer_sharded_state_dict},
+                                output_dir,
+                            )
                 else:
                     if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
                         global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
@@ -2809,7 +2835,12 @@ class Trainer:
                             or "remove_master_weight" not in self.args.unified_checkpoint_config
                         ):
                             paddle.save(global_rank, os.path.join(signal_dir, f".master_weight.done.{global_rank}"))
-            if self.args.should_save or self.args.use_expert_parallel:
+
+            if (
+                self.args.should_save
+                or self.args.use_expert_parallel
+                or (self.args.data_parallel_degree > 1 and not self.args.use_hybrid_parallel)
+            ):
                 if not self.args.use_hybrid_parallel:
                     logger.info("Saving optimizer files.")
                     if self.args.unified_checkpoint:
@@ -2819,7 +2850,7 @@ class Trainer:
                             output_dir,
                             signal_dir,
                         )
-                    else:
+                    elif not self.args.using_flex_checkpoint:
                         if self.args.data_parallel_rank > 0 and self.args.use_expert_parallel:
                             self._save_ckpt_func(
                                 self._filter_moe_no_sync_optimizer_params(),
@@ -2832,6 +2863,13 @@ class Trainer:
                                 os.path.join(output_dir, optimizer_name),
                                 saved_signal_path,
                             )
+
+                    else:
+                        optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
+                        dist.save_state_dict(
+                            {**model_sharded_state_dict, **optimizer_sharded_state_dict},
+                            output_dir,
+                        )
 
                 # FIXME: maybe only save one copy
                 paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
@@ -3096,6 +3134,24 @@ class Trainer:
                 with open(path, "w") as f:
                     json.dump(model_meta, f)
 
+    def _load_scheduler(self, checkpoint):
+        if checkpoint is None:
+            self.runtime_timer.stop()
+            return
+
+        if not self.args.ignore_load_lr_and_optim:
+            if distributed_isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
+                self.lr_scheduler.set_state_dict(
+                    paddle.load(distributed_file(os.path.join(checkpoint, SCHEDULER_NAME)))
+                )
+            else:
+                raise ValueError(f"scheduler-file not found, scheduler:{os.path.join(checkpoint, SCHEDULER_NAME)}")
+
+            if self.do_grad_scaling and distributed_isfile(os.path.join(checkpoint, SCALER_NAME)):
+                self.scaler.load_state_dict(
+                    paddle.load(distributed_file(os.path.join(checkpoint, SCALER_NAME)), return_numpy=True)
+                )
+
     def _load_optimizer_and_scheduler(self, checkpoint):
         """If optimizer and scheduler states exist, load them."""
         self.runtime_timer.start("checkpoint loading time")
@@ -3137,6 +3193,7 @@ class Trainer:
                     and "split_param" in split_parallel_config(self.args.sharding_parallel_config)
                 ):
                     model = self.model_wrapped
+
                 opt_state_dict = self.unified_checkpoint_handler.load_unified_optimizer(
                     model=model,
                     optimizer=self.optimizer,
@@ -3168,18 +3225,7 @@ class Trainer:
             optimizer_name = _add_variant(PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             raise ValueError(f"optimizer-state-dict not found, opt: {os.path.join(checkpoint, optimizer_name)}.")
 
-        if not self.args.ignore_load_lr_and_optim:
-            if distributed_isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
-                self.lr_scheduler.set_state_dict(
-                    paddle.load(distributed_file(os.path.join(checkpoint, SCHEDULER_NAME)))
-                )
-            else:
-                raise ValueError(f"scheduler-file not found, scheduler:{os.path.join(checkpoint, SCHEDULER_NAME)}")
-
-            if self.do_grad_scaling and distributed_isfile(os.path.join(checkpoint, SCALER_NAME)):
-                self.scaler.load_state_dict(
-                    paddle.load(distributed_file(os.path.join(checkpoint, SCALER_NAME)), return_numpy=True)
-                )
+        self._load_scheduler(checkpoint)
 
         if self.args.offload_optim:
             logger.info("Offloading optimizer state...")

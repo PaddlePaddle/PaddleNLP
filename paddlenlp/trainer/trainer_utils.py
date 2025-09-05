@@ -28,6 +28,7 @@ import os
 import random
 import threading
 import time
+from collections import defaultdict
 from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
@@ -52,6 +53,21 @@ from ..utils.import_utils import is_paddle_cuda_available, is_psutil_available
 from ..utils.log import logger
 from ..utils.pdc_sdk import PDCErrorCode, PDCErrorMessageMap, pdc_tool
 from .utils.helper import distributed_file
+
+try:
+    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
+        DygraphShardingOptimizerV2,
+    )
+except:
+    DygraphShardingOptimizerV2 = None
+
+try:
+    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
+        DygraphShardingOptimizer,
+    )
+except:
+    DygraphShardingOptimizer = None
+
 
 __all__ = [
     "TrainOutput",
@@ -1357,3 +1373,56 @@ def init_nccl_config(nccl_comm_group_config, strategy):
     set_comm_config("moe_sharding_configs", "check_nccl_config", nccl_config.get("moe_sharding_check", None))
     set_comm_config("default_comm_group_configs", "nccl_config", nccl_config.get("default", None))
     return strategy
+
+
+def init_optimizer(optimizer):
+    """
+    Initialize the optimizer's states according to its type.
+
+    For DygraphShardingOptimizer (V1), initializes accumulators for local parameters.
+    For DygraphShardingOptimizerV2, manually initializes master weights and state dict for sharded parameters.
+    For other cases, initializes accumulators for all parameters.
+
+    Args:
+        optimizer: The optimizer instance to be initialized.
+    """
+    if DygraphShardingOptimizer is not None and isinstance(optimizer._inner_opt, DygraphShardingOptimizer):
+        local_params = optimizer._rank2params[optimizer._sharding_rank]
+        optimizer._create_accumulators(paddle.base.framework.default_main_program().global_block(), local_params)
+        return
+
+    elif DygraphShardingOptimizerV2 is not None and isinstance(optimizer._inner_opt, DygraphShardingOptimizerV2):
+
+        def init_param_optimizer_states(param_iter):
+            master_weights = {}
+            state_dict = {}
+            for static_name, shape in param_iter:
+                master_weights[static_name] = paddle.zeros(shape, dtype="float32")
+                for moment in ("moment1_0", "moment2_0"):
+                    key = f"{static_name}_fp32_master_0_{moment}"
+                    state_dict[key] = paddle.zeros(shape, dtype="float32")
+                for beta in ("beta1_pow_acc_0", "beta2_pow_acc_0"):
+                    key = f"{static_name}_fp32_master_0_{beta}"
+                    state_dict[key] = paddle.zeros((1,), dtype="float32")
+            return master_weights, state_dict
+
+        def buffer_params():
+            for buffer in optimizer._comm_buffer_list:
+                for param_name, grad_view in buffer._sharding_param_grad_view.items():
+                    numel = grad_view._param.numel().item()
+                    param_begin = grad_view._param_begin
+                    param_end = grad_view._param_end
+                    index = grad_view._index
+                    padding_begin = index + numel
+                    shape = (min(padding_begin, param_end) - param_begin,)
+                    if shape[0] > 0:
+                        yield param_name, shape
+
+        master_weights, state_dict = init_param_optimizer_states(buffer_params())
+        state_dict["master_weights"] = master_weights
+        state_dict["LR_Scheduler"] = {"last_epoch": 1, "last_lr": 5e-06}
+        optimizer.set_state_dict(state_dict)
+        return
+    optimizer._create_accumulators(
+        paddle.base.framework.default_main_program().global_block(), optimizer._parameter_list
+    )
