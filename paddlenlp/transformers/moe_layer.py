@@ -24,6 +24,8 @@ import paddle.distributed as dist
 from paddle import Tensor, nn
 from paddle.distributed.communication.group import Group
 
+from paddlenlp.utils.log import logger
+
 from .moe_gate import PretrainedMoEGate
 from .token_dispatcher import MoEFlexTokenDispatcher
 
@@ -257,7 +259,7 @@ class MoELayer(nn.Layer):
                     p.expert = not (self.is_tp_moe or self.is_dummy_moe)  # type: ignore
                     p.no_sync = not (self.is_tp_moe or self.is_dummy_moe)
                     logger.info(f"expert param={p.name}, no-sync={p.no_sync}")
-                    if self.is_mp_moe or self.is_dp_moe:
+                    if self.is_tp_moe or self.is_dp_moe:
                         p.is_distributed = True
 
     def forward(
