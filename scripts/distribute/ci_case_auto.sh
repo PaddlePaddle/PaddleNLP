@@ -3199,7 +3199,7 @@ function llm_qwen_dygraph_auto_bs1_fp32_DP2() {
 {
     "model_name_or_path": "qwen/qwen-7b",
     "tokenizer_name_or_path": "qwen/qwen-7b",
-    "hybrid_parallel_topo_order": \"$DEFAULT_TOPO\",
+    "hybrid_parallel_topo_order": "$DEFAULT_TOPO",
     "input_dir": "./data",
     "output_dir": "./checkpoints/qwen_pretrain_ckpts",
     "per_device_train_batch_size": 1,
@@ -3291,7 +3291,7 @@ function llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2() {
 {
     "model_name_or_path": "qwen/qwen-7b",
     "tokenizer_name_or_path": "qwen/qwen-7b",
-    "hybrid_parallel_topo_order": \"$DEFAULT_TOPO\",
+    "hybrid_parallel_topo_order": "$DEFAULT_TOPO",
     "input_dir": "./data",
     "output_dir": "./checkpoints/qwen_pretrain_ckpts",
     "per_device_train_batch_size": 1,
@@ -3381,7 +3381,7 @@ function llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2-PP2() {
 {
     "model_name_or_path": "qwen/qwen-7b",
     "tokenizer_name_or_path": "qwen/qwen-7b",
-    "hybrid_parallel_topo_order": \"$DEFAULT_TOPO\",
+    "hybrid_parallel_topo_order": "$DEFAULT_TOPO",
     "input_dir": "./data",
     "output_dir": "./checkpoints/qwen_pretrain_ckpts",
     "per_device_train_batch_size": 1,
@@ -3473,7 +3473,7 @@ function llm_qwen_dygraph_auto_bs1_bf16_DP2-MP2-PP2() {
 {
     "model_name_or_path": "qwen/qwen-7b",
     "tokenizer_name_or_path": "qwen/qwen-7b",
-    "hybrid_parallel_topo_order": \"$DEFAULT_TOPO\",
+    "hybrid_parallel_topo_order": "$DEFAULT_TOPO",
     "input_dir": "./data",
     "output_dir": "./checkpoints/qwen_pretrain_ckpts",
     "per_device_train_batch_size": 1,
@@ -4120,7 +4120,7 @@ function llama_baichuan_dygraph_auto_sp_async_reduce_scatter_bs8_bf16_DP4-MP2-SP
 {
     "model_name_or_path": "baichuan-inc/Baichuan2-13B-Base",
     "tokenizer_name_or_path": "baichuan-inc/Baichuan2-13B-Base",
-    "hybrid_parallel_topo_order": \"$DEFAULT_TOPO\",
+    "hybrid_parallel_topo_order": "$DEFAULT_TOPO",
     "input_dir": "./data",
     "output_dir": "./checkpoints/baichuan2_13b_ckpts",
     "split": "949,50,1",
