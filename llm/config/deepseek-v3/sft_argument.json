@@ -8,7 +8,7 @@
   "per_device_eval_batch_size": 1,
   "eval_accumulation_steps": 1,
   "max_steps": 100,
-  "max_grad_norm": 0,
+  "max_grad_norm": 1.0,
   "amp_master_grad": true,
   "num_train_epochs": 1,
   "learning_rate": 2.2e-05,

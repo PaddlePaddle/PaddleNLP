@@ -1323,21 +1323,6 @@ class Trainer:
                                 elif p.grad is not None:
                                     p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
 
-                    if os.environ.get("FIX_EP_GRAD", None):
-                        param_count = 0
-                        for p in model._layers.parameters():
-                            if hasattr(p, "is_moe_param") and p.is_moe_param:
-                                with paddle.no_grad():
-                                    if hasattr(p, "main_grad") and p.main_grad is not None:
-                                        # print("main grad scale 1/ep")
-                                        p.main_grad.scale_(1.0 / self.args.expert_parallel_degree)
-                                        param_count += 1
-                                    elif p.grad is not None:
-                                        # print("grad scale 1/ep")
-                                        p.grad.scale_(1.0 / self.args.expert_parallel_degree)
-                                        param_count += 1
-                        print("fix ep grad count:{}".format(param_count), flush=True)
-
                     # Optimizer step
                     self.callback_handler.on_optimizer_begin(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None

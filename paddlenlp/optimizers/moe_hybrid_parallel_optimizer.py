@@ -179,7 +179,7 @@ class MoEHybridParallelClipGrad:
             )
 
             is_moe_param = getattr(p, "is_moe_param", False)
-            print(f"p.name:{p.name}, is_moe_param:{is_moe_param}")
+
             if is_moe_param:
                 assert 0
             if not_shared_enable:
@@ -350,13 +350,6 @@ class MoEHybridParallelClipGrad:
         return getattr(self._clip, item)
 
     def __call__(self, params_grads):
-        print("==== zyc debug in moe_hybrid_parallel_optimizer.py ====")
-        for p, g in params_grads:
-            has_moe_attr = hasattr(p, "is_moe_param")
-            is_moe_param = False
-            if has_moe_attr:
-                is_moe_param = p.is_moe_param
-            print(f"p.name:{p.name}, has_moe_attr:{has_moe_attr}, is_moe_param:{is_moe_param}")
         return self._dygraph_clip(params_grads)
 
 

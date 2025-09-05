@@ -46,7 +46,7 @@ from paddlenlp.peft.reft import (
     ReFTModel,
     intervention_mapping,
 )
-from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed, MoECorrectionBiasAdjustCallback
+from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed, MoECorrectionBiasAdjustCallback, MoeExpertsGradScaleCallback
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
     AutoConfig,
@@ -474,7 +474,11 @@ def main():
         callbacks += [ZeroPaddingIterDatasetCallback()]
     
     if getattr(model_config, "topk_method", None) == "noaux_tc":
-        callbacks += [MoECorrectionBiasAdjustCallback(lr=0)]
+        # deepseek_v3 finetune do not update the bias, so set lr to 0.0
+        callbacks += [MoECorrectionBiasAdjustCallback(lr=0.0)]
+    
+    if training_args.use_expert_parallel:
+        callbacks += [MoeExpertsGradScaleCallback(training_args)]
     
     print("callbacks:", callbacks, flush=True)
     trainer = SFTTrainer(

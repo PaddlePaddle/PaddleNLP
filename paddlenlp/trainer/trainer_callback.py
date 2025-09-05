@@ -46,6 +46,7 @@ __all__ = [
     "PrinterCallback",
     "EarlyStoppingCallback",
     "MoECorrectionBiasAdjustCallback",
+    "MoeExpertsGradScaleCallback",
 ]
 
 
@@ -674,3 +675,40 @@ class MoECorrectionBiasAdjustCallback(TrainerCallback):
                     usages.pop(0).zero_()
 
         model.apply(update_bias)
+        
+class MoeExpertsGradScaleCallback(TrainerCallback):
+    """
+    此 hook 用于修正专家参数的梯度被放大N倍的问题
+    """
+
+    def __init__(self, args):
+        """_summary_
+
+        Args:
+            args (_type_): _description_
+        """
+        if not args.use_expert_parallel:
+            raise ValueError("This callback should be used with expert parallel")
+        if args.expert_parallel_degree > 1:
+            self.expert_gradient_scaling_factor = 1.0 / args.expert_parallel_degree
+            if args.tensor_parallel_degree > 1:
+                self.expert_gradient_scaling_factor *= args.tensor_parallel_degree
+            logger.info(
+                f"EP-MoE is used, expert gradient scaling factor is set to {self.expert_gradient_scaling_factor}"
+            )
+
+    def on_optimizer_begin(self, args, state, control, **kwargs):
+        model = kwargs["model"]
+        param_count = 0
+        for p in model.parameters():
+            if not getattr(p, "no_sync", False):
+                continue
+            if hasattr(p, "is_moe_param") and p.is_moe_param:
+                with paddle.no_grad():
+                    if hasattr(p, "main_grad") and p.main_grad is not None:
+                        p.main_grad.scale_(self.expert_gradient_scaling_factor)
+                        param_count += 1
+                    elif p.grad is not None:
+                        p.grad.scale_(self.expert_gradient_scaling_factor)
+                        param_count += 1
+        logger.info("correct ep grad count:{}".format(param_count))
