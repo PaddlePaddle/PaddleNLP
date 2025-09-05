@@ -43,7 +43,7 @@
   + [Q4.5 【解语】wordtag 模型如何自定义添加命名实体及对应词类?](#6-5)
 
 + [其他使用咨询](#使用咨询问题)
-  + [Q5.1 在 CUDA11使用 PaddlNLP 报错?](#7-1)
+  + [Q5.1 在 CUDA11使用 PaddleNLP 报错?](#7-1)
   + [Q5.2 如何设置 parameter？](#7-2)
   + [Q5.3 GPU 版的 Paddle 虽然能在 CPU 上运行，但是必须要有 GPU 设备吗？](#7-3)
   + [Q5.4  如何指定用 CPU 还是 GPU 训练模型？](#7-4)
@@ -429,7 +429,7 @@ model.set_state_dict(paddle.load("xxx_para"))
 
 <a name="7-1"></a>
 
-##### Q5.1 在 CUDA11使用 PaddlNLP 报错?
+##### Q5.1 在 CUDA11使用 PaddleNLP 报错?
 
 **A:** 在 CUDA11安装，可参考[issue](https://github.com/PaddlePaddle/PaddleNLP/issues/348)，其他 CUDA 版本安装可参考 [官方文档](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html)
 
