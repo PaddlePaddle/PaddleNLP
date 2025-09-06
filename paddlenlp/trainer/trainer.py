@@ -378,6 +378,7 @@ class Trainer:
                 self.model,
                 self.optimizer,
                 remap_parameter_name=self.args.load_sharded_model_remap_parameter_name,
+                is_ema=self.args.sharded_model_from_ema,
             )
 
         if self.args.unified_checkpoint:
