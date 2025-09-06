@@ -605,11 +605,7 @@ class ShardingIO:
 
         node_model_state = load_model_slices()
         node_model_state = reshard_pp(node_model_state)
-        opt_state = reshard_sharding(node_model_state)
-        if self.is_ema:
-            return {"master_weights": opt_state.get("master_weights", {})}
-        else:
-            return opt_state
+        return reshard_sharding(node_model_state)
 
     def manipulate_state_dict_and_config(self, model_to_save, merge_tensor_parallel=False, state_dict=None):
         weight_name_suffix = self.args.sharded_name_suffix()
