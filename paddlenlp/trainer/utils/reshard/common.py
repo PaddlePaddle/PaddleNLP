@@ -102,7 +102,7 @@ def convert_opt_name_to_tname(tensor_names, opt_names):
                 opt_to_t[t] = t[: -len(s)]
                 _find = True
                 break
-        assert _find
+        assert _find, t
     return opt_to_t
 
 
