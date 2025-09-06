@@ -411,28 +411,22 @@ class ShardingIO:
         return state_dict
 
     def _load_optimizer_state_of_one_shard(self, checkpoint, base_opt_name, optimizer_name_suffix, group_getter=None):
-        def load_impl(_base_opt_name):
-            optimizer_name = _add_variant(_base_opt_name, optimizer_name_suffix)
-            path = os.path.join(checkpoint, optimizer_name)
-            logger.info(f"load optimizer state from {path}")
-            if os.path.isfile(path):
-                return self._remap_parameter_name(
-                    checkpoint,
-                    self._modify_ckpt_for_compatibility(paddlenlp_load(path, map_location="cpu")),
-                    is_opt=True,
-                )
-            logger.info(f"{path} not exists")
-            return None
-
-        opt_state = load_impl(base_opt_name)
         if self.is_ema:
-            ema_opt_state = load_impl(base_opt_name.replace("optimizer", "ema"))
-            if ema_opt_state is not None:
-                assert opt_state is not None, "optimizer state should exist when EMA optimizer state exists"
-                opt_state["master_weights"] = ema_opt_state.pop("master_weights", {})
-            else:
-                assert opt_state is None, "optimizer state should not exist when EMA optimizer state does not exist"
-        return opt_state
+            base_opt_name = base_opt_name.replace("optimizer", "ema")
+        optimizer_name = _add_variant(base_opt_name, optimizer_name_suffix)
+        path = os.path.join(checkpoint, optimizer_name)
+        logger.info(f"load optimizer state from {path}")
+        if os.path.isfile(path):
+            opt_state = paddlenlp_load(path, map_location="cpu")
+            if self.is_ema:
+                opt_state = {"master_weights": opt_state.get("master_weights", {})}
+            return self._remap_parameter_name(
+                checkpoint,
+                self._modify_ckpt_for_compatibility(opt_state),
+                is_opt=True,
+            )
+        logger.info(f"{path} not exists")
+        return None
 
     def _modify_ckpt_for_compatibility(self, ckpt):
         master_weights = ckpt.get("master_weights", None)
