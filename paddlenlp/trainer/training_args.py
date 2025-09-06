@@ -638,6 +638,11 @@ class TrainingArguments:
         metadata={"help": "Whether to remap parameter name when load_sharded_model = true."},
     )
 
+    sharded_model_from_ema: bool = field(
+        default=False,
+        metadata={"help": "Whether to load sharded model from EMA."},
+    )
+
     tensor_parallel_degree: int = field(
         default=-1,
         metadata={
