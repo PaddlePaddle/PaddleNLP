@@ -2337,6 +2337,14 @@ class TrainingArguments:
             return 0
 
     @property
+    def moe_sharding_parallel_rank(self):
+        if self.use_hybrid_parallel:
+            hcg = fleet.get_hybrid_communicate_group()
+            return max(hcg.get_moe_sharding_parallel_group().rank, 0)
+        else:
+            return 0
+
+    @property
     def context_parallel_rank(self):
         if self.use_hybrid_parallel:
             hcg = fleet.get_hybrid_communicate_group()
@@ -2506,7 +2514,9 @@ class TrainingArguments:
                 return True
             elif self.use_hybrid_parallel:
                 # save on dataset rank 0
-                return self.sharding_parallel_rank == 0 and (self.data_parallel_rank == 0 or self.use_expert_parallel)
+                return (
+                    self.sharding_parallel_rank == 0 and (self.data_parallel_rank == 0 or self.use_expert_parallel)
+                ) or (self.expert_parallel_degree > 1 and self.moe_sharding_parallel_rank == 0)
             else:
                 return self.process_index == 0 or self.use_expert_parallel
 

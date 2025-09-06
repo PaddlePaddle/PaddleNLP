@@ -17,6 +17,8 @@
 # wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin
 # wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx
 
-mpirun rm -rf output
-nohup mpirun sh script/train_gpu.sh config/deepseek-v3/sft_argument.json > run.log 2>&1 & 
+#mpirun rm -rf output
+#nohup mpirun sh script/train_gpu.sh config/deepseek-v3/sft_argument.json > run.log 2>&1 & 
+
+nohup sh script/train_gpu.sh config/deepseek-v3/sft_argument.json > run.log 2>&1 &
 
