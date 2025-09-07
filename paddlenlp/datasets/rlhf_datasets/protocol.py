@@ -1158,3 +1158,4 @@ class DataProto:
             micro_batches.append(DataProto.from_single_dict(micro_batch))
 
         return micro_batches
+

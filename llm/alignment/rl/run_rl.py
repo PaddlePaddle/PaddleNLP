@@ -55,6 +55,7 @@ def process_args(model_args: ModelArgument, data_args: DataArgument, training_ar
     training_args.max_src_len = data_args.max_prompt_len
     training_args.actor_model_name_or_path = model_args.actor_model_name_or_path
     training_args.max_length = data_args.max_length
+    # training_args.hybrid_parallel_topo_order = "mp_first"
 
     if training_args.use_rm_server:
         if model_args.reward_server is None:
@@ -319,11 +320,21 @@ def main():
         max_sequence_length=data_args.max_length,
     )
 
+    # import random
+    # random.seed(training_args.seed)
+    # paddle.seed(training_args.seed)
+    # print(f"Fu set seed:{training_args.seed}")
+    gather_in_micro_dp = training_args.gather_in_micro_dp # 修改入口
+    use_export_only_rollout = training_args.use_export_only_rollout # 修改入口
+    print(f"Fu gather_in_micro_dp:{gather_in_micro_dp}, use_export_only_rollout:{use_export_only_rollout}")
     if (
         training_args.rollout_tensor_parallel_degree != training_args.tensor_parallel_degree
         or training_args.pipeline_parallel_degree > 1
     ):
-        reshard_controller = ReshardController(tensor_parallel_degree=training_args.rollout_tensor_parallel_degree)
+        reshard_controller = ReshardController(train_tensor_parallel_degree=training_args.tensor_parallel_degree,
+                                               infer_tensor_parallel_degree=training_args.rollout_tensor_parallel_degree,
+                                               gather_in_micro_dp=gather_in_micro_dp
+                                               )
     else:
         reshard_controller = None
 
@@ -401,6 +412,8 @@ def main():
         compute_metrics=compute_metrics,  # TODO: only used for grpo (kk datasets)
         generation_config=generation_config,
         reshard_controller=reshard_controller,
+        gather_in_micro_dp=gather_in_micro_dp,
+        use_export_only_rollout=use_export_only_rollout,
     )
 
     # TODO(gongenlei) resume_from_checkpoint is not ready

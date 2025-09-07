@@ -238,6 +238,7 @@ class PPOTrainer(RLTrainerBase):
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
         generation_config: Optional[GenerationConfig] = None,
         reshard_controller: Optional[ReshardController] = None,
+        **kwargs,
     ):
         """
         Args:
@@ -318,6 +319,8 @@ class PPOTrainer(RLTrainerBase):
         ) = self.init_train_num(self.train_dataloader)
 
         args.max_steps = self.max_steps
+        self.gather_in_micro_dp = kwargs.get("gather_in_micro_dp", False)
+        self.use_export_only_rollout = kwargs.get("use_export_only_rollout", False)
 
         self.reshard_controller = reshard_controller
         trainer_agrs = {
@@ -333,6 +336,7 @@ class PPOTrainer(RLTrainerBase):
             "optimizers": optimizers,
             "preprocess_logits_for_metrics": preprocess_logits_for_metrics,
         }
+
 
         self.actor_trainer = self.create_actor_trainer(
             model=actor_model,
@@ -401,6 +405,7 @@ class PPOTrainer(RLTrainerBase):
             self.timers.log = types.MethodType(new_timer_log, self.timers)
         self.generation_config = generation_config
 
+
     def create_actor_trainer(
         self,
         model: Union[PretrainedModel, nn.Layer] = None,
@@ -432,6 +437,7 @@ class PPOTrainer(RLTrainerBase):
             [None, lr_scheduler],
             preprocess_logits_for_metrics,
             reshard_controller,
+            gather_in_micro_dp=self.gather_in_micro_dp,
         )
         actor_trainer.set_eval_model(model_eval)
         actor_trainer.timers = self.timers
@@ -719,7 +725,7 @@ class PPOTrainer(RLTrainerBase):
         inputs = self._prepare_inputs(inputs)
         data_trans_group = getattr(self.actor_trainer, "_data_trans_group", None)
         inputs = data_group_split(inputs, group=data_trans_group)
-        with reload_and_offload_scope(self, self.actor_model, self.reference_model, self.actor_trainer):
+        with reload_and_offload_scope(self, self.actor_model, self.reference_model, self.actor_trainer, export_only_rollout=True):
             with infer_guard(self.actor_trainer):
                 prompt_only_batch = DataProto.from_single_dict(
                     {
@@ -1351,12 +1357,23 @@ class PPOTrainer(RLTrainerBase):
 
             step = -1
             for prompt_only_batch_dict in self.prompt_only_dataloader:
+                timer_batch = TimerScope(
+                    self.timers,
+                    RolloutStages.BATCH,
+                )
+                timer_batch.start()
+
                 prompt_only_batch: DataProto = DataProto.from_single_dict(prompt_only_batch_dict)
                 self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
                 # step 1-1: rollout data with actor model (eval) and reward model
                 self.set_eval()
                 data_trans_group = getattr(self.actor_trainer, "_data_trans_group", None)
+
+                # print(f"Fu data check [before data group split] prompt_only_batch: {prompt_only_batch.batch['input_ids'].shape}, {prompt_only_batch.batch['input_ids']._md5sum()}")
+                # print(f"Fu data check [before data group split] prompt_only_batch: {prompt_only_batch.batch['input_ids'][:,-120:-100]}")
                 prompt_only_batch = data_group_split(prompt_only_batch, group=data_trans_group)
+                # print(f"Fu data check [after data group split] prompt_only_batch: {prompt_only_batch.batch['input_ids'].shape}, {prompt_only_batch.batch['input_ids']._md5sum()}")
+                # print(f"Fu data check [after data group split] prompt_only_batch: {prompt_only_batch.batch['input_ids'][:,-120:-100]}")
                 eos_token_ids = llm_utils.get_eos_token_id(self.tokenizer, self.generation_config)
                 pad_token_id = self.tokenizer.pad_token_id
                 prompt_only_batch.meta_info = {
@@ -1373,7 +1390,7 @@ class PPOTrainer(RLTrainerBase):
                     repeat_times=self.args.rollout_n, interleave=True
                 )
                 prompt_only_batch_expand.rename("raw_prompt_len", "raw_prompt_len_expand")
-
+                
                 expand_prompt = prompt_only_batch_expand.batch["input_ids"]
                 per_device_rollout_batch_size = self.args.per_device_rollout_batch_size
                 cleanup_batches, indices, label_ids_batches = [], [], []
@@ -1383,9 +1400,9 @@ class PPOTrainer(RLTrainerBase):
                     RolloutStages.ACTOR_MODEL_ENABLE_DISABLE,
                     minus_names=[RolloutStages.GENERATE],
                 )
-
+                
                 timer_scope_actor_model.start()
-                with reload_and_offload_scope(self, self.actor_model):
+                with reload_and_offload_scope(self, self.actor_model, export_only_rollout=True):
                     timer_scope_rollout = TimerScope(self.timers, RolloutStages.GENERATE)
                     timer_scope_rollout.start()
                     with infer_guard(self.actor_trainer):
@@ -1394,9 +1411,25 @@ class PPOTrainer(RLTrainerBase):
                         for i in range(0, total_batch_size, per_device_rollout_batch_size):
                             micro_prompt_batch = prompt_only_batch[i : i + per_device_rollout_batch_size]
                             # generate for multi batches and then disable FuseMT model
+
+                            # hcg = fleet.get_hybrid_communicate_group()
+                            # rollout_sharding_parallel_group = hcg.get_sharding_parallel_group()
+                            # rollout_data_parallel_group = hcg.get_data_parallel_group()
+                            # rollout_model_parallel_group = hcg.get_model_parallel_group()
+                            # rollout_pipeline_parallel_group = hcg.get_pipeline_parallel_group()
+                            # print(f"Fu rollout dp group:{rollout_data_parallel_group}, rollout tp group:{rollout_model_parallel_group}, rollout sdp group:{rollout_sharding_parallel_group}") #, rollout pp group:{rollout_pipeline_parallel_group}
+                            
+                            # print(f"Fu data check [before generate_sequences] micro_prompt_batch: {micro_prompt_batch.batch['input_ids'].shape}, {micro_prompt_batch.batch['input_ids']._md5sum()}")
+                            # print(f"Fu data check [before generate_sequences] micro_prompt_batch: {micro_prompt_batch.batch['input_ids'][:,300:320]}")
                             generated_batches: List[DataProto] = self.actor_trainer.generate_sequences(
                                 micro_prompt_batch
                             )
+
+                            # for idx,generated_batch in enumerate(generated_batches):
+                            #     print(f"Fu generated_batch {idx}, lr padding count:{count_lr_padding(generated_batch.batch['input_ids'])}")
+                                # print(f"Fu data check [after generate_sequences] generated_batch: {generated_batch.batch['input_ids'].shape}, {generated_batch.batch['input_ids']._md5sum()}")
+                                # print(f"Fu data check [after generate_sequences] generated_batch: {generated_batch.batch['input_ids'][:,300:320]}")
+                            
                             # NOTE(drownfish19): do process for each micro_batch, prepare for split mode
                             micro_ret = self.remove_pad_tokens_after_generate(generated_batches)
                             micro_cleanup_batches, micro_indices, micro_label_ids_batches = micro_ret
@@ -1453,7 +1486,11 @@ class PPOTrainer(RLTrainerBase):
                     }
                 )
 
-                batch = data_group_merge(batch, group=data_trans_group)
+                batch = data_group_merge(batch, group=data_trans_group, pad_token_id=0) #self.tokenizer.pad_token_id
+                # print(f"Fu data check [after data group merge] batch: {batch.batch['input_ids'].shape}, {batch.batch['input_ids']._md5sum()} lr padding count:{count_lr_padding(batch.batch['input_ids'])}")
+                # print(f"Fu data check [after data group merge] batch: {batch.batch['input_ids'][:,300:320]}")
+                
+
                 # step 2-2: balance batches based on batch tokens
                 if self.args.balance_batch:
                     batch = self._balance_batch(batch)
@@ -1461,12 +1498,12 @@ class PPOTrainer(RLTrainerBase):
                 # step 2-3: compute logprob for rollout data
                 with self.autocast_smart_context_manager():
                     with TimerScope(self.timers, RolloutStages.ROLLOUT_LOGPROB):
-                        with reload_and_offload_scope(self, self.reference_model):
+                        with reload_and_offload_scope(self, self.reference_model, export_only_rollout=not self.use_export_only_rollout):
                             with TimerScope(self.timers, RolloutStages.ROLLOUT_REF_LOGPROB):
                                 ref_log_probs = self.reference_trainer.compute_logprob(batch, key="ref_log_probs")
                                 batch = batch.union(ref_log_probs)
 
-                        with reload_and_offload_scope(self, self.actor_model):
+                        with reload_and_offload_scope(self, self.actor_model, export_only_rollout=not self.use_export_only_rollout):
                             with TimerScope(self.timers, RolloutStages.ROLLOUT_OLD_LOGPROB):
                                 log_probs = self.actor_trainer.compute_logprob(batch, key="log_probs")
                                 batch = batch.union(log_probs)
@@ -1481,6 +1518,7 @@ class PPOTrainer(RLTrainerBase):
                         self,
                         self.critic_model if self.args.rl_algorithm == "ppo" else None,
                         self.reward_model if not self.args.use_rm_server and not self.args.use_rule_reward else None,
+                        export_only_rollout=not self.use_export_only_rollout
                     ):
                         with TimerScope(self.timers, RolloutStages.ROLLOUT_REWARD_VALUE):
                             reward_tensor = self.reward_trainer.compute_reward(
@@ -1605,7 +1643,7 @@ class PPOTrainer(RLTrainerBase):
                 # step 3: train actor model and critic model with rollout data
                 self.set_train()
                 with TimerScope(self.timers, ActorStages.MODEL_ENABLE_DISABLE, minus_names=[ActorStages.RL_STEP]):
-                    with reload_and_offload_scope(self, self.actor_model, self.actor_trainer.optimizer):
+                    with reload_and_offload_scope(self, self.actor_model, self.actor_trainer.optimizer, export_only_rollout=not self.use_export_only_rollout):
                         with TimerScope(self.timers, ActorStages.RL_STEP):
                             # timer_info = {} # prepare for each micro_step
                             micro_batches = batch.split_batch_into_micro_batches(
@@ -1619,6 +1657,9 @@ class PPOTrainer(RLTrainerBase):
                                 with TimerScopeManualLabel(
                                     self.timers, get_timer_label(ActorStages.MICRO_STEPS) + f"_{micro_step}"
                                 ):
+                                    
+                                    # print(f"Fu data check [before train step {micro_step}] micro_batch: {micro_batch.batch['input_ids'].shape}, {micro_batch.batch['input_ids']._md5sum()} lr count padding:{count_lr_padding(micro_batch.batch['input_ids'])}")
+                                    # print(f"Fu data check [before train step {micro_step}] micro_batch: {micro_batch.batch['input_ids'][:,300:320]}")
                                     rl_info = self.actor_trainer.update_actor(micro_batch)
 
                                 paddle.device.cuda.empty_cache()
@@ -1644,12 +1685,14 @@ class PPOTrainer(RLTrainerBase):
                                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
 
                                 step += 1
-
+                timer_batch.stop()
+                
                 self._print_timer()
                 self._maybe_log_save_evaluate(rl_info, None, epoch, ignore_keys_for_eval, inputs=micro_batch)
                 paddle.device.cuda.empty_cache()
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
+                    
 
             if step < 0:
                 logger.warning(
@@ -1937,3 +1980,101 @@ class PPOTrainer(RLTrainerBase):
         batch.batch["reward_advantages"] = batch.batch["reward_advantages"] * batch.batch["eos_mask"]
 
         return batch
+
+def remove_pad_and_count_lr(tensor, pad_id=151643):
+    """
+    输入二维 tensor，去除所有pad_id元素，同时统计每行左、右两侧连续pad_id数量。
+
+    Args:
+        tensor (paddle.Tensor): shape = [batch_size, seq_len]
+        pad_id (int): 填充id
+
+    Returns:
+        filtered (paddle.Tensor): 一维tensor，去除所有pad_id的有效元素
+        left_pad_counts (paddle.Tensor): shape=[batch_size], 每行左侧连续pad数量
+        right_pad_counts (paddle.Tensor): shape=[batch_size], 每行右侧连续pad数量
+    """
+    batch_size, seq_len = tensor.shape
+    left_pad_counts = []
+    right_pad_counts = []
+
+    # 转numpy计算连续pad数量更方便
+    tensor_np = tensor.numpy()
+
+    for row in tensor_np:
+        # 左侧连续pad数量
+        left_count = 0
+        for val in row:
+            if val == pad_id:
+                left_count += 1
+            else:
+                break
+
+        # 右侧连续pad数量
+        right_count = 0
+        for val in row[::-1]:
+            if val == pad_id:
+                right_count += 1
+            else:
+                break
+
+        left_pad_counts.append(left_count)
+        right_pad_counts.append(right_count)
+
+    # 转成tensor
+    left_pad_counts = paddle.to_tensor(left_pad_counts, dtype='int64')
+    right_pad_counts = paddle.to_tensor(right_pad_counts, dtype='int64')
+
+    # 过滤掉所有pad_id元素，返回一维tensor
+    mask = tensor != pad_id
+    filtered = paddle.masked_select(tensor, mask)
+
+    # print(f"tensor left padding:{left_pad_counts}, right paddin:{right_pad_counts}")
+    return filtered, left_pad_counts, right_pad_counts
+
+
+def count_lr_padding(tensor, pad_id=151643):
+    """
+    统计每行左、右两侧连续pad_id数量。
+
+    Args:
+        tensor (paddle.Tensor): shape = [batch_size, seq_len]
+        pad_id (int): 填充id
+
+    Returns:
+        filtered (paddle.Tensor): 一维tensor，去除所有pad_id的有效元素
+        left_pad_counts (paddle.Tensor): shape=[batch_size], 每行左侧连续pad数量
+        right_pad_counts (paddle.Tensor): shape=[batch_size], 每行右侧连续pad数量
+    """
+    batch_size, seq_len = tensor.shape
+    left_pad_counts = []
+    right_pad_counts = []
+
+    # 转numpy计算连续pad数量更方便
+    tensor_np = tensor.numpy()
+
+    for row in tensor_np:
+        # 左侧连续pad数量
+        left_count = 0
+        for val in row:
+            if val == pad_id:
+                left_count += 1
+            else:
+                break
+
+        # 右侧连续pad数量
+        right_count = 0
+        for val in row[::-1]:
+            if val == pad_id:
+                right_count += 1
+            else:
+                break
+
+        left_pad_counts.append(left_count)
+        right_pad_counts.append(right_count)
+
+    # 转成tensor
+    left_pad_counts = paddle.to_tensor(left_pad_counts, dtype='int64')
+    right_pad_counts = paddle.to_tensor(right_pad_counts, dtype='int64')
+
+    return left_pad_counts, right_pad_counts

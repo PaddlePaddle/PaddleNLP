@@ -294,7 +294,7 @@ class StateDictKeysChecker:
         return all_diff_keys
 
 
-def naive_fuse_merge_tp(weight_list, is_column=True, fuse_tensor_parts=2):
+def naive_fuse_merge_tp(weight_list, is_column=True, fuse_tensor_parts=2, **kwargs):
     """
 
     [A1 B1],[A2 B2]  => [A1, A2, B1, B2]
@@ -330,7 +330,7 @@ def naive_fuse_merge_tp(weight_list, is_column=True, fuse_tensor_parts=2):
     else:
         tensor = paddle.concat([reorder[i] for i in index], axis=axis)
 
-        if tensor.place.is_gpu_place():
+        if tensor.place.is_gpu_place() and not kwargs.get("keep_on_gpu", False):
             tensor = tensor._copy_to(paddle.CUDAPinnedPlace(), False)
         return tensor
 
@@ -419,7 +419,7 @@ def naive_fuse_split_tp(
         return np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis)
 
 
-def normal_fuse_merge_tp(weight_list, is_column=True):
+def normal_fuse_merge_tp(weight_list, is_column=True, **kwargs):
     """
 
     [A1],[A2]  => [A1, A2]
@@ -437,7 +437,7 @@ def normal_fuse_merge_tp(weight_list, is_column=True):
             return np.concatenate(weight_list, axis=-1)
         else:
             tensor = paddle.concat(weight_list, axis=-1)
-            if tensor.place.is_gpu_place():
+            if tensor.place.is_gpu_place() and not kwargs.get("keep_on_gpu", False):
                 tensor = tensor._copy_to(paddle.CUDAPinnedPlace(), False)
             return tensor
     else:
@@ -445,7 +445,7 @@ def normal_fuse_merge_tp(weight_list, is_column=True):
             return np.concatenate(weight_list, axis=0)
         else:
             tensor = paddle.concat(weight_list, axis=0)
-            if tensor.place.is_gpu_place():
+            if tensor.place.is_gpu_place() and not kwargs.get("keep_on_gpu", False):
                 tensor = tensor._copy_to(paddle.CUDAPinnedPlace(), False)
             return tensor
 
@@ -720,21 +720,22 @@ def get_tensor_parallel_merge_func(tensor_parallel_degree, tensor_parallel_rank,
         is_old_qkv=False,
         is_naive_2fuse=False,
         is_naive_3fuse=False,
+        **kwargs,
     ):
         if x is None:
             return None
 
         if is_naive_2fuse:
-            return naive_fuse_merge_tp(x, is_column=is_column, fuse_tensor_parts=2)
+            return naive_fuse_merge_tp(x, is_column=is_column, fuse_tensor_parts=2, **kwargs)
         elif is_naive_3fuse:
-            return naive_fuse_merge_tp(x, is_column=is_column, fuse_tensor_parts=3)
+            return naive_fuse_merge_tp(x, is_column=is_column, fuse_tensor_parts=3, **kwargs)
         else:
-            x = normal_fuse_merge_tp(x, is_column=is_column)
+            x = normal_fuse_merge_tp(x, is_column=is_column, **kwargs)
 
         if is_old_qkv:
             assert is_column, "QKV tensor should be column parallel linear."
             assert num_attention_heads is not None, "is_old_qkv need num_attention_heads"
-            x = tensor_parallel_qkv_to_naive_merged_qkv(x, num_attention_heads)
+            x = tensor_parallel_qkv_to_naive_merged_qkv(x, num_attention_heads, **kwargs)
         if transpose:
             x = np.transpose(x, [1, 0])
 
@@ -744,7 +745,7 @@ def get_tensor_parallel_merge_func(tensor_parallel_degree, tensor_parallel_rank,
 
 
 def get_tensor_parallel_split_func(tensor_parallel_degree, tensor_parallel_rank, num_attention_heads=None):
-    def fn(x, is_column=True, transpose=False, is_old_qkv=False, is_naive_2fuse=False, is_naive_3fuse=False):
+    def fn(x, is_column=True, transpose=False, is_old_qkv=False, is_naive_2fuse=False, is_naive_3fuse=False, **kwargs):
         if x is None:
             return None
         if transpose:
@@ -755,17 +756,17 @@ def get_tensor_parallel_split_func(tensor_parallel_degree, tensor_parallel_rank,
         if is_old_qkv:
             assert is_column, "QKV tensor should be column parallel linear."
             assert num_attention_heads is not None, "is_old_qkv need num_attention_heads"
-            x = naive_merged_qkv_to_tensor_parallel_qkv(x, num_attention_heads)
+            x = naive_merged_qkv_to_tensor_parallel_qkv(x, num_attention_heads, **kwargs)
         if is_naive_2fuse:
             return naive_fuse_split_tp(
-                x, tensor_parallel_degree, tensor_parallel_rank, is_column=is_column, fuse_tensor_parts=2
+                x, tensor_parallel_degree, tensor_parallel_rank, is_column=is_column, fuse_tensor_parts=2, **kwargs
             )
         if is_naive_3fuse:
             return naive_fuse_split_tp(
-                x, tensor_parallel_degree, tensor_parallel_rank, is_column=is_column, fuse_tensor_parts=3
+                x, tensor_parallel_degree, tensor_parallel_rank, is_column=is_column, fuse_tensor_parts=3, **kwargs
             )
 
-        return normal_fuse_split_tp(x, tensor_parallel_degree, tensor_parallel_rank, is_column=is_column)
+        return normal_fuse_split_tp(x, tensor_parallel_degree, tensor_parallel_rank, is_column=is_column, **kwargs)
 
     return fn
 
