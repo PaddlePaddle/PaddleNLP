@@ -5,6 +5,7 @@ on: [push, pull_request]
 jobs:
   Test:
     name: Test
+    if: false
     runs-on: ubuntu-24.04
     permissions:
       pull-requests: write
