@@ -28,6 +28,7 @@ from paddlenlp.data.causal_dataset import (
 )
 from paddlenlp.trainer import (
     FP8QuantWeightCallback,
+    MoECorrectionBiasAdjustCallback,
     PdArgumentParser,
     StepFlexToken,
     Trainer,
@@ -570,6 +571,10 @@ def main():
     )
 
     callbacks = [StepFlexToken(), FP8QuantWeightCallback()]
+
+    if getattr(config, "topk_method", None) == "noaux_tc":
+        aux_loss_free_gamma = getattr(config, "aux_loss_free_gamma", 0.001)
+        callbacks += [MoECorrectionBiasAdjustCallback(aux_loss_free_gamma)]
 
     trainer = PretrainingTrainer(
         model=model,
