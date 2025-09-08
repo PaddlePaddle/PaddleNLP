@@ -13,8 +13,18 @@ env:
   TASK: PaddleNLP-CI-Lint-${{ github.event.pull_request.number }}
 
 jobs:
+  check-bypass:
+    name: Check bypass
+    uses: ./.github/workflows/check-bypass.yml
+    with:
+      workflow-name: 'lint'
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+
   Lint:
     name: Lint
+    needs: check-bypass
+    if: ${{ needs.check-bypass.outputs.can-skip != 'true' }}
     runs-on: [self-hosted, ernie-cpu]
     steps:
       - name: Run Container
