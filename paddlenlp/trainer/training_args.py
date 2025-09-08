@@ -614,6 +614,16 @@ class TrainingArguments:
             )
         },
     )
+    sharding_offload_opt_buffersize_GB: int = field(
+        default=-1,
+        metadata={
+            "help": (
+                "Set the size of the optimizer offload buffer when need_hack_offload_optimizer() is True. This option only takes effect when "
+                "use DygraphShardingOptimizerV2. The default value is -1, which means that all of the optimizer states will be offloaded. Only "
+                "works when export HACK_OFFLOAD_OPTIMIZER=1. "
+            )
+        },
+    )
 
     save_sharded_model: bool = field(
         default=False,
@@ -1530,6 +1540,10 @@ class TrainingArguments:
                             strategy.hybrid_configs["sharding_configs"].comm_buffer_size_MB = int(
                                 self.sharding_comm_buffer_size_MB
                             )
+
+                        strategy.hybrid_configs["sharding_configs"].offload_opt_buffer_size = int(
+                            self.sharding_offload_opt_buffersize_GB
+                        )
 
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
