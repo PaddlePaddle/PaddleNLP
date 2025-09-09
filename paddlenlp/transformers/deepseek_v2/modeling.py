@@ -1544,8 +1544,6 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
                 qk_rope_head_dim,
                 position_ids,
                 eps,
-                q_lens,
-                out_proj_weight,
                 kv_lora_rank,
                 softmax_scale,
             ) = ctx.saved_tensor()
