@@ -78,7 +78,15 @@ def weight_process(name, quant_config, lora_config, state_dict, device):
         raise ValueError(f"quant_config.weight_quantize_algo {quant_config.weight_quantize_algo} is not supported.")
 
 
+def get_mixer(mixer, mixer_num, index=0):
+    if index == mixer_num - 1:
+        return mixer[index]
+    else:
+        return mixer[index] @ get_mixer(mixer, mixer_num, index + 1)
+
+
 def lora_process(name, layer, lora_config, state_dict, device, lora_state_dict=None):
+
     target_device = device if device == "cpu" else device + ":0"
 
     if (name + ".weight") not in state_dict.keys():
@@ -86,35 +94,44 @@ def lora_process(name, layer, lora_config, state_dict, device, lora_state_dict=N
 
     weight = state_dict.pop(name + ".weight")
     lora_use_mixer = lora_config.lora_use_mixer
+
+    mixer_num = lora_config.mixer_num
+    mixer = {}
     use_mora = lora_config.use_mora
+
     if lora_state_dict is None:
         lora_A = state_dict.pop(name + ".lora_A")
         if not use_mora:
             lora_B = state_dict.pop(name + ".lora_B")
         if lora_use_mixer:
-            lora_AB = state_dict.pop(name + ".lora_AB")
+            for i in range(mixer_num):
+                mixer[i] = state_dict.pop(name + ".lora_mixer_" + str(i))
     else:
         lora_A = lora_state_dict.pop(name + ".lora_A")
         if not use_mora:
             lora_B = lora_state_dict.pop(name + ".lora_B")
         if lora_use_mixer:
-            lora_AB = lora_state_dict.pop(name + ".lora_AB")
+            for i in range(mixer_num):
+                mixer[i] = state_dict.pop(name + ".lora_mixer_" + str(i))
     if device != "cpu":
         weight = weight.to(target_device)
         lora_A = lora_A.to(target_device)
         if not use_mora:
             lora_B = lora_B.to(target_device)
         if lora_use_mixer:
-            lora_AB = lora_AB.to(target_device)
+            for key in mixer.keys():
+                mixer[key] = mixer[key].to(target_device)
 
     if device == "cpu" and weight.dtype.name == "BF16":
         weight = weight.astype("float32")
         lora_A = lora_A.astype("float32")
         if not use_mora:
             lora_B = lora_B.astype("float32")
+
         if lora_use_mixer:
-            lora_AB = lora_AB.astype(lora_config.dtype)
-            delta_weight = layer.get_delta_weight(lora_A, lora_B, lora_AB)
+            for key in mixer.keys():
+                mixer[key] = mixer[key].astype(lora_config.dtype)
+            delta_weight = layer.get_delta_weight(lora_A, lora_B, get_mixer(mixer, mixer_num))
         elif use_mora:
             delta_weight = layer.get_delta_weight(lora_A)
         else:
@@ -122,7 +139,7 @@ def lora_process(name, layer, lora_config, state_dict, device, lora_state_dict=N
         out = (weight + delta_weight).astype(lora_config.dtype)
     else:
         if lora_use_mixer:
-            delta_weight = layer.get_delta_weight(lora_A, lora_B, lora_AB)
+            delta_weight = layer.get_delta_weight(lora_A, lora_B, get_mixer(mixer, mixer_num))
         elif use_mora:
             delta_weight = layer.get_delta_weight(lora_A)
         else:

@@ -25,6 +25,8 @@ export llama_data_path=/llama_data
 export llm_gpt_case_path=$root_path/llm/auto_parallel/gpt-3
 export gpt_data_path=/fleetx_data
 
+DEFAULT_TOPO=pp_first
+
 unset CUDA_VISIBLE_DEVICES
 
 function is_a100() {
@@ -256,6 +258,7 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
                 ./run_pretrain_auto.py \
                 --model_name_or_path "meta-llama/Llama-2-7b" \
                 --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
+                --hybrid_parallel_topo_order $DEFAULT_TOPO \
                 --input_dir "./data" \
                 --output_dir "./output" \
                 --weight_decay 0.01 \
@@ -358,6 +361,7 @@ function llama_dygraph_auto_bs8_fp32_DP2() {
         --model_type "llama" \
         --model_name_or_path "facebook/llama-7b" \
         --tokenizer_name_or_path "facebook/llama-7b" \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "./data" \
         --output_dir $case_out_dir \
         --split 949,50,1 \
@@ -429,6 +433,7 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2() {
         --model_type "llama" \
         --model_name_or_path "facebook/llama-7b" \
         --tokenizer_name_or_path "facebook/llama-7b" \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "./data" \
         --output_dir $case_out_dir \
         --split 949,50,1 \
@@ -511,6 +516,7 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
                 --model_type "llama" \
                 --model_name_or_path "facebook/llama-7b" \
                 --tokenizer_name_or_path "facebook/llama-7b" \
+                --hybrid_parallel_topo_order $DEFAULT_TOPO \
                 --input_dir "./data" \
                 --output_dir $case_out_dir \
                 --split 949,50,1 \
@@ -584,6 +590,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
         --model_type "llama" \
         --model_name_or_path "facebook/llama-7b" \
         --tokenizer_name_or_path "facebook/llama-7b" \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "./data" \
         --output_dir $case_out_dir \
         --split 949,50,1 \
@@ -659,6 +666,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate() {
         --use_intermediate_api 1\
         --model_name_or_path "facebook/llama-7b" \
         --tokenizer_name_or_path "facebook/llama-7b" \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "./data" \
         --output_dir $case_out_dir \
         --split 949,50,1 \
@@ -732,6 +740,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2() {
             --model_type "llama" \
             --model_name_or_path "facebook/llama-7b" \
             --tokenizer_name_or_path "facebook/llama-7b" \
+            --hybrid_parallel_topo_order $DEFAULT_TOPO \
             --input_dir "./data" \
             --output_dir $case_out_dir \
             --split 949,50,1 \
@@ -806,6 +815,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2_intermediate() {
         python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
             --model_name_or_path "facebook/llama-7b" \
             --tokenizer_name_or_path "facebook/llama-7b" \
+            --hybrid_parallel_topo_order $DEFAULT_TOPO \
             --input_dir "./data" \
             --output_dir $case_out_dir \
             --split 949,50,1 \
@@ -883,6 +893,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
             --model_type "llama_pp" \
             --model_name_or_path "facebook/llama-7b" \
             --tokenizer_name_or_path "facebook/llama-7b" \
+            --hybrid_parallel_topo_order $DEFAULT_TOPO \
             --input_dir "./data" \
             --output_dir $case_out_dir \
             --split 949,50,1 \
@@ -950,6 +961,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
             --model_type "llama_pp" \
             --model_name_or_path "facebook/llama-7b" \
             --tokenizer_name_or_path "facebook/llama-7b" \
+            --hybrid_parallel_topo_order $DEFAULT_TOPO \
             --input_dir "./data" \
             --output_dir $auto_case_out_dir \
             --split 949,50,1 \
@@ -1031,6 +1043,7 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2() {
             ./run_pretrain_auto.py \
             --model_name_or_path "meta-llama/Llama-2-13b" \
             --tokenizer_name_or_path "meta-llama/Llama-2-13b" \
+            --hybrid_parallel_topo_order $DEFAULT_TOPO \
             --input_dir "./data" \
             --output_dir "./output" \
             --split 949,50,1 \
@@ -1131,6 +1144,7 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
             ./run_pretrain_auto.py \
             --model_name_or_path "meta-llama/Llama-2-13b" \
             --tokenizer_name_or_path "meta-llama/Llama-2-13b" \
+            --hybrid_parallel_topo_order $DEFAULT_TOPO \
             --input_dir "./data" \
             --output_dir "./output" \
             --split 949,50,1 \
@@ -1245,6 +1259,7 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP() {
                     --model_type "llama" \
                     --model_name_or_path "facebook/llama-7b" \
                     --tokenizer_name_or_path "facebook/llama-7b" \
+                    --hybrid_parallel_topo_order $DEFAULT_TOPO \
                     --input_dir "./data" \
                     --output_dir $case_out_dir \
                     --split 949,50,1 \
@@ -1361,6 +1376,7 @@ function llama_pir_auto_fuse_ffn_attention_qkv_MP2() {
                 run_pretrain_auto.py \
                 --model_name_or_path "facebook/llama-7b" \
                 --tokenizer_name_or_path "facebook/llama-7b" \
+                --hybrid_parallel_topo_order $DEFAULT_TOPO \
                 --input_dir "./data" \
                 --output_dir $auto_case_out_dir \
                 --split 949,50,1 \
@@ -1523,6 +1539,7 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP() {
             --model_type "llama" \
             --model_name_or_path "facebook/llama-7b" \
             --tokenizer_name_or_path "facebook/llama-7b" \
+            --hybrid_parallel_topo_order $DEFAULT_TOPO \
             --input_dir "./data" \
             --output_dir $case_out_dir \
             --split 949,50,1 \
@@ -1623,6 +1640,7 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
             --model_type "llama" \
             --model_name_or_path "facebook/llama-7b" \
             --tokenizer_name_or_path "facebook/llama-7b" \
+            --hybrid_parallel_topo_order $DEFAULT_TOPO \
             --input_dir "./data" \
             --output_dir $case_out_dir \
             --split 949,50,1 \
@@ -1737,6 +1755,7 @@ function llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN() {
         --model_type "llama" \
         --model_name_or_path "facebook/llama-7b" \
         --tokenizer_name_or_path "facebook/llama-7b" \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "./data" \
         --output_dir $case_out_dir \
         --split 949,50,1 \
@@ -1836,6 +1855,7 @@ function llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate() {
         --log_dir $case_log_dir \
         ../run_dpo_auto.py\
         --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --train_dataset_path ${llama_data_path}/data_dpo/data/train.jsonl \
         --dev_dataset_path ${llama_data_path}/data_dpo/data/dev.jsonl \
         --output_dir ./checkpoints/dpo_ckpts \
@@ -1926,6 +1946,7 @@ function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1() {
             --model_type "llama" \
             --model_name_or_path "facebook/llama-7b" \
             --tokenizer_name_or_path "facebook/llama-7b" \
+            --hybrid_parallel_topo_order $DEFAULT_TOPO \
             --input_dir "./data" \
             --output_dir $case_out_dir \
             --split 949,50,1 \
@@ -2033,6 +2054,7 @@ function llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
             --model_type "llama" \
             --model_name_or_path "facebook/llama-7b" \
             --tokenizer_name_or_path "facebook/llama-7b" \
+            --hybrid_parallel_topo_order $DEFAULT_TOPO \
             --input_dir "./data" \
             --output_dir $case_out_dir \
             --split 949,50,1 \
@@ -2156,6 +2178,7 @@ function llama_align_dygraph_dy2st_pir_auto_pp_bs2_bf16_DP1-MP1-PP4() {
             --model_type "llama" \
             --model_name_or_path "facebook/llama-7b" \
             --tokenizer_name_or_path "facebook/llama-7b" \
+            --hybrid_parallel_topo_order $DEFAULT_TOPO \
             --input_dir "./data" \
             --output_dir $case_out_dir \
             --split 949,50,1 \
@@ -2248,6 +2271,7 @@ function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1() {
         ../../run_pretrain.py \
         --model_name_or_path "facebook/llama-7b" \
         --tokenizer_name_or_path "facebook/llama-7b" \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "./data" \
         --output_dir $dy_case_out_dir \
         --split 949,50,1 \
@@ -2321,6 +2345,7 @@ function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1() {
         run_pretrain_auto.py \
         --model_name_or_path "facebook/llama-7b" \
         --tokenizer_name_or_path "facebook/llama-7b" \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "./data" \
         --output_dir $auto_case_out_dir \
         --split 949,50,1 \
@@ -2403,6 +2428,7 @@ function llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2(){
         --model_type "llama" \
         --model_name_or_path "baichuan-inc/Baichuan2-13B-Base" \
         --tokenizer_name_or_path "baichuan-inc/Baichuan2-13B-Base" \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "./data" \
         --output_dir $case_out_dir \
         --split 949,50,1 \
@@ -2475,6 +2501,7 @@ function llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate
         --use_intermediate_api true \
         --model_name_or_path "baichuan-inc/Baichuan2-13B-Base" \
         --tokenizer_name_or_path "baichuan-inc/Baichuan2-13B-Base" \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "./data" \
         --output_dir $case_out_dir \
         --split 949,50,1 \
@@ -2548,6 +2575,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2() {
         run_pretrain_auto.py \
         --model_name_or_path gpt2-medium-en \
         --tokenizer_name_or_path gpt2-medium-en \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "$gpt_data_path/data" \
         --output_dir "output/$task_name" \
         --split 949,50,1 \
@@ -2620,6 +2648,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2() {
         run_pretrain_auto.py \
         --model_name_or_path gpt2-medium-en \
         --tokenizer_name_or_path gpt2-medium-en \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "$gpt_data_path/data" \
         --output_dir $case_out_dir  \
         --split 949,50,1 \
@@ -2692,6 +2721,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
         run_pretrain_auto.py \
         --model_name_or_path gpt2-medium-en \
         --tokenizer_name_or_path gpt2-medium-en \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "$gpt_data_path/data" \
         --output_dir $case_out_dir  \
         --split 949,50,1 \
@@ -2765,6 +2795,7 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
         run_pretrain_auto.py \
         --model_name_or_path gpt2-medium-en \
         --tokenizer_name_or_path gpt2-medium-en \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "$gpt_data_path/data" \
         --output_dir $case_out_dir  \
         --split 949,50,1 \
@@ -2838,6 +2869,7 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate() {
         run_pretrain_auto.py \
         --model_name_or_path gpt2-medium-en \
         --tokenizer_name_or_path gpt2-medium-en \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "$gpt_data_path/data" \
         --output_dir $case_out_dir  \
         --split 949,50,1 \
@@ -2911,6 +2943,7 @@ function llm_gpt_pir_auto_bs4_TP2(){
         run_pretrain_auto.py \
         --model_name_or_path gpt3-13B-en \
         --tokenizer_name_or_path gpt3-13B-en \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "$gpt_data_path/data" \
         --output_dir "output/$task_name" \
         --split 949,50,1 \
@@ -2978,6 +3011,7 @@ function llm_gpt_pir_auto_bs4_TP2_PP2(){
             run_pretrain_auto.py \
             --model_name_or_path gpt3-13B-en \
             --tokenizer_name_or_path gpt3-13B-en \
+            --hybrid_parallel_topo_order $DEFAULT_TOPO \
             --input_dir "$gpt_data_path/data" \
             --output_dir "output/$task_name" \
             --split 949,50,1 \
@@ -3041,6 +3075,7 @@ function llm_gpt_pir_auto_bs8_DP2_TP2_PP2(){
         run_pretrain_auto.py \
         --model_name_or_path gpt3-13B-en \
         --tokenizer_name_or_path gpt3-13B-en \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "$gpt_data_path/data" \
         --output_dir "output/$task_name" \
         --split 949,50,1 \
@@ -3107,6 +3142,7 @@ function llm_gpt_pir_auto_bs8_DP2_TP2_PP2_intermediate(){
         run_pretrain_auto.py \
         --model_name_or_path gpt3-13B-en \
         --tokenizer_name_or_path gpt3-13B-en \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "$gpt_data_path/data" \
         --output_dir "output/$task_name" \
         --split 949,50,1 \
@@ -3163,6 +3199,7 @@ function llm_qwen_dygraph_auto_bs1_fp32_DP2() {
 {
     "model_name_or_path": "qwen/qwen-7b",
     "tokenizer_name_or_path": "qwen/qwen-7b",
+    "hybrid_parallel_topo_order": "$DEFAULT_TOPO",
     "input_dir": "./data",
     "output_dir": "./checkpoints/qwen_pretrain_ckpts",
     "per_device_train_batch_size": 1,
@@ -3254,6 +3291,7 @@ function llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2() {
 {
     "model_name_or_path": "qwen/qwen-7b",
     "tokenizer_name_or_path": "qwen/qwen-7b",
+    "hybrid_parallel_topo_order": "$DEFAULT_TOPO",
     "input_dir": "./data",
     "output_dir": "./checkpoints/qwen_pretrain_ckpts",
     "per_device_train_batch_size": 1,
@@ -3343,6 +3381,7 @@ function llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2-PP2() {
 {
     "model_name_or_path": "qwen/qwen-7b",
     "tokenizer_name_or_path": "qwen/qwen-7b",
+    "hybrid_parallel_topo_order": "$DEFAULT_TOPO",
     "input_dir": "./data",
     "output_dir": "./checkpoints/qwen_pretrain_ckpts",
     "per_device_train_batch_size": 1,
@@ -3434,6 +3473,7 @@ function llm_qwen_dygraph_auto_bs1_bf16_DP2-MP2-PP2() {
 {
     "model_name_or_path": "qwen/qwen-7b",
     "tokenizer_name_or_path": "qwen/qwen-7b",
+    "hybrid_parallel_topo_order": "$DEFAULT_TOPO",
     "input_dir": "./data",
     "output_dir": "./checkpoints/qwen_pretrain_ckpts",
     "per_device_train_batch_size": 1,
@@ -3547,6 +3587,7 @@ function llm_qwen_pir_auto_bs1_bf16_TP2(){
         run_pretrain_auto.py \
         --model_name_or_path "qwen/qwen-14b" \
         --tokenizer_name_or_path "qwen/qwen-14b" \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "./data" \
         --output_dir "output/$task_name/" \
         --per_device_train_batch_size 1\
@@ -3624,6 +3665,7 @@ function llm_qwen_pir_auto_bs1_bf16_TP2_PP2(){
         run_pretrain_auto.py \
         --model_name_or_path "qwen/qwen-14b" \
         --tokenizer_name_or_path "qwen/qwen-14b" \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --input_dir "./data" \
         --output_dir "output/$task_name/" \
         --per_device_train_batch_size 1\
@@ -3694,6 +3736,7 @@ function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
         --log_dir  "$case_log_dir" \
         ../run_finetune_auto.py \
         --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
+        --hybrid_parallel_topo_order $DEFAULT_TOPO \
         --dataset_name_or_path "./data" \
         --output_dir "$case_out_dir" \
         --enable_auto_parallel true \
@@ -3853,6 +3896,7 @@ if [ $IS_A100 -eq 1 ]; then
     --model_type "deepseekv3_auto" \
     --model_name_or_path $model_config_json \
     --tokenizer_name_or_path "deepseek-ai/DeepSeek-V3" \
+    --hybrid_parallel_topo_order $DEFAULT_TOPO \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --split 949,50,1 \
@@ -3999,6 +4043,7 @@ if [ $IS_A100 -eq 1 ]; then
     --model_type "deepseekv3_auto" \
     --model_name_or_path $model_config_json \
     --tokenizer_name_or_path "deepseek-ai/DeepSeek-V3" \
+    --hybrid_parallel_topo_order $DEFAULT_TOPO \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --split 949,50,1 \
@@ -4075,6 +4120,7 @@ function llama_baichuan_dygraph_auto_sp_async_reduce_scatter_bs8_bf16_DP4-MP2-SP
 {
     "model_name_or_path": "baichuan-inc/Baichuan2-13B-Base",
     "tokenizer_name_or_path": "baichuan-inc/Baichuan2-13B-Base",
+    "hybrid_parallel_topo_order": "$DEFAULT_TOPO",
     "input_dir": "./data",
     "output_dir": "./checkpoints/baichuan2_13b_ckpts",
     "split": "949,50,1",

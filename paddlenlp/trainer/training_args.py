@@ -642,6 +642,11 @@ class TrainingArguments:
         metadata={"help": "Whether to remap parameter name when load_sharded_model = true."},
     )
 
+    sharded_model_from_ema: bool = field(
+        default=False,
+        metadata={"help": "Whether to load sharded model from EMA."},
+    )
+
     tensor_parallel_degree: int = field(
         default=-1,
         metadata={
@@ -791,7 +796,7 @@ class TrainingArguments:
                 "Following options are supported:\n"
                 "- pp_first. the topo order is dp, pp, sharding, mp \n"
                 "- sharding_first. the topo order is dp, sharding, pp, mp \n"
-                "Default is None, for pp_first"
+                "Default is None, for sharding_first"
             )
         },
     )
@@ -1057,6 +1062,10 @@ class TrainingArguments:
     zcc_ema_interval: Optional[int] = field(
         default=1,
         metadata={"help": "Interval between updating EMA parameters."},
+    )
+    zcc_ema_loss_threshold: Optional[float] = field(
+        default=None,
+        metadata={"help": "If set not None, only do EMA when the training loss is smaller than the threshold value"},
     )
     save_tokenizer: Optional[bool] = field(
         default=True,
@@ -2116,7 +2125,7 @@ class TrainingArguments:
                 self.expert_tensor_parallel_degree = -1
 
         if self.hybrid_parallel_topo_order is None:
-            self.hybrid_parallel_topo_order = "pp_first"
+            self.hybrid_parallel_topo_order = "sharding_first"
         assert self.hybrid_parallel_topo_order in ["pp_first", "sharding_first"]
 
         if self.use_hybrid_parallel and self.enable_auto_parallel:

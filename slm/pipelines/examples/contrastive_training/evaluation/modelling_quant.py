@@ -215,7 +215,6 @@ class HiddenPredictorWrapper:
         self.sentence_pooling_method = sentence_pooling_method
         self.query_instruction = query_instruction
         self.document_instruction = document_instruction
-        self.document_instruction = document_instruction
         self.eval_batch_size = eval_batch_size
         self.max_seq_length = max_seq_length
         self.model_flag = model_flag

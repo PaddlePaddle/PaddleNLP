@@ -24,6 +24,8 @@ import paddle.distributed as dist
 from paddle import Tensor, nn
 from paddle.distributed.communication.group import Group
 
+from paddlenlp.utils.log import logger
+
 from .moe_gate import PretrainedMoEGate
 from .token_dispatcher import MoEFlexTokenDispatcher
 
@@ -155,12 +157,12 @@ class MoELayer(nn.Layer):
     def __init__(
         self,
         config,
-        moe_num_experts: int,
+        moe_num_experts: int,  # 128
         expert_class: nn.Layer,
         expert_kwargs: dict,
         gate: PretrainedMoEGate,
         capacity: int = 1.0,
-        moe_group: str = "data",
+        moe_group: str = "tp",  # will be re-assigned from config
         all_to_all_dropout=0.0,
     ):
         super().__init__()
@@ -169,6 +171,8 @@ class MoELayer(nn.Layer):
 
         self.moe_num_experts = moe_num_experts
         self.capacity = capacity
+        self.is_tp_moe = False
+        self.is_dp_moe = False
 
         try:
             dist.fleet.get_hybrid_communicate_group()
@@ -179,7 +183,7 @@ class MoELayer(nn.Layer):
         if (
             is_fleet_init
             and dist.fleet.get_hybrid_communicate_group().get_data_parallel_world_size() > 1
-            and moe_group == "data"
+            and moe_group == "dp"
         ):
             self.moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
             self.moe_rank = dist.get_rank(self.moe_group)
@@ -190,8 +194,29 @@ class MoELayer(nn.Layer):
                 self.moe_num_experts, self.expert_parallel_degree
             )
             self.is_dummy_moe = False if self.expert_parallel_degree > 1 else True
+            self.is_dp_moe = True
+        elif (
+            is_fleet_init
+            and dist.fleet.get_hybrid_communicate_group().get_model_parallel_world_size() > 1
+            and moe_group == "tp"
+        ):
+            # for qwen3moe,moe_group should be "tp", since dp always == 1
+            self.moe_group = dist.fleet.get_hybrid_communicate_group().get_model_parallel_group()
+
+            self.moe_rank = dist.get_rank(self.moe_group)  # i for num_worker in a TP group
+            self.moe_rank = 0 if self.moe_rank < 0 else self.moe_rank  # 1
+
+            self.expert_parallel_degree = dist.get_world_size(self.moe_group)
+
+            self.expert_parallel_degree = 1 if self.expert_parallel_degree < 0 else self.expert_parallel_degree  # 4
+
+            self.moe_num_experts_per_device = self._parse_moe_expert_parallel(
+                self.moe_num_experts, self.expert_parallel_degree
+            )  # e.g. 单机2路tp， 那么 32  = 128/4
+
+            self.is_dummy_moe = False if self.expert_parallel_degree > 1 else True  # False
+            self.is_tp_moe = True
         else:
-            # when moe_group is dummy, we don't need to use all_to_all
             self.moe_group = None
             self.moe_rank = 0
             self.expert_parallel_degree = 1
@@ -210,6 +235,7 @@ class MoELayer(nn.Layer):
 
         self.gate = gate
         self.gate.group = self.moe_group
+
         self._post_init()
 
     def _parse_moe_expert_parallel(self, moe_num_experts, expert_parallel_degree):
@@ -219,6 +245,7 @@ class MoELayer(nn.Layer):
         assert (
             moe_num_experts % expert_parallel_degree == 0
         ), f"expert moe_num_experts={moe_num_experts} % moe_world_size={expert_parallel_degree} == 0"
+
         moe_num_experts_per_device = moe_num_experts // expert_parallel_degree
         return moe_num_experts_per_device
 
@@ -229,9 +256,11 @@ class MoELayer(nn.Layer):
         for k in self.experts:
             if k is not None:
                 for p in k.parameters():
-                    p.expert = not self.is_dummy_moe
-                    p.no_sync = not self.is_dummy_moe
-                    # logger.info(f"expert param={p.name}, no-sync={p.no_sync}")
+                    p.expert = not (self.is_tp_moe or self.is_dummy_moe)  # type: ignore
+                    p.no_sync = not (self.is_tp_moe or self.is_dummy_moe)
+                    logger.info(f"expert param={p.name}, no-sync={p.no_sync}")
+                    if self.is_tp_moe or self.is_dp_moe:
+                        p.is_distributed = True
 
     def forward(
         self,
@@ -257,10 +286,12 @@ class MoELayer(nn.Layer):
         # topk_ids    : sk
         # token_priority    : se
         # self.exp_counts  :
-        capacity, topk_weight, topk_ids, token_priority, l_aux, l_zloss = self.gate(hidden_state)
+
+        capacity, topk_weight, topk_ids, token_priority, l_aux, l_zloss = self.gate(hidden_state)  # here
 
         """MoE expert dispatch from: https://huggingface.co/deepseek-ai/DeepSeek-V3/blob/main/modeling_deepseek.py"""
         cnts = paddle.zeros([topk_ids.shape[0], len(self.experts)], dtype=topk_ids.dtype)
+
         cnts = cnts.put_along_axis(topk_ids, 1, axis=1)
 
         tokens_per_expert = cnts.sum(axis=0)
@@ -271,6 +302,7 @@ class MoELayer(nn.Layer):
 
         if self.expert_parallel_degree > 1:
             tokens_per_ep_rank = tokens_per_expert.reshape([self.expert_parallel_degree, -1]).sum(axis=1)
+
             tokens_per_expert_group = _AllToAll.apply(
                 [tokens_per_expert.shape[0]], tokens_per_expert, group=self.moe_group
             )
@@ -278,6 +310,7 @@ class MoELayer(nn.Layer):
                 tokens_per_expert_group.reshape([self.expert_parallel_degree, -1]).sum(axis=1).cpu().tolist()
             )
             input_split_sizes = tokens_per_ep_rank.cpu().tolist()
+
             gathered_tokens = _AllToAll.apply(
                 [tokens_per_expert_group.sum(axis=0).cpu().item(), sorted_tokens.shape[1]],
                 sorted_tokens,
@@ -290,25 +323,35 @@ class MoELayer(nn.Layer):
                 [self.expert_parallel_degree, self.moe_num_experts_per_device]
             ).sum(axis=0)
             gatherd_idxs = np.zeros(shape=(gathered_tokens.shape[0],), dtype=np.int32)
+
             s = 0
             for i, k in enumerate(tokens_per_expert_group.cpu().numpy()):
                 gatherd_idxs[s : s + k] = i % self.moe_num_experts_per_device
                 s += k
             gatherd_idxs = gatherd_idxs.argsort()
             sorted_tokens = gathered_tokens[gatherd_idxs]
+
             tokens_per_expert = tokens_per_expert_post_gather
 
         outputs = []
         start_idx = 0
+
         for i, num_tokens in enumerate(tokens_per_expert):
             end_idx = start_idx + num_tokens
+
             if num_tokens == 0:
                 continue
+
             expert = self.experts[i + self.moe_rank * self.moe_num_experts_per_device]
+
             tokens_for_this_expert = sorted_tokens[start_idx:end_idx]
+
             expert_out = expert(tokens_for_this_expert)
+
             outputs.append(expert_out)
+
             start_idx = end_idx
+
         outs = paddle.concat(outputs, axis=0) if len(outputs) > 0 else paddle.to_tensor(0, dtype=sorted_tokens.dtype)
         if self.expert_parallel_degree > 1:
             new_x = paddle.empty_like(outs)
@@ -324,6 +367,7 @@ class MoELayer(nn.Layer):
 
         new_x = paddle.empty_like(outs)
         new_x[idxs] = outs
+
         final_out = (
             new_x.reshape(topk_ids.shape + [-1])
             .astype(topk_weight.dtype)
@@ -339,7 +383,6 @@ class MoELayer(nn.Layer):
 
 class MoEFlexTokenLayer(nn.Layer):
     def __init__(self, config, moe_num_experts, expert_class, expert_kwargs, gate, moe_group):
-
         super().__init__()
         self.config = config
         self.moe_group = moe_group
@@ -357,7 +400,6 @@ class MoEFlexTokenLayer(nn.Layer):
     def expert_forward(self, dispatched_input, tokens_per_expert):
         outputs = []
         tokens_per_expert = tokens_per_expert.tolist()
-        # print(f"all tokens: {sum(tokens_per_expert)}, detail: {tokens_per_expert}")
         chunks = paddle.split(dispatched_input, num_or_sections=tokens_per_expert, axis=0)
         for chunk, expert in zip(chunks, self.experts):
             chunk = chunk.contiguous()

@@ -326,6 +326,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             logits += self.gumbel_rsample(logits.shape)
 
         gates = self.gate_score_func(logits=logits)
+
         capacity = self._capacity(gates, self.capacity_factor, self.max_capacity, self.min_capacity)
 
         # Create a mask for 1st's expert per token
@@ -396,6 +397,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         logits: paddle.Tensor,
     ) -> Tuple[int, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor]:
         # everything is in fp32 in this function
+
         gates = self.gate_score_func(logits=logits)
 
         # Create a mask for 1st's expert per token.

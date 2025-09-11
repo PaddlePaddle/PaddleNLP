@@ -29,6 +29,7 @@ global_verification_fail_arr=()
 target_lists_for_gpt=(
     "slm/model_zoo/gpt-3"
     "llm/auto_parallel/gpt-3"
+    "paddlenlp/trainer/training_args.py"
     "paddlenlp/transformers/gpt"
     "scripts/distribute"
     ".github/workflows/distribute.yml"
@@ -37,6 +38,7 @@ target_lists_for_gpt=(
 target_lists_for_llama=(
     "llm/auto_parallel/llama"
     "paddlenlp/trainer/auto_trainer.py"
+    "paddlenlp/trainer/training_args.py"
     "paddlenlp/transformers/llama"
     "scripts/distribute"
     ".github/workflows/distribute.yml"
@@ -45,6 +47,7 @@ target_lists_for_llama=(
 target_lists_for_deepseek=(
     "llm/auto_parallel/deepseek-v3"
     "paddlenlp/trainer/auto_trainer.py"
+    "paddlenlp/trainer/training_args.py"
     "paddlenlp/transformers/deepseek_v2/modeling_auto.py"
     "paddlenlp/transformers/deepseek_v2/modeling.py"
     "paddlenlp/transformers/deepseek_v3/modeling_auto.py"

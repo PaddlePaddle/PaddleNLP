@@ -37,8 +37,18 @@ defaults:
     shell: bash
 
 jobs:
+  check-bypass:
+    name: Check bypass
+    uses: ./.github/workflows/check-bypass.yml
+    with:
+      workflow-name: 'distribute-a100'
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+
   distribute-a100-ci:
     name: distribute-a100-ci
+    needs: check-bypass
+    if: ${{ needs.check-bypass.outputs.can-skip != 'true' }}
     runs-on:
       group: Distribute
     steps:
