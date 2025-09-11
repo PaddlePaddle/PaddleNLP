@@ -968,8 +968,12 @@ class Trainer:
 
                 if resume_from_checkpoint is not None:
                     model_sharded_state_dict = self.model.sharded_state_dict()
-                    self.optimizer.sharded_state_dict(model_sharded_state_dict)
-                    init_optimizer(self.optimizer)
+                    accessible_files = os.listdir(resume_from_checkpoint)
+                    metadata_files = [file for file in accessible_files if file.endswith(".metadata")]
+                    assert len(metadata_files) == 1, "Only support one metadata file now."
+                    metadata = paddle.load(os.path.join(resume_from_checkpoint, metadata_files[0]))
+                    state_dict_metadata = metadata.state_dict_metadata
+                    init_optimizer(self.optimizer, model_sharded_state_dict, state_dict_metadata)
                     optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
                     sharded_state_dict = {**model_sharded_state_dict, **optimizer_sharded_state_dict}
                     dist.load_state_dict(sharded_state_dict, resume_from_checkpoint, aoa_config=self.args.aoa_config)
