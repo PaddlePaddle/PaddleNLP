@@ -1646,6 +1646,7 @@ class TrainingArguments:
                 self.sharding_parallel_degree
                 * self.tensor_parallel_degree
                 * self.sep_parallel_degree
+                * self.context_parallel_degree
                 * self.pipeline_parallel_degree
             )
 
