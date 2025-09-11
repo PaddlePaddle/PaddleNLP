@@ -1541,7 +1541,7 @@ class TrainingArguments:
                                 self.sharding_comm_buffer_size_MB
                             )
 
-                        if getattr(strategy.hybrid_configs["sharding_configs"], "offload_opt_buffer_size", None):
+                        if hasattr(strategy.hybrid_configs["sharding_configs"], "offload_opt_buffer_size"):
                             strategy.hybrid_configs["sharding_configs"].offload_opt_buffer_size = int(
                                 self.sharding_offload_opt_buffersize_GB
                             )
