@@ -24,7 +24,7 @@ jobs:
 
       - name: Update paddle
         run: |
-          echo "Do not code in the incubate/fleety_20250421 branch, please go to incubate/fleety_12 branch!"
-          echo "不要在incubate/fleety_20250421分支提交代码，请到incubate/fleety_12分支"
+          echo "Do not code in the incubate/fleety_20250421 branch, please go to develop branch!"
+          echo "不要在incubate/fleety_20250421分支提交代码，请到develop分支"
           exit 1
 
