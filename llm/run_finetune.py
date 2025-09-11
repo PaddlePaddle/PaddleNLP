@@ -267,6 +267,7 @@ def main():
     model_config.using_fake_gate = model_args.using_fake_gate
     model_config.moe_subbatch_token_num = model_args.moe_subbatch_token_num
     model_config.aux_loss_alpha = model_args.aux_loss_alpha
+    model_config.gradient_accumulation_steps = training_args.gradient_accumulation_steps
     logger.info(f"Final model config: {model_config}")
 
     logger.info("Creating model")
