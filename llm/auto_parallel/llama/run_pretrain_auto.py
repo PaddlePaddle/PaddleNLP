@@ -411,12 +411,12 @@ def init_seed(seed: int = 1234, args=None):
             elif args.hybrid_parallel_topo_order == "sharding_first":
                 order = ["dp", "sharding", "pp", "mp", "sep"]
             if args.context_parallel_degree is not None and args.context_parallel_degree > 1:
-                sep_degree = args.context_parallel_degree 
+                sep_degree = args.context_parallel_degree
             elif args.sep_parallel_degree is not None and args.sep_parallel_degree > 1:
                 sep_degree = args.sep_parallel_degree
             else:
                 sep_degree = 1
-            sep_degree=args.sep_parallel_degree if args.sep_parallel_degree > 1 else args.context_parallel_degree
+            sep_degree = args.sep_parallel_degree if args.sep_parallel_degree > 1 else args.context_parallel_degree
             topo = Topology(
                 dist.get_rank(),
                 dist.get_world_size(),
@@ -480,7 +480,7 @@ def main():
     if (
         do_enable_linear_fused_grad_add or do_enable_mp_async_allreduce or do_enable_sp_async_reduce_scatter
     ) and not training_args.to_static:
-        from llm.utils.fused_layers import mock_layers
+        from paddle.incubate.nn import mock_layers
 
         mock_layers(do_enable_linear_fused_grad_add, do_enable_mp_async_allreduce, do_enable_sp_async_reduce_scatter)
 
