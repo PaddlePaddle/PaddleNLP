@@ -24,6 +24,7 @@ import paddle.distributed as dist
 import paddle.distributed.auto_parallel.intermediate.parallelize as parallelize
 import paddle.nn as nn
 from paddle.distributed import fleet
+from paddle.distributed.auto_parallel.pipelining.schedules import get_pp_schedule
 from paddle.profiler.utils import switch_job_schedule_profiler
 from tqdm.auto import tqdm
 
@@ -48,9 +49,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     ShardingOption,
     TrainOutput,
     _exec_mode_guard,
-    check_auto_parallel_pipeline_support,
     get_last_checkpoint,
-    get_pp_schedule,
     has_length,
     speed_metrics,
 )
@@ -81,7 +80,6 @@ class AutoTrainer(Trainer):
                 kwargs.update({"criterion": loss_func})
         self.auto_dist_config = kwargs.pop("auto_dist_config", None)
         model = kwargs.get("model", None)
-        self.model_type = kwargs.pop("model_type", None)
         assert model is not None
         if kwargs.get("args", None) is not None and kwargs["args"].use_intermediate_api:
             if not parallelize.has_parallelized_model:
@@ -103,16 +101,19 @@ class AutoTrainer(Trainer):
 
         self.global_mesh = fleet.auto.get_mesh()
         self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
-        if self.args.pipeline_parallel_degree > 1 and check_auto_parallel_pipeline_support(self.model_type):
+        if self.args.pipeline_parallel_degree > 1:
             self.pp_schedule = get_pp_schedule(
                 model,
-                self.model_type,
-                self.args.n_microbatches,
+                self.args.gradient_accumulation_steps,
                 self.criterion,
                 self.args.pipeline_schedule_mode,
                 self.args.pipeline_parallel_degree,
                 self.comm_group_in_pp,
             )
+            self.args.per_device_train_batch_size = (
+                self.args.per_device_train_batch_size * self.args.gradient_accumulation_steps
+            )
+            self.args.gradient_accumulation_steps = 1
         self._in_pir_mode = paddle.base.framework.get_flags("FLAGS_enable_pir_api")["FLAGS_enable_pir_api"]
 
     @classmethod
@@ -762,6 +763,7 @@ class AutoTrainer(Trainer):
 
         final_loss = None
         if len(losses) != 0:
+            losses = [loss[0] for loss in losses]
             final_loss = paddle.stack(losses).mean()
 
         return final_loss
@@ -770,16 +772,13 @@ class AutoTrainer(Trainer):
         self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]
     ) -> paddle.Tensor:
         assert self.args.pipeline_parallel_degree > 1, "pipeline_parallel_degree must be greater than 1."
-        assert check_auto_parallel_pipeline_support(
-            self.model_type
-        ), "dynamic auto_parallel pipeline only supports special models"
         with self.autocast_smart_context_manager():
             loss = self.compute_pipeline_loss(model, inputs)
 
         return loss
 
     def dynamic_training(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
-        if self.args.pipeline_parallel_degree > 1 and check_auto_parallel_pipeline_support(self.model_type):
+        if self.args.pipeline_parallel_degree > 1:
             return self.dynamic_auto_parallel_pipeline_training(model, inputs)
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
