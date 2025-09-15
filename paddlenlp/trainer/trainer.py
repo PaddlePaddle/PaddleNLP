@@ -929,13 +929,13 @@ class Trainer:
         self._memory_tracker.start()
 
         if not self.args.enable_auto_parallel:
-            if not self.args.should_load_sharding_stage1_model and not self.args.using_flex_checkpoint:
+            if not self.args.should_load_sharding_stage1_model and not self.args.load_flex_checkpoint:
                 self._load_from_checkpoint(resume_from_checkpoint)
 
             if self.args.should_load_sharding_stage1_model:
                 model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
 
-            elif self.args.should_save_sharding_stage1_model:
+            elif self.args.should_save_sharding_stage1_model and not self.args.load_flex_checkpoint:
                 # In the non-sharded mode, should invoke _load_from_checkpoint before _wrap_model.
                 # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast params from rank0 to the other ranks.
                 model = self._wrap_model(self.model_wrapped)
@@ -949,17 +949,8 @@ class Trainer:
                 if delay_optimizer_creation:
                     self.create_optimizer_and_scheduler(num_training_steps=max_steps)
                 self._load_optimizer_and_scheduler(resume_from_checkpoint)
-            elif not self.args.using_flex_checkpoint:
-                model = self._wrap_model(self.model_wrapped)
-                # for the rest of this function `model` is the outside model, whether it was wrapped or not
-                if model is not self.model:
-                    self.model_wrapped = model
-                if delay_optimizer_creation:
-                    self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-                self._load_optimizer_and_scheduler(resume_from_checkpoint)
-            else:
-                assert self.args.using_flex_checkpoint, "default using flex_checkpoint!"
 
+            elif self.args.load_flex_checkpoint:
                 model = self._wrap_model(self.model_wrapped)
                 if model is not self.model:
                     self.model_wrapped = model
@@ -968,17 +959,34 @@ class Trainer:
                     self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
                 if resume_from_checkpoint is not None:
-                    model_sharded_state_dict = self.model.sharded_state_dict()
-                    accessible_files = os.listdir(resume_from_checkpoint)
-                    metadata_files = [file for file in accessible_files if file.endswith(".metadata")]
-                    assert len(metadata_files) == 1, "Only support one metadata file now."
-                    metadata = paddle.load(os.path.join(resume_from_checkpoint, metadata_files[0]))
-                    state_dict_metadata = metadata.state_dict_metadata
-                    init_optimizer(self.optimizer, model_sharded_state_dict, state_dict_metadata)
-                    optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
-                    sharded_state_dict = {**model_sharded_state_dict, **optimizer_sharded_state_dict}
-                    dist.load_state_dict(sharded_state_dict, resume_from_checkpoint, aoa_config=self.args.aoa_config)
-                    self._load_scheduler(resume_from_checkpoint)
+                    if not self.args.ignore_load_lr_and_optim:
+                        model_sharded_state_dict = self.model.sharded_state_dict()
+                        accessible_files = os.listdir(resume_from_checkpoint)
+                        metadata_files = [file for file in accessible_files if file.endswith(".metadata")]
+                        assert len(metadata_files) == 1, "Only support one metadata file now."
+                        metadata = paddle.load(os.path.join(resume_from_checkpoint, metadata_files[0]))
+                        state_dict_metadata = metadata.state_dict_metadata
+                        init_optimizer(self.optimizer, model_sharded_state_dict, state_dict_metadata)
+                        optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
+                        sharded_state_dict = {**model_sharded_state_dict, **optimizer_sharded_state_dict}
+                        dist.load_state_dict(
+                            sharded_state_dict, resume_from_checkpoint, aoa_config=self.args.aoa_config, offload=False
+                        )
+                        self._load_scheduler(resume_from_checkpoint)
+                    else:
+                        model_sharded_state_dict = self.model.sharded_state_dict()
+                        sharded_state_dict = model_sharded_state_dict
+                        dist.load_state_dict(
+                            sharded_state_dict, resume_from_checkpoint, aoa_config=self.args.aoa_config
+                        )
+            else:
+                model = self._wrap_model(self.model_wrapped)
+                # for the rest of this function `model` is the outside model, whether it was wrapped or not
+                if model is not self.model:
+                    self.model_wrapped = model
+                if delay_optimizer_creation:
+                    self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+                self._load_optimizer_and_scheduler(resume_from_checkpoint)
         else:
             model = self.model_wrapped
             if delay_optimizer_creation:
@@ -2738,7 +2746,7 @@ class Trainer:
         else:
             self.save_model(output_dir)
 
-        if self.args.using_flex_checkpoint:
+        if self.args.save_flex_checkpoint:
             model_sharded_state_dict = self.model.sharded_state_dict()
             os.makedirs(output_dir, exist_ok=True)
 
@@ -2801,7 +2809,18 @@ class Trainer:
                             signal_dir,
                         )
                     else:
-                        if not self.args.using_flex_checkpoint:
+                        if self.args.save_flex_checkpoint:
+                            optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
+                            dist.save_state_dict(
+                                {**model_sharded_state_dict, **optimizer_sharded_state_dict},
+                                output_dir,
+                            )
+                            if self.args.should_save:
+                                if self.tokenizer is not None and self.args.save_tokenizer:
+                                    self.tokenizer.save_pretrained(output_dir)
+                                # Good practice: save your training arguments together with the trained model
+                                paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
+                        else:
                             if self.dp_group.rank > 0:  # this should only work for MoE saving
                                 self._save_ckpt_func(
                                     self._filter_moe_no_sync_optimizer_params(),
@@ -2821,12 +2840,7 @@ class Trainer:
                                     )
                                 else:
                                     self._save_ckpt_func(state_dict, save_path, saved_signal_path)
-                        else:
-                            optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
-                            dist.save_state_dict(
-                                {**model_sharded_state_dict, **optimizer_sharded_state_dict},
-                                output_dir,
-                            )
+
                 else:
                     if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
                         global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
@@ -2852,7 +2866,18 @@ class Trainer:
                             output_dir,
                             signal_dir,
                         )
-                    elif not self.args.using_flex_checkpoint:
+                    elif self.args.save_flex_checkpoint:
+                        optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
+                        dist.save_state_dict(
+                            {**model_sharded_state_dict, **optimizer_sharded_state_dict},
+                            output_dir,
+                        )
+                        if self.args.should_save:
+                            if self.tokenizer is not None and self.args.save_tokenizer:
+                                self.tokenizer.save_pretrained(output_dir)
+                            # Good practice: save your training arguments together with the trained model
+                            paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
+                    else:
                         if self.args.data_parallel_rank > 0 and self.args.use_expert_parallel:
                             self._save_ckpt_func(
                                 self._filter_moe_no_sync_optimizer_params(),
@@ -2865,13 +2890,6 @@ class Trainer:
                                 os.path.join(output_dir, optimizer_name),
                                 saved_signal_path,
                             )
-
-                    else:
-                        optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
-                        dist.save_state_dict(
-                            {**model_sharded_state_dict, **optimizer_sharded_state_dict},
-                            output_dir,
-                        )
 
                 # FIXME: maybe only save one copy
                 paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
@@ -2892,6 +2910,18 @@ class Trainer:
 
             if self.args.unified_checkpoint and (self.args.offload_optim or self.args.tensorwise_offload_optimizer):
                 self._offload_optimizer()
+
+        else:
+            if self.args.save_flex_checkpoint:
+                dist.save_state_dict(
+                    model_sharded_state_dict,
+                    output_dir,
+                )
+                if self.args.should_save:
+                    if self.tokenizer is not None and self.args.save_tokenizer:
+                        self.tokenizer.save_pretrained(output_dir)
+                    # Good practice: save your training arguments together with the trained model
+                    paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
 
         self.runtime_timer.stop()
 
@@ -3107,6 +3137,7 @@ class Trainer:
         else:
             if isinstance(self.model, PretrainedModel) and self.args.should_save_sharding_stage1_model:
                 config_to_save = None
+                self.sharding_io.set_optimizer(self.optimizer)
                 state_dict, config_to_save, weight_name_suffix = self.sharding_io.manipulate_state_dict_and_config(
                     self.model, merge_tensor_parallel=merge_tensor_parallel
                 )
