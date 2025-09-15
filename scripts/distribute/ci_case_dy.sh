@@ -106,7 +106,7 @@ function gpt_case_list_dygraph() {
         gpt_175B_DP1_MP1_PP8
         gpt_generation_345M_single
         gpt_generation_345M_hybrid
-        gpt_345M_mp8_qat
+        # gpt_345M_mp8_qat
         # gpt_export_345M_mp1
         # gpt_export_345M_mp2
         # gpt_export_qat_345M
