@@ -508,19 +508,6 @@ class FP8LinearFunctionBase:
 
             return dx, dw1, dw2
 
-    @staticmethod
-    def fp8_mlp_bwd_norm_rc(do3, x, norm_w, norm_eps, w1, w2):
-        # ===== recompute norm_output =====
-        norm_output, invar = fused_ln.fused_rms_norm(x, norm_w, norm_eps)
-
-        # ===== compute fp8_mlp_fwd =====
-        d_norm_output = FP8LinearFunctionBase.fp8_mlp_bwd(do3, norm_output, w1, w2, True)
-
-        if hasattr(norm_w, "_apply_backward_hook"):
-            norm_w._apply_backward_hook()
-
-        return d_norm_output, norm_output, invar
-
 
 class FP8LinearFunction(paddle.autograd.PyLayer):
     @staticmethod
