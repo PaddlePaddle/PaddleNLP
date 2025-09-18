@@ -258,6 +258,7 @@ class MoELayer(nn.Layer):
                     p.no_sync = not (self.is_tp_moe or self.is_dummy_moe)
                     # logger.info(f"expert param={p.name}, no-sync={p.no_sync}")
                     if self.is_tp_moe or self.is_dp_moe:
+
                         p.is_distributed = True
 
     def forward(
