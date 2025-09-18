@@ -169,6 +169,8 @@ class MoELayer(nn.Layer):
 
         self.moe_num_experts = moe_num_experts
         self.capacity = capacity
+        self.is_tp_moe = False
+        self.is_dp_moe = False
 
         try:
             dist.fleet.get_hybrid_communicate_group()
@@ -190,6 +192,7 @@ class MoELayer(nn.Layer):
                 self.moe_num_experts, self.expert_parallel_degree
             )
             self.is_dummy_moe = False if self.expert_parallel_degree > 1 else True
+            self.is_dp_moe = True
         elif (
             is_fleet_init
             and dist.fleet.get_hybrid_communicate_group().get_model_parallel_world_size() > 1
@@ -210,6 +213,7 @@ class MoELayer(nn.Layer):
             )  # e.g. 单机2路tp， 那么 32  = 128/4
 
             self.is_dummy_moe = False if self.expert_parallel_degree > 1 else True  # False
+            self.is_tp_moe = True
         else:
             self.moe_group = None
             self.moe_rank = 0
@@ -250,9 +254,11 @@ class MoELayer(nn.Layer):
         for k in self.experts:
             if k is not None:
                 for p in k.parameters():
-                    p.expert = not self.is_dummy_moe
-                    p.no_sync = not self.is_dummy_moe
+                    p.expert = not (self.is_tp_moe or self.is_dummy_moe)  # type: ignore
+                    p.no_sync = not (self.is_tp_moe or self.is_dummy_moe)
                     # logger.info(f"expert param={p.name}, no-sync={p.no_sync}")
+                    if self.is_tp_moe or self.is_dp_moe:
+                        p.is_distributed = True
 
     def forward(
         self,
