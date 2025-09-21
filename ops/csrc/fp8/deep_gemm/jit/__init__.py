@@ -16,6 +16,6 @@
 # Copyright (c) 2025 DeepSeek
 # Licensed under the MIT License - https://github.com/deepseek-ai/DeepEP/blob/main/LICENSE
 
-from .compiler import build, get_nvcc_compiler
-from .runtime import Runtime
+from .compiler import get_nvcc_compiler, build
 from .template import cpp_format, generate
+from .runtime import Runtime

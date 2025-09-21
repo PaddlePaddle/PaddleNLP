@@ -39,6 +39,7 @@ import paddle
 import paddle.amp.auto_cast as autocast
 import paddle.distributed as dist
 import paddle.nn as nn
+import psutil
 from packaging import version
 from paddle import framework
 from paddle.distributed.fleet.meta_parallel import PipelineLayer
@@ -139,6 +140,7 @@ from .trainer_callback import (
     DefaultFlowCallback,
     PrinterCallback,
     ProgressCallback,
+    SPGradSyncCallback,
     TrainerCallback,
     TrainerControl,
     TrainerState,
@@ -371,7 +373,14 @@ class Trainer:
         self.optimizer_grouped_parameters = None
         self.sharding_io = None
         if self.args.should_save_sharding_stage1_model or self.args.should_load_sharding_stage1_model:
-            self.sharding_io = ShardingIO(self.args, self.model, self.optimizer)
+            self.sharding_io = ShardingIO(
+                self.args,
+                self.model,
+                self.optimizer,
+                remap_parameter_name=self.args.load_sharded_model_remap_parameter_name,
+                is_ema=self.args.sharded_model_from_ema,
+            )
+
         if self.args.unified_checkpoint:
             self.unified_checkpoint_handler = UnifiedCheckpointHandler(self.args)
 
@@ -437,9 +446,8 @@ class Trainer:
             ), "should_save_sharding_stage1_model should be True when using zero cost checkpoint"
             assert (
                 ShardingOption.FULL_SHARD not in self.args.sharding
-            ), "FULL_SHARD is not supported when using zero cost checkpoint"
-            assert not self.args.save_tokenizer, "save_tokenizer is not supported when using zero cost checkpoint"
-            assert not self.args.save_rng_states, "save_rng_states is not supported when using zero cost checkpoint"
+            ), "FULL_SHARD is not supported when using flash save mode"
+            assert not self.args.save_tokenizer, "save_tokenizer is not supported when using flash save mode"
 
             # init attributes for zero cost checkpoint mode
             self.zcc_manager = None
@@ -804,9 +812,16 @@ class Trainer:
         if resume_from_checkpoint is not None:
             path = _add_variant(PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             path = os.path.join(resume_from_checkpoint, path).replace("optimizer", "ema")
+            if self.args.zcc_save_ema_coef is not None and self.sharding_io is not None:
+                success, err_msg = self.sharding_io.check_same_strategy(resume_from_checkpoint)
+            else:
+                success, err_msg = True, None
             if os.path.exists(path):
-                logger.info(f"ZCC EMA load from {path}")
-                self.zcc_manager.set_ema_state_dict(path)
+                if success:
+                    logger.info(f"ZCC EMA load from {path}")
+                    self.zcc_manager.set_ema_state_dict(path)
+                else:
+                    logger.info(f"ZCC EMA does not load {path} because {err_msg}")
             else:
                 logger.info(f"ZCC EMA state dict not found, in: {path}")
 
@@ -1370,6 +1385,16 @@ class Trainer:
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
+
+                    # For ZCC EMA
+                    if self.args.enable_zero_cost_checkpoint:
+                        tr_loss_for_zcc = tr_loss.clone()
+                        dist.all_reduce(
+                            tr_loss_for_zcc, dist.ReduceOp.SUM
+                        )  # 3级并行时，每个pp下的loss会广播，全局reduce-mean的时候，分子分母都会乘以pp_world_size，结果会被约掉
+                        tr_loss_for_zcc_scalar = tr_loss_for_zcc.item() / dist.get_world_size()
+                        self.state.loss = tr_loss_for_zcc_scalar
+
                     self.state.consumed_samples = (
                         self.state.global_step
                         * args.per_device_train_batch_size
@@ -2007,34 +2032,18 @@ class Trainer:
         if checkpoint is None:
             return
 
-        # if use distributed training
-        if self.args.world_size > 1:
-            process_index = self.args.process_index
-            rng_file_list = [None for x in range(self.args.world_size)]
-            if self.args.should_save:
-                rng_file = os.path.join(checkpoint, f"rng_state_{self.args.world_size}.pth")
-                if os.path.isfile(rng_file):
-                    rng_file_list = paddle.load(rng_file, return_numpy=True)
-            paddle.distributed.broadcast_object_list(rng_file_list, src=0)
-            # if rng_file_list still empty, not log rng state.
-            if rng_file_list[0] is None:
-                logger.info(
-                    f"Didn't find an RNG file for process {process_index}, if you are resuming a training that "
-                    "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
-                )
-                return
-            else:
-                checkpoint_rng_state = rng_file_list[process_index]
-        else:
-            rng_file = os.path.join(checkpoint, "rng_state.pth")
-            if not os.path.isfile(rng_file):
-                logger.info(
-                    "Didn't find an RNG file, if you are resuming a training that was launched in a distributed "
-                    "fashion, reproducibility is not guaranteed."
-                )
-                return
+        rng_file = os.path.join(checkpoint, f"rng_state_{dist.get_rank()}.pth")
+        if not os.path.isfile(rng_file):
+            logger.info(
+                "Didn't find an RNG file, if you are resuming a training that was launched in a distributed "
+                "fashion, reproducibility is not guaranteed."
+            )
+            return
 
-            checkpoint_rng_state = paddle.load(rng_file, return_numpy=True)
+        checkpoint_rng_state = paddle.load(rng_file, return_numpy=True)
+        if checkpoint_rng_state.get("world_size", None) != self.args.world_size:
+            logger.warn("Cannot load rng states when changing world size of training job.")
+            return
 
         random.setstate(checkpoint_rng_state["python"])
         np.random.set_state(checkpoint_rng_state["numpy"])
@@ -2195,11 +2204,6 @@ class Trainer:
                 model = decorated
             else:
                 model, self.optimizer = decorated
-
-        if self.args.tensor_parallel_degree > 1 and self.args.sequence_parallel:
-            register_sequence_parallel_allreduce_hooks(
-                model, self.args.gradient_accumulation_steps, self.args.fuse_sequence_parallel_allreduce
-            )
 
         if self.args.world_size == 1:
             if self.args.amp_master_grad:
@@ -2389,6 +2393,17 @@ class Trainer:
                 ):
                     self.optimizer._set_broadcast_overlap(True, model)
 
+        # use callback for sp grad sync in case of unexpected behaviour (except sharding stage 2&3)
+        if self.args.tensor_parallel_degree > 1 and self.args.sequence_parallel:
+            if ShardingOption.SHARD_GRAD_OP in self.args.sharding or ShardingOption.FULL_SHARD in self.args.sharding:
+                register_sequence_parallel_allreduce_hooks(
+                    unwrap_model(model),
+                    self.args.gradient_accumulation_steps,
+                    self.args.fuse_sequence_parallel_allreduce,
+                )
+            else:
+                self.add_callback(SPGradSyncCallback(model._layers))
+
         return model
 
     def _prepare_input(self, data: Union[paddle.Tensor, Any]) -> Union[paddle.Tensor, Any]:
@@ -2568,7 +2583,8 @@ class Trainer:
         # for v in self._pp_data_buffer[0].values():
         #     assert isinstance(v, paddle.Tensor), f"Only support tensor as pipeline mode input, got type {type(v)}"
 
-        inputs = model._prepare_pipeline_inputs_func(self._pp_data_buffer)
+        with self.autocast_smart_context_manager():
+            inputs = model._prepare_pipeline_inputs_func(self._pp_data_buffer)
         self._pp_data_buffer = []
 
         model.train()
@@ -2724,28 +2740,24 @@ class Trainer:
         if self.args.should_save:
             self.state.save_to_json(os.path.join(output_dir, TRAINER_STATE_NAME))
 
-        # Save RNG state in non-distributed training
-        rng_states = {
-            "python": random.getstate(),
-            "numpy": np.random.get_state(),
-            "cuda": paddle.get_rng_state(),
-            "cpu": paddle.framework.core.default_cpu_generator().get_state(),
-        }
-        if self.args.use_hybrid_parallel:
-            rng_states[
-                "hybrid_parallel_rng_state_tracker"
-            ] = fleet.meta_parallel.get_rng_state_tracker().get_states_tracker()
+        if self.args.save_rng_states:
+            # Save RNG state in non-distributed training
+            rng_states = {
+                "python": random.getstate(),
+                "numpy": np.random.get_state(),
+                "cuda": paddle.get_rng_state(),
+                "cpu": paddle.framework.core.default_cpu_generator().get_state(),
+                "world_size": self.args.world_size,
+            }
+            if self.args.use_hybrid_parallel:
+                rng_states[
+                    "hybrid_parallel_rng_state_tracker"
+                ] = fleet.meta_parallel.get_rng_state_tracker().get_states_tracker()
 
         if self.args.save_rng_states:
-            if self.args.world_size > 1:
-                rng_states_list = []
-                paddle.distributed.all_gather_object(rng_states_list, rng_states)
-                if self.args.should_save:
-                    os.makedirs(output_dir, exist_ok=True)
-                    paddle.save(rng_states_list, os.path.join(output_dir, f"rng_state_{self.args.world_size}.pth"))
-            else:
-                os.makedirs(output_dir, exist_ok=True)
-                paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
+            rng_state_file = os.path.join(output_dir, f"rng_state_{dist.get_rank()}.pth")
+            os.makedirs(output_dir, exist_ok=True)
+            paddle.save(rng_states, rng_state_file)
 
         # only save model state dict, ignore optimizer and scheduler
         if not self.args.ignore_save_lr_and_optim:
@@ -3200,6 +3212,14 @@ class Trainer:
 
         if self.state.epoch is not None:
             logs["progress_or_epoch"] = round(self.state.epoch, 4)
+
+        if self.timers:
+            logs.update(self.timers.info(self.timers.timers.keys()))
+
+        mem_info = psutil.virtual_memory()
+        logs["cpu_used_memory"] = round(mem_info.used / (1024**3), 2)
+        logs["cpu_available_memory"] = round(mem_info.available / (1024**3), 2)
+
         self.state.log_history = []
         self.control = self.callback_handler.on_log(self.args, self.state, self.control, logs, **kwargs)
 

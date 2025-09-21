@@ -326,6 +326,8 @@ class BiEncoderModel(PretrainedModel):
             input_texts = self.preprocess_sentences_for_llara(input_texts, query_or_doc="query")
         if self.model_flag == "bge-en-icl":
             input_texts = self.preprocess_sentences_for_bge_en_icl(input_texts, query_or_doc="query")
+        if self.model_flag == "qwen3":
+            input_texts = self.preprocess_sentences_for_qwen3(input_texts, query_or_doc="query")
 
         encode_results = self.encode_sentences(sentences=input_texts, model=self.query_model, tokenizer=self.tokenizer)
         return encode_results
@@ -356,6 +358,8 @@ class BiEncoderModel(PretrainedModel):
             if isinstance(corpus[0], dict):
                 input_texts = [doc["text"] for doc in corpus]
                 input_titles = [doc.get("title", "") for doc in corpus]
+        if self.model_flag == "qwen3":
+            input_texts = self.preprocess_sentences_for_qwen3(input_texts, query_or_doc="doc")
 
         encode_results = self.encode_sentences(
             sentences=input_texts, titles=input_titles, model=self.corpus_model, tokenizer=self.tokenizer
@@ -415,3 +419,7 @@ class BiEncoderModel(PretrainedModel):
         sentences_after_process = [prefix + " " + sentence + " " + suffix for sentence in sentences_after_process]
 
         return sentences_after_process
+
+    def preprocess_sentences_for_qwen3(self, sentences: List[str], query_or_doc: str, **kwargs) -> List[str]:
+        sentences = [f"{sentence}<|endoftext|>" for sentence in sentences]
+        return sentences

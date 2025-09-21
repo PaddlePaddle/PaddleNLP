@@ -93,7 +93,7 @@ def parse_registers(line):
 
 
 def modify_segment(m, name, ffma_lines):
-    num_lines = len(ffma_lines)
+    num_lines = (len(ffma_lines) * 9 // 16) // 2 * 2
     assert num_lines % 2 == 0
 
     le_bytes, new_le_bytes = [], []

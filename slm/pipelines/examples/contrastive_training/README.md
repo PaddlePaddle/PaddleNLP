@@ -1,16 +1,22 @@
 # 向量检索模型训练
 
-推荐安装 gpu 版本的[PaddlePaddle](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html)，以 cuda12.3的 paddle 为例，安装命令如下：
+推荐安装 gpu 版本的[PaddlePaddle](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html)，以 cuda11.8的 paddle 为例，安装命令如下：
 
 ```
-conda install nccl -c conda-forge
-conda install paddlepaddle-gpu==3.0.0rc1 -i https://www.paddlepaddle.org.cn/packages/stable/cu123/ -c conda-forge
+# 创建一个名为 paddle_env 的新环境，并激活
+conda create --name paddle_env python=3.10
+conda activate paddle_env
+
+# 安装 paddlenlp develop版本
+pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+
+# 安装 paddlepaddle-gpu nightly版本
+pip install --pre paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/nightly/cu118/
+
+#安装其他依赖：
+pip install -r slm/pipelines/examples/contrastive_training/requirements.txt
 ```
-安装其他依赖：
-```
-pip install git+https://github.com/PaddlePaddle/PaddleNLP.git@develop
-pip install -r requirements.txt
-```
+
 
 下载 DuReader-Retrieval 中文数据集：
 ```
@@ -45,7 +51,7 @@ python train.py --do_train \
 python -m paddle.distributed.launch --gpus "0,1,2,3" train.py --do_train \
               --model_name_or_path rocketqa-zh-base-query-encoder \
               --output_dir rocketqa-zh-base-query-encoder-duretrieval \
-              --train_data ./data/dual.train.json \
+              --train_data ./data/dureader_dual.train.jsonl \
               --overwrite_output_dir \
               --fine_tune_type sft \
               --sentence_pooling_method cls \
@@ -132,7 +138,7 @@ python evaluation/benchmarks.py --model_type bert \
     --passage_max_length 512 \
 ```
 可配置参数包括：
-- `model_type`: 模型的类似，可选 bert 或 roberta 等等
+- `model_type`: 模型的类型，可选 bert 或 roberta 等等
 - `query_model`: query 向量模型的路径
 - `passage_model`: passage 向量模型的路径
 - `query_max_length`: query 的最大长度
@@ -178,8 +184,11 @@ python -u evaluation/eval_mteb.py \
 - `padding_side`：设置 padding 的位置，可取 left 或 right
 - `add_bos_token`：是否添加起始符，0表示不添加，1表示添加
 - `add_eos_token`：是否添加结束符，0表示不添加，1表示添加
+- `quant_type`：是否使用量化加载，可选项包括 weight_only_int8，weight_only_int4，no，默认为 no，即不进行量化
+- `kv_cache_reuse`: 量化加载时，是否仅预分配首层 kv_cache 并重复利用，0 表示不复用，1 表示复用，默认为 0，此策略可降低量化加载时显存占用
 
-# MTEB 评估
+
+## MTEB 评估
 [MTEB](https://github.com/embeddings-benchmark/mteb)
 是一个大规模文本嵌入评测基准，包含了丰富的向量检索评估任务和数据集。
 本仓库主要面向其中的英文检索任务（Retrieval），并额外支持针对 MSMARCO-Title 的评估。
@@ -197,6 +206,7 @@ python -u evaluation/eval_mteb.py \
 | [NV‑Embed‑v1](https://huggingface.co/nvidia/NV-Embed-v1)                                              |     4096     |
 | [BGE‑EN‑ICL](https://huggingface.co/BAAI/bge-en-icl)                                                  |     4096     |
 | [LLARA‑passage](https://huggingface.co/BAAI/LLARA-passage)                                            |     4096     |
+| [Qwen3-Embedding-8B](https://huggingface.co/Qwen/Qwen3-Embedding-8B)                                  |     32K     |
 
 可支持配置的参数：
 - `base_model_name_or_path`: 模型名称或路径
@@ -222,6 +232,7 @@ MSMARCO-Title 数据集, MRR@10, Recall@10, NDCG@10分数：
 | RocketQA v1                 | 36.94  |   65.67   |  43.51  |
 | RocketQA v2                 | 38.88  |   67.06   |  45.28  |
 | bge-large-en-v1.5           | 35.30  |   64.24   |  41.96  |
+| Qwen3-Embedding-8B          | 38.66  |   69.46   |  45.72  |
 | repllama-v1-7b-lora-passage | 38.24  |   66.26   |  45.13  |
 | NV-Embed-v1                 | 38.39  |   68.02   |  45.21  |
 | bge-en-icl (zero-shot)      | 42.74  |   71.90   |  49.47  |
@@ -237,6 +248,7 @@ MTEB-Retrieval 数据集, MRR@10分数：
 | NV‑Embed‑v1                 |  65.24   |  60.28  |    45.17     |        48.14         |  80.19  | 86.78  |  69.24   |  88.36   |  39.73  |  59.40   | 66.70  |     88.35      |  34.27  |  75.17  |   42.50    |   94.33   |
 | bge‑en‑icl (zero‑shot)      |  69.29   |  77.83  |    57.88     |        45.69         |  82.04  | 92.50  |  65.78   |  92.76   |  39.97  |  61.84   | 69.64  |     90.22      |  41.14  |    75.13  |   56.56    |   90.33   |
 | LLARA-passage               |  60.11   |  38.77  |    34.58     |        36.19         |  75.50  | 81.02  |  51.72   |  86.36   |  38.81  |  57.69   | 56.85  |     80.58      |  30.15  |  73.17  |   67.20    |   93.07   |
+| Qwen3-Embedding-8B          |  69.79    |  70.12  |    61.52     |        52.23         |  81.29  | 93.54  |  69.72   |  89.46    |  37.44  |  61.46   |  59.63   |     88.01      |  49.32  |  74.06  |   59.09    |   100.00  |
 
 MTEB-Retrieval 数据集, Recall@10分数：
 | 模型                        | 平均分数 | ArguAna | ClimateFEVER | CQADupstackRetrieval | DBPedia |  FEVER | FiQA2018 | HotpotQA | MSMARCO | NFCorpus |   NQ   | QuoraRetrieval | SCIDOCS | SciFact | Touche2020 | TRECCOVID |
@@ -248,6 +260,7 @@ MTEB-Retrieval 数据集, Recall@10分数：
 | NV‑Embed‑v1                 |  58.78   |  93.95  |    41.07     |        64.66         |  28.67  | 95.24  |  70.62   |  85.19   |  69.15  |  18.45   | 89.16  |     95.92      |  21.27  |  90.02  |   15.94    |   2.36    |
 | bge‑en‑icl (zero‑shot)      |  60.62   |  97.08  |    52.19     |        60.38         |  29.81  | 96.92  |  67.42   |  88.33   |  69.53  |  20.42   | 90.96  |     97.02      |  27.33  |   91.05   |   18.81    |   2.11    |
 | LLARA-passage               |  52.30   |  76.17  |    32.52     |        47.91         |  26.33  | 90.48  |  51.09   |  71.16   |  67.82  |  17.67   | 81.89  |     92.54      |  18.12  |  86.80  |   21.81    |   2.23    |
+| Qwen3-Embedding-8B          |  60.96     |  97.51  |    52.34     |        67.80         |  28.99  | 96.01  |  71.33   |   79.05    |  67.43  |  19.95   | 84.87  |     96.16      |  34.57  |  93.50  |   22.41    |   2.50    |
 
 MTEB-Retrieval 数据集, NDCG@10分数：
 | 模型                        | 平均分数 | ArguAna | ClimateFEVER | CQADupstackRetrieval | DBPedia |  FEVER | FiQA2018 | HotpotQA | MSMARCO | NFCorpus |   NQ   | QuoraRetrieval | SCIDOCS | SciFact | Touche2020 | TRECCOVID |
@@ -259,8 +272,87 @@ MTEB-Retrieval 数据集, NDCG@10分数：
 | NV‑Embed‑v1                 |  58.86   |  68.30  |    34.37     |        50.27         |  48.29  | 86.58  |  62.90   |  79.92   |  46.48  |  37.98   | 71.22  |     89.20      |  20.16  |  78.30  |   23.98    |   84.91   |
 | bge‑en‑icl (zero‑shot)      |  61.62   |  82.34  |    45.33     |        47.27         |  50.60  | 91.91  |  59.13   |  84.90   |  46.78  |  40.66   | 73.85  |     91.03      |  25.46  |  77.91  |   30.71    |   76.38   |
 | LLARA-passage               |  52.48   |  47.51  |    26.13     |        37.26         |  44.12  | 81.09  |  43.98   |  69.17   |  45.49  |  37.07   | 61.76  |     82.29      |  17.30  |  76.07  |   36.73    |   81.30   |
+| Qwen3-Embedding-8B          |   62.36     |  76.63  |    47.13     |        54.01         |  48.86  | 91.82  |  62.14   | 76.28    |  44.29  |  41.31   | 64.63  |     89.03      |  32.22  |  78.48  |   34.99    |   93.54   |
 
 
+## 压缩
+
+### 模型删层
+模型剪枝脚本 `shortgpt_prune.py`，用于评估并移除大语言模型中重要性较低的层，以生成一个更小、更高效的模型。该脚本采用“块影响”度量来计算层的重要性，并直接在内存中完成剪枝和保存，流程高效。
+
+#### 使用方法
+
+通过以下命令执行剪枝脚本。可指定原始模型、输出路径、要剪枝的层数以及模型中 transformer 层的路径。
+
+以 repllama-v1-7b-lora-passage 为例：
+```bash
+python shortgpt_prune.py \
+    --model_name_or_path castorini/repllama-v1-7b-lora-passage \
+    --output_model_path ./pruned-repllama-v1-7b-lora-passage \
+    --n_prune_layers 6 \
+    --layers_path "llama.layers"
+```
+
+以 NV-Embed-v1为例：
+```bash
+python shortgpt_prune.py \
+    --model_name_or_path nvidia/NV-Embed-v1 \
+    --output_model_path ./pruned-NV-Embed-v1_pruned_26 \
+    --n_prune_layers 6 \
+    --layers_path "layers"
+```
+可配置参数包括：
+- `--model_name_or_path`: 原始模型的名称或本地路径。
+- `--output_model_path`: 剪枝后模型的保存路径。
+- `--n_prune_layers`: 希望移除的层数。脚本会自动找出最不重要的 N 层。
+- `--layers_path`: 模型对象中指向 transformer 层列表的点分隔路径（例如 repllama 为`"llama.layers"`, llama 为`"model.layers"`）。
+
+#### 性能评估
+剪枝完成后，可以使用 output_model_path 路径下的新模型进行[MTEB 评估](#评估)。
+
+在多个检索任务上评估了`RepLLaMA`模型剪枝前后的性能和推理速度。所有实验均在单张 80G A100 GPU 上进行。
+
+
+| 模型 | 指标 | MSMARCO-Title<br>(MRR@10) | SciFact<br>(NDCG@10) | FiQA2018<br>(NDCG@10)| QuoraRetrieval<br>(NDCG@10) | NFCorpus<br>(NDCG@10) |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **RepLLaMA** | Batchsize | 7 | 22 | 8 | 320 | 15 |
+| | 时间 (s) | 106863  | 257  | 1381  | 1649  | 198  |
+| | 性能 | 38.33 | 76.19  | 45.95  | 88.25  | 38.02  |
+| **+shortgpt** | Batchsize | 7 | 22 | 9 | 390 | 15 |
+| | 时间 (s) | 88064  | 211  | 1169 | 1475 | 162  |
+| | 性能 | 36.31 | 73.82  | 44.36 | 88.06 | 38.05  |
+
+### 模型量化
+支持对向量模型进行量化加载，以降低显存占用和推理延迟。
+
+#### 使用方法
+```bash
+python -u evaluation/eval_mteb.py \
+    --base_model_name_or_path castorini/repllama-v1-7b-lora-passage \
+    --output_folder eval_results/repllama-v1-7b-lora-passage \
+    --task_name 'SciFact' \
+    --eval_batch_size 8 \
+    --max_seq_length 2048 \
+    --task_split dev \
+    --quant_type weight_only_int8 \
+    --kv_cache_reuse 1
+```
+可配置参数包括：
+* `--quant_type`：是否使用量化加载，可选项包括 weight_only_int8，weight_only_int4，no，默认为 no，即不进行量化
+* `--kv_cache_reuse`: 量化加载时，是否仅预分配首层 kv_cache 并重复利用，0 表示不复用，1 表示复用，默认为 0，此策略可降低量化加载时显存占用
+
+
+#### 性能评估
+在多个检索任务上评估了`RepLLaMA`模型量化加载前后的性能和推理速度。所有实验均在单张 80G A100 GPU 上进行。
+
+| 模型 | 指标 | MSMARCO-Title<br>(MRR@10) | SciFact<br>(NDCG@10) | FiQA2018<br>(NDCG@10)| QuoraRetrieval<br>(NDCG@10) | NFCorpus<br>(NDCG@10) |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **RepLLaMA** | Batchsize | 7 | 22 | 8 | 320 | 15 |
+| | 时间 (s) | 106863  | 257  | 1381  | 1649  | 198  |
+| | 性能 | 38.33 | 76.19  | 45.95  | 88.25  | 38.02  |
+| **+int8量化** | Batchsize | 50 | 180 | 80 | 180 | 180 |
+| | 时间 (s) | 70888  | 172  | 904  | 1143  | 132 |
+| | 性能 | 37.21 | 75.92 | 45.67 | 88.00 | 37.71 |
 
 ## Reference
 
@@ -281,3 +373,5 @@ MTEB-Retrieval 数据集, NDCG@10分数：
 [8] Yingqi Qu, Yuchen Ding, Jing Liu, Kai Liu, Ruiyang Ren, Wayne Xin Zhao, Daxiang Dong, Hua Wu, Haifeng Wang: RocketQA: An Optimized Training Approach to Dense Passage Retrieval for Open-Domain Question Answering. NAACL 2021
 
 [9] Ruiyang Ren, Yingqi Qu, Jing Liu, Wayne Xin Zhao, Qiaoqiao She, Hua Wu, Haifeng Wang, Ji-Rong Wen: RocketQAv2: A Joint Training Method for Dense Passage Retrieval and Passage Re-ranking. EMNLP 2021
+
+[10] Xin Men, Mingyu Xu, Qingyu Zhang, Bingning Wang, Hongyu Lin, Yaojie Lu, Xianpei Han, Weipeng Chen: Shortgpt: Layers in large language models are more redundant than you expect. ACL Findings 2025

@@ -614,6 +614,16 @@ class TrainingArguments:
             )
         },
     )
+    sharding_offload_opt_buffersize_GB: int = field(
+        default=-1,
+        metadata={
+            "help": (
+                "Set the size of the optimizer offload buffer when need_hack_offload_optimizer() is True. This option only takes effect when "
+                "use DygraphShardingOptimizerV2. The default value is -1, which means that all of the optimizer states will be offloaded. Only "
+                "works when export HACK_OFFLOAD_OPTIMIZER=1. "
+            )
+        },
+    )
 
     save_sharded_model: bool = field(
         default=False,
@@ -631,6 +641,16 @@ class TrainingArguments:
                 "When use sharding stage1 and set load_sharded_model True, it means loading the sharded model. The sharded model is saved when we set save_sharded_model True."
             )
         },
+    )
+
+    load_sharded_model_remap_parameter_name: bool = field(
+        default=False,
+        metadata={"help": "Whether to remap parameter name when load_sharded_model = true."},
+    )
+
+    sharded_model_from_ema: bool = field(
+        default=False,
+        metadata={"help": "Whether to load sharded model from EMA."},
     )
 
     tensor_parallel_degree: int = field(
@@ -782,7 +802,7 @@ class TrainingArguments:
                 "Following options are supported:\n"
                 "- pp_first. the topo order is dp, pp, sharding, mp \n"
                 "- sharding_first. the topo order is dp, sharding, pp, mp \n"
-                "Default is None, for pp_first"
+                "Default is None, for sharding_first"
             )
         },
     )
@@ -1045,6 +1065,10 @@ class TrainingArguments:
         default=1,
         metadata={"help": "Interval between updating EMA parameters."},
     )
+    zcc_ema_loss_threshold: Optional[float] = field(
+        default=None,
+        metadata={"help": "If set not None, only do EMA when the training loss is smaller than the threshold value"},
+    )
     save_tokenizer: Optional[bool] = field(
         default=True,
         metadata={"help": "Save tokenizer to output_dir."},
@@ -1240,6 +1264,8 @@ class TrainingArguments:
                                 "use_dualpipev",
                                 "forward_backward_overlap_scheduler",
                                 "enable_dynamic_shape",
+                                "sync_moment",
+                                "sync_param",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accept config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -1292,6 +1318,18 @@ class TrainingArguments:
                         in pipeline_parallel_config,
                         "enable_dynamic_shape": "enable_dynamic_shape" in pipeline_parallel_config,
                     }
+
+                    pp_sync_param = "sync_param" in pipeline_parallel_config
+                    pp_sync_moment = "sync_moment" in pipeline_parallel_config
+
+                    if pp_sync_param:
+                        logger.info("setting pp sync_param")
+                        strategy.hybrid_configs["pp_configs"].sync_param = True
+
+                    if pp_sync_moment:
+                        logger.info("setting pp sync_moment")
+                        strategy.hybrid_configs["pp_configs"].sync_moment = True
+
                     if dygraph_pp_configs["dp_comm_overlap"]:
                         raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
 
@@ -1388,6 +1426,17 @@ class TrainingArguments:
                         logger.warning("segment parallel is not supported!!!, Ignore it.")
                     return support_sep
 
+                def is_context_parallel_supported():
+                    import inspect
+
+                    members = [
+                        name for (name, date) in inspect.getmembers(fleet.base.topology.EPHybridCommunicateGroup)
+                    ]
+                    support_cp = "get_context_parallel_world_size" in members
+                    if not support_cp:
+                        logger.warning("context parallel is not supported!!! Ignore it.")
+                    return support_cp
+
                 if self.hybrid_parallel_topo_order == "pp_first":
                     if is_segment_parallel_supported():
                         order = ["dp", "pp", "sharding", "sep", "mp"]
@@ -1399,9 +1448,25 @@ class TrainingArguments:
                     else:
                         order = ["dp", "sharding", "pp", "mp"]
                 if self.use_expert_parallel:
-                    order = order[1:-1] + ["dp", "mp"]
+                    if self.moe_sharding_parallel_degree >= 1 and self.expert_parallel_degree > 1:
+                        if is_context_parallel_supported():
+                            order = ["sharding", "moe_sharding", "pp", "sep", "cp", "dp", "ep", "mp"]
+                        else:
+                            order = ["sharding", "moe_sharding", "pp", "sep", "dp", "ep", "mp"]
+                    else:
+                        order = ["sharding", "pp", "sep", "dp", "mp"]
 
-                if is_segment_parallel_supported():
+                if is_context_parallel_supported():
+                    hybrid_configs = {
+                        "dp_degree": self.data_parallel_degree,
+                        "mp_degree": self.tensor_parallel_degree,
+                        "pp_degree": self.pipeline_parallel_degree,
+                        "sharding_degree": self.sharding_parallel_degree,
+                        "sep_degree": self.sep_parallel_degree,
+                        "cp_degree": self.context_parallel_degree,
+                        "order": order,
+                    }
+                elif is_segment_parallel_supported():
                     hybrid_configs = {
                         "dp_degree": self.data_parallel_degree,
                         "mp_degree": self.tensor_parallel_degree,
@@ -1420,6 +1485,13 @@ class TrainingArguments:
                         "sharding_degree": self.sharding_parallel_degree,
                         "order": order,
                     }
+
+                if self.expert_parallel_degree > 1:
+                    assert (
+                        self.use_expert_parallel is True and self.moe_sharding_parallel_degree >= 0
+                    ), f"invalid expert_parallel_degree {self.expert_parallel_degree} and use_expert_paralle:{self.use_expert_parallel}."
+                    hybrid_configs["ep_degree"] = self.expert_parallel_degree
+                    hybrid_configs["moe_sharding_degree"] = self.moe_sharding_parallel_degree
 
                 try:
                     if self.split_norm_comm:
@@ -1472,6 +1544,11 @@ class TrainingArguments:
                         if self.sharding_comm_buffer_size_MB > 0:
                             strategy.hybrid_configs["sharding_configs"].comm_buffer_size_MB = int(
                                 self.sharding_comm_buffer_size_MB
+                            )
+
+                        if hasattr(strategy.hybrid_configs["sharding_configs"], "offload_opt_buffer_size"):
+                            strategy.hybrid_configs["sharding_configs"].offload_opt_buffer_size = int(
+                                self.sharding_offload_opt_buffersize_GB
                             )
 
                         if "split_param" in sharding_parallel_config:
@@ -1549,9 +1626,6 @@ class TrainingArguments:
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
 
-                if self.expert_parallel_degree > 1:
-                    self.add_moe_comm_group()
-
         elif self.enable_auto_parallel:
             self.tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
             self.sep_parallel_degree = max(self.sep_parallel_degree, 1)
@@ -1565,10 +1639,7 @@ class TrainingArguments:
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
                     self.sharding_parallel_degree = world_size // (
-                        self.tensor_parallel_degree
-                        * self.sep_parallel_degree
-                        * self.context_parallel_degree
-                        * self.pipeline_parallel_degree
+                        self.tensor_parallel_degree * self.sep_parallel_degree * self.pipeline_parallel_degree
                     )
 
             self.sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
@@ -1993,10 +2064,7 @@ class TrainingArguments:
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
                     self.sharding_parallel_degree = world_size // (
-                        tensor_parallel_degree
-                        * sep_parallel_degree
-                        * context_parallel_degree
-                        * pipeline_parallel_degree
+                        tensor_parallel_degree * sep_parallel_degree * pipeline_parallel_degree
                     )
 
             sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
@@ -2004,18 +2072,27 @@ class TrainingArguments:
                 logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
                 self.sharding = []
 
-            if sharding_parallel_degree > 1:
-                assert (
-                    sharding_parallel_degree % expert_parallel_degree == 0
-                ), f"sharding_parallel_degree should be divided by expert_parallel_degree, current sharding_parallel_degree: {sharding_parallel_degree}, expert_parallel_degree: {expert_parallel_degree}."
-
             self.data_parallel_degree = world_size // (
-                sharding_parallel_degree
-                * tensor_parallel_degree
-                * sep_parallel_degree
-                * context_parallel_degree
-                * pipeline_parallel_degree
+                sharding_parallel_degree * tensor_parallel_degree * sep_parallel_degree * pipeline_parallel_degree
             )
+
+            if expert_parallel_degree > 1:
+                assert (
+                    self.expert_tensor_parallel_degree <= 1
+                ), "expert_tensor_parallel_degree > 1 is not supported when expert_parallel_degree > 1"
+                moe_sharding_parallel_degree = world_size // (pipeline_parallel_degree * expert_parallel_degree)
+            else:
+                moe_sharding_parallel_degree = 1
+            moe_sharding_parallel_degree = max(moe_sharding_parallel_degree, 1)
+            if moe_sharding_parallel_degree > 1 and self.data_parallel_degree > 1:
+                raise NotImplementedError(
+                    f"Currently only support use expert_data_parallel strategy together with sharding_parallel strategy, but not with data_parallel strategy. But got data_parallel_degree: {self.data_parallel_degree}, expert_parallel_degree: {expert_parallel_degree}, moe_sharding_parallel_degree: {moe_sharding_parallel_degree}."
+                )
+
+            if sharding_parallel_degree > 1 and moe_sharding_parallel_degree > 1:
+                assert (
+                    sharding_parallel_degree % moe_sharding_parallel_degree == 0
+                ), f"sharding_parallel_degree should be divided by moe_sharding_parallel_degree, current sharding_parallel_degree: {sharding_parallel_degree}, moe_sharding_parallel_degree: {moe_sharding_parallel_degree}."
 
             assert not (
                 self.data_parallel_degree > 1 and expert_parallel_degree > 1
@@ -2038,6 +2115,7 @@ class TrainingArguments:
                 self.context_parallel_degree = context_parallel_degree
                 self.expert_parallel_degree = expert_parallel_degree
                 self.expert_tensor_parallel_degree = expert_tensor_parallel_degree
+                self.moe_sharding_parallel_degree = moe_sharding_parallel_degree
 
             if not self.use_hybrid_parallel:
                 self.sharding = []
@@ -2050,7 +2128,7 @@ class TrainingArguments:
                 self.expert_tensor_parallel_degree = -1
 
         if self.hybrid_parallel_topo_order is None:
-            self.hybrid_parallel_topo_order = "pp_first"
+            self.hybrid_parallel_topo_order = "sharding_first"
         assert self.hybrid_parallel_topo_order in ["pp_first", "sharding_first"]
 
         if self.use_hybrid_parallel and self.enable_auto_parallel:
@@ -2205,6 +2283,28 @@ class TrainingArguments:
         else:
             return 0
 
+    @property
+    def expert_parallel_rank(self):
+        if self.use_hybrid_parallel:
+            hcg = fleet.get_hybrid_communicate_group()
+            if hasattr(hcg, "get_expert_parallel_rank"):
+                return max(hcg.get_expert_parallel_rank(), 0)
+            else:
+                return 0
+        else:
+            return 0
+
+    @property
+    def context_parallel_rank(self):
+        if self.use_hybrid_parallel:
+            hcg = fleet.get_hybrid_communicate_group()
+            if hasattr(hcg, "get_context_parallel_rank"):
+                return max(hcg.get_context_parallel_rank(), 0)
+            else:
+                return 0
+        else:
+            return 0
+
     def _format_name(self, prefix, rank, degree):
         size = 2
         return f"{prefix}{rank:0>{size}d}"
@@ -2219,7 +2319,7 @@ class TrainingArguments:
                 name.append(self._format_name("pp", self.pipeline_parallel_rank, self.pipeline_parallel_degree))
             if self.sharding_parallel_degree > 1:
                 name.append(self._format_name("shard", self.sharding_parallel_rank, self.sharding_parallel_degree))
-            if self.use_expert_parallel:
+            if self.use_expert_parallel and self.expert_parallel_degree <= 1:
                 name.append(self._format_name("moe", self.data_parallel_rank, self.data_parallel_degree))
             return "_".join(name)
         else:
@@ -2235,7 +2335,7 @@ class TrainingArguments:
                 name.append(self._format_name("tp", self.tensor_parallel_rank, self.tensor_parallel_degree))
             if self.pipeline_parallel_degree > 1:
                 name.append(self._format_name("pp", self.pipeline_parallel_rank, self.pipeline_parallel_degree))
-            if self.use_expert_parallel:
+            if self.use_expert_parallel and self.expert_parallel_degree <= 1:
                 name.append(self._format_name("moe", self.data_parallel_rank, self.data_parallel_degree))
             return "_".join(name)
 
@@ -2244,7 +2344,9 @@ class TrainingArguments:
                 return self._format_name("moe", self.data_parallel_rank, self.data_parallel_degree)
             return None
 
-    def sharded_name_suffix(self, shard_id=None, pp_id=None, moe_id=None):
+    def sharded_name_suffix(self, shard_id=None, pp_id=None, moe_id=None, sharding_parallel_degree=None):
+        if sharding_parallel_degree is None:
+            sharding_parallel_degree = self.sharding_parallel_degree
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
@@ -2254,12 +2356,12 @@ class TrainingArguments:
                     pp_id = self.pipeline_parallel_rank
                 assert isinstance(pp_id, int)
                 name.append(self._format_name("pp", pp_id, self.pipeline_parallel_degree))
-            if self.sharding_parallel_degree > 1:
+            if sharding_parallel_degree > 1:
                 if shard_id is None:
                     shard_id = self.sharding_parallel_rank
                 assert isinstance(shard_id, int)
-                name.append(self._format_name("shard", shard_id, self.sharding_parallel_degree))
-            if self.use_expert_parallel:
+                name.append(self._format_name("shard", shard_id, sharding_parallel_degree))
+            if self.use_expert_parallel and self.expert_parallel_degree <= 1:
                 if moe_id is None:
                     moe_id = self.data_parallel_rank
                 assert isinstance(moe_id, int)
@@ -2385,9 +2487,7 @@ class TrainingArguments:
     def should_load_sharding_stage1_model(self):
         if self.enable_auto_parallel:
             return False
-        return (
-            ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.load_sharded_model
-        )
+        return self.load_sharded_model
 
     @property
     def should_load_dataset(self):

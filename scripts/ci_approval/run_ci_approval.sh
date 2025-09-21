@@ -16,7 +16,7 @@
 
 failed_num=0
 echo_list=()
-approval_line=`curl -H "Authorization: token ${GITHUB_API_TOKEN}" https://api.github.com/repos/PaddlePaddle/PaddleNLP/pulls/${GIT_PR_ID}/reviews?per_page=10000`
+approval_line=`curl -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/PaddlePaddle/PaddleNLP/pulls/${PR_ID}/reviews?per_page=10000`
 
 function add_failed(){
     failed_num=`expr $failed_num + 1`
@@ -33,7 +33,7 @@ function check_approval(){
     fi
 }
 
-for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+for file_name in `git diff --numstat upstream/${BRANCH} |awk '{print $NF}'`;do
     arr_file_name=(${file_name//// })
     dir1=${arr_file_name[0]}
     dir2=${arr_file_name[1]}
