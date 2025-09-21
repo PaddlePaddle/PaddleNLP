@@ -479,7 +479,7 @@ class Trainer:
             or isinstance(self.model, ReFTModel)
         ):
             if (
-                self.args.load_checkpoint_format == "unified_checkpoint"
+                self.args.save_checkpoint_format == "unified_checkpoint"
                 and "skip_save_model_weight" in self.args.unified_checkpoint_config
             ):
                 self.args.unified_checkpoint_config.remove("skip_save_model_weight")
@@ -1509,10 +1509,7 @@ class Trainer:
             if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
                 self._load_best_model_from_peft_checkpoint()
             else:
-                if (
-                    self.args.save_checkpoint_format == "unified_checkpoint"
-                    or self.args.load_checkpoint_format == "unified_checkpoint"
-                ):
+                if self.args.load_checkpoint_format == "unified_checkpoint":
                     self.unified_checkpoint_handler.load_unified_checkpoint(
                         self.model,
                         self.state.best_model_checkpoint,
@@ -2357,8 +2354,10 @@ class Trainer:
             if (
                 hasattr(self.args, "enable_sharding_comm_overlap")
                 and self.args.enable_sharding_comm_overlap
-                and self.args.load_checkpoint_format == "unified_checkpoint"
-                or self.args.load_checkpoint_format == "unified_checkpoint"
+                and (
+                    self.args.save_checkpoint_format == "unified_checkpoint"
+                    or self.args.load_checkpoint_format == "unified_checkpoint"
+                )
                 and "split_param" in split_parallel_config(self.args.sharding_parallel_config)
             ):
                 model.register_sharding_comm_overlap_hook(self.optimizer)
@@ -2712,7 +2711,7 @@ class Trainer:
                 # For ckpt integrity
                 paddle.save(self.state.global_step, os.path.join(output_dir, ".model_done"))
         if (
-            self.args.load_checkpoint_format == "unified_checkpoint"
+            self.args.save_checkpoint_format == "unified_checkpoint"
             and "async_save" in self.args.unified_checkpoint_config
             and not self.is_in_train
         ):
