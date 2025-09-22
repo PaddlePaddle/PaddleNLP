@@ -826,16 +826,7 @@ class Trainer:
                 success, err_msg = self.sharding_io.check_same_strategy(resume_from_checkpoint)
             else:
                 success, err_msg = True, None
-            if self.args.zcc_save_ema_coef is not None and self.sharding_io is not None:
-                success, err_msg = self.sharding_io.check_same_strategy(resume_from_checkpoint)
-            else:
-                success, err_msg = True, None
             if os.path.exists(path):
-                if success:
-                    logger.info(f"ZCC EMA load from {path}")
-                    self.zcc_manager.set_ema_state_dict(path)
-                else:
-                    logger.info(f"ZCC EMA does not load {path} because {err_msg}")
                 if success:
                     logger.info(f"ZCC EMA load from {path}")
                     self.zcc_manager.set_ema_state_dict(path)
