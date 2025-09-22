@@ -408,9 +408,9 @@ class TrainingArguments:
         ckpt_quant_stage (`str`, *optional*):
             Whether activate checkpoint quantization. O0: deactivate, O1: Int8 compression, O2: Int4 compression. (default: O0).
         save_checkpoint_format (`str`, *optional*):
-            Specifies the format for saving checkpoints. Options are: None, 'sharding_io', 'unified_checkpoint', 'flex_checkpoint', and 'safetensor'. (default: None). This setting is ignored if the corresponding switch is configured.
+            Specifies the format for saving checkpoints. Options are: None, 'sharding_io', 'unified_checkpoint', 'flex_checkpoint'. (default: None). This setting is ignored if the corresponding switch is configured.
         load_checkpoint_format (`str`, *optional*):
-            Specifies the format for loading checkpoints. Options are: None, 'sharding_io', 'unified_checkpoint', 'flex_checkpoint', and 'safetensor'. (default: None). This setting is ignored if the corresponding switch is configured.
+            Specifies the format for loading checkpoints. Options are: None, 'sharding_io', 'unified_checkpoint', 'flex_checkpoint'. (default: None). This setting is ignored if the corresponding switch is configured.
         aoa_config (`Optional[dict[str, list[str]]]`, *optional*):
             The AoA configuration of FlexCheckpoint, used to describe the mapping between model weights and the checkpoint content. Default is None.
     """
@@ -953,7 +953,7 @@ class TrainingArguments:
             "help": (
                 "Specifies the format used to save checkpoints. "
                 "Available options: 'sharding_io', 'unified_checkpoint', "
-                "'flex_checkpoint', 'safetensor'."
+                "'flex_checkpoint'."
                 "This setting is ignored if the corresponding switch is configured."
             )
         },
@@ -965,7 +965,7 @@ class TrainingArguments:
             "help": (
                 "Specifies the format used to load checkpoints. "
                 "Available options: 'sharding_io', 'unified_checkpoint', "
-                "'flex_checkpoint', 'safetensor'."
+                "'flex_checkpoint'."
                 "This setting is ignored if the corresponding switch is configured."
             )
         },
@@ -2175,13 +2175,10 @@ class TrainingArguments:
 
     def _post_init_save_checkpoint_format(self):
         if self.save_checkpoint_format:
-            valid_modes = ["unified_checkpoint", "sharding_io", "safetensor", "flex_checkpoint"]
+            valid_modes = ["unified_checkpoint", "sharding_io", "flex_checkpoint"]
             assert (
                 self.save_checkpoint_format in valid_modes
             ), f"Invalid save_checkpoint_format: {self.save_checkpoint_format}, Only these formats are allowed: {valid_modes}."
-
-            if self.save_checkpoint_format == "safetensor":
-                raise NotImplementedError("safetensor checkpoint saving is not implemented yet.")
         else:
             if self.unified_checkpoint:
                 self.save_checkpoint_format = "unified_checkpoint"
@@ -2190,13 +2187,10 @@ class TrainingArguments:
 
     def _post_init_load_checkpoint_format(self):
         if self.load_checkpoint_format:
-            valid_modes = ["unified_checkpoint", "sharding_io", "safetensor", "flex_checkpoint"]
+            valid_modes = ["unified_checkpoint", "sharding_io", "flex_checkpoint"]
             assert (
                 self.load_checkpoint_format in valid_modes
             ), f"Invalid load_checkpoint_format: {self.load_checkpoint_format}, Only these formats are allowed: {valid_modes}."
-
-            if self.load_checkpoint_format == "safetensor":
-                raise NotImplementedError("safetensor checkpoint loading is not implemented yet.")
         else:
             if self.unified_checkpoint:
                 self.load_checkpoint_format = "unified_checkpoint"
