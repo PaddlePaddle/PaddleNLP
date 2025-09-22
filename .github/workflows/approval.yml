@@ -25,7 +25,6 @@ jobs:
           wget -q --no-proxy https://xly-devops.bj.bcebos.com/PaddleTest/PaddleNLP/PaddleNLP-develop.tar.gz --no-check-certificate
           rm -rf  * .[^.]* && tar zxf PaddleNLP-develop.tar.gz --strip-components=1 >/dev/null
           rm -rf PaddleNLP-develop.tar.gz >/dev/null
-          cd PaddleNLP/
           git fetch origin pull/${PR_ID}/head
           git checkout -b origin_pr FETCH_HEAD
           git remote add upstream https://github.com/PaddlePaddle/PaddleNLP.git
