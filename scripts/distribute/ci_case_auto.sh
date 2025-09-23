@@ -636,7 +636,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.35163116
+    loss_base=9.35162163
     if [ $IS_A100 -ne 0 ];then
         if [ $IS_CUDA123 -ne 0 ];then
             loss_base=9.39367676
@@ -789,7 +789,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2() {
         if [ $IS_CUDA123 -ne 0 ];then
             loss_base=9.38431835
         else
-            loss_base=9.38430595
+            loss_base=9.38431168
         fi
         ips_base=-1
         mem_base=-1
@@ -944,7 +944,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
         if [ $IS_CUDA123 -ne 0 ];then
             loss_base=9.57173729
         else
-            loss_base=9.57199001
+            loss_base=9.57190609
         fi
         ips_base=-1
         mem_base=-1
@@ -1321,7 +1321,7 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP() {
                     if [ $IS_CUDA123 -ne 0 ];then
                         loss_base=9.38023453
                     else
-                        loss_base=9.37972641
+                        loss_base=9.37980728
                     fi
                 elif [ $IS_A100 -ne 0 ] && [ $to_static -eq 1 ];then
                     if [ $IS_CUDA123 -ne 0 ];then
@@ -1594,7 +1594,7 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP() {
         ips=-1
         mem=-1
         echo "result: to_static=$to_static loss=$loss loss_md5=$loss_md5 ips=$ips mem=$mem"
-        loss_base=9.25199432
+        loss_base=9.25199356
         loss_md5_base=83531e98ee11cd271db175150ab254bb
         if [ $IS_A100 -ne 0 ] && [ $to_static -eq 0 ];then
             if [ $IS_CUDA123 -ne 0 ];then
