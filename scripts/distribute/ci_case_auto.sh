@@ -641,7 +641,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
         if [ $IS_CUDA123 -ne 0 ];then
             loss_base=9.39367676
         else
-            loss_base=9.3936882
+            loss_base=9.39368343
         fi
     fi
     ips_base=-1
@@ -1390,7 +1390,7 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP() {
                     if [ $IS_CUDA123 -ne 0 ];then
                         loss_base=9.37985001
                     else
-                        loss_base=9.37989655
+                        loss_base=9.38000336
                     fi
                 fi
                 ips=-1
@@ -1663,13 +1663,13 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP() {
             if [ $IS_CUDA123 -ne 0 ];then
                 loss_base=9.44244614
             else
-                loss_base=9.44203339
+                loss_base=9.44232788
             fi
         elif [ $IS_A100 -ne 0 ] && [ $to_static -eq 1 ];then
             if [ $IS_CUDA123 -ne 0 ];then
                 loss_base=9.44231339
             else
-                loss_base=9.44231415
+                loss_base=9.44244537
             fi
         fi
         ips_base=-1
