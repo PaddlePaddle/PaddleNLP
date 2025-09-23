@@ -64,6 +64,5 @@ class GetPaddingOffsetV2Test(unittest.TestCase):
         assert sum(ref_cu_seqlens_q - cu_seqlens_q) == 0, "Check cu_seqlens_q failed."
         assert sum(ref_cu_seqlens_k - cu_seqlens_k) == 0, "Check cu_seqlens_k failed."
 
-
 if __name__ == "__main__":
     unittest.main()

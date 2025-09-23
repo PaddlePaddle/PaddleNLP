@@ -17,22 +17,46 @@
 # --- Script Configuration ---
 # Exit immediately if a command exits with a non-zero status.
 set -e
+declare -A query_instructions=(
+    ["ArguAna"]="Given a claim, find documents that refute the claim."
+    ["ClimateFEVER"]="Given a claim about climate change, retrieve documents that support or refute the claim."
+    ["DBPedia"]="Given a query, retrieve relevant entity descriptions from DBPedia."
+    ["FEVER"]="Given a claim, retrieve documents that support or refute the claim."
+    ["FiQA2018"]="Given a financial question, retrieve user replies that best answer the question."
+    ["HotpotQA"]="Given a multi-hop question, retrieve documents that can help answer the question."
+    ["MSMARCO"]="Given a web search query, retrieve relevant passages that answer the query."
+    ["NFCorpus"]="Given a question, retrieve relevant documents that best answer the question."
+    ["Natural Question"]="Given a question, retrieve Wikipedia passages that answer the question."
+    ["QuoraRetrieval"]="Given a question, retrieve questions that are semantically equivalent to the given question."
+    ["SCIDOCS"]="Given a scientific paper title, retrieve paper abstracts that are cited by the given paper."
+    ["SciFact"]="Given a scientific claim, retrieve documents that support or refute the claim."
+    ["Touche2020"]="Given a question, retrieve detailed and persuasive arguments that answer the question."
+    ["TREC-COVID"]="Given a query, retrieve documents that answer the query."
+    ["MSMARCOTITLE"]="Given a web search query, retrieve relevant passages that answer the query."
+    ["CQADupstackAndroidRetrieval"]="Given a question, retrieve detailed question descriptions from Stackexchange that are duplicates to the given question."
+    ["CQADupstackEnglishRetrieval"]="Given a question, retrieve detailed question descriptions from Stackexchange that are duplicates to the given question."
+    ["CQADupstackGamingRetrieval"]="Given a question, retrieve detailed question descriptions from Stackexchange that are duplicates to the given question."
+    ["CQADupstackGisRetrieval"]="Given a question, retrieve detailed question descriptions from Stackexchange that are duplicates to the given question."
+    ["CQADupstackMathematicaRetrieval"]="Given a question, retrieve detailed question descriptions from Stackexchange that are duplicates to the given question."
+    ["CQADupstackPhysicsRetrieval"]="Given a question, retrieve detailed question descriptions from Stackexchange that are duplicates to the given question."
+    ["CQADupstackProgrammersRetrieval"]="Given a question, retrieve detailed question descriptions from Stackexchange that are duplicates to the given question."
+    ["CQADupstackStatsRetrieval"]="Given a question, retrieve detailed question descriptions from Stackexchange that are duplicates to the given question."
+    ["CQADupstackTexRetrieval"]="Given a question, retrieve detailed question descriptions from Stackexchange that are duplicates to the given question."
+    ["CQADupstackUnixRetrieval"]="Given a question, retrieve detailed question descriptions from Stackexchange that are duplicates to the given question."
+    ["CQADupstackWebmastersRetrieval"]="Given a question, retrieve detailed question descriptions from Stackexchange that are duplicates to the given question."
+    ["CQADupstackWordpressRetrieval"]="Given a question, retrieve detailed question descriptions from Stackexchange that are duplicates to the given question."
+)
 
 # Define the list of all tasks (datasets) to be evaluated.
-# TASKS=(
-#     "ArguAna" "ClimateFEVER" "DBPedia" "FEVER" "FiQA2018" "HotpotQA" "MSMARCO" "NFCorpus" "NQ" "QuoraRetrieval" 
-#     "SCIDOCS" "SciFact" "Touche2020" "TRECCOVID" "CQADupstackAndroidRetrieval" "CQADupstackEnglishRetrieval" 
-#     "CQADupstackGamingRetrieval" "CQADupstackGisRetrieval" "CQADupstackMathematicaRetrieval" "CQADupstackPhysicsRetrieval" 
-#     "CQADupstackProgrammersRetrieval" "CQADupstackStatsRetrieval" "CQADupstackTexRetrieval" "CQADupstackUnixRetrieval" 
-#     "CQADupstackWebmastersRetrieval" "CQADupstackWordpressRetrieval" "MSMARCOTITLE"
-# )
-
-TASKS=("ArguAna" "SCIDOCS" "FEVER")
-
+TASKS=(
+    "ArguAna" "ClimateFEVER" "DBPedia" "FEVER" "FiQA2018" "HotpotQA" "MSMARCO" "NFCorpus" "NQ" "QuoraRetrieval" 
+    "SCIDOCS" "SciFact" "Touche2020" "TRECCOVID" "CQADupstackAndroidRetrieval" "CQADupstackEnglishRetrieval" 
+    "CQADupstackGamingRetrieval" "CQADupstackGisRetrieval" "CQADupstackMathematicaRetrieval" "CQADupstackPhysicsRetrieval" 
+    "CQADupstackProgrammersRetrieval" "CQADupstackStatsRetrieval" "CQADupstackTexRetrieval" "CQADupstackUnixRetrieval" 
+    "CQADupstackWebmastersRetrieval" "CQADupstackWordpressRetrieval" "MSMARCOTITLE")
 
 # You can uncomment the models you wish to evaluate.
-# MODELS_TO_RUN=("RocketQA-V1" "RocketQA-V2" "BGE" "RepLLaMA" "NV-Embed-v1" "BGE-EN-ICL" "LLARA-passage")
-MODELS_TO_RUN=("BGE") 
+MODELS_TO_RUN=("RocketQA-V1" "RocketQA-V2" "BGE" "RepLLaMA" "NV-Embed-v1" "BGE-EN-ICL" "LLARA-passage" "Qwen3-Embedding")
 
 
 # ===================================================================================
@@ -97,7 +121,8 @@ if [[ " ${MODELS_TO_RUN[*]} " =~ " BGE " ]]; then
               --output_folder en_results/bge-large-en-v1.5_2 \
               --task_name "$task" \
               --task_split $([[ "$task" == *"MSMARCO"* ]] && echo "dev" || echo "test") \
-              --document_instruction 'Represent this sentence for searching relevant passages: ' \
+              --query_instruction 'Represent this sentence for searching relevant passages: ' \
+              --document_instruction "" \
               --pooling_method mean \
               --max_seq_length 512 \
               --eval_batch_size 32 \
@@ -139,10 +164,12 @@ if [[ " ${MODELS_TO_RUN[*]} " =~ " NV-Embed-v1 " ]]; then
     echo "===== Running Evaluation for Model: NV-Embed-v1 ====="
     for task in "${TASKS[@]}"; do
         echo "--- Task: $task ---"
+        query_instruction="${query_instructions[$task]}"
         python3.10 evaluation/eval_mteb.py \
               --base_model_name_or_path nvidia/NV-Embed-v1 \
               --output_folder en_results/nv-embed-v1 \
-              --query_instruction "Given a claim, find documents that refute the claim" \
+              --query_instruction "$query_instruction" \
+              --document_instruction "" \
               --task_name "$task" \
               --task_split $([[ "$task" == *"MSMARCO"* ]] && echo "dev" || echo "test") \
               --eval_batch_size 8
@@ -157,12 +184,14 @@ if [[ " ${MODELS_TO_RUN[*]} " =~ " BGE-EN-ICL " ]]; then
     echo "===== Running Evaluation for Model: BGE-EN-ICL ====="
     for task in "${TASKS[@]}"; do
         echo "--- Task: $task ---"
+        query_instruction="${query_instructions[$task]}"
         python3.10 evaluation/eval_mteb.py \
               --base_model_name_or_path BAAI/bge-en-icl \
               --output_folder en_results/bge-en-icl \
               --task_name "$task" \
               --task_split $([[ "$task" == *"MSMARCO"* ]] && echo "dev" || echo "test") \
-              --query_instruction $'<instruct> Given a scientific claim, retrieve documents that support or refute the claim.\n<query>' \
+              --query_instruction "<instruct> ${query_instruction}\n<query>" \
+              --document_instruction "" \
               --max_seq_length 512 \
               --eval_batch_size 32 \
               --dtype "float32" \
@@ -185,6 +214,8 @@ if [[ " ${MODELS_TO_RUN[*]} " =~ " LLARA-passage " ]]; then
               --output_folder en_results/llara-passage \
               --task_name "$task" \
               --task_split $([[ "$task" == *"MSMARCO"* ]] && echo "dev" || echo "test") \
+              --query_instruction "" \
+              --document_instruction "" \
               --eval_batch_size 8 \
               --pooling_method last_8 \
               --model_flag llara \
@@ -194,6 +225,30 @@ if [[ " ${MODELS_TO_RUN[*]} " =~ " LLARA-passage " ]]; then
     done
 fi
 
+
+# ===================================================================================
+# 👀 8. Qwen3-Embedding
+# ===================================================================================
+if [[ " ${MODELS_TO_RUN[*]} " =~ " Qwen3-Embedding " ]]; then
+    echo "===== Running Evaluation for Model: Qwen3-Embedding ====="
+    for task in "${TASKS[@]}"; do
+        echo "--- Task: $task ---"
+        query_instruction="${query_instructions[$task]}"
+        python3.10 evaluation/eval_mteb.py \
+              --base_model_name_or_path Qwen/Qwen3-Embedding-8B \
+              --output_folder en_results/qwen3-embedding \
+              --task_name "$task" \
+              --task_split $([[ "$task" == *"MSMARCO"* ]] && echo "dev" || echo "test") \
+              --query_instruction "Instruct: ${query_instruction}\nQuery:" \
+              --document_instruction "" \
+              --eval_batch_size 8 \
+              --pooling_method last \
+              --model_flag qwen3 \
+              --add_bos_token 0 \
+              --add_eos_token 1 \
+              --max_seq_length 4096 
+    done
+fi
 
 
 echo "All specified evaluations are complete."
