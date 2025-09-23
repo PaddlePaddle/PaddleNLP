@@ -153,7 +153,7 @@ class VisualSentiment(object):
             save_path (str): path that the image is saved to.
             image_type (str): Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram].
             with_line_chart (bool): Whether to plot line chart, Only work when image_type is set be histogram.
-            top_n (int): show top_n of frequency of apsects, Only work when image_type is set be histogram.
+            top_n (int): show top_n of frequency of aspects, Only work when image_type is set be histogram.
         """
 
         if not aspect_freq:
@@ -226,13 +226,13 @@ class VisualSentiment(object):
         self, aspect_opinion, save_path, sentiment="all", image_type="wordcloud", with_line_chart="true", top_n=15
     ):
         """
-        generate image with aspect and opinion, that is, combining apsect with opinion to display the more specifical opinions of aspect.
+        generate image with aspect and opinion, that is, combining aspect with opinion to display the more specific opinions of aspect.
         this method can help you at two aspects: 1. mining custom's overall impression of products/services; 2. analyzing the quality of some aspect and improve it further.
         Args:
             aspect_opinion (dict[dict] or dict): when sentiment set be "all", a expected dict containing aspect, opinion and its frequency, the key is aspect and its value is a dict containing the aspect's opinion and frequency. when sentiment set be "positive" or "netative", a expected dict containing aspect with opinion and frequency, the key is aspect with opinion and its value is frequency.
             aspect_sentiment (dict[dict]): a dict containing aspect, sentiment and its frequency, the key is aspect and its value is a dict containing the aspect's sentiment and frequency.
             save_path (str): path that the image is saved to.
-            sentiment (str): analyzing aspect with sentiment, Only "all", "positive" and "negative" are received. "positive" only analyzes positive aspects with opinions, "negative" only analyzes negative aspects with opinions, and "all" analyzes all apsects.
+            sentiment (str): analyzing aspect with sentiment, Only "all", "positive" and "negative" are received. "positive" only analyzes positive aspects with opinions, "negative" only analyzes negative aspects with opinions, and "all" analyzes all aspects.
             image_type (str): Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram].
             with_line_chart (bool): Whether to plot line chart, Only work when image_type is set be histogram.
             top_n (int): show top_n of frequency of opinions, Only work when image_type is set be histogram.
@@ -286,7 +286,7 @@ class VisualSentiment(object):
         self, aspect_sentiment, save_path, image_type="wordcloud", top_n=0, descend_aspects=None
     ):
         """
-        generate image with aspect and sentiment, that is, combining apsect and sentiment to display the sentiment of aspect.
+        generate image with aspect and sentiment, that is, combining aspect and sentiment to display the sentiment of aspect.
         This method can help you more intuitively analyze customers' direct impressions of aspects of products/services.
         Args:
             aspect_sentiment (dict[dict]): a dict containing aspect, sentiment and its frequency, the key is aspect and its value is a dict containing the aspect's sentiment and frequency.
@@ -496,7 +496,7 @@ class SentaVisualization(BaseComponent):
 
     def run(self, sr_save_path: str):
         """
-        :Param sr_save_path: The file path of sentiment analysis fesults.
+        :Param sr_save_path: The file path of sentiment analysis results.
         """
         if not os.path.exists(sr_save_path):
             raise ValueError("The sentiment analysis file not exist: {}".format(sr_save_path))

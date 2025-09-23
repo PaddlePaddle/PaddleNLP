@@ -935,7 +935,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
             --data_impl "mmap" \
             --enable_auto_parallel 1 \
             --to_static 0 \
-            --max_grad_norm 0.0 \
+            --max_grad_norm 1.0 \
             >>${log_path}/$FUNCNAME 2>&1
         loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
         ips=-1
@@ -1003,7 +1003,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
             --data_impl "mmap" \
             --enable_auto_parallel 1 \
             --to_static 0 \
-            --max_grad_norm 0.0 \
+            --max_grad_norm 1.0 \
             --resume_from_checkpoint "${case_out_dir}/checkpoint-9" \
             >>${log_path}/$FUNCNAME 2>&1
         pp_resume_from_hybrid_ckpt_loss=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
@@ -1012,6 +1012,69 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
         echo "pp_resume from hybrid ckpt result: loss=$pp_resume_from_hybrid_ckpt_loss ips=$pp_resume_from_hybrid_ckpt_ips mem=$pp_resume_from_hybrid_ckpt_mem"
         
         check_result $FUNCNAME ${loss} ${pp_resume_from_hybrid_ckpt_loss} ${ips} ${pp_resume_from_hybrid_ckpt_ips} ${mem} ${pp_resume_from_hybrid_ckpt_mem}
+        
+        echo "=========== $FUNCNAME run dygraph auto hybrid pp in align mode ==========="
+        export FLAGS_enable_auto_parallel_align_mode=1
+        task_name="llama_auto_bs8_fp16_dp2mp2pp2_hybrid_pp_in_align_mode"
+        align_mode_case_out_dir="output/$task_name"
+        align_mode_case_log_dir="output/$task_name""_log"
+        rm -rf $align_mode_case_out_dir
+        rm -rf $align_mode_case_log_dir
+
+        python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $align_mode_case_log_dir run_pretrain_auto.py \
+            --model_type "llama_pp" \
+            --model_name_or_path "facebook/llama-7b" \
+            --tokenizer_name_or_path "facebook/llama-7b" \
+            --input_dir "./data" \
+            --output_dir $align_mode_case_out_dir \
+            --split 949,50,1 \
+            --max_seq_length 2048 \
+            --hidden_size 1024 \
+            --intermediate_size 3072 \
+            --num_hidden_layers 8 \
+            --num_attention_heads 32 \
+            --per_device_train_batch_size 4 \
+            --per_device_eval_batch_size 4 \
+            --n_microbatch 4 \
+            --gradient_accumulation_steps 1 \
+            --use_flash_attention 1 \
+            --use_fused_rms_norm 0 \
+            --fp16 1 \
+            --fp16_opt_level "O2" \
+            --amp_master_grad 1 \
+            --scale_loss 1024 \
+            --pipeline_parallel_degree 2 \
+            --pipeline_schedule_mode "FThenB" \
+            --tensor_parallel_degree 2 \
+            --sharding_parallel_degree 1 \
+            --learning_rate 0.0001 \
+            --min_learning_rate 0.00001 \
+            --max_steps 10 \
+            --save_steps 20 \
+            --weight_decay 0.01 \
+            --warmup_ratio 0.01 \
+            --logging_steps 1 \
+            --dataloader_num_workers 1 \
+            --sharding "" \
+            --eval_steps 1000000 \
+            --disable_tqdm true \
+            --continue_training 0 \
+            --recompute 0 \
+            --do_train \
+            --do_eval \
+            --device "gpu" \
+            --data_impl "mmap" \
+            --enable_auto_parallel 1 \
+            --to_static 0 \
+            --max_grad_norm 1.0 \
+            >>${log_path}/$FUNCNAME 2>&1
+        align_mode_loss=`cat $align_mode_case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+        align_mode_ips=-1
+        align_mode_mem=-1
+        echo "result: loss=$align_mode_loss ips=$align_mode_ips mem=$align_mode_mem"
+
+        check_result $FUNCNAME ${loss} ${align_mode_loss} ${ips} ${align_mode_ips} ${mem} ${align_mode_mem}
+        
         echo "=========== $FUNCNAME run  end ==========="
     fi
 }
@@ -2126,8 +2189,6 @@ function llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
         fi
         echo "result: $pp_mode loss=$loss"
     done
-    loss_base_fthenb=10.24240494
-    loss_base_vpp=10.24149513  # Paddle PR#74530
     ips=-1
     mem=-1
     ips_base=-1
@@ -2135,10 +2196,17 @@ function llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
     for step in $(seq 1 $max_step); do
         echo "step=$step fthenb loss: ${loss1_array[$step-1]}, vpp loss: ${loss2_array[$step-1]}"
     done
-    echo "FThenB check"
-    check_result $FUNCNAME ${loss_base_fthenb} ${loss1} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "VPP check"
-    check_result $FUNCNAME ${loss_base_vpp} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
+    if [ $IS_A100 -ne 0 ];then
+        check_result $FUNCNAME ${loss1} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
+    else
+        loss_base_fthenb=10.24240494
+        loss_base_vpp=10.24149513  # Paddle PR#74530
+        echo "FThenB check"
+        check_result $FUNCNAME ${loss_base_fthenb} ${loss1} ${ips_base} ${ips} ${mem_base} ${mem}
+        echo "VPP check"
+        check_result $FUNCNAME ${loss_base_vpp} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
+    fi
+    
     echo "=========== $FUNCNAME run  end ==========="
 }
 

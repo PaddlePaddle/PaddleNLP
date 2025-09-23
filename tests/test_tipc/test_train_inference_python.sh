@@ -322,7 +322,7 @@ else
                 elif [[ ${trainer} = ${trainer_key2} ]]; then
                     run_train=${trainer_value2}
                     run_export=${export_value2}
-                # In case of @to_static, we re-used norm_traier,
+                # In case of @to_static, we reused norm_traier,
                 # but append "--to_static" for config
                 # to trigger "apply_to_static" logic in 'train.py'
                 elif [ ${trainer} = "${to_static_key}" ]; then

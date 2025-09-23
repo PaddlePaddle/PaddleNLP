@@ -74,7 +74,7 @@ class DocPrompter(BaseComponent):
         :param model: Choose model name.
         :param device_id: Choose gpu device id.
         :param num_threads: Number of processing threads.
-        :param lang: Choose langugae.
+        :param lang: Choose language.
         :param batch_size: Number of samples the model receives in one batch for inference.
                            Memory consumption is much lower in inference mode. Recommendation: Increase the batch size
                            to a value so only a single batch is used.

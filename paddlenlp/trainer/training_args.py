@@ -614,6 +614,16 @@ class TrainingArguments:
             )
         },
     )
+    sharding_offload_opt_buffersize_GB: int = field(
+        default=-1,
+        metadata={
+            "help": (
+                "Set the size of the optimizer offload buffer when need_hack_offload_optimizer() is True. This option only takes effect when "
+                "use DygraphShardingOptimizerV2. The default value is -1, which means that all of the optimizer states will be offloaded. Only "
+                "works when export HACK_OFFLOAD_OPTIMIZER=1. "
+            )
+        },
+    )
 
     save_sharded_model: bool = field(
         default=False,
@@ -1099,7 +1109,12 @@ class TrainingArguments:
     def __post_init__(self):
         world_size = paddle.distributed.get_world_size()
         if in_auto_parallel_align_mode():
-            self.max_grad_norm = 0.0
+            # self.max_grad_norm = 0.0
+            # The current auto_hybrid_pp has aligned the handling of ClipGradByGlobalNorm with the original dygraph semi-auto parallel and dynamic manual-parallel modes and can correctly handle grad_clip, so it is no longer necessary to set max_grad_norm=0.0.
+            if self.max_grad_norm != 0.0:
+                warnings.warn(
+                    "max_grad_norm is not 0.0,We will execute ClipGradByGlobalNorm,if you want to disable it,please set max_grad_norm=0.0"
+                )
             os.environ["FLAGS_max_inplace_grad_add"] = "65536"
             os.environ["FLAGS_embedding_deterministic"] = "1"
             os.environ["FLAGS_cudnn_deterministic"] = "1"
@@ -1531,6 +1546,11 @@ class TrainingArguments:
                                 self.sharding_comm_buffer_size_MB
                             )
 
+                        if hasattr(strategy.hybrid_configs["sharding_configs"], "offload_opt_buffer_size"):
+                            strategy.hybrid_configs["sharding_configs"].offload_opt_buffer_size = int(
+                                self.sharding_offload_opt_buffersize_GB
+                            )
+
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
                             assert self.amp_master_grad, "Currently sharding stage1 v2 only support amp_master_grad"
@@ -1631,6 +1651,7 @@ class TrainingArguments:
                 self.sharding_parallel_degree
                 * self.tensor_parallel_degree
                 * self.sep_parallel_degree
+                * self.context_parallel_degree
                 * self.pipeline_parallel_degree
             )
 

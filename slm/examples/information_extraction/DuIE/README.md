@@ -115,7 +115,7 @@ sh predict.sh
 之后可以使用官方评估脚本评估训练模型在 dev_data.json 上的效果。如：
 
 ```shell
-python re_official_evaluation.py --golden_file=dev_data.json  --predict_file=predicitons.json.zip [--alias_file alias_dict]
+python re_official_evaluation.py --golden_file=dev_data.json  --predict_file=predictions.json.zip [--alias_file alias_dict]
 ```
 输出指标为 Precision, Recall 和 F1，Alias file 包含了合法的实体别名，最终评测的时候会使用，这里不予提供。
 

@@ -5,7 +5,7 @@ device: "gpu" # use cpu or gpu devices to train.
 seed: 2020
 
 task: "link_prediction"
-model_name_or_path: "ernie-tiny" # ernie-tiny or ernie-1.0 avaiable
+model_name_or_path: "ernie-tiny" # ernie-tiny or ernie-1.0 available
 sample_workers: 1
 optimizer_type: "adam"
 lr: 0.00005

@@ -119,13 +119,13 @@ class DynamicSSIGenerator:
         return schema_ordered_dict
 
     @staticmethod
-    def sample_negative(postive, candidates, k=5):
+    def sample_negative(positive, candidates, k=5):
         if k < 0:
             k = len(candidates)
         negative_set = set()
         for index in np.random.permutation(len(candidates))[:k].tolist():
             negative = candidates[index]
-            if negative not in postive:
+            if negative not in positive:
                 negative_set.add(negative)
 
         return list(negative_set)
@@ -143,7 +143,7 @@ class DynamicSSIGenerator:
         """
         neg_cands = candidates if candidates is not None else self.spot_list
 
-        negative_spot = self.sample_negative(postive=positive, candidates=neg_cands, k=self.negative)
+        negative_spot = self.sample_negative(positive=positive, candidates=neg_cands, k=self.negative)
         positive_spot = random.sample(positive, math.floor(len(positive) * self.positive_rate))
 
         converted_spot_prefix = self.convert_prefix(
@@ -166,7 +166,7 @@ class DynamicSSIGenerator:
             List[str]: Sampled Negative Asoc List
         """
         neg_cands = candidates if candidates is not None else self.asoc_list
-        negative_asoc = self.sample_negative(postive=positive, candidates=neg_cands, k=self.negative)
+        negative_asoc = self.sample_negative(positive=positive, candidates=neg_cands, k=self.negative)
         converted_asoc_prefix = self.convert_prefix(
             candidates=positive + negative_asoc,
             prompt=self.asoc_prompt_id,
