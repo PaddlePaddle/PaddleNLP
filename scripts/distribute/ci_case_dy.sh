@@ -605,6 +605,7 @@ function check_result() {
 }
 
 function before_hook_for_gpt() {
+    set -e
     echo -e "\033[31m ---- Set FLAGS for GPT dygraph cases  \033[0m"
     cd ${gpt_case_path}
     env | grep FLAGS
@@ -710,6 +711,7 @@ function before_hook_for_gpt() {
 }
 
 function before_hook_for_llm_gpt() {
+    set -e
     echo -e "\033[31m ---- Set FLAGS for llm GPT cases  \033[0m"
     cd ${llm_gpt_case_path}
     export FLAGS_cudnn_deterministic=1
