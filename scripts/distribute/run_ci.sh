@@ -179,6 +179,7 @@ function contain_case(){
 }
 ####################################
 function execute_func_list(){
+    set -e
     cd ${log_path} || { echo "Failed to enter log_path: $log_path"; return 1; } 
     total_count=0
     success_count=0

@@ -4381,7 +4381,6 @@ function before_hook_for_gpt() {
 }
 
 function before_hook_for_llama() {
-    set -e
     echo -e "\033[31m ---- Set FLAGS for LLaMA auto cases  \033[0m"
     cd ${llama_case_path}
     export FLAGS_new_executor_micro_batching=True  # True：打开新执行器
@@ -4431,7 +4430,6 @@ function before_hook_for_llama() {
 }
 
 function before_hook_for_deepseek() {
-    set -e
     echo -e "\033[31m ---- Set FLAGS for LLaMA auto cases  \033[0m"
     cd ${deepseek_case_path}
     export FLAGS_new_executor_micro_batching=True  # True：打开新执行器
