@@ -63,6 +63,7 @@ class SFTConfig(TrainingArguments):
     model_init_kwargs: Optional[dict[str, Any]] = None
     dataset_kwargs: Optional[dict[str, Any]] = None
     eval_packing: Optional[bool] = None
+    recompute_offload: Optional[bool] = None
     use_ssa: bool = field(
         default=False,
         metadata={

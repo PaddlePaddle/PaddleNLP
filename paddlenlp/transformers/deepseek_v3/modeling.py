@@ -88,6 +88,7 @@ class DeepseekV3ForCausalLM(DeepseekV3PretrainedModel):
         self,
         input_ids: paddle.Tensor = None,
         attention_mask: Optional[paddle.Tensor] = None,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
         position_ids: Optional[paddle.Tensor] = None,
         past_key_values: Optional[List[paddle.Tensor]] = None,
         inputs_embeds: Optional[paddle.Tensor] = None,
@@ -139,6 +140,7 @@ class DeepseekV3ForCausalLM(DeepseekV3PretrainedModel):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
         )
 
         hidden_states = outputs[0]

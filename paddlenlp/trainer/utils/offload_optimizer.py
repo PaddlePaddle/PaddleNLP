@@ -48,6 +48,14 @@ def hack_offload_optimizer():
 
     setattr(Optimizer, "_add_accumulator", new_add_accumulator)
 
+    origin_create_master_weight = getattr(Optimizer, "_create_master_weight")
+    def new_create_master_weight(self, *args, **kwargs):
+        x = origin_create_master_weight(self, *args, **kwargs)
+        offload(x)
+        return x
+
+    setattr(Optimizer, "_create_master_weight", new_create_master_weight)
+
     # Step 2: mock _C_ops.adamw_ and _C_ops.adamw
     for name in ["adam_", "adamw_"]:
         origin_op = getattr(_C_ops, name)

@@ -235,6 +235,9 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
                 attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             )
         elif self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
+            offload_kwargs = {}
+            if self.config.recompute_offload:
+                offload_kwargs["offload_indices"] = [0]
             if attention_mask is not None or attn_mask_startend_row_indices is not None:
                 hidden_states = recompute(
                     super().forward,
@@ -243,6 +246,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
                     attention_mask=attention_mask,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                     use_reentrant=self.config.recompute_use_reentrant,
+                    **offload_kwargs,
                 )
             else:
                 # for pretrain
@@ -300,6 +304,9 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 )
             elif self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
+                offload_kwargs = {}
+                if self.config.recompute_offload:
+                    offload_kwargs["offload_indices"] = [0]
                 if attention_mask is not None or attn_mask_startend_row_indices is not None:
                     hidden_states = recompute(
                         super().forward,
@@ -309,6 +316,7 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
                         attention_mask=attention_mask,
                         attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                         use_reentrant=self.config.recompute_use_reentrant,
+                        **offload_kwargs,
                     )
                 else:
                     # for pretrain
