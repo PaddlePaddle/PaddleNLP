@@ -65,10 +65,13 @@ def hack_offload_optimizer():
             ret = origin_op(*args)
             is_offload_opt = getattr(args[0], "is_offload_opt", False)
             for i, arg in enumerate(args):
-                need_offload_arg = i >= 2 and isinstance(arg, paddle.Tensor) and is_offload_opt
-                if is_offload_opt_cache_master_weight():
-                    need_offload_arg = need_offload_arg and i != 8
-                if need_offload_arg:  # do not offload parameter and gradient
+                # need_offload_arg = i >= 2 and isinstance(arg, paddle.Tensor) and is_offload_opt
+                # if is_offload_opt_cache_master_weight():
+                #     need_offload_arg = need_offload_arg and i != 8
+                # if need_offload_arg:  # do not offload parameter and gradient
+                if (
+                    i >= 2 and isinstance(arg, paddle.Tensor) and is_offload_opt
+                ):  # do not offload parameter and gradient
                     offload(arg)
             return ret
 
