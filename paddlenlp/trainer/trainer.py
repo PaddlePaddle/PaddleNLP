@@ -173,6 +173,8 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
 )
 from .training_args import TrainingArguments
 from .unified_checkpoint import UnifiedCheckpointHandler
+from .unified_checkpoint.utils import generate_base_static_name
+from paddle.distributed.checkpoint.sharded_tensor import ShardedTensor, build_sharded_state_dict
 from .utils import reshard as reshard_util
 from .utils.async_save import AsyncSaver
 
@@ -203,7 +205,6 @@ DEFAULT_PROGRESS_CALLBACK = ProgressCallback
 
 if is_datasets_available():
     import datasets
-
 
 try:
     from paddle.distributed.fleet.utils import mix_precision_utils
@@ -881,6 +882,7 @@ class Trainer:
             logger.info("All processes finished downloading from pdc")
 
         train_dataloader = self.get_train_dataloader()
+
 
         total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
         len_dataloader = None
@@ -2221,7 +2223,7 @@ class Trainer:
         in_tensor_parallel_mode = self.args.tensor_parallel_degree > 1
         in_sep_parallel_mode = self.args.sep_parallel_degree > 1
         in_cp_parallel_mode = self.args.context_parallel_degree > 1
-
+         
         # Multi-gpu training
         if self.args.world_size > 1 and (not self.args.use_hybrid_parallel):
             # MOE use DDP to broadcaset parameters.
@@ -2243,7 +2245,6 @@ class Trainer:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
                 assert self.optimizer is not None, "optimizer is empty!"
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
-
         # Pipeline mode
         if in_pipeline_parallel_mode:
             if self.args.amp_master_grad:
@@ -2288,12 +2289,11 @@ class Trainer:
                     "Using default prepare pipeline inputs func, only support input_ids and labels as inputs."
                 )
                 model._prepare_pipeline_inputs_func = _prepare_pipeline_inputs_func
-
+            
             assert self.optimizer is not None, "Pipeline mode need decorate optimizer, pelease init optimizer."
             if self.args.amp_master_grad:
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
-
             if (
                 hasattr(self.args, "enable_sharding_comm_overlap")
                 and self.args.enable_sharding_comm_overlap
@@ -2301,7 +2301,6 @@ class Trainer:
                 and "split_param" in split_parallel_config(self.args.sharding_parallel_config)
             ):
                 model.register_sharding_comm_overlap_hook(self.optimizer)
-
         # No pipeline mode, sharding only
         if not in_pipeline_parallel_mode and in_sharding_parallel_mode:
             # Sharded DDP!
@@ -2315,7 +2314,6 @@ class Trainer:
                     model = paddle.distributed.fleet.meta_parallel.TensorParallel(
                         model, hcg, strategy=fleet.fleet._user_defined_strategy
                     )
-
             if ShardingOption.SHARD_OP in self.args.sharding:
                 if self.args.amp_master_grad:
                     mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
@@ -2334,7 +2332,6 @@ class Trainer:
                     level = "p_g_os"
 
                 from paddle.distributed.sharding import group_sharded_parallel
-
                 # add dp_group and exclude_layer params
                 # https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/distributed/sharding/group_sharded_parallel_cn.html#group-sharded-parallel
                 extra_kwargs = {}
@@ -2357,6 +2354,7 @@ class Trainer:
                     offload=cpu_offload,
                     **extra_kwargs,
                 )
+
                 if ShardingOption.SHARD_GRAD_OP in self.args.sharding and self.args.amp_master_grad:
                     assert hasattr(optimizer, "use_main_grad"), (
                         "Current installed paddle doesn't support sharding stage 2 with main grad, "
@@ -2382,7 +2380,6 @@ class Trainer:
             if self.args.amp_master_grad:
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
-
         # stage1 has v1 and v2 version
         if in_sharding_parallel_mode and ShardingOption.SHARD_OP in self.args.sharding:
             if "split_param" in self.args.sharding_parallel_config:
@@ -2688,7 +2685,7 @@ class Trainer:
                         filter_optimzier_state_dict[op_k] = op_v
         return filter_optimzier_state_dict
 
-    def _ordered_save(self, state_dict, save_path, signal_path=None):
+    def _ordered_save(self, state_dict, save_path):
         group_size = self.args.ordered_save_group_size
         hcg = fleet.get_hybrid_communicate_group()
         if hcg.get_sharding_parallel_world_size() > 1 or hcg.get_model_parallel_world_size() <= 1:
@@ -2707,10 +2704,6 @@ class Trainer:
             if dist.get_rank() in group:
                 paddle.save(state_dict, save_path)
             dist.barrier(mp_group)
-
-        if signal_path is not None:
-            with open(signal_path, mode="w+") as f:
-                f.write("1")
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
@@ -2776,6 +2769,99 @@ class Trainer:
 
         # only save model state dict, ignore optimizer and scheduler
         if not self.args.ignore_save_lr_and_optim:
+
+    
+            model_sharded_state_dict = self.model.sharded_state_dict()
+            print(type(self.optimizer))
+            print(type(self.optimizer._inner_opt))
+            print(type(self.optimizer._inner_opt._inner_opt))
+            opt_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
+
+            
+
+            sharded_state_dict = {}
+            sharded_state_dict.update(model_sharded_state_dict)
+            sharded_state_dict.update(opt_sharded_state_dict)
+
+
+
+            # for k,v in sharded_state_dict.items():
+            #     print(k, "   ====>   ",v,)
+            
+            # pre_save_md5 = {}
+            # for k,v in sharded_state_dict.items():
+            #     print(k, "   ====>   ",v.local_tensor.dtype)
+            #     pre_save_md5[k] = v.local_tensor._md5sum()
+        
+
+            from paddle.distributed.flex_checkpoint import ShardedTensor
+            for k,v in sharded_state_dict.items():
+                if not isinstance(v, ShardedTensor):
+                    print(k,"  is not ShardedTensor!")
+
+            # dist.save_state_dict(
+            #     state_dict=sharded_state_dict,
+            #     path = "./tmp"
+            # )
+            print("====> end save")
+
+            for k,v in sharded_state_dict.items():
+                paddle.assign(paddle.zeros(v.local_tensor.shape,v.local_tensor.dtype),v.local_tensor)
+            
+            # after_save_md5 = {}
+            # for k,v in sharded_state_dict.items():
+
+            #     print(k, "   ====>   ", v.local_tensor._md5sum())
+            #     after_save_md5[k] =  v.local_tensor._md5sum()
+                
+
+            # for k in after_save_md5.keys():
+            #     assert pre_save_md5[k] != after_save_md5[k] , f"{k} not be assign zeros"
+
+            
+            aoa_config = {
+                "aoa_statements" : ['llama.layers.0.self_attn.qkv_proj.weight -> llama.layers.0.self_attn.qkv_proj.weight ,fused_qkv , num_heads=64, num_key_value_groups = 8 \n']
+            }
+            print("====> begin load")
+            dist.load_state_dict(
+                state_dict=sharded_state_dict,
+                path = "./tmp",
+                aoa_config=aoa_config, 
+            )
+            # print("====> end load")
+            # after_load_md5 = {}
+            # for k,v in sharded_state_dict.items():
+            #     print(k, "   ====>   ", v.local_tensor._md5sum())
+            #     after_load_md5[k] = v.local_tensor._md5sum()
+            #     if k == "lm_head.weight":
+            #         print(v.local_tensor)
+            
+            # print("====> m5 check!!!")
+            # for k in after_save_md5.keys():
+            #     if "lm_head" in k:
+            #         continue
+            #     print(k ,"  ===>. ", pre_save_md5[k], " ===> ",after_load_md5[k])
+            #     assert pre_save_md5[k] == after_load_md5[k] , f"{k} error load!"
+
+
+            # print("===> begin load!")
+            # dist.load_state_dict(
+            #     state_dict=sharded_state_dict,
+            #     path = "./tmp"
+            # )
+            # print("===> end load!")
+            # print("==================> ")
+            # print("===> begin save!")
+            # dist.save_state_dict(
+            #     state_dict=sharded_state_dict,
+            #     path = "./tmp"
+            # )
+            # print("===> end save!")
+
+
+            import sys
+            sys.exit()
+
             optimizer_name = _add_variant(PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             saved_signal_path = os.path.join(output_dir, f"saved_signal_{dist.get_rank()}")
 
