@@ -1296,17 +1296,38 @@ class DeepseekV2DecoderLayer(nn.Layer):
         seq_len = hidden_states.shape[seq_axis]
         assert seq_len % sub_seq_len == 0
         num_chunks = seq_len // sub_seq_len
-        split_list = [sub_seq_len] * num_chunks
-        input_list = paddle.split(hidden_states, split_list, axis=seq_axis)
+        input_list = paddle.split(hidden_states, num_chunks, axis=seq_axis)
         output_list = []
 
-        for chunk in input_list:
-            out = recompute(
-                self.mlp.forward,
-                chunk,
-                **offload_kwargs,
-            )
-            output_list.append(out)
+        if isinstance(self.mlp, DeepseekV2MoEFlexToken):
+            if attn_mask_startend_row_indices is not None:
+                if self.config.sequence_parallel and self.config.tensor_parallel_degree > 1:
+                    flat_mask = paddle.transpose(attn_mask_startend_row_indices, [2, 0, 1])
+                    flat_mask = ScatterOp.apply(flat_mask)
+                flat_mask = paddle.flatten(flat_mask)
+                mask_list = paddle.split(flat_mask, num_chunks)
+            else:
+                mask_list = [None] * num_chunks
+
+            for chunk, mask_chunk in zip(input_list, mask_list):
+                masked_token_indices = None
+                if mask_chunk is not None:
+                    masked_token_indices = mask_chunk == 0
+                out = recompute(
+                    self.mlp.forward,
+                    chunk,
+                    masked_token_indices=masked_token_indices,
+                    **offload_kwargs,
+                )
+                output_list.append(out)
+        else:
+            for chunk in input_list:
+                out = recompute(
+                    self.mlp.forward,
+                    chunk,
+                    **offload_kwargs,
+                )
+                output_list.append(out)
         hidden_states = paddle.concat(output_list, axis=seq_axis)
         outputs = recompute(
             self.post_process,
@@ -1443,9 +1464,12 @@ class DeepseekV2DecoderLayer(nn.Layer):
         self_attn_weights = attn_outputs[2] if output_attentions else None
         present_key_value = attn_outputs[3] if use_cache else None
 
-        masked_token_indices = None
         if attn_mask_startend_row_indices is not None and isinstance(self.mlp, DeepseekV2MoEFlexToken):
-            flat_mask = paddle.flatten(attn_mask_startend_row_indices)
+            masked_token_indices = None
+            if self.config.sequence_parallel and self.config.tensor_parallel_degree > 1:
+                flat_mask = paddle.transpose(attn_mask_startend_row_indices, [2, 0, 1])
+                flat_mask = ScatterOp.apply(flat_mask)
+            flat_mask = paddle.flatten(flat_mask)
             masked_token_indices = flat_mask == 0
             hidden_states = self.mlp(hidden_states, masked_token_indices=masked_token_indices)
         else:
