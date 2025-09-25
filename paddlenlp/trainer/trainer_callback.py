@@ -700,6 +700,9 @@ class MoECorrectionBiasAdjustCallback(TrainerCallback):
 
         model.apply(get_stat)
 
+        if not usages:
+            return
+
         usages_tensor = paddle.stack(usages, 0)  # [num_layers, num_experts]
         if not hasattr(fleet, "_hcg"):
             dist.all_reduce(usages_tensor)
