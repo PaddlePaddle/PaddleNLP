@@ -881,8 +881,8 @@ class DeepseekV2MoEFlexToken(MoEFlexTokenLayer):
             intermediate_size = config.moe_intermediate_size * config.n_shared_experts
             self.shared_experts = DeepseekV2MLP(config=config, intermediate_size=intermediate_size, is_moe=False)
 
-    def forward(self, hidden_states):
-        final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
+    def forward(self, hidden_states, masked_token_indices=None):
+        final_hidden_states, l_aux, l_zloss = super().forward(hidden_states, masked_token_indices=masked_token_indices)
         if self.training and self.alpha > 0.0:
             l_aux = l_aux * self.alpha
             final_hidden_states = AddAuxiliaryLoss.apply(final_hidden_states, l_aux)
@@ -1003,6 +1003,7 @@ class DeepseekV2Attention(nn.Layer):
         # fmt: on
 
         if self.config.tensor_parallel_degree > 1 and self.config.sequence_parallel:
+
             def grad_allreduce_hook(param, accumulation_steps):
                 hcg = fleet.get_hybrid_communicate_group()
                 pg = hcg.get_model_parallel_group().process_group
@@ -1018,10 +1019,17 @@ class DeepseekV2Attention(nn.Layer):
                             pg.allreduce(param.grad).wait()
 
                 return __impl__
+
             # kv_a_proj_with_mqa and q_a_proj grad need to be reduce between mp
-            self.kv_a_proj_with_mqa.weight._register_backward_hook(grad_allreduce_hook(self.kv_a_proj_with_mqa.weight, accumulation_steps=config.gradient_accumulation_steps))
-            self.q_a_proj.weight._register_backward_hook(grad_allreduce_hook(self.q_a_proj.weight, accumulation_steps=config.gradient_accumulation_steps))
-        
+            self.kv_a_proj_with_mqa.weight._register_backward_hook(
+                grad_allreduce_hook(
+                    self.kv_a_proj_with_mqa.weight, accumulation_steps=config.gradient_accumulation_steps
+                )
+            )
+            self.q_a_proj.weight._register_backward_hook(
+                grad_allreduce_hook(self.q_a_proj.weight, accumulation_steps=config.gradient_accumulation_steps)
+            )
+
         self._init_rope()
 
         self.softmax_scale = self.q_head_dim ** (-0.5)
@@ -1431,7 +1439,14 @@ class DeepseekV2DecoderLayer(nn.Layer):
         self_attn_weights = attn_outputs[2] if output_attentions else None
         present_key_value = attn_outputs[3] if use_cache else None
 
-        hidden_states = self.mlp(hidden_states)
+        masked_token_indices = None
+        if attn_mask_startend_row_indices is not None and isinstance(self.mlp, DeepseekV2MoEFlexToken):
+            flat_mask = paddle.flatten(attn_mask_startend_row_indices)
+            masked_token_indices = flat_mask == 0
+            hidden_states = self.mlp(hidden_states, masked_token_indices=masked_token_indices)
+        else:
+            hidden_states = self.mlp(hidden_states)
+
         outputs = self.post_process(
             hidden_states, residual, output_attentions, use_cache, self_attn_weights, present_key_value
         )

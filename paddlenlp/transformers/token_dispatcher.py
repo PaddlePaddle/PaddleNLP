@@ -261,12 +261,19 @@ class MoEFlexTokenDispatcher(MoETokenDispatcher):
         )
 
     def token_permutation(
-        self, hidden_states: paddle.Tensor, probs: paddle.Tensor, routing_map: paddle.Tensor
+        self, hidden_states: paddle.Tensor, probs: paddle.Tensor, routing_map: paddle.Tensor, masked_token_indices=None
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         self.hidden_shape = hidden_states.shape
         hidden_states = hidden_states.view([-1, self.hidden_shape[-1]])
 
         self._comm_manager.setup_metadata(routing_map, probs)
+        if masked_token_indices is not None:
+            self._comm_manager.token_indices.stop_gradient = True
+            masked_token_indices = masked_token_indices.unsqueeze(axis=-1)
+            self._comm_manager.token_indices = paddle.masked_fill(
+                self._comm_manager.token_indices, masked_token_indices, -1
+            )
+
         hidden_states = self._comm_manager.dispatch(hidden_states)
         global_input_tokens = self._comm_manager.get_permuted_hidden_states_by_experts(hidden_states)
         tokens_per_expert = self._comm_manager.get_number_of_tokens_per_expert()
