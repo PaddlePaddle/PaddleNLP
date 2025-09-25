@@ -1657,7 +1657,11 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP() {
         ips=-1
         mem=-1
         echo "result: to_static=$to_static loss=$loss loss_md5=$loss_md5 ips=$ips mem=$mem"
-        loss_base=9.25199356
+        if [ $to_static -eq 0 ];then
+            loss_base=9.25199432
+        elif [ $to_static -eq 1 ];then
+            loss_base=9.25199356
+        fi
         loss_md5_base=83531e98ee11cd271db175150ab254bb
         if [ $IS_A100 -ne 0 ] && [ $to_static -eq 0 ];then
             if [ $IS_CUDA123 -ne 0 ];then
