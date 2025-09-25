@@ -414,6 +414,15 @@ class SelfAttention(nn.Layer):
             value_layer.shape[:2] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
         )
 
+        B, S, G, D = key_layer.shape
+        key_layer = key_layer.unsqueeze(-2)
+        key_layer = key_layer.expand(B, S, G, multiplier, D)
+        key_layer = key_layer.reshape(B, S, self.num_attention_heads_per_partition, self.hidden_size_per_attention_head)
+        value_layer = value_layer.unsqueeze(-2)
+        value_layer = value_layer.expand(B, S, G, multiplier, D)
+        value_layer = value_layer.reshape(B, S, self.num_attention_heads_per_partition, self.hidden_size_per_attention_head)
+
+
         # ==================================
         # core attention computation
         # ==================================
