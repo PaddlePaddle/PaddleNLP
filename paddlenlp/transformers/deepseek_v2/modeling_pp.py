@@ -294,11 +294,12 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
         hidden_states = hidden_states_main_model
         for depth in range(self.config.num_nextn_predict_layers):
             inputs_embeds_cur_depth = inputs_embeds_cur_depth_list[depth]
-            
+
             moelayer_use_subbatch_recompute = self.config.moe_subbatch_token_num > 0
             if moelayer_use_subbatch_recompute:
                 hidden_states = super().subbatch_recompute_forward(
                     hidden_states,
+                    inputs_embeds_cur_depth,
                     position_ids=position_ids,
                     attention_mask=attention_mask,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,

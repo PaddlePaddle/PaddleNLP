@@ -378,12 +378,12 @@ class MoEFlexTokenLayer(nn.Layer):
 
         return paddle.concat(outputs, axis=0)
 
-    def forward(self, hidden_states: paddle.Tensor, masked_token_indices=None):
+    def forward(self, hidden_states: paddle.Tensor, masked_tokens=None):
         _, _, d_model = hidden_states.shape
         # reshaped_input = hidden_states.reshape([-1, d_model])
         probs, routing_map, l_aux, l_zloss = self.router(hidden_states)
         (dispatched_input, tokens_per_expert) = self.token_dispatcher.token_permutation(
-            hidden_states, probs, routing_map, masked_token_indices
+            hidden_states, probs, routing_map, masked_tokens
         )
         expert_output = self.expert_forward(dispatched_input, tokens_per_expert)
         output, _ = self.token_dispatcher.token_unpermutation(expert_output, None)
