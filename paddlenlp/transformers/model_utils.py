@@ -32,6 +32,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
 import aistudio_sdk
 import numpy as np
 import paddle
+import paddle.distributed as dist
 import paddle.nn as nn
 import six
 from huggingface_hub import (
@@ -2988,14 +2989,40 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             "pp_config": None,
             "cp_config": None,
         }
+        has_auto_dist_config = False
         for name, layer in self.named_sublayers(include_self=True):
             if hasattr(layer, "auto_dist_config"):
+                has_auto_dist_config = True
                 if name != "":
                     prefix = name + "."
                 else:
                     prefix = ""
                 layer_config = layer.auto_dist_config(prefix)
                 merged_config = self.merge_auto_dist_configs([merged_config, layer_config])
+        if not has_auto_dist_config:
+            model_file = inspect.getfile(self.__class__)
+            model_dir = os.path.dirname(model_file)
+            config_path = os.path.join(model_dir, "intermediate_api_config.json")
+            assert os.path.exists(config_path), (
+                f"intermediate api config file not found at {config_path}. "
+                "Please ensure the file exists or implement auto_dist_config in layers."
+            )
+            with open(config_path, "r") as f:
+                iconfig = json.load(f)
+
+            def process_config_value(value):
+                if isinstance(value, dict):
+                    return {k: process_config_value(v) for k, v in value.items()}
+                elif isinstance(value, list):
+                    return [getattr(dist, v)() for v in value if hasattr(dist, v)]
+                elif isinstance(value, str) and hasattr(dist, value):
+                    return getattr(dist, value)()
+                return value
+
+            iconfig = {k: process_config_value(v) for k, v in iconfig.items()}
+            layer_config = {f"{k}": v for k, v in iconfig.items()}
+            merged_config = self.merge_auto_dist_configs([merged_config, layer_config])
+
         final_config = {
             "dp_config": None,
             "mp_config": None,
