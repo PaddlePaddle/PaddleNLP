@@ -1052,6 +1052,11 @@ class DeepseekV2MoE(MoELayer):
             using_post_norm_recompute=self.using_post_norm_recompute,
         )
 
+        for expert in self.experts:
+            if expert is not None:
+                setattr(expert.w1, "is_expert_weight", True)
+                setattr(expert.w2, "is_expert_weight", True)
+
         if config.offline_quant_expert_weight and config.clear_origin_weight_when_offline_quant:
             moe_grad_group = fleet.get_hybrid_communicate_group().expert_grad_comm_group
             expert_w1_list = [expert.w1 for expert in self.experts if expert is not None]
