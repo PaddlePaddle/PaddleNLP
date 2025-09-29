@@ -1301,8 +1301,9 @@ class DeepseekV2DecoderLayer(nn.Layer):
 
         if isinstance(self.mlp, DeepseekV2MoEFlexToken):
             if attn_mask_startend_row_indices is not None:
+                flat_mask = attn_mask_startend_row_indices
                 if self.config.sequence_parallel and self.config.tensor_parallel_degree > 1:
-                    flat_mask = paddle.transpose(attn_mask_startend_row_indices, [2, 0, 1])
+                    flat_mask = paddle.transpose(flat_mask, [2, 0, 1])
                     flat_mask = ScatterOp.apply(flat_mask)
                 flat_mask = paddle.flatten(flat_mask)
                 mask_list = paddle.split(flat_mask, num_chunks)
@@ -1468,8 +1469,9 @@ class DeepseekV2DecoderLayer(nn.Layer):
 
         if attn_mask_startend_row_indices is not None and isinstance(self.mlp, DeepseekV2MoEFlexToken):
             masked_tokens = None
+            flat_mask = attn_mask_startend_row_indices
             if self.config.sequence_parallel and self.config.tensor_parallel_degree > 1:
-                flat_mask = paddle.transpose(attn_mask_startend_row_indices, [2, 0, 1])
+                flat_mask = paddle.transpose(flat_mask, [2, 0, 1])
                 flat_mask = ScatterOp.apply(flat_mask)
             flat_mask = paddle.flatten(flat_mask)
             masked_tokens = flat_mask == 0
@@ -2284,6 +2286,39 @@ class DeepseekV2PretrainingCriterion(nn.Layer):
                 )
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
+        def subbatch_compute_loss(preds, labels, subbatch_token_num):
+            seq_axis = 1
+            seq_len = preds.shape[seq_axis]
+            assert seq_len % subbatch_token_num == 0
+            num_chunks = seq_len // subbatch_token_num
+            preds_list = paddle.split(preds, num_chunks, axis=seq_axis)
+            labels_list = paddle.split(labels, num_chunks, axis=seq_axis)
+
+            loss_list = []
+            offload_kwargs = {}
+            for pred_chunk, label_chunk in zip(preds_list, labels_list):
+                with paddle.amp.auto_cast(False):
+                    offload_kwargs["offload_indices"] = [0]
+                    sub_loss = recompute(
+                        self.loss_func,
+                        pred_chunk.astype("float32"),
+                        label_chunk.unsqueeze(2),
+                        **offload_kwargs,
+                    )
+                    loss_list.append(sub_loss)
+
+            masked_lm_loss = paddle.concat(loss_list, axis=seq_axis)
+            binary_sequence = paddle.where(
+                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+            )
+            count = paddle.sum(binary_sequence)
+            if count == 0:
+                loss = paddle.sum(masked_lm_loss * binary_sequence)
+            else:
+                loss = paddle.sum(masked_lm_loss * binary_sequence) / count
+
+            return loss
+
         def compute_loss(preds, labels):
             with paddle.amp.auto_cast(False):
                 masked_lm_loss = self.loss_func(preds.astype("float32"), labels.unsqueeze(2))
@@ -2308,19 +2343,35 @@ class DeepseekV2PretrainingCriterion(nn.Layer):
             masked_lm_labels = masked_lm_labels[:, : -self.config.num_nextn_predict_layers]
             seq_length = masked_lm_labels.shape[1]
 
-            loss = compute_loss(prediction_scores, masked_lm_labels)
+            # save_dir = f"/root/paddlejob/gpfs/zhangyichen/tp{self.config.tensor_parallel_degree}_outputs/NODE{dist.get_rank() // 8}_outputs"
+            # paddle.save(prediction_scores, os.path.join(save_dir, f"main_pred_rank{dist.get_rank()}"))
+            # paddle.save(masked_lm_labels, os.path.join(save_dir, f"main_labels_rank{dist.get_rank()}"))
+            if self.config.moe_subbatch_token_num > 0:
+                loss = subbatch_compute_loss(prediction_scores, masked_lm_labels, self.config.moe_subbatch_token_num)
+            else:
+                loss = compute_loss(prediction_scores, masked_lm_labels)
 
             mtp_loss_res = []
             for depth in range(self.config.num_nextn_predict_layers):
                 prediction_scores_cur_depth = mtp_logits[depth]
                 masked_lm_labels_cur_depth = masked_lm_labels_ori[:, (depth + 1) : (depth + 1 + seq_length)]
-                res_cur_depth = compute_loss(prediction_scores_cur_depth, masked_lm_labels_cur_depth)
+                # paddle.save(prediction_scores_cur_depth, os.path.join(save_dir, f"mtp_pred_rank{dist.get_rank()}"))
+                # paddle.save(masked_lm_labels_cur_depth, os.path.join(save_dir, f"mtp_labels_rank{dist.get_rank()}"))
+                if self.config.moe_subbatch_token_num > 0:
+                    res_cur_depth = subbatch_compute_loss(
+                        prediction_scores_cur_depth, masked_lm_labels_cur_depth, self.config.moe_subbatch_token_num
+                    )
+                else:
+                    res_cur_depth = compute_loss(prediction_scores_cur_depth, masked_lm_labels_cur_depth)
                 mtp_loss_res.append(res_cur_depth)
 
             loss = add_loss(loss, self.config.num_nextn_predict_lambda * sum([x for x in mtp_loss_res]) / len(mtp_loss_res))  # fmt: skip
 
         else:
-            loss = compute_loss(prediction_scores, masked_lm_labels)
+            if self.config.moe_subbatch_token_num > 0:
+                loss = subbatch_compute_loss(prediction_scores, masked_lm_labels, self.config.moe_subbatch_token_num)
+            else:
+                loss = compute_loss(prediction_scores, masked_lm_labels)
 
         if router_loss is not None and isinstance(router_loss, paddle.Tensor):
             loss = add_loss(loss, router_loss)
