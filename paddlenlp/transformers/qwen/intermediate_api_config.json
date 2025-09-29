@@ -1,0 +1,36 @@
+{
+    "sp_config": {
+        "parallelize_plan": {
+            "qwen.wte": [
+                "RowWiseParallel",
+                "SequenceParallelBegin"
+            ],
+            "qwen.h.*.attn.c_attn": "ColWiseParallel",
+            "qwen.h.*.attn.c_proj": "RowWiseParallel",
+            "qwen.h.*.attn": "SequenceParallelDisable",
+            "qwen.h.*.mlp.gate_up_fused_proj": "ColWiseParallel",
+            "qwen.h.*.mlp.w1": "ColWiseParallel",
+            "qwen.h.*.mlp.w2": "ColWiseParallel",
+            "qwen.h.*.mlp.c_proj": "RowWiseParallel",
+            "qwen.h.*.mlp": "SequenceParallelDisable",
+            "lm_head.weight": "ColWiseParallel",
+            "lm_head": "SequenceParallelEnd"
+        }
+    },
+    "mp_config": {
+        "parallelize_plan": {
+            "qwen.wte": "RowWiseParallel",
+            "qwen.h.*.attn.c_attn": "ColWiseParallel",
+            "qwen.h.*.attn.c_proj": "RowWiseParallel",
+            "qwen.h.*.mlp.gate_up_fused_proj": "ColWiseParallel",
+            "qwen.h.*.mlp.w1": "ColWiseParallel",
+            "qwen.h.*.mlp.w2": "ColWiseParallel",
+            "qwen.h.*.mlp.c_proj": "RowWiseParallel",
+            "lm_head.weight": "ColWiseParallel"
+        }
+    },
+    "pp_config": {
+        "split_spec": "qwen.h",
+        "global_spec": "qwen.global_layer"
+    }
+}
