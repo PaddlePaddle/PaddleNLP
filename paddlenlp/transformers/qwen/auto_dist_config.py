@@ -15,7 +15,7 @@
 import paddle.distributed as dist
 
 
-def auto_dist_config(self, prefix=""):
+def get_dist_config(model, prefix=""):
     if prefix != "":
         assert prefix.endswith(".")
     config = {
