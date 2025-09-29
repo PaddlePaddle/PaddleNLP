@@ -667,7 +667,7 @@ class QWenForCausalLMNet(QWenPretrainedModelNet):
             "sp_config": {
                 "parallelize_plan": {
                     f"{prefix}qwen.wte": [
-                        dist.RowWiseParallel(),
+                        dist.ColWiseParallel(),
                         dist.SequenceParallelBegin(),
                     ],
                     f"{prefix}qwen.h.*.attn.c_attn": dist.ColWiseParallel(),
@@ -684,7 +684,7 @@ class QWenForCausalLMNet(QWenPretrainedModelNet):
             },
             "mp_config": {
                 "parallelize_plan": {
-                    f"{prefix}qwen.wte": dist.RowWiseParallel(),
+                    f"{prefix}qwen.wte": dist.ColWiseParallel(),
                     f"{prefix}qwen.h.*.attn.c_attn": dist.ColWiseParallel(),
                     f"{prefix}qwen.h.*.attn.c_proj": dist.RowWiseParallel(),
                     f"{prefix}qwen.h.*.mlp.gate_up_fused_proj": dist.ColWiseParallel(),
