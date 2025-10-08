@@ -31,10 +31,10 @@ import types
 import warnings
 from collections import OrderedDict
 from collections.abc import Mapping
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-import deepcopy
 import numpy as np
 import paddle
 import paddle.amp.auto_cast as autocast
@@ -878,7 +878,7 @@ class Trainer:
             for k, v in optimizer_sharded_state_dict.items():
                 v.local_tensor._clear_to_zero_allocation()
 
-            if isinstance(self.optimizer.inner_opt, DygraphShardingOptimizerV2):
+            if isinstance(self.optimizer._inner_opt, DygraphShardingOptimizerV2):
                 color_to_comm_buffer_list = self.optimizer._color_to_comm_buffer_list
                 for color, _comm_buffer_list in color_to_comm_buffer_list.items():
                     for comm_buffer in _comm_buffer_list:
@@ -954,16 +954,10 @@ class Trainer:
 
             for k, v in optimizer_sharded_state_dict.items():
                 source_tensor = optimizer_sharded_state_dict_pin[k]
-                target_tensor = paddle.zeros_like(v.local_tensor)
-                if source_tensor.place != target_tensor.place:
-                    source_tensor = source_tensor.to(target_tensor.place)
-                paddle.assign(source_tensor, target_tensor)
-                target_tensor_pin = target_tensor.cpu()
-                del target_tensor
-                target_tensor_pin._share_buffer_to(v.local_tensor)
+                source_tensor._share_buffer_to(v.local_tensor)
                 del source_tensor
 
-            if isinstance(self.optimizer.inner_opt, DygraphShardingOptimizerV2):
+            if isinstance(self.optimizer._inner_opt, DygraphShardingOptimizerV2):
                 color_to_comm_buffer_list = self.optimizer._color_to_comm_buffer_list
                 for color, _comm_buffer_list in color_to_comm_buffer_list.items():
                     for comm_buffer in _comm_buffer_list:
