@@ -3167,6 +3167,19 @@ class PipelinePretrainedModel(PretrainedModel):
 
         return state_dict
 
+    def sharded_state_dict(self, *args, **kwargs):
+        sharded_state_dict = super().sharded_state_dict(*args, **kwargs)
+        if self._single_to_pp_mapping is None:
+            self._set_pipeline_name_mapping()
+        assert len(self._single_to_pp_mapping) > 0, "The pipeline stage must have parameters!"
+
+        for k in list(sharded_state_dict.keys()):
+            v = sharded_state_dict.pop(k)
+            v.key = self._pp_to_single_mapping[k]
+            sharded_state_dict[self._pp_to_single_mapping[k]] = v
+
+        return sharded_state_dict
+
     def set_state_dict(self, state_dict, *args, **kwargs):
         if self._single_to_pp_mapping is None:
             self._set_pipeline_name_mapping()

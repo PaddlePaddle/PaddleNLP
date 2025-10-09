@@ -407,6 +407,12 @@ class TrainingArguments:
             Whether to release gradients during training. Default is `False`.
         ckpt_quant_stage (`str`, *optional*):
             Whether activate checkpoint quantization. O0: deactivate, O1: Int8 compression, O2: Int4 compression. (default: O0).
+        save_checkpoint_format (`str`, *optional*):
+            Specifies the format for saving checkpoints. Options are: None, 'sharding_io', 'unified_checkpoint', 'flex_checkpoint'. (default: None). This setting is ignored if the corresponding switch is configured.
+        load_checkpoint_format (`str`, *optional*):
+            Specifies the format for loading checkpoints. Options are: None, 'sharding_io', 'unified_checkpoint', 'flex_checkpoint'. (default: None). This setting is ignored if the corresponding switch is configured.
+        aoa_config (`Optional[dict[str, list[str]]]`, *optional*):
+            The AoA configuration of FlexCheckpoint, used to describe the mapping between model weights and the checkpoint content. Default is None.
     """
 
     output_dir: str = field(
@@ -941,6 +947,29 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether to use async_save instead of paddle.save."},
     )
+    save_checkpoint_format: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": (
+                "Specifies the format used to save checkpoints. "
+                "Available options: 'sharding_io', 'unified_checkpoint', "
+                "'flex_checkpoint'."
+                "This setting is ignored if the corresponding switch is configured."
+            )
+        },
+    )
+
+    load_checkpoint_format: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": (
+                "Specifies the format used to load checkpoints. "
+                "Available options: 'sharding_io', 'unified_checkpoint', "
+                "'flex_checkpoint'."
+                "This setting is ignored if the corresponding switch is configured."
+            )
+        },
+    )
     ordered_save_group_size: int = field(
         default=0,
         metadata={
@@ -1106,6 +1135,13 @@ class TrainingArguments:
         default=None, metadata={"help": "NCCL中通信组的细粒度控制的配置文件路径, 默认值为None, 代表不启用此项配置"}
     )
 
+    aoa_config: Optional[dict[str, list[str]]] = field(
+        default=None,
+        metadata={
+            "help": "The AoA configuration of FlexCheckpoint, used to describe the mapping between model weights and the checkpoint content. Default is None."
+        },
+    )
+
     def __post_init__(self):
         world_size = paddle.distributed.get_world_size()
         if in_auto_parallel_align_mode():
@@ -1210,7 +1246,8 @@ class TrainingArguments:
             raise ValueError("AdamW Mini currently doesn't support tensor parallelism.")
 
         self._post_init_parallel_degree()
-
+        self._post_init_save_checkpoint_format()
+        self._post_init_load_checkpoint_format()
         if self.to_static:
             assert world_size == 1 or self.enable_auto_parallel, (
                 "It's not supported for training in static mode except the following cases : "
@@ -1864,7 +1901,10 @@ class TrainingArguments:
         else:
             if world_size > 1:
                 if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized():
-                    if self.unified_checkpoint:
+                    if self.save_checkpoint_format in [
+                        "unified_checkpoint",
+                        "flex_checkpoint",
+                    ] or self.load_checkpoint_format in ["unified_checkpoint", "flex_checkpoint"]:
                         # DP use hybrid group
                         strategy = fleet.DistributedStrategy()
                         fleet.init(is_collective=True, strategy=strategy)
@@ -1872,16 +1912,20 @@ class TrainingArguments:
                         paddle.distributed.init_parallel_env()
 
         if (
-            self.unified_checkpoint
+            (
+                self.save_checkpoint_format == "unified_checkpoint"
+                or self.load_checkpoint_format == "unified_checkpoint"
+            )
             and self.sharding_parallel_degree > 0
             and ShardingOption.FULL_SHARD in self.sharding
         ):
             logger.warning(
-                "Unified checkpoint currently do not support sharding stage3, set `unified_checkpoint` to False."
+                "Unified checkpoint currently do not support sharding stage3, disabling unified_checkpoint format."
             )
-            self.unified_checkpoint = False
+            self.save_checkpoint_format = None
+            self.load_checkpoint_format = None
 
-        if self.unified_checkpoint:
+        if self.save_checkpoint_format == "unified_checkpoint" or self.load_checkpoint_format == "unified_checkpoint":
             unified_checkpoint_config = set(self.unified_checkpoint_config.split(" "))
             if sys.platform.startswith("win") and "async_save" in self.unified_checkpoint_config:
                 raise ValueError("Currently do not support asynchronous saving for Windows system!")
@@ -2133,6 +2177,30 @@ class TrainingArguments:
 
         if self.use_hybrid_parallel and self.enable_auto_parallel:
             self.use_hybrid_parallel = False
+
+    def _post_init_save_checkpoint_format(self):
+        if self.save_checkpoint_format:
+            valid_modes = ["unified_checkpoint", "sharding_io", "flex_checkpoint"]
+            assert (
+                self.save_checkpoint_format in valid_modes
+            ), f"Invalid save_checkpoint_format: {self.save_checkpoint_format}, Only these formats are allowed: {valid_modes}."
+        else:
+            if self.unified_checkpoint:
+                self.save_checkpoint_format = "unified_checkpoint"
+            elif self.save_sharded_model:
+                self.save_checkpoint_format = "sharding_io"
+
+    def _post_init_load_checkpoint_format(self):
+        if self.load_checkpoint_format:
+            valid_modes = ["unified_checkpoint", "sharding_io", "flex_checkpoint"]
+            assert (
+                self.load_checkpoint_format in valid_modes
+            ), f"Invalid load_checkpoint_format: {self.load_checkpoint_format}, Only these formats are allowed: {valid_modes}."
+        else:
+            if self.unified_checkpoint:
+                self.load_checkpoint_format = "unified_checkpoint"
+            elif self.load_sharded_model:
+                self.load_checkpoint_format = "sharding_io"
 
     def add_moe_comm_group(self):
         hybrid_configs = fleet.fleet._user_defined_strategy.hybrid_configs
@@ -2462,6 +2530,8 @@ class TrainingArguments:
                 return True
             elif self.enable_auto_parallel:
                 return True
+            elif self.save_checkpoint_format == "flex_checkpoint":
+                return False
             elif self.use_hybrid_parallel:
                 # save on dataset rank 0
                 return self.sharding_parallel_rank == 0 and (self.data_parallel_rank == 0 or self.use_expert_parallel)
@@ -2480,14 +2550,16 @@ class TrainingArguments:
         if self.enable_auto_parallel:
             return False
         return (
-            ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.save_sharded_model
+            ShardingOption.SHARD_OP in self.sharding
+            and self.sharding_parallel_degree > 1
+            and self.save_checkpoint_format == "sharding_io"
         )
 
     @property
     def should_load_sharding_stage1_model(self):
         if self.enable_auto_parallel:
             return False
-        return self.load_sharded_model
+        return self.load_checkpoint_format == "sharding_io"
 
     @property
     def should_load_dataset(self):

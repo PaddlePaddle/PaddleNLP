@@ -83,7 +83,7 @@ class DygraphBlockInferenceHiddenPredictor(DygraphBlockInferencePredictor):
                 )
 
             inputs = self.model_inputs
-
+            
             _, full_hidden_states = self.model(
                 input_ids=inputs["input_ids"],
                 seq_lens_this_time=inputs["seq_lens_this_time"],
@@ -245,7 +245,7 @@ class HiddenPredictorWrapper:
             try_import("paddlenlp_ops")
         except ImportError:
             logger.warning("paddlenlp_ops does not exist, please install paddlenlp_ops.")
-            return
+            #return
         tensor_parallel_degree = paddle.distributed.get_world_size()
         if tensor_parallel_degree > 1:
             strategy = fleet.DistributedStrategy()

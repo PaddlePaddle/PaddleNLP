@@ -1,6 +1,6 @@
 # 向量检索模型训练
 
-推荐安装 gpu 版本的[PaddlePaddle](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html)，以 cuda11.8的 paddle 为例，安装命令如下：
+推荐安装 gpu 版本的[PaddlePaddle](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html)，以 cuda 12.6 的 paddle 为例，安装命令如下：
 
 ```
 # 创建一个名为 paddle_env 的新环境，并激活
@@ -11,9 +11,9 @@ conda activate paddle_env
 pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 
 # 安装 paddlepaddle-gpu nightly版本
-pip install --pre paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/nightly/cu118/
+pip install --pre paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/nightly/cu126/
 
-#安装其他依赖：
+# 安装其他依赖：
 pip install -r slm/pipelines/examples/contrastive_training/requirements.txt
 ```
 
@@ -153,6 +153,10 @@ python -u evaluation/eval_mteb.py \
     --base_model_name_or_path ${model_path} \
     --output_folder eval_results/${model_path} \
     --task_name 'DuRetrieval' \
+    --document_instruction "" \
+    --query_instruction "" \
+    --padding_side right \
+    --pooling_method "cls" \
     --eval_batch_size 8 \
     --max_seq_length 2048 \
     --task_split dev
@@ -164,6 +168,7 @@ model_path=repllama-v1-7b-duretrieval 或 NV-Embed-v1-duretrieval
 python -u evaluation/eval_mteb.py \
     --base_model_name_or_path ${model_path} \
     --output_folder eval_results/${model_path} \
+    --document_instruction "" \
     --query_instruction "query: " \
     --task_name 'DuRetrieval' \
     --eval_batch_size 8 \
@@ -197,7 +202,7 @@ python -u evaluation/eval_mteb.py \
 <!-- |  **模&nbsp;型**         | [RocketQA&nbsp;V1](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQA_NAACL2021) | [RocketQA&nbsp;V2](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQAv2_EMNLP2021) | [BGE‑Large‑en‑v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5) | [RepLLaMA‑passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage) | [NV‑Embed‑v1](https://huggingface.co/nvidia/NV-Embed-v1) | [BGE‑EN‑ICL](https://huggingface.co/BAAI/bge-en-icl) | [LLARA‑passage](https://huggingface.co/BAAI/LLARA-passage) |
 |--------------|-------------|-------------|-------------------|-----------------------------|-------------|------------------------|---------------|
 | **最&nbsp;大&nbsp;序&nbsp;列&nbsp;长&nbsp;度**  | 512         |     512     |        512        |            4096             |    4096     |          4096          |     4096      | -->
-| 模型                        | 最大序列长度 |
+| 模型                        | 最大序列长度（单卡80G） |
 |-----------------------------|--------------|
 | [RocketQA&nbsp;V1](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQA_NAACL2021)    |     512      |
 | [RocketQA&nbsp;V2](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQAv2_EMNLP2021)  |     512      |
@@ -206,7 +211,7 @@ python -u evaluation/eval_mteb.py \
 | [NV‑Embed‑v1](https://huggingface.co/nvidia/NV-Embed-v1)                                              |     4096     |
 | [BGE‑EN‑ICL](https://huggingface.co/BAAI/bge-en-icl)                                                  |     4096     |
 | [LLARA‑passage](https://huggingface.co/BAAI/LLARA-passage)                                            |     4096     |
-| [Qwen3-Embedding-8B](https://huggingface.co/Qwen/Qwen3-Embedding-8B)                                  |     32K     |
+| [Qwen3-Embedding-8B](https://huggingface.co/Qwen/Qwen3-Embedding-8B)                                  |     8192     |
 
 可支持配置的参数：
 - `base_model_name_or_path`: 模型名称或路径
@@ -308,9 +313,9 @@ python shortgpt_prune.py \
 - `--layers_path`: 模型对象中指向 transformer 层列表的点分隔路径（例如 repllama 为`"llama.layers"`, llama 为`"model.layers"`）。
 
 #### 性能评估
-剪枝完成后，可以使用 output_model_path 路径下的新模型进行[MTEB 评估](#评估)。
+剪枝完成后，可以使用 `output_model_path` 路径下的新模型进行[MTEB 评估](#评估)。
 
-在多个检索任务上评估了`RepLLaMA`模型剪枝前后的性能和推理速度。所有实验均在单张 80G A100 GPU 上进行。
+在多个检索任务上评估了 `RepLLaMA` 模型剪枝前后的性能和推理速度。所有实验均在单张 80G A100 GPU 上进行。
 
 
 | 模型 | 指标 | MSMARCO-Title<br>(MRR@10) | SciFact<br>(NDCG@10) | FiQA2018<br>(NDCG@10)| QuoraRetrieval<br>(NDCG@10) | NFCorpus<br>(NDCG@10) |
@@ -325,6 +330,26 @@ python shortgpt_prune.py \
 ### 模型量化
 支持对向量模型进行量化加载，以降低显存占用和推理延迟。
 
+#### 安装依赖
+
+要使用量化功能，需要安装 `paddlenlp_ops` 自定义算子。安装过程大约需要 20 分钟。
+
+```
+# 克隆 PaddleNLP 仓库并进入目录
+git clone https://github.com/PaddlePaddle/PaddleNLP.git
+cd PaddleNLP
+
+# 更新 Git 子模块
+git submodule update --init
+
+# 编译并安装
+cd csrc
+bash tools/build_wheel.sh
+```
+
+编译完成后，脚本会自动将 `paddlenlp_ops` 安装到当前 Python 环境，并生成一个 `.whl` 安装包。您可以将此文件分享并在其他环境中使用 `pip install` 进行安装。
+
+
 #### 使用方法
 ```bash
 python -u evaluation/eval_mteb.py \
@@ -333,7 +358,9 @@ python -u evaluation/eval_mteb.py \
     --task_name 'SciFact' \
     --eval_batch_size 8 \
     --max_seq_length 2048 \
-    --task_split dev \
+    --task_split 'test' \
+    --query_instruction 'query: ' \
+    --document_instruction 'passage: ' \
     --quant_type weight_only_int8 \
     --kv_cache_reuse 1
 ```
@@ -343,7 +370,7 @@ python -u evaluation/eval_mteb.py \
 
 
 #### 性能评估
-在多个检索任务上评估了`RepLLaMA`模型量化加载前后的性能和推理速度。所有实验均在单张 80G A100 GPU 上进行。
+在多个检索任务上评估了 `RepLLaMA` 模型量化加载前后的性能和推理速度。所有实验均在单张 80G A100 GPU 上进行。
 
 | 模型 | 指标 | MSMARCO-Title<br>(MRR@10) | SciFact<br>(NDCG@10) | FiQA2018<br>(NDCG@10)| QuoraRetrieval<br>(NDCG@10) | NFCorpus<br>(NDCG@10) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
@@ -356,22 +383,22 @@ python -u evaluation/eval_mteb.py \
 
 ## Reference
 
-[1] Aditya Kusupati, Gantavya Bhatt, Aniket Rege, Matthew Wallingford, Aditya Sinha, Vivek Ramanujan, William Howard-Snyder, Kaifeng Chen, Sham M. Kakade, Prateek Jain, Ali Farhadi: Matryoshka Representation Learning. NeurIPS 2022.
+[1] Yingqi Qu, Yuchen Ding, Jing Liu, Kai Liu, Ruiyang Ren, Wayne Xin Zhao, Daxiang Dong, Hua Wu, Haifeng Wang: RocketQA: An Optimized Training Approach to Dense Passage Retrieval for Open-Domain Question Answering. NAACL 2021
 
-[2] Xueguang Ma, Liang Wang, Nan Yang, Furu Wei, Jimmy Lin: Fine-Tuning LLaMA for Multi-Stage Text Retrieval. arXiv 2023.
+[2] Ruiyang Ren, Yingqi Qu, Jing Liu, Wayne Xin Zhao, Qiaoqiao She, Hua Wu, Haifeng Wang, Ji-Rong Wen: RocketQAv2: A Joint Training Method for Dense Passage Retrieval and Passage Re-ranking. EMNLP 2021
 
-[3] Shitao Xiao, Zheng Liu, Peitian Zhang, Niklas Muennighof: C-Pack: Packaged Resources To Advance General Chinese Embedding. SIGIR 2024.
+[3] Aditya Kusupati, Gantavya Bhatt, Aniket Rege, Matthew Wallingford, Aditya Sinha, Vivek Ramanujan, William Howard-Snyder, Kaifeng Chen, Sham M. Kakade, Prateek Jain, Ali Farhadi: Matryoshka Representation Learning. NeurIPS 2022.
 
-[4] Niklas Muennighoff, Nouamane Tazi, Loic Magne, Nils Reimers: MTEB: Massive Text Embedding Benchmark. EACL 2023.
+[4] Xueguang Ma, Liang Wang, Nan Yang, Furu Wei, Jimmy Lin: Fine-Tuning LLaMA for Multi-Stage Text Retrieval. arXiv 2023.
 
-[5] Chankyu Lee, Rajarshi Roy, Mengyao Xu, Jonathan Raiman, Mohammad Shoeybi, Bryan Catanzaro, Wei Ping: NV-Embed: Improved Techniques for Training LLMs as Generalist Embedding Models. ICLR 2025.
+[5] Niklas Muennighoff, Nouamane Tazi, Loic Magne, Nils Reimers: MTEB: Massive Text Embedding Benchmark. EACL 2023.
 
-[6] Zheng Liu, Chaofan Li, Shitao Xiao, Yingxia Shao, Defu Lian: Llama2Vec: Unsupervised Adaptation of Large Language Models for Dense Retrieval. ACL 2024.
+[6] Shitao Xiao, Zheng Liu, Peitian Zhang, Niklas Muennighof: C-Pack: Packaged Resources To Advance General Chinese Embedding. SIGIR 2024.
 
-[7] Chaofan Li, MingHao Qin, Shitao Xiao, Jianlyu Chen, Kun Luo, Yingxia Shao, Defu Lian, Zheng Liu: Making Text Embedders Few-Shot Learners. ICLR 2025.
+[7] Zheng Liu, Chaofan Li, Shitao Xiao, Yingxia Shao, Defu Lian: Llama2Vec: Unsupervised Adaptation of Large Language Models for Dense Retrieval. ACL 2024.
 
-[8] Yingqi Qu, Yuchen Ding, Jing Liu, Kai Liu, Ruiyang Ren, Wayne Xin Zhao, Daxiang Dong, Hua Wu, Haifeng Wang: RocketQA: An Optimized Training Approach to Dense Passage Retrieval for Open-Domain Question Answering. NAACL 2021
+[8] Chankyu Lee, Rajarshi Roy, Mengyao Xu, Jonathan Raiman, Mohammad Shoeybi, Bryan Catanzaro, Wei Ping: NV-Embed: Improved Techniques for Training LLMs as Generalist Embedding Models. ICLR 2025.
 
-[9] Ruiyang Ren, Yingqi Qu, Jing Liu, Wayne Xin Zhao, Qiaoqiao She, Hua Wu, Haifeng Wang, Ji-Rong Wen: RocketQAv2: A Joint Training Method for Dense Passage Retrieval and Passage Re-ranking. EMNLP 2021
+[9] Chaofan Li, MingHao Qin, Shitao Xiao, Jianlyu Chen, Kun Luo, Yingxia Shao, Defu Lian, Zheng Liu: Making Text Embedders Few-Shot Learners. ICLR 2025.
 
 [10] Xin Men, Mingyu Xu, Qingyu Zhang, Bingning Wang, Hongyu Lin, Yaojie Lu, Xianpei Han, Weipeng Chen: Shortgpt: Layers in large language models are more redundant than you expect. ACL Findings 2025
