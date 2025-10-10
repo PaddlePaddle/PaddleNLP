@@ -232,6 +232,7 @@ class Qwen3ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     config_class = Qwen3Config
 
     _get_tensor_parallel_mappings = Qwen3PretrainedModel._get_tensor_parallel_mappings
+    _get_fuse_or_split_param_mappings = Qwen3PretrainedModel._get_fuse_or_split_param_mappings
     _init_weights = Qwen3PretrainedModel._init_weights
     _keys_to_ignore_on_load_unexpected = Qwen3PretrainedModel._keys_to_ignore_on_load_unexpected
     _get_model_flops = Qwen3PretrainedModel._get_model_flops
