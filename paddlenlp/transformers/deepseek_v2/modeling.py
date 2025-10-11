@@ -697,6 +697,33 @@ class MoEGate(PretrainedMoEGate):
             # default_initializer=nn.initializer.Constant(1.0),
         )
 
+        def grad_allreduce_hook(param, accumulation_steps):
+                hcg = fleet.get_hybrid_communicate_group()
+                pg = hcg.get_model_parallel_group().process_group
+                step = [0]
+
+                @paddle.autograd.no_grad()
+                def __impl__():
+                    step[0] += 1
+                    print("step:", step[0], flush=True)
+                    if (step[0] % accumulation_steps) == 0:
+                        if hasattr(param, "main_grad"):
+                            # print("before allreduce param name:{}, main_grad:{}".format(param.name, param.main_grad), flush=True)
+                            pg.allreduce(param.main_grad).wait()
+                            # print("after allreduce param name:{}, main_grad:{}".format(param.name, param.main_grad), flush=True)
+                        else:
+                            pg.allreduce(param.grad).wait()
+
+                return __impl__
+
+        if config.sequence_parallel:
+            self.weight._register_backward_hook(
+                grad_allreduce_hook(
+                    self.weight, accumulation_steps=config.gradient_accumulation_steps*16
+                )
+            )
+            # mark_as_sequence_parallel_parameter(self.weight)
+
         self.config = config
         if config.topk_method == "noaux_tc":
             self.e_score_correction_bias = paddle.create_parameter(

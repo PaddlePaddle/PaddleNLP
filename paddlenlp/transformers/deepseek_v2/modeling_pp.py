@@ -170,7 +170,7 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
             batch_size, seq_length, _ = inputs_embeds.shape
 
             if self.sequence_parallel:
-                inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])  # [B, S, H] --> [S, B, H]
+                inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2]).contiguous()  # [B, S, H] --> [S, B, H]
                 # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
                 # inputs_embeds = paddle.reshape(inputs_embeds, [-1, inputs_embeds.shape[-1]])
                 # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
@@ -185,7 +185,7 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
                     axis=1,
                 )
                 if self.sequence_parallel:
-                    inputs_embeds_mtp = paddle.transpose(inputs_embeds_mtp, [1, 0, 2])  # [B, S, H] --> [S, B, H]
+                    inputs_embeds_mtp = paddle.transpose(inputs_embeds_mtp, [1, 0, 2]).contiguous()  # [B, S, H] --> [S, B, H]
                     # inputs_embeds_mtp = inputs_embeds_mtp.reshape([-1, inputs_embeds_mtp.shape[-1]])
                     inputs_embeds_mtp = ScatterOp.apply(inputs_embeds_mtp)
                 embeds_res.append(inputs_embeds_mtp)
@@ -197,7 +197,7 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
             return return_args(inputs_embeds, attention_mask, attn_mask_startend_row_indices, position_ids)
         else:
             if self.sequence_parallel:
-                inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])  # [B, S, H] --> [S, B, H]
+                inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2]).contiguous()  # [B, S, H] --> [S, B, H]
                 # inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[-1]])
                 inputs_embeds = ScatterOp.apply(inputs_embeds)
             return return_args(inputs_embeds, attention_mask, attn_mask_startend_row_indices, position_ids)

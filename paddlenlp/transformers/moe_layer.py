@@ -379,6 +379,9 @@ class MoEFlexTokenLayer(nn.Layer):
         return paddle.concat(outputs, axis=0)
 
     def forward(self, hidden_states: paddle.Tensor, masked_tokens=None):
+        # NOTE: masked_tokens has some bug with sequence_parallel
+        # enable masked_tokens when fix the bug
+        masked_tokens = None
         _, _, d_model = hidden_states.shape
         # reshaped_input = hidden_states.reshape([-1, d_model])
         probs, routing_map, l_aux, l_zloss = self.router(hidden_states)

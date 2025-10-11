@@ -1115,6 +1115,7 @@ class Trainer:
             ckpt_pre = self.args.hf_ckpt_dir
 
             load_paddle_model_from_safetensors(model, weight_map_path, ckpt_pre, verbose=True)
+            dist.barrier()
 
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
