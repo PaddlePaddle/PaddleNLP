@@ -23,9 +23,8 @@ jobs:
       - name: Update paddle
         run: |
           wget -q --no-proxy https://xly-devops.bj.bcebos.com/PaddleTest/PaddleNLP/PaddleNLP-develop.tar.gz --no-check-certificate
-          rm -rf PaddleNLP-develop && tar zxf PaddleNLP-develop.tar.gz >/dev/null
-          mv PaddleNLP-develop PaddleNLP && rm -rf PaddleNLP-develop.tar.gz >/dev/null
-          cd PaddleNLP/
+          tar zxf PaddleNLP-develop.tar.gz --strip-components=1 >/dev/null
+          rm -rf PaddleNLP-develop.tar.gz >/dev/null
           git fetch origin pull/${PR_ID}/head
           git checkout -b origin_pr FETCH_HEAD
           git remote add upstream https://github.com/PaddlePaddle/PaddleNLP.git
@@ -44,5 +43,5 @@ jobs:
       - name: Display Required Approvers
         if: steps.check-bypass.outputs.can-skip != 'true'
         run: |
-          cd PaddleNLP/scripts/ci_approval
+          cd scripts/ci_approval
           bash -x run_ci_approval.sh

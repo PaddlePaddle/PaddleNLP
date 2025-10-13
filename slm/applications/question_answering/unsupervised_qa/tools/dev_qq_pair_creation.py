@@ -36,7 +36,7 @@ def extract_q_from_json_file(json_file, out_file=None, test_sample_num=None, que
         if out_file:
             wf = open(os.path.join(out_file), "w", encoding="utf-8")
         if query_answer_path:
-            qeury_answer_wf = open(query_answer_path, "w", encoding="utf-8")
+            query_answer_wf = open(query_answer_path, "w", encoding="utf-8")
         q_list = []
         for i, json_line in enumerate(rf.readlines()):
             line_dict = json.loads(json_line)
@@ -47,7 +47,7 @@ def extract_q_from_json_file(json_file, out_file=None, test_sample_num=None, que
             answer = line_dict["answer"]
             if not test_sample_num or i < test_sample_num:
                 if query_answer_path:
-                    qeury_answer_wf.write(
+                    query_answer_wf.write(
                         question.replace("\n", " ").replace("\t", " ").strip()
                         + "\t"
                         + answer.replace("\n", " ").replace("\t", " ").strip()
@@ -59,9 +59,9 @@ def extract_q_from_json_file(json_file, out_file=None, test_sample_num=None, que
             else:
                 break
         if query_answer_path:
-            qeury_answer_wf.close()
+            query_answer_wf.close()
         if out_file:
-            wf.colse()
+            wf.close()
         return q_list
 
 

@@ -106,11 +106,11 @@ def sp_async_reducesctter(x_grad):
 def sync_mp_allreduce(task, dist_tensor):
     mp_placement_index = dist_tensor.process_mesh.dim_names.index("mp")
     new_placments = list()
-    for idx, placment in enumerate(dist_tensor.placements):
+    for idx, placement in enumerate(dist_tensor.placements):
         if idx == mp_placement_index:
             new_placments.append(dist.Replicate())
         else:
-            new_placments.append(placment)
+            new_placments.append(placement)
     place = paddle.framework._current_expected_place()
     place = paddle.framework._get_paddle_place(place)
 

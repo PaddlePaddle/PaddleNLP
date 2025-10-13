@@ -335,7 +335,7 @@ def main():
 
     prune_order = sorted(range(len(short_model.importances)), key=lambda i: short_model.importances[i])
     layers_to_delete = set(prune_order[: args.n_prune_layers])
-
+    
     print("\n--- Importance Calculation Complete ---")
     print(f"Calculated importances: {[f'{v:.2f}' for v in short_model.importances]}")
     print(f"Pruning order (least to most important): {prune_order}")

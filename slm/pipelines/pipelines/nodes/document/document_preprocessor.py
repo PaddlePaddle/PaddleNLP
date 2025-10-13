@@ -42,7 +42,7 @@ class DocOCRProcessor(BaseComponent):
         """
         Init Document Preprocessor.
         :param use_gpu: Whether to use all available GPUs or the CPU. Falls back on CPU if no GPU is available.
-        :param lang: Choose ocr model processing langugae
+        :param lang: Choose ocr model processing language
         """
         self._lang = lang
         self._use_gpu = False if paddle.get_device() == "cpu" else use_gpu
