@@ -46,7 +46,7 @@ from paddlenlp.peft.reft import (
     ReFTModel,
     intervention_mapping,
 )
-from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed, MoECorrectionBiasAdjustCallback, MoeExpertsGradScaleCallback
+from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed, MoECorrectionBiasAdjustCallback, MoeExpertsGradScaleCallback, MoEGateSpGradSyncCallBack
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
     AutoConfig,
@@ -481,6 +481,9 @@ def main():
     
     if training_args.use_expert_parallel:
         callbacks += [MoeExpertsGradScaleCallback(training_args)]
+    
+    if model_config.moe_subbatch_token_num > 0:
+        callbacks += [MoEGateSpGradSyncCallBack()]
     
     print("callbacks:", callbacks, flush=True)
     trainer = SFTTrainer(
