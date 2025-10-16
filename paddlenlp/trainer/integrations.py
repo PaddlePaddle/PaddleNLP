@@ -467,7 +467,13 @@ class SwanLabCallback(TrainerCallback):
                 init_args["experiment_name"] = args.run_name
             elif trial_name is not None:
                 init_args["experiment_name"] = trial_name
-            init_args["project"] = os.getenv("SWANLAB_PROJECT", "PaddleNLP")
+
+            # new add this for experiment_name
+            experiment_name = os.getenv("SWANLAB_EXP_NAME", None)
+            if experiment_name is not None:
+                init_args["experiment_name"] = experiment_name
+
+            init_args["project"] = os.getenv("SWANLAB_PROJECT", None)
             if args.logging_dir is not None:
                 init_args["logdir"] = os.getenv("SWANLAB_LOG_DIR", args.logging_dir)
 
