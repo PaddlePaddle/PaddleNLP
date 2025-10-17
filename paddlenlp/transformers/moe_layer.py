@@ -337,7 +337,7 @@ class MoELayer(nn.Layer):
 
 
 class MoEFlexTokenLayer(nn.Layer):
-    def __init__(self, config, moe_num_experts, expert_class, expert_kwargs, gate, moe_group):
+    def __init__(self, config, moe_num_experts, expert_class, expert_kwargs, gate, moe_group, layer_idx):
 
         super().__init__()
         self.config = config
@@ -362,6 +362,7 @@ class MoEFlexTokenLayer(nn.Layer):
             else:
                 self.experts.append(None)
         self.router = gate
+        self.layer_idx = layer_idx
 
     def expert_forward(self, dispatched_input, tokens_per_expert):
         outputs = []
@@ -381,10 +382,12 @@ class MoEFlexTokenLayer(nn.Layer):
     def forward(self, hidden_states: paddle.Tensor, masked_tokens=None):
         # NOTE: masked_tokens has some bug with sequence_parallel
         # enable masked_tokens when fix the bug
-        masked_tokens = None
+        if self.config.drop_comm_masked_token is False:
+            masked_tokens = None
         _, _, d_model = hidden_states.shape
         # reshaped_input = hidden_states.reshape([-1, d_model])
         probs, routing_map, l_aux, l_zloss = self.router(hidden_states)
+
         (dispatched_input, tokens_per_expert) = self.token_dispatcher.token_permutation(
             hidden_states, probs, routing_map, masked_tokens
         )

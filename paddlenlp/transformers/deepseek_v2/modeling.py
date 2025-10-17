@@ -842,7 +842,7 @@ class DeepseekV2MoEFlexToken(MoEFlexTokenLayer):
     A mixed expert module containing shared experts.
     """
 
-    def __init__(self, config: DeepseekV2Config):
+    def __init__(self, config: DeepseekV2Config, layer_idx):
         gate = MoEGate(
             config=config,
             num_experts=config.n_routed_experts,
@@ -859,6 +859,7 @@ class DeepseekV2MoEFlexToken(MoEFlexTokenLayer):
         hcg = fleet.get_hybrid_communicate_group()
         moe_group = hcg.get_expert_parallel_group()
         moe_grad_group = hcg.get_moe_sharding_parallel_group()
+        self.layer_idx = layer_idx
 
         super().__init__(
             config=config,
@@ -867,6 +868,7 @@ class DeepseekV2MoEFlexToken(MoEFlexTokenLayer):
             expert_kwargs={"config": config, "intermediate_size": config.moe_intermediate_size, "is_moe": True},
             gate=gate,
             moe_group=moe_group,
+            layer_idx=layer_idx,
         )
 
         self.is_mp_moe = False
@@ -1254,7 +1256,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
         MoELayerClass = DeepseekV2MoEFlexToken if config.using_flex_token else DeepseekV2MoE
 
         self.mlp = (
-            MoELayerClass(config)
+            MoELayerClass(config, layer_idx)
             if (
                 config.n_routed_experts is not None
                 and layer_idx >= config.first_k_dense_replace
@@ -2348,9 +2350,6 @@ class DeepseekV2PretrainingCriterion(nn.Layer):
             masked_lm_labels = masked_lm_labels[:, : -self.config.num_nextn_predict_layers]
             seq_length = masked_lm_labels.shape[1]
 
-            # save_dir = f"/root/paddlejob/gpfs/zhangyichen/tp{self.config.tensor_parallel_degree}_outputs/NODE{dist.get_rank() // 8}_outputs"
-            # paddle.save(prediction_scores, os.path.join(save_dir, f"main_pred_rank{dist.get_rank()}"))
-            # paddle.save(masked_lm_labels, os.path.join(save_dir, f"main_labels_rank{dist.get_rank()}"))
             if self.config.moe_subbatch_token_num > 0:
                 loss = subbatch_compute_loss(prediction_scores, masked_lm_labels, self.config.moe_subbatch_token_num)
             else:
@@ -2360,8 +2359,6 @@ class DeepseekV2PretrainingCriterion(nn.Layer):
             for depth in range(self.config.num_nextn_predict_layers):
                 prediction_scores_cur_depth = mtp_logits[depth]
                 masked_lm_labels_cur_depth = masked_lm_labels_ori[:, (depth + 1) : (depth + 1 + seq_length)]
-                # paddle.save(prediction_scores_cur_depth, os.path.join(save_dir, f"mtp_pred_rank{dist.get_rank()}"))
-                # paddle.save(masked_lm_labels_cur_depth, os.path.join(save_dir, f"mtp_labels_rank{dist.get_rank()}"))
                 if self.config.moe_subbatch_token_num > 0:
                     res_cur_depth = subbatch_compute_loss(
                         prediction_scores_cur_depth, masked_lm_labels_cur_depth, self.config.moe_subbatch_token_num

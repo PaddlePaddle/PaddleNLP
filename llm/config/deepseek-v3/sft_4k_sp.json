@@ -52,7 +52,8 @@
     "sequence_parallel": true,
     "tensor_parallel_output": true,
     "amp_master_grad": true,
-    "sharding_parallel_config": "split_param"
+    "sharding_parallel_config": "split_param",
+    "drop_comm_masked_token": true
   }
   
   

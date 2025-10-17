@@ -1,6 +1,6 @@
 {
-  "model_name_or_path": "/root/paddlejob/tmpspace/huggingface_model/huggingface/deepseek-ai/DeepSeek-V3-bf16/",
-  "hf_ckpt_dir": "/root/paddlejob/tmpspace/huggingface_model/huggingface/deepseek-ai/DeepSeek-V3-bf16/",
+  "model_name_or_path": "/root/paddlejob/gpfs/huggingface_model/huggingface/deepseek-ai/DeepSeek-V3-bf16/",
+  "hf_ckpt_dir": "/root/paddlejob/gpfs/huggingface_model/huggingface/deepseek-ai/DeepSeek-V3-bf16/",
   "dataset_name_or_path": "/root/paddlejob/gpfs/zhengzhonghui/codes/data_100k/",
   "output_dir": "./checkpoints/sft_ckpts",
   "per_device_train_batch_size": 1,
@@ -52,6 +52,7 @@
   "sequence_parallel": true,
   "tensor_parallel_output": true,
   "amp_master_grad": true,
-  "sharding_parallel_config": "split_param"
+  "sharding_parallel_config": "split_param",
+  "drop_comm_masked_token": true
 }
 

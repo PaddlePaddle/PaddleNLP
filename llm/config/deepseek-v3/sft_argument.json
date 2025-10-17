@@ -28,7 +28,7 @@
   "expert_parallel_degree": 16,
   "continue_training": false,
   "pipeline_parallel_config": "enable_delay_scale_loss disable_partial_send_recv disable_batch_p2p_comm",
-  "tensor_parallel_config": "enable_delay_scale_loss",
+  "tensor_parallel_config": "enable_delay_scale_loss sync_param sync_grad",
   "sharding_parallel_config": "split_param",
   "load_best_model_at_end": true,
   "eval_with_do_generation": false,
@@ -52,5 +52,6 @@
   "pre_alloc_memory": 60,
   "tensorwise_offload_optimizer": true,
   "sequence_parallel": false,
-  "tensor_parallel_output": true
+  "tensor_parallel_output": true,
+  "drop_comm_masked_token": true
 }

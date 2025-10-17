@@ -46,7 +46,14 @@ from paddlenlp.peft.reft import (
     ReFTModel,
     intervention_mapping,
 )
-from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed, MoECorrectionBiasAdjustCallback, MoeExpertsGradScaleCallback, MoEGateSpGradSyncCallBack
+from paddlenlp.trainer import (
+    MoECorrectionBiasAdjustCallback,
+    MoeExpertsGradScaleCallback,
+    MoEGateSpGradSyncCallBack,
+    PdArgumentParser,
+    get_last_checkpoint,
+    set_seed,
+)
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
     AutoConfig,
@@ -262,13 +269,13 @@ def main():
         if model_args.strategy_name == "YaRNScalingRotaryEmbedding":
             model_config.long_sequence_init_args["original_max_position_embeddings"] = data_args.max_length
 
-
     model_config.using_flex_token = model_args.using_flex_token
     model_config.using_fake_gate = model_args.using_fake_gate
     model_config.moe_subbatch_token_num = model_args.moe_subbatch_token_num
     model_config.aux_loss_alpha = model_args.aux_loss_alpha
     model_config.gradient_accumulation_steps = training_args.gradient_accumulation_steps
     model_config.recompute_offload = training_args.recompute_offload
+    model_config.drop_comm_masked_token = model_args.drop_comm_masked_token
     logger.info(f"Final model config: {model_config}")
 
     logger.info("Creating model")
@@ -474,17 +481,17 @@ def main():
     callbacks = []
     if isinstance(train_ds, ZeroPaddingIterableDataset):
         callbacks += [ZeroPaddingIterDatasetCallback()]
-    
+
     if getattr(model_config, "topk_method", None) == "noaux_tc":
         # deepseek_v3 finetune do not update the bias, so set lr to 0.0
         callbacks += [MoECorrectionBiasAdjustCallback(lr=0.0)]
-    
+
     if training_args.use_expert_parallel:
         callbacks += [MoeExpertsGradScaleCallback(training_args)]
-    
-    if model_config.moe_subbatch_token_num > 0:
+
+    if training_args.tensor_parallel_degree > 1 and training_args.sequence_parallel:
         callbacks += [MoEGateSpGradSyncCallBack()]
-    
+
     print("callbacks:", callbacks, flush=True)
     trainer = SFTTrainer(
         model=model,
