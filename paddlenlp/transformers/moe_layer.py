@@ -337,7 +337,7 @@ class MoELayer(nn.Layer):
 
 
 class MoEFlexTokenLayer(nn.Layer):
-    def __init__(self, config, moe_num_experts, expert_class, expert_kwargs, gate, moe_group, layer_idx):
+    def __init__(self, config, moe_num_experts, expert_class, expert_kwargs, gate, moe_group):
 
         super().__init__()
         self.config = config
@@ -362,7 +362,6 @@ class MoEFlexTokenLayer(nn.Layer):
             else:
                 self.experts.append(None)
         self.router = gate
-        self.layer_idx = layer_idx
 
     def expert_forward(self, dispatched_input, tokens_per_expert):
         outputs = []
