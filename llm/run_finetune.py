@@ -70,7 +70,7 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
 from paddlenlp.transformers.longlora import replace_llama_attn, set_group_size
-from paddlenlp.trl import DataConfig, ModelConfig, SFTConfig, SFTTrainer
+from paddlenlp.trl import DataConfig, DisLoRATrainer, ModelConfig, SFTConfig, SFTTrainer
 from paddlenlp.trl.llm_utils import (
     ZeroPaddingIterDatasetCallback,
     compute_metrics,
@@ -458,19 +458,26 @@ def main():
     if model_args.dislora and hasattr(model_args, "ortho_lambda"):
         training_args.dislora_ortho_lambda = model_args.ortho_lambda
 
-    trainer = SFTTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_ds,
-        eval_dataset=dev_ds,
-        tokenizer=tokenizer,
-        compute_metrics=metrics,
-        data_collator=data_collator_fn if not model_args.reft else ReftDataCollator(data_collator=data_collator_fn),
-        do_generation=data_args.eval_with_do_generation,
-        callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
-        gen_args=gen_args,
-        data_args=data_args,
-    )
+    trainer_kwargs = {
+        "model": model,
+        "args": training_args,
+        "train_dataset": train_ds,
+        "eval_dataset": dev_ds,
+        "tokenizer": tokenizer,
+        "compute_metrics": metrics,
+        "data_collator": data_collator_fn if not model_args.reft else ReftDataCollator(data_collator=data_collator_fn),
+        "do_generation": data_args.eval_with_do_generation,
+        "callbacks": [ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
+        "gen_args": gen_args,
+        "data_args": data_args,
+    }
+
+    if model_args.dislora:
+        logger.info("Using DisLoRATrainer for training.")
+        trainer = DisLoRATrainer(**trainer_kwargs)
+    else:
+        trainer = SFTTrainer(**trainer_kwargs)
+
     trainable_parameters = [
         p for p in model.parameters() if not p.stop_gradient or ("quantization_linear" in p.name and "w_1" in p.name)
     ]

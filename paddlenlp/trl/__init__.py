@@ -14,6 +14,7 @@
 
 from ..transformers.dpo_criterion import AutoDPOCriterion, DPOCriterion
 from ..transformers.kto_criterion import KTOCriterion
+from .dislora_trainer import *
 from .dpo_auto_trainer import DPOAutoTrainer
 from .dpo_trainer import DPOTrainer
 from .embedding_trainer import EmbeddingTrainer
