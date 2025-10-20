@@ -127,6 +127,7 @@ class Qwen3MoeForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     config_class = Qwen3MoeConfig
 
     _get_tensor_parallel_mappings = Qwen3MoePretrainedModel._get_tensor_parallel_mappings
+    _get_fuse_or_split_param_mappings = Qwen3MoePretrainedModel._get_fuse_or_split_param_mappings
     _init_weights = Qwen3MoePretrainedModel._init_weights
     _keys_to_ignore_on_load_unexpected = Qwen3MoePretrainedModel._keys_to_ignore_on_load_unexpected
     _tied_weights_keys = ["lm_head.weight"]
