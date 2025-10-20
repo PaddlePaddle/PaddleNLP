@@ -127,11 +127,38 @@ class Qwen3MoeForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     config_class = Qwen3MoeConfig
 
     _get_tensor_parallel_mappings = Qwen3MoePretrainedModel._get_tensor_parallel_mappings
+    _get_fuse_or_split_param_mappings = Qwen3MoePretrainedModel._get_fuse_or_split_param_mappings
     _init_weights = Qwen3MoePretrainedModel._init_weights
     _keys_to_ignore_on_load_unexpected = Qwen3MoePretrainedModel._keys_to_ignore_on_load_unexpected
     _tied_weights_keys = ["lm_head.weight"]
 
     # DONOT Add base_model_prefix !!!!
+    @classmethod
+    def get_tensor_parallel_convert_actions(
+        cls, config, loaded_state_dict_keys, is_split=True, ignore_error=False, base_model_prefix=None
+    ):
+        """
+        Get the tensor parallel convert actions for the model.
+        This function is overridden to handle the case where MoE experts are grouped and should not be split across TP ranks.
+        """
+        # Get the default tensor parallel actions from the base class by calling super() with the exact same arguments.
+        tp_actions = super().get_tensor_parallel_convert_actions(
+            config,
+            loaded_state_dict_keys,
+            is_split=is_split,
+            ignore_error=ignore_error,
+            base_model_prefix=base_model_prefix,
+        )
+
+        # If moe_group is set, expert parameters should not be split.
+        # We remove them from the tp_actions dictionary.
+        if "Qwen3MoeForCausalLM" in config.architectures and config.moe_group == "tp":
+            # Iterate over a copy of the keys to safely modify the dictionary
+            for key in list(tp_actions.keys()):
+                if "mlp.experts" in key:
+                    del tp_actions[key]
+
+        return tp_actions
 
     @classmethod
     def _prepare_pipeline_inputs_func(cls, inputs):
