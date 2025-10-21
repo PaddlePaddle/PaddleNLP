@@ -141,4 +141,3 @@ autogen/
 ops/csrc/fp8/deep_gemm/include/cutlass
 ops/csrc/fp8/deep_gemm/include/cute
 .ccls-cache
-llm/log
