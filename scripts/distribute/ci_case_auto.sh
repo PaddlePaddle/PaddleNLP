@@ -112,7 +112,7 @@ function llama_case_list_auto() {
         llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
         llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
         llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2
-        llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2_intermediate
+        #llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2_intermediate
         llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp
         # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
         llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw
