@@ -44,4 +44,4 @@ jobs:
         if: steps.check-bypass.outputs.can-skip != 'true'
         run: |
           cd scripts/ci_approval
-          bash -x run_ci_approval_cherry-pick.sh
+          bash run_ci_approval_cherry-pick.sh
