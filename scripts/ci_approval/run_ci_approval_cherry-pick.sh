@@ -33,11 +33,12 @@ function check_approval(){
     fi
 }
 
+echo_line="The PaddleNLP repository will be switched to the PaddleFormers repository soon, so the PR needs to be merged into PaddleFormers first and the PR link should be filled in the current PR description area. Then please contact From00 for approval."
 check_approval 1 From00
 
 if [ -n "${echo_list}" ];then
     echo "**************************************************************"
-    echo "The PaddleNLP repository will be switched to the PaddleFormers repository soon, so the PR needs to be merged into PaddleFormers first and the PR link should be filled in the current PR description area. Then please contact From00 for approval."
+    echo "Please find RD for approval."
     echo -e "${echo_list[@]}"
     echo "There are ${failed_num} approved errors."
     echo "**************************************************************"
