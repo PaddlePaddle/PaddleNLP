@@ -172,6 +172,7 @@ class Qwen3DecoderLayerPipe(Qwen3DecoderLayer):
         elif attn_mask_startend_row_indices is not None and attn_mask_startend_row_indices.dtype == paddle.int64:
             attn_mask_startend_row_indices, position_ids = None, attn_mask_startend_row_indices
 
+        batch_size = position_ids.shape[0]
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
             recompute_fn = rr_recompute if any(self.skip_recompute_ops.values()) else recompute
             if attention_mask is not None or attn_mask_startend_row_indices is not None:
@@ -182,6 +183,7 @@ class Qwen3DecoderLayerPipe(Qwen3DecoderLayer):
                     attention_mask=attention_mask,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                     use_reentrant=False,
+                    batch_size=batch_size,
                 )
             else:
                 # for pretrain
@@ -191,6 +193,7 @@ class Qwen3DecoderLayerPipe(Qwen3DecoderLayer):
                     position_ids=position_ids,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                     use_reentrant=self.config.recompute_use_reentrant,
+                    batch_size=batch_size,
                 )
         else:
             hidden_states = super().forward(
@@ -198,6 +201,7 @@ class Qwen3DecoderLayerPipe(Qwen3DecoderLayer):
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                batch_size=batch_size,
             )
 
         return return_args(hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids)
