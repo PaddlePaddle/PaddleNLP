@@ -69,7 +69,7 @@ jobs:
           FLAGS_dynamic_static_unified_comm: "True"
           FLAGS_dataloader_use_file_descriptor: "False"
           python_version: "3.10"
-          paddle_whl: https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuSome-LinuxCentos-Gcc82-Cuda118-Cudnn86-Trt85-Py310-CINN-Compile/31f801d3b98c280601701964995f0a1f96f088d1/paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl
+          paddle_whl: https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuSome-LinuxCentos-Gcc82-Cuda118-Cudnn86-Trt85-Py310-CINN-Compile/0af06ea9bd3e744afcd12e70dffd21ae9d0ae626/paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl
         run: |
           container_name=${TASK}-$(date +%Y%m%d-%H%M%S)
           echo "container_name=${container_name}" >> "$GITHUB_ENV"
