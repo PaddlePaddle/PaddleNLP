@@ -741,6 +741,8 @@ class MoEGate(PretrainedMoEGate):
             return scores, routing_map, l_aux, l_zloss
 
         capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.topkgating(scores)
+        dispatch_mask.stop_gradient = True
+        exp_counts.stop_gradient = True
         return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss
 
 
