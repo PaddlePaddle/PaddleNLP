@@ -40,7 +40,13 @@ except:
     pass
 
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
-from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft import (
+    LoRAConfig,
+    LoRAModel,
+    PrefixConfig,
+    PrefixModelForCausalLM,
+    TAREModel,
+)
 from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.transformers import (
@@ -85,6 +91,9 @@ class PredictorArgument:
     device: str = field(default="gpu", metadata={"help": "Device"})
     dtype: str = field(default=None, metadata={"help": "Model dtype"})
     lora_path: str = field(default=None, metadata={"help": "The directory of LoRA parameters. Default to None"})
+    tare_path: str = field(default=None, metadata={"help": "The directory of TARE parameters. Default to None"})
+    tare_n: int = field(default=8, metadata={"help": "The num of TARE editors. Default to 8."})
+    tare_k: int = field(default=7, metadata={"help": "The num of TARE selected editors. Default to 7."})
     export_precache: bool = field(default=False, metadata={"help": "whether use prefix weight to do infer"})
     prefix_path: str = field(
         default=None, metadata={"help": "The directory of Prefix Tuning parameters. Default to None"}
@@ -355,6 +364,11 @@ class DygraphPredictor(BasePredictor):
                 prefix_path=config.prefix_path,
                 postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
             )
+
+        if config.tare_path is not None:
+            self.model = TAREModel(base_model=self.model, n=config.tare_n, k=config.tare_k)
+            self.model.load_model(os.path.join(config.tare_path, "delta_vector.pth"))
+
         self.model.eval()
 
     @paddle.no_grad()

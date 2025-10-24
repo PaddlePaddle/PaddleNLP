@@ -122,6 +122,11 @@ class ModelConfig:
     # reft related parameter
     reft: bool = field(default=False, metadata={"help": "Whether using reft method"})
 
+    # tare related parameters
+    tare: bool = field(default=False, metadata={"help": "Whether to use tare technique"})
+    tare_n: int = field(default=8, metadata={"help": "Num of TARE editors"})
+    tare_k: int = field(default=7, metadata={"help": "Num of TARE selected editors"})
+
     from_aistudio: bool = field(default=False, metadata={"help": "Whether to load model from aistudio"})
     save_to_aistudio: bool = field(default=False, metadata={"help": "Whether to save model to aistudio"})
     aistudio_repo_id: str = field(default=None, metadata={"help": "The id of aistudio repo"})
