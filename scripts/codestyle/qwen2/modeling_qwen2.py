@@ -403,40 +403,40 @@ def scaled_dot_product_attention(
         return (attn_output, attn_weights) if output_attentions else attn_output
 
 
-    class Qwen2RMSNorm(nn.Layer):
-        """Qwen2的RMSNorm，继承自LlamaRMSNorm"""
-        def __init__(self, config: Qwen2Config):
-            super().__init__()
-            self.hidden_size = config.hidden_size
-        self.weight = paddle.create_parameter(
-            shape=[self.hidden_size],
-            dtype=paddle.get_default_dtype(),
-            default_initializer=nn.initializer.Constant(1.0),
-        )
-        self.variance_epsilon = config.rms_norm_eps
-        self.config = config
+class Qwen2RMSNorm(nn.Layer):
+    """Qwen2的RMSNorm，继承自LlamaRMSNorm"""
+    def __init__(self, config: Qwen2Config):
+        super().__init__()
+        self.hidden_size = config.hidden_size
+    self.weight = paddle.create_parameter(
+        shape=[self.hidden_size],
+        dtype=paddle.get_default_dtype(),
+        default_initializer=nn.initializer.Constant(1.0),
+    )
+    self.variance_epsilon = config.rms_norm_eps
+    self.config = config
 
-        if config.sequence_parallel:
-            mark_as_sequence_parallel_parameter(self.weight)
+    if config.sequence_parallel:
+        mark_as_sequence_parallel_parameter(self.weight)
 
-    def forward(self, hidden_states):
-        if self.config.use_fused_rms_norm:
-            return fusion_ops.fusion_rms_norm(hidden_states, self.weight, self.variance_epsilon)
+def forward(self, hidden_states):
+    if self.config.use_fused_rms_norm:
+        return fusion_ops.fusion_rms_norm(hidden_states, self.weight, self.variance_epsilon)
 
-        if paddle.in_dynamic_mode():
-            with paddle.amp.auto_cast(False):
-                # hidden_states = hidden_states.astype("float32")
-                # variance = hidden_states.pow(2).mean(-1, keepdim=True)
-                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-                hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
-        else:
-            hidden_states = hidden_states.astype("float32")
-            variance = hidden_states.pow(2).mean(-1, keepdim=True)
+    if paddle.in_dynamic_mode():
+        with paddle.amp.auto_cast(False):
+            # hidden_states = hidden_states.astype("float32")
+            # variance = hidden_states.pow(2).mean(-1, keepdim=True)
+            variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
+    else:
+        hidden_states = hidden_states.astype("float32")
+        variance = hidden_states.pow(2).mean(-1, keepdim=True)
+        hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
 
-        if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
-            hidden_states = paddle.cast(hidden_states, self.weight.dtype)
-        return hidden_states * self.weight
+    if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
+        hidden_states = paddle.cast(hidden_states, self.weight.dtype)
+    return hidden_states * self.weight
 class Qwen2RotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
