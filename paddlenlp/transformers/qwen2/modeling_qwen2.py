@@ -403,11 +403,11 @@ def scaled_dot_product_attention(
         return (attn_output, attn_weights) if output_attentions else attn_output
 
 
-class Qwen2RMSNorm(nn.Layer):
-    """Qwen2的RMSNorm，继承自LlamaRMSNorm"""
-    def __init__(self, config: Qwen2Config):
-        super().__init__()
-        self.hidden_size = config.hidden_size
+    class Qwen2RMSNorm(nn.Layer):
+        """Qwen2的RMSNorm，继承自LlamaRMSNorm"""
+        def __init__(self, config: Qwen2Config):
+            super().__init__()
+            self.hidden_size = config.hidden_size
         self.weight = paddle.create_parameter(
             shape=[self.hidden_size],
             dtype=paddle.get_default_dtype(),
