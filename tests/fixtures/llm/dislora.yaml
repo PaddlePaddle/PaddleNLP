@@ -1,0 +1,78 @@
+dislora:
+  base:
+    dataset_name_or_path: "./data"
+    per_device_train_batch_size: 1
+    gradient_accumulation_steps: 5
+    per_device_eval_batch_size: 8
+    eval_accumulation_steps: 16
+    num_train_epochs: 1
+    learning_rate: 2e-05
+    lr_scheduler_type: linear
+    warmup_steps: 30
+    logging_steps: 1
+    evaluation_strategy: "no"
+    save_strategy: "steps"
+    save_steps: 500
+    src_length: 256
+    max_length: 256
+    fp16: true
+    fp16_opt_level: "O2"
+    do_train: true
+    do_eval: false
+    disable_tqdm: false
+    load_best_model_at_end: false
+    eval_with_do_generation: false
+    recompute: false
+    save_total_limit: 5
+    sharding: "stage3"
+    zero_padding: false
+    use_flash_attention: false
+    unified_checkpoint: false
+    tensor_parallel_degree: 1
+    pipeline_parallel_degree: 1
+    dislora: true
+    dislora_rank: 8
+    dislora_dropout: 0.05
+
+    s_tsd: 8
+    ortho_lambda: 1.0
+    prefer_small_sigma: true
+
+  default:
+    llama:
+      model_name_or_path: __internal_testing__/tiny-random-llama
+    chatglm:
+      model_name_or_path: __internal_testing__/tiny-fused-chatglm
+    chatglm2:
+      model_name_or_path: __internal_testing__/tiny-fused-chatglm2
+    bloom:
+      model_name_or_path: __internal_testing__/tiny-fused-bloom
+    qwen:
+      model_name_or_path: __internal_testing__/tiny-fused-qwen
+    qwen2:
+      model_name_or_path: __internal_testing__/tiny-random-qwen2
+    qwen2moe:
+      model_name_or_path: __internal_testing__/tiny-random-qwen2moe
+    baichuan:
+      model_name_or_path: __internal_testing__/tiny-fused-baichuan
+
+inference-predict:
+  default:
+    mode: dynamic 
+    max_length: 20
+    batch_size: 2
+    decode_strategy: greedy_search
+    dtype: float16
+
+inference-to-static:
+  default:
+    dtype: float16
+    max_length: 20
+
+inference-infer:
+  default:
+    mode: static
+    dtype: float16
+    batch_size: 2
+    decode_strategy: greedy_search
+    max_length: 20

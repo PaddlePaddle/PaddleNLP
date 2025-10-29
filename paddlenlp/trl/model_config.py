@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import List, Optional
 
 __all__ = ["ModelConfig"]
 
@@ -92,6 +92,27 @@ class ModelConfig:
         default=None, metadata={"help": "Initialize lokr state dict and apply customized lokr config"}
     )
     lokr_dim: int = field(default=8, metadata={"help": "Lora dimension in LoKr dimension for adapter matrix"})
+
+    # dislora related parameters
+    dislora: bool = field(default=False, metadata={"help": "Whether to use dislora technique"})
+    dislora_path: str = field(default=None, metadata={"help": "Initialize dislora state dict."})
+    dislora_rank: int = field(default=8, metadata={"help": "DisLoRA attention dimension"})
+    dislora_dropout: float = field(default=0.05, metadata={"help": "DisLoRA dropout"})
+    target_modules: Optional[List[str]] = field(
+        default=None,
+        metadata={"help": "Custom target modules for DisLoRA. If None, will use default modules based on model type."},
+    )
+    dash_flag: int = field(
+        default=50, metadata={"help": "The number of preheating steps before introducing additional low-rank updates"}
+    )
+    s_tsd: int = field(
+        default=8, metadata={"help": "The number of top-k singular vectors dynamically selected after preheating"}
+    )
+    ortho_lambda: float = field(default=1, metadata={"help": "The weight of orthogonal regularization loss"})
+    prefer_small_sigma: bool = field(
+        default=True,
+        metadata={"help": "Whether to prioritize the smallest singular value in the top-k selection process"},
+    )
 
     # prefix tuning related parameters
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})

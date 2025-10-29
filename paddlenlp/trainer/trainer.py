@@ -88,7 +88,14 @@ from ..data import (
     default_data_collator,
     init_dataloader_comm_group,
 )
-from ..peft import LoKrModel, LoRAModel, PrefixModelForCausalLM, ReFTModel, VeRAModel
+from ..peft import (
+    DisLoRAModel,
+    LoKrModel,
+    LoRAModel,
+    PrefixModelForCausalLM,
+    ReFTModel,
+    VeRAModel,
+)
 from ..quantization.quantization_linear import (
     ColumnParallelQuantizationLinear,
     QuantizationLinear,
@@ -113,6 +120,7 @@ from ..transformers.segment_parallel_utils import split_inputs_sequence_dim
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
+    DISLORA_WEIGHTS_NAME,
     LOKR_WEIGHTS_NAME,
     LORA_WEIGHTS_NAME,
     MODEL_META_NAME,
@@ -481,6 +489,7 @@ class Trainer:
             or isinstance(self.model, PrefixModelForCausalLM)
             or isinstance(self.model, VeRAModel)
             or isinstance(self.model, LoKrModel)
+            or isinstance(self.model, DisLoRAModel)
             or isinstance(self.model, ReFTModel)
         ):
             if (
@@ -636,6 +645,8 @@ class Trainer:
                 weights_file = os.path.join(resume_from_checkpoint, VERA_WEIGHTS_NAME)
             elif isinstance(self.model, LoKrModel):
                 weights_file = os.path.join(resume_from_checkpoint, LOKR_WEIGHTS_NAME)
+            elif isinstance(self.model, DisLoRAModel):
+                weights_file = os.path.join(resume_from_checkpoint, DISLORA_WEIGHTS_NAME)
             elif isinstance(self.model, ReFTModel):
                 self.model.from_pretrained(resume_from_checkpoint, self.model.model)
                 return
@@ -704,6 +715,7 @@ class Trainer:
             or isinstance(self.model, PrefixModelForCausalLM)
             or isinstance(self.model, VeRAModel)
             or isinstance(self.model, LoKrModel)
+            or isinstance(self.model, DisLoRAModel)
             or isinstance(self.model, ReFTModel)
         ):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
@@ -3135,6 +3147,7 @@ class Trainer:
             or isinstance(self.model, PrefixModelForCausalLM)
             or isinstance(self.model, VeRAModel)
             or isinstance(self.model, LoKrModel)
+            or isinstance(self.model, DisLoRAModel)
             or isinstance(self.model, ReFTModel)
         ):
             self.model.save_pretrained(
