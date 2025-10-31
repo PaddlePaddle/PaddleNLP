@@ -177,7 +177,33 @@ python merge_lokr_params.py \
 - `device`: 运行环境，默认为 gpu。
 </div>
 
-#### 3.4.4 ReFT
+#### 3.4.5 DisLoRA
+```
+# 单卡DisLoRA
+python  run_finetune.py ./config/llama/dislora_argument.json
+
+# 多卡DisLoRA（暂不支持张量模型并行）
+python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  run_finetune.py ./config/llama/dislora_argument.json
+```
+为了后续的**压缩**和**静态图推理**方便，我们提供 DisLoRA 参数合并脚本，可以将 DisLoRA 参数合并到主干模型并保存相应的权重。
+```
+python merge_dislora_params.py \
+    --model_name_or_path ./base_model \
+    --dislora_path ./checkpoints/dislora_ckpts \
+    --merge_dislora_model_path ./checkpoints/dislora_merge \
+    --device "gpu" \
+    --low_gpu_mem True
+```
+
+<summary>&emsp; 脚本参数介绍</summary><div>
+
+- `dislora_path`: DisLoRA 参数和配置路径，对 DisLoRA 参数进行初始化，默认为 None。
+- `model_name_or_path`: 必须，主干模型参数路径，默认为 None。
+- `merge_dislora_model_path`: 必须，合并参数后保存路径，默认为 None。
+- `device`: 运行环境，默认为 gpu。
+</div>
+
+#### 3.4.6 ReFT
 ```
 # 单卡ReFT
 python  run_finetune.py ./config/llama/reft_argument.json
@@ -228,6 +254,8 @@ python ./predict/reft_predictor.py \
 - `vera_rank`: VeRA 算法中 rank（秩）的值，默认为8。
 - `lokr`: 是否开启 [LoKr](https://arxiv.org/abs/2309.14859) 微调策略，默认为 False。
 - `lokr_rank`: LoKr 算法中 rank（秩）的值，默认为8。
+- `dislora`: 是否开启 [DisLoRA] 微调策略，默认为 False。
+- `dislora_rank`: DisLoRA 算法中 rank（秩）的值，默认为8。
 - `use_long_sequence_strategies`: 是否使用长序列扩展策略，默认为 False。
 - `reft`: 是否开启 [ReFT](https://arxiv.org/abs/2404.03592) 微调策略，默认为 False。
 - `use_mora`: 是否开启 [MoRA](https://arxiv.org/abs/2405.12130) 微调策略，默认为 False。

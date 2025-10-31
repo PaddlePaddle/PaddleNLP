@@ -75,6 +75,10 @@ class SFTConfig(TrainingArguments):
             "help": "The ratio parameter for grouping in SSA, controlling the number of tokens considered in each group for sparse attention calculation."
         },
     )
+    dislora_ortho_lambda: float = field(
+        default=0.0,
+        metadata={"help": "Orthogonal regularization weight for DisLoRA. Set to 1 for Pareto optimization."},
+    )
 
     def __post_init__(self):
         super().__post_init__()
