@@ -1020,6 +1020,9 @@ class DeepseekV2MoE(MoELayer):
         if self.using_post_norm_recompute:
             assert norm_weight is not None and norm_eps is not None
 
+        hcg = fleet.get_hybrid_communicate_group()
+        moe_grad_group = hcg.get_moe_sharding_parallel_group()
+
         gate = MoEGate(
             config=config,
             num_experts=config.n_routed_experts,
@@ -1051,15 +1054,24 @@ class DeepseekV2MoE(MoELayer):
             moe_group="expert",
             using_post_norm_recompute=self.using_post_norm_recompute,
         )
-
+        self.is_mp_moe = False
+        self.is_ep_moe = True
         if config.offline_quant_expert_weight and config.clear_origin_weight_when_offline_quant:
             moe_grad_group = fleet.get_hybrid_communicate_group().expert_grad_comm_group
             expert_w1_list = [expert.w1 for expert in self.experts if expert is not None]
             expert_w2_list = [expert.w2 for expert in self.experts if expert is not None]
             for p in expert_w1_list:
+                setattr(p, "is_moe_param", True)
                 setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
+                p.no_sync = not self.is_mp_moe
+                p.expert = not self.is_mp_moe
+                logger.info(f"expert no-sync={p.no_sync}-{p.name}")
             for p in expert_w2_list:
+                setattr(p, "is_moe_param", True)
                 setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
+                p.no_sync = not self.is_mp_moe
+                p.expert = not self.is_mp_moe
+                logger.info(f"expert no-sync={p.no_sync}-{p.name}")
 
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
@@ -2154,6 +2166,14 @@ class DeepseekV2Attention(nn.Layer):
 
         self._init_rope()
         self.softmax_scale = self.q_head_dim ** (-0.5)
+        # fmt: on
+        self.softmax_scale = self.q_head_dim ** (-0.5)
+        if self.config.rope_scaling is not None:
+            mscale_all_dim = self.config.rope_scaling.get("mscale_all_dim", 0)
+            scaling_factor = self.config.rope_scaling["factor"]
+            if mscale_all_dim:
+                mscale = yarn_get_mscale(scaling_factor, mscale_all_dim)
+                self.softmax_scale = self.softmax_scale * mscale * mscale
 
         # fmt: off
         if self.config.tensor_parallel_degree > 1:
@@ -2202,15 +2222,6 @@ class DeepseekV2Attention(nn.Layer):
                     self.kv_b_proj = Linear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), bias_attr=False)
                     self.o_proj = Linear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
                 self.kv_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.kv_lora_rank)
-
-        # fmt: on
-        self.softmax_scale = self.q_head_dim ** (-0.5)
-        if self.config.rope_scaling is not None:
-            mscale_all_dim = self.config.rope_scaling.get("mscale_all_dim", 0)
-            scaling_factor = self.config.rope_scaling["factor"]
-            if mscale_all_dim:
-                mscale = yarn_get_mscale(scaling_factor, mscale_all_dim)
-                self.softmax_scale = self.softmax_scale * mscale * mscale
 
         self.attn_func = scaled_dot_product_attention
 
@@ -3259,19 +3270,17 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
 class FastCrossEntropyFunction(paddle.autograd.PyLayer):
     @staticmethod
     def forward(ctx, preds, labels):
-        softmax_val, loss = paddle._C_ops.cross_entropy_with_softmax(preds, labels, False, True, False, -100, -1)
-
+        preds = preds.cast(paddle.float32)
+        softmax_val, loss = paddle._C_ops.cross_entropy_with_softmax(preds, labels, False, True, True, -100, -1)
         ctx.save_for_backward(labels, softmax_val)
         return loss
 
     @staticmethod
     def backward(ctx, dout):
         labels, softmax_val = ctx.saved_tensor()
-
         preds_grad = paddle.incubate.nn.functional.cross_entropy_with_softmax_bwd_w_downcast(
-            labels, softmax_val.cast(paddle.float32), dout.cast(paddle.float32)
+            labels, softmax_val, dout.cast(paddle.float32)
         )
-
         return preds_grad, None
 
 

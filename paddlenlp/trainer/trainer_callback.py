@@ -25,11 +25,10 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 
 import numpy as np
-from tqdm.auto import tqdm
-
 import paddle
 import paddle.distributed as dist
 from paddle.distributed.fleet import fleet
+from tqdm.auto import tqdm
 
 from paddlenlp.transformers.moe_gate import PretrainedMoEGate
 from paddlenlp.transformers.moe_utils import offload, reload
@@ -49,6 +48,7 @@ __all__ = [
     "EarlyStoppingCallback",
     "StepFlexToken",
     "FP8QuantWeightCallback",
+    "MoeExpertsGradScaleCallback",
     "MoECorrectionBiasAdjustCallback",
 ]
 
@@ -732,3 +732,40 @@ class MoECorrectionBiasAdjustCallback(TrainerCallback):
                     usages.pop(0).zero_()
 
         model.apply(update_bias)
+
+
+class MoeExpertsGradScaleCallback(TrainerCallback):
+    """
+    This hook is used to correct the issue where the gradients of expert parameters are amplified by a factor of N.
+    """
+
+    def __init__(self, args):
+        """_summary_
+        Args:
+            args (_type_): _description_
+        """
+        if not args.use_expert_parallel:
+            raise ValueError("This callback should be used with expert parallel")
+        if args.expert_parallel_degree > 1:
+            self.expert_gradient_scaling_factor = 1.0 / args.expert_parallel_degree
+            if args.tensor_parallel_degree > 1:
+                self.expert_gradient_scaling_factor *= args.tensor_parallel_degree
+            logger.info(
+                f"EP-MoE is used, expert gradient scaling factor is set to {self.expert_gradient_scaling_factor}"
+            )
+
+    def on_optimizer_begin(self, args, state, control, **kwargs):
+        model = kwargs["model"]
+        param_count = 0
+        for p in model.parameters():
+            if not getattr(p, "no_sync", False):
+                continue
+            if hasattr(p, "is_moe_param") and p.is_moe_param:
+                with paddle.no_grad():
+                    if hasattr(p, "main_grad") and p.main_grad is not None:
+                        p.main_grad.scale_(self.expert_gradient_scaling_factor)
+                        param_count += 1
+                    elif p.grad is not None:
+                        p.grad.scale_(self.expert_gradient_scaling_factor)
+                        param_count += 1
+        logger.info("correct ep grad count:{}".format(param_count))

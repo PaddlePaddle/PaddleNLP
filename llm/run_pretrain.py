@@ -29,6 +29,7 @@ from paddlenlp.data.causal_dataset import (
 from paddlenlp.trainer import (
     FP8QuantWeightCallback,
     MoECorrectionBiasAdjustCallback,
+    MoeExpertsGradScaleCallback,
     PdArgumentParser,
     StepFlexToken,
     Trainer,
@@ -571,6 +572,9 @@ def main():
     )
 
     callbacks = [StepFlexToken(), FP8QuantWeightCallback()]
+
+    if training_args.use_expert_parallel:
+        callbacks += [MoeExpertsGradScaleCallback(training_args)]
 
     if getattr(config, "topk_method", None) == "noaux_tc":
         aux_loss_free_gamma = getattr(config, "aux_loss_free_gamma", 0.001)

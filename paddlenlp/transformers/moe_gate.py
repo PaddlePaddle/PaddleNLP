@@ -140,6 +140,8 @@ class MoEGateMixin:
             paddle.Tensor: The value of sequence auxiliary loss.
         """
         batch_size, seq_len, _ = gates.shape
+        gates = gates / (gates.sum(axis=-1, keepdim=True) + 1e-20)
+        _, topk_idx = paddle.topk(gates, top_k, axis=-1)
         ce = paddle.zeros([batch_size, self.num_experts])
         topk_idx = topk_idx.reshape([batch_size, -1])
         ce.put_along_axis_(indices=topk_idx, values=paddle.ones([batch_size, seq_len * top_k]), axis=1, reduce="add")
@@ -582,7 +584,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
         if self.norm_topk_prob:
             gates_masked = gates_masked / denom_s
-        
+
         gates_masked *= self.routed_scaling_factor
 
         if hasattr(self.config, "seq_aux") and self.config.seq_aux:
