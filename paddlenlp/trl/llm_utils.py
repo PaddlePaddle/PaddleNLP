@@ -181,15 +181,39 @@ def get_lora_target_modules(model):
             ".*mlp.w2.*",
             ".*mlp.c_proj.*",
         ]
+    # TODO maybe changed to use model.config.model_type for more generality as Paddleformers
     elif model.base_model_prefix == "qwen2" or isinstance(model, Qwen2ForCausalLMPipe):
+        # qwen2 dense lora support
         target_modules = [
+            # fused
+            ".*qkv_proj.*",
+            ".*gate_up_fused_proj.*",
+            # independent
             ".*q_proj.*",
             ".*k_proj.*",
             ".*v_proj.*",
-            ".*o_proj.*",
             ".*gate_proj.*",
-            ".*down_proj.*",
             ".*up_proj.*",
+            # always exist
+            ".*o_proj.*",
+            ".*down_proj.*",
+        ]
+
+    elif getattr(model, "config", None) is not None and model.config.model_type == "qwen3":
+        # qwen3 dense lora support
+        target_modules = [
+            # fused
+            ".*qkv_proj.*",
+            ".*gate_up_fused_proj.*",
+            # independent
+            ".*q_proj.*",
+            ".*k_proj.*",
+            ".*v_proj.*",
+            ".*gate_proj.*",
+            ".*up_proj.*",
+            # always exist
+            ".*o_proj.*",
+            ".*down_proj.*",
         ]
     elif model.base_model_prefix == "mixtral":
         target_modules = [

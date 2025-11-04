@@ -1,4 +1,4 @@
-# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,33 +25,137 @@ from paddle.distributed.fleet.meta_parallel import (
 )
 from paddle.distributed.fleet.recompute.recompute import recompute
 
+from paddlenlp.transformers.refined_recompute import get_skip_recompute_ops
+from paddlenlp.transformers.refined_recompute import recompute as rr_recompute
+
+from ...utils.tools import get_env_device
+from ..dpo_criterion import DPOCriterion
 from ..model_utils import PipelinePretrainedModel
 from .modeling import (
-    Qwen3MoeConfig,
-    Qwen3MoeDecoderLayer,
-    Qwen3MoeLMHead,
-    Qwen3MoePretrainedModel,
-    Qwen3MoePretrainingCriterion,
-    Qwen3MoeRMSNorm,
+    Qwen2Config,
+    Qwen2DecoderLayer,
+    Qwen2LMHead,
+    Qwen2Model,
+    Qwen2PretrainedModel,
+    Qwen2PretrainingCriterion,
+    Qwen2RMSNorm,
 )
 
 __all__ = [
-    "Qwen3MoeForCausalLMPipe",
+    "Qwen2ForCausalLMPipe",
 ]
 
-from ..qwen2_moe.modeling_pp import (
-    Qwen2MoeEmbeddingPipe,
-    get_attr,
-    parse_args,
-    return_args,
-)
+
+def parse_args(args):
+    if isinstance(args, tuple):
+        if len(args) == 4:
+            hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = args
+        elif len(args) == 3:
+            hidden_states, attention_mask, attn_mask_startend_row_indices = args
+            position_ids = None
+        elif len(args) == 2:
+            hidden_states, attention_mask = args
+            attn_mask_startend_row_indices, position_ids = None, None
+    else:
+        hidden_states = args
+        attention_mask, attn_mask_startend_row_indices, position_ids = None, None, None
+
+    if position_ids is not None:
+        position_ids.stop_gradient = True
+
+    if attention_mask is not None:
+        attention_mask.stop_gradient = True
+
+    if attn_mask_startend_row_indices is not None:
+        attn_mask_startend_row_indices.stop_gradient = True
+
+    return hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids
 
 
-class Qwen3MoeEmbeddingPipe(Qwen2MoeEmbeddingPipe):
-    pass
+def return_args(hidden_states, attention_mask=None, attn_mask_startend_row_indices=None, position_ids=None):
+    ret = (hidden_states,)
+
+    if attention_mask is not None:
+        ret += (attention_mask.clone(),)
+    if attn_mask_startend_row_indices is not None:
+        ret += (attn_mask_startend_row_indices.clone(),)
+    if position_ids is not None:
+        ret += (position_ids.clone(),)
+    if len(ret) == 1:
+        ret = ret[0]
+
+    return ret
 
 
-class Qwen3MoeDecoderLayerPipe(Qwen3MoeDecoderLayer):
+def get_attr(layer, name):
+    if getattr(layer, name, None) is not None:
+        return getattr(layer, name, None)
+    else:
+        return get_attr(layer._layer, name)
+
+
+class Qwen2EmbeddingPipe(nn.Layer):
+    """Extends QWenEmbeddings to forward attention_mask through the pipeline."""
+
+    def __init__(self, config: Qwen2Config):
+        super(Qwen2EmbeddingPipe, self).__init__()
+        self.config = config
+        self.sequence_parallel = config.sequence_parallel
+        self.hidden_size = config.hidden_size
+        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
+            self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
+                config.vocab_size,
+                config.hidden_size,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+            )
+        else:
+            self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
+
+    @property
+    def embedding_weight(self):
+        return get_attr(self.embed_tokens, "weight")
+
+    def forward(self, args):
+        """_summary_
+
+        Args:
+            input (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        input_ids, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
+        input_embeds = self.embed_tokens(input_ids)
+        if self.config.sequence_parallel:
+            from paddlenlp.transformers import ScatterOp
+
+            # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
+            bs, seq_len, hidden_size = input_embeds.shape
+            input_embeds = paddle.reshape_(input_embeds, [bs * seq_len, hidden_size])
+            # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
+            input_embeds = ScatterOp.apply(input_embeds)
+
+        batch_size, seq_length = input_ids.shape
+
+        if attention_mask is not None:
+            assert (
+                attn_mask_startend_row_indices is None
+            ), "attention_mask and attn_mask_startend_row_indices can not be set at same time"
+
+            attention_mask = Qwen2Model._prepare_decoder_attention_mask(
+                attention_mask, (batch_size, seq_length), 0, input_embeds.dtype
+            )
+            attention_mask.stop_gradient = True
+            if get_env_device() == "npu":
+                attention_mask = attention_mask.astype("bool")
+        elif get_env_device() == "npu":
+            attention_mask = paddle.tril(paddle.ones((seq_length, seq_length), dtype="bool"))
+            attention_mask.stop_gradient = True
+
+        return return_args(input_embeds, attention_mask, attn_mask_startend_row_indices, position_ids)
+
+
+class Qwen2DecoderLayerPipe(Qwen2DecoderLayer):
     def forward(self, args):
         hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
 
@@ -68,27 +172,25 @@ class Qwen3MoeDecoderLayerPipe(Qwen3MoeDecoderLayer):
         elif attn_mask_startend_row_indices is not None and attn_mask_startend_row_indices.dtype == paddle.int64:
             attn_mask_startend_row_indices, position_ids = None, attn_mask_startend_row_indices
 
-        batch_size = position_ids.shape[0]
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
+            recompute_fn = rr_recompute if any(self.skip_recompute_ops.values()) else recompute
             if attention_mask is not None or attn_mask_startend_row_indices is not None:
-                hidden_states = recompute(
+                hidden_states = recompute_fn(
                     super().forward,
                     hidden_states,
                     position_ids=position_ids,
                     attention_mask=attention_mask,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                     use_reentrant=False,
-                    batch_size=batch_size,
                 )
             else:
                 # for pretrain
-                hidden_states = recompute(
+                hidden_states = recompute_fn(
                     super().forward,
                     hidden_states,
                     position_ids=position_ids,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                     use_reentrant=self.config.recompute_use_reentrant,
-                    batch_size=batch_size,
                 )
         else:
             hidden_states = super().forward(
@@ -96,76 +198,52 @@ class Qwen3MoeDecoderLayerPipe(Qwen3MoeDecoderLayer):
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 attn_mask_startend_row_indices=attn_mask_startend_row_indices,
-                batch_size=batch_size,
             )
 
         return return_args(hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids)
 
 
-class Qwen3MoeRMSNormPipe(nn.Layer):
+class Qwen2RMSNormPipe(nn.Layer):
     def __init__(self, config):
         super().__init__()
-        self.norm = Qwen3MoeRMSNorm(config)
+        self.norm = Qwen2RMSNorm(config)
 
     def forward(self, args):
         hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
         return self.norm(hidden_states)
 
 
-class Qwen3MoeLMHeadPipe(Qwen3MoeLMHead):
+class Qwen2LMHeadPipe(Qwen2LMHead):
     def __init__(self, config, transpose_y=False):
-        super(Qwen3MoeLMHeadPipe, self).__init__(config)
+        super(Qwen2LMHeadPipe, self).__init__(config, transpose_y=transpose_y)
 
     @property
     def embedding_weight(self):
         return get_attr(self, "weight")
 
 
-class Qwen3MoeForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
+class Qwen2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     """QWenForPretraining adapted for pipeline parallelism.
 
     The largest change is flattening the QWenModel class so we can express it as a
     sequence of layers including embedding, transformer layers, and output.
     """
 
-    config_class = Qwen3MoeConfig
+    config_class = Qwen2Config
 
-    _get_tensor_parallel_mappings = Qwen3MoePretrainedModel._get_tensor_parallel_mappings
-    _get_fuse_or_split_param_mappings = Qwen3MoePretrainedModel._get_fuse_or_split_param_mappings
-    _init_weights = Qwen3MoePretrainedModel._init_weights
-    _keys_to_ignore_on_load_unexpected = Qwen3MoePretrainedModel._keys_to_ignore_on_load_unexpected
+    _get_tensor_parallel_mappings = Qwen2PretrainedModel._get_tensor_parallel_mappings
+    _init_weights = Qwen2PretrainedModel._init_weights
+    _keys_to_ignore_on_load_unexpected = Qwen2PretrainedModel._keys_to_ignore_on_load_unexpected
+    _get_model_flops = Qwen2PretrainedModel._get_model_flops
+    _get_hardware_flops = Qwen2PretrainedModel._get_hardware_flops
+
     _tied_weights_keys = ["lm_head.weight"]
 
     # DONOT Add base_model_prefix !!!!
-    @classmethod
-    def get_tensor_parallel_convert_actions(
-        cls, config, loaded_state_dict_keys, is_split=True, ignore_error=False, base_model_prefix=None
-    ):
-        """
-        Get the tensor parallel convert actions for the model.
-        This function is overridden to handle the case where MoE experts are grouped and should not be split across TP ranks.
-        """
-        # Get the default tensor parallel actions from the base class by calling super() with the exact same arguments.
-        tp_actions = super().get_tensor_parallel_convert_actions(
-            config,
-            loaded_state_dict_keys,
-            is_split=is_split,
-            ignore_error=ignore_error,
-            base_model_prefix=base_model_prefix,
-        )
-
-        # If moe_group is set, expert parameters should not be split.
-        # We remove them from the tp_actions dictionary.
-        if "Qwen3MoeForCausalLM" in config.architectures and config.moe_group == "tp":
-            # Iterate over a copy of the keys to safely modify the dictionary
-            for key in list(tp_actions.keys()):
-                if "mlp.experts" in key:
-                    del tp_actions[key]
-
-        return tp_actions
 
     @classmethod
     def _prepare_pipeline_inputs_func(cls, inputs):
+
         first_stage_keys = ["input_ids", "attention_mask", "attn_mask_startend_row_indices", "position_ids"]
         last_stage_keys = ["labels"]
 
@@ -188,7 +266,7 @@ class Qwen3MoeForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             get_expected_keys(inputs_batch, last_stage_keys),
         ]
 
-    def __init__(self, config: Qwen3MoeConfig):
+    def __init__(self, config: Qwen2Config):
         self.config = config
 
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
@@ -216,32 +294,30 @@ class Qwen3MoeForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         if config.tie_word_embeddings:
             self.add_sequential_layer(
                 SharedLayerDesc(
-                    "model_moe_shared_weight",
-                    Qwen3MoeEmbeddingPipe,
-                    shared_weight_attr="embedding_weight",
-                    config=config,
+                    "qwen2_shared_weight", Qwen2EmbeddingPipe, shared_weight_attr="embedding_weight", config=config
                 ),
-                "model",
+                "qwen2",
             )
         else:
-            self.add_sequential_layer(LayerDesc(Qwen3MoeEmbeddingPipe, config=config), "model")
+            self.add_sequential_layer(LayerDesc(Qwen2EmbeddingPipe, config=config), "qwen2")
 
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
                 LayerDesc(
-                    Qwen3MoeDecoderLayerPipe,
+                    Qwen2DecoderLayerPipe,
                     config=config,
                     layerwise_recompute=i not in self.no_recompute_layers,
+                    skip_recompute_ops=get_skip_recompute_ops(config, i),
                 ),
-                f"model.layers.{i}",
+                f"qwen2.layers.{i}",
             )
-        self.add_sequential_layer(LayerDesc(Qwen3MoeRMSNormPipe, config=config), "model")
+        self.add_sequential_layer(LayerDesc(Qwen2RMSNormPipe, config=config), "qwen2")
 
         if config.tie_word_embeddings:
             self.add_sequential_layer(
                 SharedLayerDesc(
-                    "model_moe_shared_weight",
-                    Qwen3MoeLMHeadPipe,
+                    "qwen2_shared_weight",
+                    Qwen2LMHeadPipe,
                     shared_weight_attr="embedding_weight",
                     config=config,
                     **{"transpose_y": True},
@@ -249,7 +325,7 @@ class Qwen3MoeForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                 "lm_head",
             )
         else:
-            self.add_sequential_layer(LayerDesc(Qwen3MoeLMHeadPipe, config=config), "lm_head")
+            self.add_sequential_layer(LayerDesc(Qwen2LMHeadPipe, config=config), "lm_head")
 
         recompute_interval = 0
         if self.enable_recompute and self.recompute_granularity == "full":
@@ -258,7 +334,7 @@ class Qwen3MoeForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             ), "pp recompute interval should smaller than num layers of each pp chunk"
             recompute_interval = self.config.pp_recompute_interval
 
-        seg_method = "layer:Qwen3MoeDecoderLayer"
+        seg_method = "layer:Qwen2DecoderLayer"
         if config.num_hidden_layers % get_hcg().topology().get_dim_size("pipe") != 0:
             seg_method = "uniform"
 
@@ -282,4 +358,7 @@ class Qwen3MoeForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         # PipelinePretrainedModel.__init__(self.super(), config=config)
 
     def get_loss_fn(self, config):
-        return Qwen3MoePretrainingCriterion(config)
+        if config.dpo_config is not None:
+            return DPOCriterion(config, use_infohub=True)
+        else:
+            return Qwen2PretrainingCriterion(config)
