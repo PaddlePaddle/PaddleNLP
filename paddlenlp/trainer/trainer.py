@@ -156,7 +156,8 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
 )
 from .training_args import TrainingArguments
 from .unified_checkpoint import UnifiedCheckpointHandler
-from .utils import reshard as reshard_util
+
+# from .utils import reshard as reshard_util
 from .utils.async_save import AsyncSaver
 from .utils.helper import (  # nested_truncate,
     broadcast_dataset_rank0_model,
@@ -1185,10 +1186,10 @@ class Trainer:
                         fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
                     # Pipeline parallel mode,  handle gradient reduce here to overlap
-                    enable_dp_comm_overlap = (
-                        self.args.pipeline_parallel_degree > 1
-                        and "enable_dp_comm_overlap" in args.pipeline_parallel_config
-                    )
+                    # enable_dp_comm_overlap = (
+                    #     self.args.pipeline_parallel_degree > 1
+                    #     and "enable_dp_comm_overlap" in args.pipeline_parallel_config
+                    # )
 
                     enable_release_grads = False
                     if args.sharding_parallel_degree > 1:
@@ -1200,13 +1201,13 @@ class Trainer:
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
                         parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
-                        if not enable_dp_comm_overlap:
-                            if self.optimizer._sharding_enable:
-                                assert reshard_util.is_sharding_opt(self.optimizer)
-                                self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
+                        # if not enable_dp_comm_overlap:
+                        #     if self.optimizer._sharding_enable:
+                        #         assert reshard_util.is_sharding_opt(self.optimizer)
+                        #         self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
-                            if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
-                                fused_allreduce_gradients_no_sync(list(parameters_list), self.optimizer._hcg)
+                        #     if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
+                        #         fused_allreduce_gradients_no_sync(list(parameters_list), self.optimizer._hcg)
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
 
