@@ -39,6 +39,7 @@ from paddlenlp.peft import (
     LoRAModel,
     PrefixConfig,
     PrefixModelForCausalLM,
+    TAREModel,
     VeRAConfig,
     VeRAModel,
 )
@@ -500,6 +501,10 @@ def main():
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
+
+        if model_args.tare:
+            model.save_model(os.path.join(training_args.output_dir, "delta_vector.pth"))
+
         if model_args.neftune:
             neft_post_hook_handle.remove()
         if training_args.benchmark:
@@ -723,6 +728,10 @@ def create_peft_model(
         )
         model = VeRAModel(model, vera_config)
         model.mark_only_vera_as_trainable(notfreezeB=True)
+        model.print_trainable_parameters()
+
+    if model_args.tare:
+        model = TAREModel(base_model=model, n=model_args.tare_n, k=model_args.tare_k)
         model.print_trainable_parameters()
 
     return model
