@@ -18,10 +18,11 @@ pip install -r slm/pipelines/examples/contrastive_training/requirements.txt
 ```
 
 
-下载 DuReader-Retrieval 中文数据集：
+下载 DuReader-Retrieval 和 MMarco-Retrieval 中文数据集：
 ```
 cd data
 wget https://paddlenlp.bj.bcebos.com/datasets/dureader_dual.train.jsonl
+python download_mmarco.py
 ```
 
 ## 训练

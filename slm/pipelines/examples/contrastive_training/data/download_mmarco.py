@@ -22,9 +22,7 @@ print(dataset["train"][1])
 print(len(dataset["train"]))
 
 
-fw = open(
-    "/141nfs/lizhuoqun/PaddleNLP_1022/PaddleNLP/slm/pipelines/examples/contrastive_training/data/mmarco.jsonl", "w"
-)
+fw = open("./mmarco.jsonl", "w")
 
 i = 0
 for data in tqdm.tqdm(dataset["train"]):
