@@ -49,9 +49,9 @@ __global__ void SwigluProbsGradKernel(
     BFloat16* do1,                // [seq_len*topk, moe_intermediate_size*2]
     float* probs_grad,            // [seq_len*topk, 1]
     BFloat16* o2_s,               // [seq_len*topk, moe_intermediate_size]
-    int moe_intermediate_size) {
-  const int row_idx = blockIdx.x;
-  const int tid = threadIdx.x;
+    int64_t moe_intermediate_size) {
+  const int64_t row_idx = blockIdx.x;
+  const int64_t tid = threadIdx.x;
 
   const BFloat16* o1_row = o1 + row_idx * moe_intermediate_size * 2;
   const BFloat16* do2_s_row = do2_s + row_idx * moe_intermediate_size;
@@ -64,7 +64,7 @@ __global__ void SwigluProbsGradKernel(
 
   float local_probs_grad = 0.0f;
 
-  for (int i = tid; i < moe_intermediate_size; i += blockDim.x) {
+  for (int64_t i = tid; i < moe_intermediate_size; i += blockDim.x) {
     float lhs = static_cast<float>(o1_row[i]);
     float rhs = static_cast<float>(o1_row[i + moe_intermediate_size]);
 
@@ -185,7 +185,7 @@ __global__ void SwigluProbsGradKernelVec4(
     BFloat16* do1,                // [seq_len*topk, moe_intermediate_size*2]
     float* probs_grad,            // [seq_len*topk, 1]
     BFloat16* o2_s,               // [seq_len*topk, moe_intermediate_size]
-    int moe_intermediate_size) {
+    int64_t moe_intermediate_size) {
   constexpr int numel_per_thread = 4;
   constexpr int k_warp_size = 32;
   const int64_t row_idx = blockIdx.x;
@@ -210,7 +210,7 @@ __global__ void SwigluProbsGradKernelVec4(
 
   float local_probs_grad = 0.0f;
 
-  const int vec_numel = (int64_t)moe_intermediate_size / numel_per_thread;
+  const int64_t vec_numel = (int64_t)moe_intermediate_size / numel_per_thread;
   for (int64_t i = tid; i < vec_numel; i += blockDim.x) {
     float4 lhs_vec4 = load_and_cast_float4(o1_row_left_half_vec4 + i);
     float4 rhs_vec4 = load_and_cast_float4(o1_row_right_half_vec4 + i);
@@ -262,13 +262,13 @@ std::vector<paddle::Tensor> SwigluProbsGradCUDABackward(
     const paddle::Tensor& unzipped_probs,
     bool inplace) {
   auto o1_dims = o1.dims();
-  int o1_outer_dim = 1;
+  int64_t o1_outer_dim = 1;
   for (int i = 0; i < o1_dims.size() - 1; i++) {
     o1_outer_dim *= o1_dims[i];
   }
 
-  const int moe_intermediate_size_2 = o1_dims[o1_dims.size() - 1];
-  const int moe_intermediate_size = moe_intermediate_size_2 / 2;
+  const int64_t moe_intermediate_size_2 = o1_dims[o1_dims.size() - 1];
+  const int64_t moe_intermediate_size = moe_intermediate_size_2 / 2;
 
   auto do1 = inplace ? o1 : paddle::empty_like(o1);
   auto probs_grad =

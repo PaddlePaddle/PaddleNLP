@@ -1,3 +1,17 @@
+// Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "quant_utils.h"
 
 template <typename T, int VecSize>
@@ -183,7 +197,7 @@ __global__ void __launch_bounds__(1024)
     for (int j = 0; j < 4; j++) {
       float input_fp32 = static_cast<float>(input[i][j]);
       float output_scaled = input_fp32 * scale_inv;
-      shm[threadIdx.x * 4 + j][i * 32 + threadIdx.y] =
+      shm[static_cast<size_t>(threadIdx.x) * 4 + j][i * 32 + threadIdx.y] =
           static_cast<OutT>(output_scaled);
     }
   }
@@ -193,13 +207,14 @@ __global__ void __launch_bounds__(1024)
   for (size_t i = 0; i < 4; i++) {
     size_t idx_n = blockIdx.z;
     size_t idx_k = block_x * 128 + threadIdx.y + i * 32;
-    size_t idx_m = block_y * 128 + threadIdx.x * 4;
+    size_t idx_m = block_y * 128 + static_cast<size_t>(threadIdx.x) * 4;
     size_t idx = (idx_n * K + idx_k) * M + idx_m;
 
     using StoreT = VecType<OutT, 4>;
     StoreT data;
     for (int j = 0; j < 4; j++) {
-      data[j] = shm[i * 32 + threadIdx.y][threadIdx.x * 4 + j];
+      data[j] =
+          shm[i * 32 + threadIdx.y][static_cast<size_t>(threadIdx.x) * 4 + j];
     }
     *reinterpret_cast<StoreT*>(out + idx) = data;
   }

@@ -1,3 +1,17 @@
+// Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "quant_utils.h"
 
 #define LAUNCH_FUSED_SPAQ(__using_pow2_scaling, __with_prob)          \
@@ -182,8 +196,8 @@ __global__ void FusedSPAQKernel(const phi::bfloat16 *__restrict__ Xin,
                                 const float *__restrict__ prob,
                                 phi::float8_e4m3fn *__restrict__ out,
                                 float *__restrict__ scales,
-                                const int rows,
-                                const int cols) {
+                                const int64_t rows,
+                                const int64_t cols) {
   // Configure shared memory
   __shared__ float smem_tile[256];  // Shared memory for activation values
   __shared__ float warp_max[2][4];  // Shared memory for warp maxima (2 quant
@@ -192,12 +206,13 @@ __global__ void FusedSPAQKernel(const phi::bfloat16 *__restrict__ Xin,
       quant_block_amax[2];  // Shared memory for quant block maxima
 
   const __nv_bfloat16 *X = reinterpret_cast<const __nv_bfloat16 *>(Xin);
-  const int x_offset = threadIdx.x;
+  const uint32_t x_offset = threadIdx.x;
   const int quant_block_idx =
       threadIdx.x / 128;  // 0 or 1, two quant blocks per block
-  const int in_y_idx = blockIdx.y;
-  const int in_x_idx = blockIdx.x * blockDim.x + x_offset;
-  const int src_idx = in_y_idx * cols + in_x_idx;
+  const int64_t in_y_idx = blockIdx.y;
+  const int64_t in_x_idx =
+      static_cast<uint64_t>(blockIdx.x) * blockDim.x + x_offset;
+  const int64_t src_idx = in_y_idx * cols + in_x_idx;
 
   // Load data and compute swiGLU activation
   if (in_x_idx < cols / 2) [[likely]] {
@@ -255,7 +270,7 @@ __global__ void FusedSPAQKernel(const phi::bfloat16 *__restrict__ Xin,
 
   // Phase 3: Compute scales and quantize the outputs
   const float block_max_float = (float)quant_block_amax[quant_block_idx];
-  const int scale_stride = (cols / 2 + 127) / 128;
+  const int64_t scale_stride = (cols / 2 + 127) / 128;
 
   float scale = ComputeScale<float, __nv_fp8_e4m3, using_pow2_scaling>(
       block_max_float, 0.0f);
@@ -265,8 +280,8 @@ __global__ void FusedSPAQKernel(const phi::bfloat16 *__restrict__ Xin,
   float output_scaled_fp32 = smem_tile[x_offset] * scale;
 
 
-  const int g_output_y_offset = in_y_idx;
-  const int g_output_x_offset = in_x_idx;
+  const int64_t g_output_y_offset = in_y_idx;
+  const int64_t g_output_x_offset = in_x_idx;
 
   // Write output and scales
   if (g_output_y_offset < rows && g_output_x_offset < cols / 2) {
@@ -284,8 +299,8 @@ void dispatch_fused_spaq(const paddle::Tensor &X,
                          const paddle::optional<paddle::Tensor> &prob,
                          paddle::Tensor &out,
                          paddle::Tensor &scale,
-                         const int rows,
-                         const int cols,
+                         const int64_t rows,
+                         const int64_t cols,
                          const bool &using_pow2_scaling,
                          const bool &with_prob) {
   constexpr int thread_per_block = 256;
@@ -297,8 +312,8 @@ void dispatch_fused_spaq(const paddle::Tensor &X,
     // 1x128 vector Each block handles several sub-row (numel = 4 x blockDim.x)
     // of input vector
     block.x = thread_per_block;
-    constexpr int vec_numel = 4;
-    const int scale_cols = scale.shape().back();
+    constexpr int64_t vec_numel = 4;
+    const int64_t scale_cols = scale.shape().back();
     DISPATCH_BOOL(
         using_pow2_scaling,
         k_using_pow2_scaling,

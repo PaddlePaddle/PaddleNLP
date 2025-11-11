@@ -1,3 +1,17 @@
+// Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "quant_utils.h"
 
 template <typename T, int VecSize>
@@ -14,8 +28,9 @@ __device__ void BlockLoad(const phi::bfloat16* X,
                           __nv_bfloat16 input[4][4],
                           size_t K) {
   for (size_t i = 0; i < 4; i++) {
-    size_t off_m = blockIdx.x * 128 + threadIdx.y + i * 32;
-    size_t off_k = blockIdx.y * 128 + threadIdx.x * VecSize;
+    size_t off_m = static_cast<size_t>(blockIdx.x) * 128 + threadIdx.y + i * 32;
+    size_t off_k =
+        static_cast<size_t>(blockIdx.y) * 128 + threadIdx.x * VecSize;
     size_t offset = off_m * K + off_k;
 
     for (size_t j = 0; j < 4; j += VecSize) {
@@ -45,15 +60,18 @@ __device__ void BlockColumnMax(const __nv_bfloat16 input[4][4],
 
   // Reduce [(32), 32, 4] => [32, 4]
   for (int i = 0; i < 4; i++) {
-    shm[threadIdx.y * 128 + i * 32 + threadIdx.x] = warp_max[i];
+    shm[static_cast<size_t>(threadIdx.y) * 128 + i * 32 + threadIdx.x] =
+        warp_max[i];
   }
   __syncthreads();
   for (int offset = 16; offset > 0; offset /= 2) {
     if (threadIdx.y < offset) {
       for (int i = 0; i < 4; i++) {
-        shm[threadIdx.y * 128 + i * 32 + threadIdx.x] =
-            __hmax(shm[threadIdx.y * 128 + i * 32 + threadIdx.x],
-                   shm[(threadIdx.y + offset) * 128 + i * 32 + threadIdx.x]);
+        shm[static_cast<size_t>(threadIdx.y) * 128 + i * 32 + threadIdx.x] =
+            __hmax(shm[static_cast<size_t>(threadIdx.y) * 128 + i * 32 +
+                       threadIdx.x],
+                   shm[(static_cast<size_t>(threadIdx.y) + offset) * 128 +
+                       i * 32 + threadIdx.x]);
       }
     }
     __syncthreads();
@@ -79,7 +97,8 @@ __device__ void BlockStoreScale(float* scale,
   }
   if (threadIdx.y == 0) {
     size_t idx_m = blockIdx.x - off_m / 128;
-    size_t off_k = blockIdx.y * 128 + threadIdx.x * VecSize;
+    size_t off_k =
+        static_cast<size_t>(blockIdx.y) * 128 + threadIdx.x * VecSize;
     size_t offset = idx_m * K + off_k;
 
     for (size_t j = 0; j < 4; j += VecSize) {
@@ -103,15 +122,16 @@ __device__ void BlockStoreOut(OutT* out,
                               const OutT shm[128][129],
                               size_t K) {
   for (size_t i = 0; i < 4; i++) {
-    size_t idx_m = blockIdx.x * 128 + threadIdx.x * 4;
-    size_t idx_k = blockIdx.y * 128 + threadIdx.y + i * 32;
+    size_t idx_m = static_cast<size_t>(blockIdx.x) * 128 + threadIdx.x * 4;
+    size_t idx_k = static_cast<size_t>(blockIdx.y) * 128 + threadIdx.y + i * 32;
     size_t idx = idx_k * cur_tokens + (idx_m - off_m);
 
     if (idx_k < K) {
       using StoreT = VecType<OutT, VecSize>;
       StoreT data;
       for (int j = 0; j < VecSize; j++) {
-        data[j] = shm[i * 32 + threadIdx.y][threadIdx.x * 4 + j];
+        data[j] =
+            shm[i * 32 + threadIdx.y][static_cast<size_t>(threadIdx.x) * 4 + j];
       }
       *reinterpret_cast<StoreT*>(out + idx) = data;
     }
@@ -123,7 +143,7 @@ __device__ std::pair<size_t, size_t> GetExpertIdx(int64_t* tokens_per_expert,
   __shared__ size_t expert_idx_, off_m_;
 
   if (threadIdx.x == 0 && threadIdx.y == 0) {
-    size_t idx_m = blockIdx.x * 128;
+    size_t idx_m = static_cast<size_t>(blockIdx.x) * 128;
     size_t off_m = 0, next_off_m = 0;
     size_t expert_idx;
     for (expert_idx = 0; expert_idx < num_experts; expert_idx++) {
@@ -176,8 +196,8 @@ __global__ void __launch_bounds__(1024)
       for (int k = 0; k < VecSize; k++) {
         float input_fp32 = static_cast<float>(input[i][j + k]);
         float output_scaled = input_fp32 * scale_inv[j + k];
-        shm[threadIdx.x * VecSize + j * 32 + k][i * 32 + threadIdx.y] =
-            static_cast<OutT>(output_scaled);
+        shm[static_cast<size_t>(threadIdx.x) * VecSize + j * 32 + k]
+           [i * 32 + threadIdx.y] = static_cast<OutT>(output_scaled);
       }
     }
   }
