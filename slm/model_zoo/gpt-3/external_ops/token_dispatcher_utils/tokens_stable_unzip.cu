@@ -293,9 +293,9 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
   if (XScale) {
     PD_CHECK(XScale->dtype() == paddle::DataType::FLOAT32);
   }
-  const int rows = X.shape()[0];  // 一般为seqlen
-  const int cols = X.shape()[1];  // 一般为7168
-  const int quanted_cols = (XScale) ? XScale->shape()[1] : 0;
+  const int64_t rows = X.shape()[0];  // 一般为seqlen
+  const int64_t cols = X.shape()[1];  // 一般为7168
+  const int64_t quanted_cols = (XScale) ? XScale->shape()[1] : 0;
   /*
   const int max_tokens_per_expert =
       ((max_tokens_per_expert_in + 127) / 128) * 128;
@@ -308,7 +308,7 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
   PD_SWITCH_NUM_EXPERTS(
       num_experts, ([&] {
         expert_base_offset<MAX_NUM_EXPERTS_C> expert_offset;
-        int tokens_cumulated = 0;
+        int64_t tokens_cumulated = 0;
         for (int i = 0; i < MAX_NUM_EXPERTS_C; i++) {
           if (i < num_experts) {
             expert_offset.data[i] = tokens_cumulated;
@@ -321,8 +321,8 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
           }
         }
 
-        const int output_rows = tokens_cumulated;
-        const int topk_calculated = expert_routemap_topk.shape()[1];
+        const int64_t output_rows = tokens_cumulated;
+        const int64_t topk_calculated = expert_routemap_topk.shape()[1];
 
         // FP8 scale unziped缓冲区分配
         if (XScale && fill_x) {
@@ -386,7 +386,7 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
         }
         // ------------ 前缀和辅助数组相关逻辑，“推”式block通信
         // -------------------
-        const int cumsum_blocknum =
+        const int64_t cumsum_blocknum =
             (rows + CUMSUM_BLOCK_SIZE - 1) / CUMSUM_BLOCK_SIZE;
         auto global_expertwise_block_cumsum =
             paddle::empty({cumsum_blocknum + 1, num_experts},
@@ -460,8 +460,8 @@ __global__ void tokens_unzip_gather_kernel(
     int64_t *__restrict__ index_unzipped,
     int64_t unzipped_rows,
     int64_t zipped_rows,
-    int token_length,
-    int scale_length,
+    int64_t token_length,
+    int64_t scale_length,
     int num_experts,
     int expert_id,
     int64_t offset) {
@@ -510,10 +510,10 @@ std::vector<paddle::Tensor> tokens_unzip_gather(
   auto x_shape = x.shape();
   PD_CHECK(x_shape.size() == 2);
   int64_t zipped_rows = x_shape[0];
-  int hidden_size = x_shape[1];
+  int64_t hidden_size = x_shape[1];
 
   std::vector<int64_t> x_scale_shape;
-  int quanted_hidden_size = 0;
+  int64_t quanted_hidden_size = 0;
   bool has_scale = (x_scale.get_ptr() != nullptr);
   if (has_scale) {
     x_scale_shape = x_scale.get().shape();
@@ -586,14 +586,14 @@ __global__ void tokens_zip_unique_add_kernel(
     const int64_t *__restrict__ index_unzipped,
     const int64_t unzipped_rows,
     const int64_t subbatch_rows,
-    const int hidden_size) {
+    const int64_t hidden_size) {
   for (int64_t unzipped_row = blockIdx.x; unzipped_row < unzipped_rows;
        unzipped_row += gridDim.x) {
     int64_t zipped_row = index_unzipped[unzipped_row];
     auto *zipped_ptr = zipped_ptrs[zipped_row / subbatch_rows] +
                        (zipped_row % subbatch_rows) * hidden_size;
     const auto *unzipped_ptr = unzipped + unzipped_row * hidden_size;
-    for (int i = threadIdx.x * VecSize; i < hidden_size;
+    for (int64_t i = threadIdx.x * VecSize; i < hidden_size;
          i += blockDim.x * VecSize) {
       phi::AlignedVector<ZipT, VecSize> zipped_tmp;
       phi::AlignedVector<UnzipT, VecSize> unzipped_tmp;
