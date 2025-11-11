@@ -1,3 +1,17 @@
+// Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "quant_utils.h"
 
 #define LAUNCH_FUSED_SPAQ(__using_pow2_scaling, __with_prob)          \
@@ -196,7 +210,8 @@ __global__ void FusedSPAQKernel(const phi::bfloat16 *__restrict__ Xin,
   const int quant_block_idx =
       threadIdx.x / 128;  // 0 or 1, two quant blocks per block
   const int64_t in_y_idx = blockIdx.y;
-  const int64_t in_x_idx = static_cast<uint64_t>(blockIdx.x) * blockDim.x + x_offset;
+  const int64_t in_x_idx =
+      static_cast<uint64_t>(blockIdx.x) * blockDim.x + x_offset;
   const int64_t src_idx = in_y_idx * cols + in_x_idx;
 
   // Load data and compute swiGLU activation
