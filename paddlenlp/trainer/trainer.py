@@ -177,12 +177,13 @@ from .utils.async_save import AsyncSaver
 
 try:
     from .utils.zero_cost_checkpoint import (
+        NonZCCEMACallback,
         ZeroCostCheckpointCallback,
         ZeroCostCheckpointManager,
         get_fused_param_mappings,
     )
 except (ImportError, ModuleNotFoundError):
-    ZeroCostCheckpointManager, get_fused_param_mappings = None, None
+    ZeroCostCheckpointManager, NonZCCEMACallback, get_fused_param_mappings = None, None, None
 from .utils.helper import (  # nested_truncate,
     broadcast_dataset_rank0_model,
     broadcast_dp_optimizer,
@@ -830,6 +831,9 @@ class Trainer:
 
         logger.info("Create zero cost checkpoint manager done.")
 
+    def add_non_zcc_ema_callback(self, resume_from_checkpoint):
+        self.add_callback(NonZCCEMACallback(resume_from_checkpoint, self.args, self.sharding_io))
+
     def train(
         self,
         resume_from_checkpoint: Optional[Union[str, bool]] = None,
@@ -967,6 +971,8 @@ class Trainer:
 
         if self.args.enable_zero_cost_checkpoint:
             self.create_zcc_manager(model, resume_from_checkpoint)
+        elif self.args.zcc_save_ema_coef is not None:
+            self.add_non_zcc_ema_callback(resume_from_checkpoint)
 
         logger.info(f"{self.runtime_timer.log()}")
         logger.info("***** Running training *****")
@@ -1390,7 +1396,7 @@ class Trainer:
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
 
                     # For ZCC EMA
-                    if self.args.enable_zero_cost_checkpoint:
+                    if self.args.enable_zero_cost_checkpoint or self.args.zcc_save_ema_coef is not None:
                         tr_loss_for_zcc = tr_loss.clone()
                         dist.all_reduce(
                             tr_loss_for_zcc, dist.ReduceOp.SUM
