@@ -25,22 +25,22 @@ __global__ void FusedActDequant(const phi::float8_e4m3fn *__restrict__ Xin,
                                 const float *__restrict__ Xscale,
                                 phi::bfloat16 *__restrict__ out,
                                 const int64_t rows,
-                                const int64_t cols) {
+                                const int cols) {
   const int64_t this_row_idx = blockIdx.x;
   if (this_row_idx >= rows) return;
 
-  const int64_t Xscale_stride = (cols + 127) / 128;  // 计算缩放因子的步长
+  const int Xscale_stride = (cols + 127) / 128;  // 计算缩放因子的步长
 
   const int vector_size = 16;  // 向量的元素数量，处理16个元素
 
   // 每行的向量数量
-  const int64_t num_vectors = cols / vector_size;
+  const int num_vectors = cols / vector_size;
   const int remaining_elements = cols % vector_size;
 
-  const int64_t tid = threadIdx.x;
+  const int tid = threadIdx.x;
 
-  for (int64_t vec_idx = tid; vec_idx < num_vectors; vec_idx += blockDim.x) {
-    int64_t x_offset = vec_idx * vector_size;
+  for (int vec_idx = tid; vec_idx < num_vectors; vec_idx += blockDim.x) {
+    int x_offset = vec_idx * vector_size;
     int64_t X_idx = (int64_t)this_row_idx * (int64_t)cols + (int64_t)x_offset;
 
     // 加载16个 __nv_fp8_e4m3 元素到向量中
@@ -76,7 +76,7 @@ __global__ void FusedActDequant(const phi::float8_e4m3fn *__restrict__ Xin,
 
   // 处理剩余不能被向量化的元素
   if (remaining_elements > 0) {
-    int64_t x_offset = num_vectors * vector_size;
+    int x_offset = num_vectors * vector_size;
     int64_t X_idx = (int64_t)this_row_idx * (int64_t)cols + (int64_t)x_offset;
     int64_t idx = X_idx + tid;
     if (tid < remaining_elements) {
@@ -110,6 +110,16 @@ std::vector<paddle::Tensor> fused_act_dequant(const paddle::Tensor &X,
   int64_t rows, cols;
   rows = X.shape()[0];
   cols = X.shape()[1];
+  PADDLE_ENFORCE_LE(
+      rows,
+      std::numeric_limits<int32_t>::max(),
+      common::errors::InvalidArgument(
+          "rows should be less than INT_MAX, received rows: (%ld)", rows));
+  PADDLE_ENFORCE_LE(
+      cols,
+      std::numeric_limits<int32_t>::max(),
+      common::errors::InvalidArgument(
+          "cols should be less than INT_MAX, received cols: (%ld)", cols));
   paddle::Tensor out;
 
   out = paddle::empty({rows, cols}, paddle::DataType::BFLOAT16, X.place());

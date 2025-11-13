@@ -460,8 +460,8 @@ __global__ void tokens_unzip_gather_kernel(
     int64_t *__restrict__ index_unzipped,
     int64_t unzipped_rows,
     int64_t zipped_rows,
-    int64_t token_length,
-    int64_t scale_length,
+    int token_length,
+    int scale_length,
     int num_experts,
     int expert_id,
     int64_t offset) {
@@ -511,6 +511,12 @@ std::vector<paddle::Tensor> tokens_unzip_gather(
   PD_CHECK(x_shape.size() == 2);
   int64_t zipped_rows = x_shape[0];
   int64_t hidden_size = x_shape[1];
+  PADDLE_ENFORCE_LE(
+      hidden_size,
+      std::numeric_limits<int32_t>::max(),
+      common::errors::InvalidArgument("hidden_size should be less than "
+                                      "INT_MAX, received hidden_size: (%ld)",
+                                      hidden_size));
 
   std::vector<int64_t> x_scale_shape;
   int64_t quanted_hidden_size = 0;
@@ -521,6 +527,12 @@ std::vector<paddle::Tensor> tokens_unzip_gather(
     PD_CHECK(x_scale_shape[0] == x_shape[0]);
     quanted_hidden_size = x_scale_shape[1];
   }
+  PADDLE_ENFORCE_LE(quanted_hidden_size,
+                    std::numeric_limits<int32_t>::max(),
+                    common::errors::InvalidArgument(
+                        "quanted_hidden_size should be less than "
+                        "INT_MAX, received quanted_hidden_size: (%ld)",
+                        quanted_hidden_size));
 
   auto x_unzipped =
       paddle::zeros({padded_num_tokens, hidden_size}, dtype, place);

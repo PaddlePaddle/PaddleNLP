@@ -185,7 +185,7 @@ __global__ void SwigluProbsGradKernelVec4(
     BFloat16* do1,                // [seq_len*topk, moe_intermediate_size*2]
     float* probs_grad,            // [seq_len*topk, 1]
     BFloat16* o2_s,               // [seq_len*topk, moe_intermediate_size]
-    int64_t moe_intermediate_size) {
+    int moe_intermediate_size) {
   constexpr int numel_per_thread = 4;
   constexpr int k_warp_size = 32;
   const int64_t row_idx = blockIdx.x;
@@ -210,7 +210,7 @@ __global__ void SwigluProbsGradKernelVec4(
 
   float local_probs_grad = 0.0f;
 
-  const int64_t vec_numel = (int64_t)moe_intermediate_size / numel_per_thread;
+  const int vec_numel = (int64_t)moe_intermediate_size / numel_per_thread;
   for (int64_t i = tid; i < vec_numel; i += blockDim.x) {
     float4 lhs_vec4 = load_and_cast_float4(o1_row_left_half_vec4 + i);
     float4 rhs_vec4 = load_and_cast_float4(o1_row_right_half_vec4 + i);
@@ -269,6 +269,12 @@ std::vector<paddle::Tensor> SwigluProbsGradCUDABackward(
 
   const int64_t moe_intermediate_size_2 = o1_dims[o1_dims.size() - 1];
   const int64_t moe_intermediate_size = moe_intermediate_size_2 / 2;
+  PADDLE_ENFORCE_LE(moe_intermediate_size,
+                    std::numeric_limits<int32_t>::max(),
+                    common::errors::InvalidArgument(
+                        "moe_intermediate_size should be less than INT_MAX, "
+                        "received moe_intermediate_size: (%ld)",
+                        moe_intermediate_size));
 
   auto do1 = inplace ? o1 : paddle::empty_like(o1);
   auto probs_grad =

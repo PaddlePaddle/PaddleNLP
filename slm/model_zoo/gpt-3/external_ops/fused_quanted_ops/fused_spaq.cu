@@ -270,7 +270,7 @@ __global__ void FusedSPAQKernel(const phi::bfloat16 *__restrict__ Xin,
 
   // Phase 3: Compute scales and quantize the outputs
   const float block_max_float = (float)quant_block_amax[quant_block_idx];
-  const int64_t scale_stride = (cols / 2 + 127) / 128;
+  const int scale_stride = (cols / 2 + 127) / 128;
 
   float scale = ComputeScale<float, __nv_fp8_e4m3, using_pow2_scaling>(
       block_max_float, 0.0f);

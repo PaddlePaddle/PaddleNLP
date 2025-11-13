@@ -60,18 +60,15 @@ __device__ void BlockColumnMax(const __nv_bfloat16 input[4][4],
 
   // Reduce [(32), 32, 4] => [32, 4]
   for (int i = 0; i < 4; i++) {
-    shm[static_cast<size_t>(threadIdx.y) * 128 + i * 32 + threadIdx.x] =
-        warp_max[i];
+    shm[threadIdx.y * 128 + i * 32 + threadIdx.x] = warp_max[i];
   }
   __syncthreads();
   for (int offset = 16; offset > 0; offset /= 2) {
     if (threadIdx.y < offset) {
       for (int i = 0; i < 4; i++) {
-        shm[static_cast<size_t>(threadIdx.y) * 128 + i * 32 + threadIdx.x] =
-            __hmax(shm[static_cast<size_t>(threadIdx.y) * 128 + i * 32 +
-                       threadIdx.x],
-                   shm[(static_cast<size_t>(threadIdx.y) + offset) * 128 +
-                       i * 32 + threadIdx.x]);
+        shm[threadIdx.y * 128 + i * 32 + threadIdx.x] =
+            __hmax(shm[threadIdx.y * 128 + i * 32 + threadIdx.x],
+                   shm[(threadIdx.y + offset) * 128 + i * 32 + threadIdx.x]);
       }
     }
     __syncthreads();
@@ -130,8 +127,7 @@ __device__ void BlockStoreOut(OutT* out,
       using StoreT = VecType<OutT, VecSize>;
       StoreT data;
       for (int j = 0; j < VecSize; j++) {
-        data[j] =
-            shm[i * 32 + threadIdx.y][static_cast<size_t>(threadIdx.x) * 4 + j];
+        data[j] = shm[i * 32 + threadIdx.y][threadIdx.x * 4 + j];
       }
       *reinterpret_cast<StoreT*>(out + idx) = data;
     }

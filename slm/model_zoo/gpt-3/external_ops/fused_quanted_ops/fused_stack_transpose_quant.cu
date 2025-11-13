@@ -197,7 +197,7 @@ __global__ void __launch_bounds__(1024)
     for (int j = 0; j < 4; j++) {
       float input_fp32 = static_cast<float>(input[i][j]);
       float output_scaled = input_fp32 * scale_inv;
-      shm[static_cast<size_t>(threadIdx.x) * 4 + j][i * 32 + threadIdx.y] =
+      shm[threadIdx.x * 4 + j][i * 32 + threadIdx.y] =
           static_cast<OutT>(output_scaled);
     }
   }
@@ -207,14 +207,13 @@ __global__ void __launch_bounds__(1024)
   for (size_t i = 0; i < 4; i++) {
     size_t idx_n = blockIdx.z;
     size_t idx_k = block_x * 128 + threadIdx.y + i * 32;
-    size_t idx_m = block_y * 128 + static_cast<size_t>(threadIdx.x) * 4;
+    size_t idx_m = block_y * 128 + threadIdx.x * 4;
     size_t idx = (idx_n * K + idx_k) * M + idx_m;
 
     using StoreT = VecType<OutT, 4>;
     StoreT data;
     for (int j = 0; j < 4; j++) {
-      data[j] =
-          shm[i * 32 + threadIdx.y][static_cast<size_t>(threadIdx.x) * 4 + j];
+      data[j] = shm[i * 32 + threadIdx.y][threadIdx.x * 4 + j];
     }
     *reinterpret_cast<StoreT*>(out + idx) = data;
   }
