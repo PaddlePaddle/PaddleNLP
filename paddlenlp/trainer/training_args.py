@@ -1348,6 +1348,7 @@ class TrainingArguments:
                                 "best_unbalanced_scheduler",
                                 "enable_offload_queue",
                                 "use_dualpipev",
+                                "forward_backward_overlap_scheduler",
                                 "enable_dynamic_shape",
                                 "sync_moment",
                                 "sync_param",
@@ -1399,6 +1400,8 @@ class TrainingArguments:
                         "best_unbalanced_scheduler": "best_unbalanced_scheduler" in pipeline_parallel_config,
                         "enable_offload_queue": "enable_offload_queue" in pipeline_parallel_config,
                         "use_dualpipev": "use_dualpipev" in pipeline_parallel_config,
+                        "forward_backward_overlap_scheduler": "forward_backward_overlap_scheduler"
+                        in pipeline_parallel_config,
                         "enable_dynamic_shape": "enable_dynamic_shape" in pipeline_parallel_config,
                     }
 
