@@ -586,6 +586,8 @@ def merge_opt_state(opt_state_map):
 def split_structure_name_mapping(structure_name_mapping, group_getter):
     res = OrderedDict()
     for k, v in structure_name_mapping.items():
+        if k not in group_getter.structure_name_mapping:
+            continue
         group = group_getter.get_group(k)
         if group.id not in res:
             res[group.id] = OrderedDict()

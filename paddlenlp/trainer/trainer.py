@@ -1129,7 +1129,7 @@ class Trainer:
 
             npu_accelerate_plugin(self.optimizer)
 
-        if self.args.ignore_data_skip:
+        if not self.args.ignore_data_skip:
             self.timers and self.timers("read-data").start()
 
         for epoch in range(epochs_trained, num_train_epochs):
@@ -1155,7 +1155,7 @@ class Trainer:
                     and self.args.split_inputs_sequence_dim
                 ):
                     inputs = split_inputs_sequence_dim_load_balance(inputs)
-                if self.args.ignore_data_skip:
+                if not self.args.ignore_data_skip:
                     self.timers and self.timers("read-data").stop()
 
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
@@ -1421,7 +1421,7 @@ class Trainer:
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
 
-                if self.args.ignore_data_skip:
+                if not self.args.ignore_data_skip:
                     self.timers and self.timers("read-data").start()
 
             if step < 0:

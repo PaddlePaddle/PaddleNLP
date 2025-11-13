@@ -50,6 +50,8 @@ from datasets import load_dataset as origin_load_dataset  # noqa: E402
 
 
 def load_from_ppnlp(path, *args, **kwargs):
+    if 'trust_remote_code' in kwargs:
+        kwargs.pop('trust_remote_code')
     ppnlp_path = paddlenlp.datasets.__path__[0]
     new_path = os.path.split(path)[-1]
     new_path = os.path.join(ppnlp_path, "hf_datasets", new_path + ".py")
