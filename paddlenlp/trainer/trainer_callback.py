@@ -157,6 +157,7 @@ class TrainerControl:
     should_save: bool = False
     should_evaluate: bool = False
     should_log: bool = False
+    should_save_hf: bool = False
 
     def _new_training(self):
         """Internal method that resets the variable for a new training."""
@@ -171,6 +172,7 @@ class TrainerControl:
         self.should_save = False
         self.should_evaluate = False
         self.should_log = False
+        self.should_save_hf = False
 
 
 class TrainerCallback:
@@ -306,6 +308,12 @@ class TrainerCallback:
         """
         pass
 
+    def on_save_hf(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        """
+        Event called after a huggingface checkpoint save.
+        """
+        pass
+
 
 class CallbackHandler(TrainerCallback):
     """Internal class that just calls the list of callbacks in order."""
@@ -386,6 +394,7 @@ class CallbackHandler(TrainerCallback):
         control.should_log = False
         control.should_evaluate = False
         control.should_save = False
+        control.should_save_hf = False
         return self.call_event("on_step_begin", args, state, control)
 
     def on_load_data_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, inputs: Dict):
@@ -417,6 +426,10 @@ class CallbackHandler(TrainerCallback):
 
     def on_prediction_step(self, args: TrainingArguments, state: TrainerState, control: TrainerControl):
         return self.call_event("on_prediction_step", args, state, control)
+
+    def on_save_hf(self, args: TrainingArguments, state: TrainerState, control: TrainerControl):
+        control.should_save_hf = False
+        return self.call_event("on_save_hf", args, state, control)
 
     def call_event(self, event, args, state, control, **kwargs):
         for callback in self.callbacks:
@@ -473,6 +486,14 @@ class DefaultFlowCallback(TrainerCallback):
         # End training
         if state.global_step >= state.max_steps:
             control.should_training_stop = True
+
+        # Save hf
+        if (
+            args.save_strategy == IntervalStrategy.STEPS
+            and args.save_hf_steps > 0
+            and state.global_step % args.save_hf_steps == 0
+        ):
+            control.should_save_hf = True
 
         return control
 

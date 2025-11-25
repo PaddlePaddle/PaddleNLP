@@ -166,3 +166,6 @@ else:
 
 USE_FAST_TOKENIZER: bool = _get_bool_env("USE_FAST_TOKENIZER", "false")
 PREFILL_USE_SAGE_ATTN: bool = _get_bool_env("PREFILL_USE_SAGE_ATTN", "false")
+
+# hf checkpoint dir name
+PREFIX_HF_CHECKPOINT_DIR = "hf_checkpoint"

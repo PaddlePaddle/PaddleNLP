@@ -413,6 +413,8 @@ class TrainingArguments:
             Specifies the format for loading checkpoints. Options are: None, 'sharding_io', 'unified_checkpoint', 'flex_checkpoint'. (default: None). This setting is ignored if the corresponding switch is configured.
         aoa_config (`Optional[dict[str, list[str]]]`, *optional*):
             The AoA configuration of FlexCheckpoint, used to describe the mapping between model weights and the checkpoint content. Default is None.
+        save_hf_steps (`int`, *optional*, defaults to 500):
+            Number of updates steps before two huggingface checkpoint saves if `save_strategy="steps"`.
     """
 
     output_dir: str = field(
@@ -1141,6 +1143,8 @@ class TrainingArguments:
             "help": "The AoA configuration of FlexCheckpoint, used to describe the mapping between model weights and the checkpoint content. Default is None."
         },
     )
+
+    save_hf_steps: int = field(default=-1, metadata={"help": "Save huggingface checkpoint every X updates steps."})
 
     def __post_init__(self):
         world_size = paddle.distributed.get_world_size()
