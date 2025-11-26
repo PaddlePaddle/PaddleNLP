@@ -130,6 +130,7 @@ from ..utils.env import (
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PREFIX_CHECKPOINT_DIR,
+    PREFIX_HF_CHECKPOINT_DIR,
     PREFIX_WEIGHTS_NAME,
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
     SAFE_PEFT_WEIGHTS_INDEX_NAME,
@@ -3053,28 +3054,30 @@ class Trainer:
     def _rotate_checkpoints(self, use_mtime=False, output_dir=None) -> None:
         if self.args.save_total_limit is None or self.args.save_total_limit <= 0:
             return
+        for checkpoint_prefix in [PREFIX_CHECKPOINT_DIR, PREFIX_HF_CHECKPOINT_DIR]:
+            # Check if we should delete older checkpoint(s)
+            checkpoints_sorted = self._sorted_checkpoints(
+                use_mtime=use_mtime, checkpoint_prefix=checkpoint_prefix, output_dir=output_dir
+            )
+            if len(checkpoints_sorted) <= self.args.save_total_limit:
+                return
 
-        # Check if we should delete older checkpoint(s)
-        checkpoints_sorted = self._sorted_checkpoints(use_mtime=use_mtime, output_dir=output_dir)
-        if len(checkpoints_sorted) <= self.args.save_total_limit:
-            return
+            # If save_total_limit=1 with load_best_model_at_end=True, we could end up deleting the last checkpoint, which
+            # we don't do to allow resuming.
+            save_total_limit = self.args.save_total_limit
+            if (
+                self.state.best_model_checkpoint is not None
+                and self.args.save_total_limit == 1
+                and checkpoints_sorted[-1] != self.state.best_model_checkpoint
+            ):
+                save_total_limit = 2
 
-        # If save_total_limit=1 with load_best_model_at_end=True, we could end up deleting the last checkpoint, which
-        # we don't do to allow resuming.
-        save_total_limit = self.args.save_total_limit
-        if (
-            self.state.best_model_checkpoint is not None
-            and self.args.save_total_limit == 1
-            and checkpoints_sorted[-1] != self.state.best_model_checkpoint
-        ):
-            save_total_limit = 2
-
-        number_of_checkpoints_to_delete = max(0, len(checkpoints_sorted) - save_total_limit)
-        checkpoints_to_be_deleted = checkpoints_sorted[:number_of_checkpoints_to_delete]
-        for checkpoint in checkpoints_to_be_deleted:
-            logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
-            # ignore_errors for shared disks between train nodes.
-            shutil.rmtree(checkpoint, ignore_errors=True)
+            number_of_checkpoints_to_delete = max(0, len(checkpoints_sorted) - save_total_limit)
+            checkpoints_to_be_deleted = checkpoints_sorted[:number_of_checkpoints_to_delete]
+            for checkpoint in checkpoints_to_be_deleted:
+                logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
+                # ignore_errors for shared disks between train nodes.
+                shutil.rmtree(checkpoint, ignore_errors=True)
 
     def _save(
         self,
