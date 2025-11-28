@@ -1632,8 +1632,15 @@ def save_hf_checkpoint(
     shard_idx,
     path,
 ):
+
+    memory_growth_threshold = 8 * (2**30)
     itr = model.full(
-        aoa_config=aoa_config, h_group=h_group, v_group=v_group, num_splits=num_splits, shard_idx=shard_idx
+        aoa_config=aoa_config,
+        h_group=h_group,
+        v_group=v_group,
+        num_splits=num_splits,
+        shard_idx=shard_idx,
+        memory_growth_threshold=memory_growth_threshold,
     )
     num_saver_ranks = h_group.nranks * v_group.nranks
     rank = h_group.rank + v_group.rank * h_group.nranks
