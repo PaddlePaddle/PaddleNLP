@@ -44,6 +44,7 @@ from packaging import version
 from paddle import framework
 from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
+
 try:
     from paddle.distributed.fleet.meta_parallel import PipelineDatasetPreprocessor
 except:
@@ -140,6 +141,9 @@ from ..utils.env import (
     TRAINER_STATE_NAME,
     TRAINING_ARGS_NAME,
     VERA_WEIGHTS_NAME,
+    MASTER_WEIGHT_DIC,
+    MODEL_STATE_DIC,
+    OPTIMIZER_STATE_DIC,
 )
 from ..utils.fault_tolerance import LOSS_INF_ERROR, LOSS_NAN_ERROR
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
@@ -669,6 +673,200 @@ class Trainer:
         elif resume_from_checkpoint is not None:
             logger.info(f"not loading ckpt :{self.args.dataset_rank}")
 
+    def _load_flex_checkpoint(self, resume_from_checkpoint):
+        def get_metadata_file_name(path):
+            files = os.listdir(path)
+            metadata_files = [f for f in files if f.endswith(".metadata")]
+            assert len(metadata_files) > 0, f"Found no metadata files in {path}"
+            assert len(metadata_files) == 1, f"Found multiple metadata files in {path}"
+            return metadata_files[0]
+
+        model_sharded_state_dict = self.model.sharded_state_dict()
+        hf_aoa_config = self.model._gen_aoa_config(self.model.config)
+        master_weights_path = os.path.join(resume_from_checkpoint, MASTER_WEIGHT_DIC)
+        opt_states_path = os.path.join(resume_from_checkpoint, OPTIMIZER_STATE_DIC)
+        model_states_path = os.path.join(resume_from_checkpoint, MODEL_STATE_DIC)
+
+        if self.args.load_from_hf:
+            hcg = dist.fleet.get_hybrid_communicate_group()
+            assert self.args.ignore_load_lr_and_optim, "Loading from HuggingFace format is only allowed when learning rate and optimizer state are ignored."
+            try:
+                moe_sharding_group = hcg.get_moe_sharding_parallel_group()
+            except Exception as e:
+                moe_sharding_group = None
+            
+            if moe_sharding_group is None or moe_sharding_group.nranks <= 1:
+                # when moe_sharding_group is None, we use the default process_group
+                process_group = None
+                dist.load_state_dict(
+                    model_sharded_state_dict,
+                    resume_from_checkpoint,
+                    aoa_config=hf_aoa_config,
+                    offload=self.args.load_via_cpu,
+                    safetensors=True,
+                    process_group=process_group,
+                    comm_method="grouped_send_recv",
+                )
+            else:
+                try:
+                    pp_group = hcg.get_pipe_parallel_group()
+                    if pp_group is None or pp_group.nranks < 1:
+                        raise NotImplementedError("Only support when pp_group is not None.")
+                except Exception as e:
+                    raise RuntimeError(f"Only support when pp_group is not None.")
+            
+                try:
+                    moe_group = hcg.get_expert_parallel_group()
+                    if moe_group is None or moe_group.nranks < 1:
+                        raise NotImplementedError("Only support when moe_group is not None.")
+                except Exception as e:
+                    raise RuntimeError(f"Only support when moe_group is not None.")
+                moe_sharding_rank = moe_sharding_group.rank
+                cur_rank = dist.get_rank()
+                if moe_sharding_rank == 0:
+                    h_ranks = []
+                    dist.all_gather_object(h_ranks, cur_rank, group=moe_group)
+                    all_ranks = []
+                    dist.all_gather_object(all_ranks, h_ranks, group=pp_group)
+                    process_group_ranks = [rank for ranks in all_ranks for rank in ranks]
+                else:
+                    process_group_ranks = []
+                src_rank = dist.get_moe_sharding_parallel_group_src_rank()
+                dist.broadcast_object_list(process_group_ranks, src=src_rank, process_group=moe_sharding_group)
+                process_group = dist.new_group(process_group_ranks)
+
+                dist.load_state_dict(
+                    model_sharded_state_dict,
+                    resume_from_checkpoint,
+                    aoa_config=hf_aoa_config,
+                    offload=self.args.load_via_cpu,
+                    safetensors=True,
+                    process_group=process_group,
+                )
+
+                dist.destroy_process_group(process_group)
+
+                for param_name, param in self.model.state_dict():
+                    dist.broadcast(param,src=src_rank, process_group=moe_sharding_group)
+            return
+
+        if not self.args.ignore_load_lr_and_optim:
+            state_dict_metadata = {}
+            metadata_paths = [
+                os.path.join(model_states_path, get_metadata_file_name(model_states_path)),
+                os.path.join(opt_states_path, get_metadata_file_name(opt_states_path)),
+                os.path.join(master_weights_path, get_metadata_file_name(master_weights_path)),
+            ]
+
+            for metadata_file in metadata_paths:
+                if not os.path.exists(metadata_file):
+                    raise FileNotFoundError(f"Metadata file not found: {metadata_file}")
+                metadata = paddle.load(metadata_file)
+                state_dict_metadata.update(metadata.state_dict_metadata)
+
+            init_optimizer(self.optimizer, model_sharded_state_dict, state_dict_metadata)
+
+            optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
+
+            opt_states = {}
+            master_weights = {}
+            for k, v in optimizer_sharded_state_dict.items():
+                if k.endswith(".w_0"):
+                    master_weights[k] = v
+                else:
+                    opt_states[k] = v
+
+            dist.load_state_dict(
+                opt_states,
+                opt_states_path,
+                aoa_config=self.args.aoa_config,
+                offload=self.args.load_via_cpu,
+                comm_method="broadcast",
+            )
+
+            dist.load_state_dict(
+                master_weights,
+                master_weights_path,
+                aoa_config=self.args.aoa_config,
+                offload=self.args.load_via_cpu,
+               comm_method="broadcast",
+            )
+
+            self._load_scheduler(resume_from_checkpoint)
+        
+        dist.load_state_dict(
+            model_sharded_state_dict,
+            model_states_path,
+            aoa_config=self.args.aoa_config,
+            offload=self.args.load_via_cpu,
+            comm_method="broadcast",
+        )
+
+    def _save_flex_model_state(self, output_dir):
+        model_sharded_state_dict = self.model.sharded_state_dict()
+        model_state_dict_path = os.path.join(output_dir, MODEL_STATE_DIC)
+        os.makedirs(model_state_dict_path, exist_ok=True)
+        dist.save_state_dict(
+            model_sharded_state_dict,
+            model_state_dict_path,
+        )
+
+    def _save_flex_optimizer_state(self, output_dir):
+        optimizer_state_dict_path = os.path.join(output_dir, OPTIMIZER_STATE_DIC)
+        optimizer_states = {}
+        master_weights = {}
+        model_sharded_state_dict = self.model.sharded_state_dict()
+        optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
+        for k, v in optimizer_sharded_state_dict.items():
+            if k.endswith(".w_0"):
+                master_weights[k] = v
+            else:
+                optimizer_states[k] = v
+
+        dist.save_state_dict(
+            optimizer_states,
+            optimizer_state_dict_path,
+        )
+
+        master_weights_path = os.path.join(output_dir, MASTER_WEIGHT_DIC)
+        dist.save_state_dict(
+            master_weights,
+            master_weights_path,
+        )
+
+        # first_md5 = {}
+        # for k,v in model_sharded_state_dict.items():
+        #     first_md5[k] = v.local_tensor._md5sum()
+        #     paddle.assign(paddle.zeros_like(v.local_tensor),v.local_tensor)
+
+        # for k,v in optimizer_sharded_state_dict.items():
+        #     first_md5[k] = v.local_tensor._md5sum()
+        #     paddle.assign(paddle.zeros_like(v.local_tensor),v.local_tensor)
+        
+        # self._load_flex_checkpoint(output_dir)
+
+        # model_sharded_state_dict = self.model.sharded_state_dict()
+        # optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
+
+        # second_md5 = {}
+        # for k,v in model_sharded_state_dict.items():
+        #     second_md5[k] = v.local_tensor._md5sum()
+        #     paddle.assign(paddle.zeros_like(v.local_tensor),v.local_tensor)
+
+        # for k,v in optimizer_sharded_state_dict.items():
+        #     second_md5[k] = v.local_tensor._md5sum()
+        #     paddle.assign(paddle.zeros_like(v.local_tensor),v.local_tensor)
+
+        # error_list = []
+        # for k,v in first_md5.items():
+        #     if v != second_md5[k]:
+        #         error_list.append(k)
+        # print("=====> error list")
+        # for l in error_list:
+        #     print(l)
+        # assert len(error_list) == 0, f"error list: {error_list}"
+
+        
     def _load_from_checkpoint(self, resume_from_checkpoint=None):
         """load state_dict from_checkpoint, Only load model state dict.
 
@@ -993,27 +1191,7 @@ class Trainer:
                 if delay_optimizer_creation:
                     self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
-                if resume_from_checkpoint is not None:
-                    if not self.args.ignore_load_lr_and_optim:
-                        model_sharded_state_dict = self.model.sharded_state_dict()
-                        accessible_files = os.listdir(resume_from_checkpoint)
-                        metadata_files = [file for file in accessible_files if file.endswith(".metadata")]
-                        assert len(metadata_files) == 1, "Only support one metadata file now."
-                        metadata = paddle.load(os.path.join(resume_from_checkpoint, metadata_files[0]))
-                        state_dict_metadata = metadata.state_dict_metadata
-                        init_optimizer(self.optimizer, model_sharded_state_dict, state_dict_metadata)
-                        optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
-                        sharded_state_dict = {**model_sharded_state_dict, **optimizer_sharded_state_dict}
-                        dist.load_state_dict(
-                            sharded_state_dict, resume_from_checkpoint, aoa_config=self.args.aoa_config
-                        )
-                        self._load_scheduler(resume_from_checkpoint)
-                    else:
-                        model_sharded_state_dict = self.model.sharded_state_dict()
-                        sharded_state_dict = model_sharded_state_dict
-                        dist.load_state_dict(
-                            sharded_state_dict, resume_from_checkpoint, aoa_config=self.args.aoa_config
-                        )
+                self._load_flex_checkpoint(resume_from_checkpoint)
             else:
                 model = self._wrap_model(self.model_wrapped)
                 # for the rest of this function `model` is the outside model, whether it was wrapped or not
@@ -2812,8 +2990,7 @@ class Trainer:
             self.save_model(output_dir)
 
         if self.args.save_checkpoint_format == "flex_checkpoint":
-            model_sharded_state_dict = self.model.sharded_state_dict()
-            os.makedirs(output_dir, exist_ok=True)
+            self._save_flex_model_state(output_dir)
 
         # Determine the new best metric / best model checkpoint
         if metrics is not None and self.args.metric_for_best_model is not None:
@@ -2877,11 +3054,7 @@ class Trainer:
                         )
                     else:
                         if self.args.save_checkpoint_format == "flex_checkpoint":
-                            optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
-                            dist.save_state_dict(
-                                {**model_sharded_state_dict, **optimizer_sharded_state_dict},
-                                output_dir,
-                            )
+                            self._save_flex_optimizer_state(output_dir)
                             if self.args.should_save:
                                 if self.tokenizer is not None and self.args.save_tokenizer:
                                     self.tokenizer.save_pretrained(output_dir)
@@ -2937,11 +3110,7 @@ class Trainer:
                             signal_dir,
                         )
                     elif self.args.save_checkpoint_format == "flex_checkpoint":
-                        optimizer_sharded_state_dict = self.optimizer.sharded_state_dict(model_sharded_state_dict)
-                        dist.save_state_dict(
-                            {**model_sharded_state_dict, **optimizer_sharded_state_dict},
-                            output_dir,
-                        )
+                        self._save_flex_optimizer_state(output_dir)
                         if self.args.should_save:
                             if self.tokenizer is not None and self.args.save_tokenizer:
                                 self.tokenizer.save_pretrained(output_dir)
@@ -2984,10 +3153,7 @@ class Trainer:
                 self._offload_optimizer()
         else:
             if self.args.save_checkpoint_format == "flex_checkpoint":
-                dist.save_state_dict(
-                    model_sharded_state_dict,
-                    output_dir,
-                )
+                self._save_flex_model_state(output_dir)
                 if self.args.should_save:
                     if self.tokenizer is not None and self.args.save_tokenizer:
                         self.tokenizer.save_pretrained(output_dir)
