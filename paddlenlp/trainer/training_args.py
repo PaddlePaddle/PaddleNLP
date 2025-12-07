@@ -415,6 +415,17 @@ class TrainingArguments:
             The AoA configuration of FlexCheckpoint, used to describe the mapping between model weights and the checkpoint content. Default is None.
         save_hf_steps (`int`, *optional*, defaults to 500):
             Number of updates steps before two huggingface checkpoint saves if `save_strategy="steps"`.
+        load_via_cpu (bool, optional):
+            Whether to load checkpoint data into CPU memory first before transferring to GPU.
+            This helps mitigate GPU memory shortage by staging data on the CPU and only moving required parts to the GPU on demand during communication.
+            Defaults to False.
+        load_from_hf (bool, optional):
+            Whether to load a checkpoint in the HuggingFace format.
+            Defaults to False.
+        comm_method (str, optional):
+            Communication method used for checkpoint resharding.
+            Choices are "send_recv", "broadcast", "multi_group_broadcast", and "grouped_send_recv".
+            Defaults to "broadcast".
     """
 
     output_dir: str = field(
@@ -1145,6 +1156,29 @@ class TrainingArguments:
     )
 
     save_hf_steps: int = field(default=-1, metadata={"help": "Save huggingface checkpoint every X updates steps."})
+
+    load_via_cpu: Optional[bool] = field(
+        default=False,
+        metadata={
+            "help": "If True, loads checkpoint data to CPU first, then transfers required parts to GPU on demand to reduce GPU memory usage. Defaults to False."
+        },
+    )
+
+    load_from_hf: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether to load a checkpoint in the HuggingFace format."},
+    )
+
+    comm_method: Optional[str] = field(
+        default="broadcast",
+        metadata={
+            "help": (
+                "Communication method for checkpoint resharding. "
+                'Choices are "send_recv", "broadcast", "multi_group_broadcast", and "grouped_send_recv". '
+                'Default is "broadcast".'
+            )
+        },
+    )
 
     def __post_init__(self):
         world_size = paddle.distributed.get_world_size()

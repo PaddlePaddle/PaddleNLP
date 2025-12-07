@@ -1567,18 +1567,17 @@ def save_full_param(
     return total_size
 
 
-def replace_name_and_gen_index(path, cur_rank_total_size):
+def replace_name_and_gen_index(path, total_size):
     index_mapping = {}
     cur_rank = paddle.distributed.get_rank()
     safetensor_files = [fname for fname in os.listdir(path) if fname.endswith(".safetensors")]
     files_num = len(safetensor_files)
     all_files_num = []
-    paddle.distributed.all_gather_object(all_files_num, files_num)
+    if paddle.distributed.get_world_size() > 1:
+        paddle.distributed.all_gather_object(all_files_num, files_num)
+    else:
+        all_files_num.append(files_num)
     total_files_num = sum(all_files_num)
-
-    all_sizes = []
-    paddle.distributed.all_gather_object(all_sizes, cur_rank_total_size)
-    total_size = sum(all_sizes)
 
     start_idx = []
     acc = 1
@@ -1586,14 +1585,12 @@ def replace_name_and_gen_index(path, cur_rank_total_size):
         start_idx.append(acc)
         acc += files_num
 
-    env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
+    env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", 0))
     env_local_size = int(os.environ.get("PADDLE_LOCAL_SIZE", 8))
-    assert env_local_rank >= 0
+    assert env_local_rank >= 0, f"expected positive local rank, got {env_local_rank}"
 
     cur_file_index = start_idx[cur_rank] // env_local_size
     total_files_num = total_files_num // env_local_size
-
-    total_size = total_size // env_local_size
 
     index_mapping = {}
     if env_local_rank == 0:
@@ -1608,10 +1605,18 @@ def replace_name_and_gen_index(path, cur_rank_total_size):
             os.rename(file_path, new_file_path)
 
     index_mapping_list = []
-    paddle.distributed.all_gather_object(index_mapping_list, index_mapping)
+    if paddle.distributed.get_world_size() > 1:
+        paddle.distributed.all_gather_object(index_mapping_list, index_mapping)
+    else:
+        index_mapping_list.append(index_mapping)
     index_mapping = {}
     for mapping in index_mapping_list:
         index_mapping.update(mapping)
+
+    # Save signal file for each card
+    saved_signal_path = os.path.join(path, f"saved_signal_{dist.get_rank()}")
+    with open(saved_signal_path, mode="w+") as f:
+        f.write("1")
 
     if env_local_rank == 0:
         index_file_name = "model.safetensors.index.json"
@@ -1622,35 +1627,87 @@ def replace_name_and_gen_index(path, cur_rank_total_size):
         with open(os.path.join(path, index_file_name), "w") as f:
             json.dump(index_infos, f, indent=4)
 
+        # For PDC signal
+        if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
+            for i in range(paddle.distributed.get_world_size()):
+                saved_signal_path = os.path.join(path, f".model_weights.done.{i}")
+                paddle.save(i, saved_signal_path)
 
-def save_hf_checkpoint(
-    model,
-    aoa_config,
-    h_group,
-    v_group,
-    num_splits,
-    shard_idx,
-    path,
-):
 
-    memory_growth_threshold = 8 * (2**30)
-    itr = model.full(
-        aoa_config=aoa_config,
-        h_group=h_group,
-        v_group=v_group,
-        num_splits=num_splits,
-        shard_idx=shard_idx,
-        memory_growth_threshold=memory_growth_threshold,
-    )
-    num_saver_ranks = h_group.nranks * v_group.nranks
-    rank = h_group.rank + v_group.rank * h_group.nranks
-    total_saved_size = save_full_param(
-        itr=itr,
-        save_dir=path,
-        rank=rank,
-        moe_sharding_world_size=num_saver_ranks,
-        max_shard_size="16GB",
-        num_saver_ranks=num_saver_ranks,
-    )
-    paddle.distributed.barrier()
-    replace_name_and_gen_index(path, total_saved_size)
+class HFFormatFullParamSaver:
+    def __init__(
+        self,
+        model,
+        aoa_config,
+        h_group=None,
+        v_group=None,
+        num_splits=None,
+        shard_idx=None,
+        saved_in_one_node=False,
+        memory_growth_threshold=8 * (2**30),
+    ):
+        self.model = model
+        self.aoa_config = aoa_config
+        self.h_group = h_group
+        self.v_group = v_group
+        self.num_splits = num_splits
+        self.shard_idx = shard_idx
+        self.saved_in_one_node = saved_in_one_node
+        self.memory_growth_threshold = memory_growth_threshold
+        self.determin_saver_based_group()
+
+    def get_full_param_iter(self):
+        assert (self.v_group and self.h_group) or not (
+            self.v_group or self.h_group
+        ), f"both h_group and v_group are provided or none of them, but got {self.v_group} and {self.h_group}"
+        if self.v_group and self.h_group:
+            assert self.shard_idx is not None, "expected shard_idx is not None"
+            assert self.num_splits is not None, "expected num_splits is not None"
+
+            param_iter = self.model.full(
+                aoa_config=self.aoa_config,
+                h_group=self.h_group,
+                v_group=self.v_group,
+                num_splits=self.num_splits,
+                shard_idx=self.shard_idx,
+                memory_growth_threshold=self.memory_growth_threshold,
+            )
+        else:
+            param_iter = self.model.full(
+                aoa_config=self.aoa_config, memory_growth_threshold=self.memory_growth_threshold
+            )
+        return param_iter
+
+    def determin_saver_based_group(self):
+        self.num_saver_ranks = paddle.distributed.get_world_size()
+        self.rank = paddle.distributed.get_rank()
+
+        if self.h_group and self.v_group:
+            self.num_saver_ranks = self.h_group.nranks * self.v_group.nranks
+            self.rank = self.h_group.rank + self.v_group.rank * self.h_group.nranks
+
+        if self.saved_in_one_node:
+            local_world_size = int(os.environ.get("PADDLE_LOCAL_SIZE", 8))
+            self.num_saver_ranks = min(local_world_size, self.num_saver_ranks)
+
+    def save_checkpoint(self, path, max_shard_size="16GB"):
+        total_saved_size = save_full_param(
+            itr=self.get_full_param_iter(),
+            save_dir=path,
+            rank=self.rank,
+            moe_sharding_world_size=self.num_saver_ranks,
+            max_shard_size=max_shard_size,
+            num_saver_ranks=self.num_saver_ranks,
+        )
+        if paddle.distributed.get_world_size() > 1:
+            paddle.distributed.barrier()
+
+        # TODO(): fix total size
+        all_sizes = []
+        if paddle.distributed.get_world_size() > 1:
+            paddle.distributed.all_gather_object(all_sizes, total_saved_size)
+        else:
+            all_sizes.append(total_saved_size)
+        total_size = sum(all_sizes)
+        replace_name_and_gen_index(path, total_size)
+        return total_saved_size
