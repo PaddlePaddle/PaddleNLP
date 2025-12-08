@@ -1585,8 +1585,8 @@ def replace_name_and_gen_index(path, total_size):
         start_idx.append(acc)
         acc += files_num
 
-    env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", 0))
     env_local_size = int(os.environ.get("PADDLE_LOCAL_SIZE", 8))
+    env_local_rank = dist.get_rank() % env_local_size
     assert env_local_rank >= 0, f"expected positive local rank, got {env_local_rank}"
 
     cur_file_index = start_idx[cur_rank] // env_local_size
