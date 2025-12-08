@@ -705,15 +705,15 @@ class Trainer:
 
             if moe_sharding_group is None or moe_sharding_group.nranks <= 1:
                 # when moe_sharding_group is None, we use the default process_group
-                process_group = None
+                logger.info(f"Loading model weights from '{resume_from_checkpoint}' in safetensors format.")
                 dist.load_state_dict(
                     model_sharded_state_dict,
                     resume_from_checkpoint,
                     aoa_config=hf_aoa_config,
                     offload=self.args.load_via_cpu,
                     safetensors=True,
-                    process_group=process_group,
-                    comm_method="grouped_send_recv",
+                    process_group=None,
+                    comm_method=self.args.comm_method,
                 )
             else:
                 try:
@@ -732,30 +732,42 @@ class Trainer:
                 moe_sharding_rank = moe_sharding_group.rank
                 cur_rank = dist.get_rank()
                 if moe_sharding_rank == 0:
-                    h_ranks = []
-                    dist.all_gather_object(h_ranks, cur_rank, group=moe_group)
-                    all_ranks = []
-                    dist.all_gather_object(all_ranks, h_ranks, group=pp_group)
-                    process_group_ranks = [rank for ranks in all_ranks for rank in ranks]
+                    moe_group_ranks = []
+                    dist.all_gather_object(moe_group_ranks, cur_rank, group=moe_group)
+                    pp_group_ranks = []
+                    dist.all_gather_object(pp_group_ranks, moe_group_ranks, group=pp_group)
+                    process_group_ranks = [rank for ranks in pp_group_ranks for rank in ranks]
                 else:
-                    process_group_ranks = []
-                src_rank = dist.get_moe_sharding_parallel_group_src_rank()
-                dist.broadcast_object_list(process_group_ranks, src=src_rank, process_group=moe_sharding_group)
+                    process_group_ranks = [0] * (pp_group.nranks * moe_group.nranks)
+                src_rank = hcg.get_moe_sharding_parallel_group_src_rank()
+                dist.broadcast_object_list(process_group_ranks, src=src_rank, group=moe_sharding_group)
+                assert any(process_group_ranks), "process_group_ranks should not be all 0"
+                logger.info(f"Creating a temporary process group with ranks: {process_group_ranks}")
                 process_group = dist.new_group(process_group_ranks)
 
-                dist.load_state_dict(
-                    model_sharded_state_dict,
-                    resume_from_checkpoint,
-                    aoa_config=hf_aoa_config,
-                    offload=self.args.load_via_cpu,
-                    safetensors=True,
-                    process_group=process_group,
-                )
+                if moe_sharding_rank == 0:
+                    logger.info(f"Loading model weights from '{resume_from_checkpoint}' in safetensors format.")
+                    # Only the first moe_sharding process is allowed to load the model weights.
+                    dist.load_state_dict(
+                        model_sharded_state_dict,
+                        resume_from_checkpoint,
+                        aoa_config=hf_aoa_config,
+                        offload=self.args.load_via_cpu,
+                        safetensors=True,
+                        process_group=process_group,
+                        comm_method=self.args.comm_method,
+                    )
 
+                dist.barrier()
+                logger.info("Destroying the temporary process group.")
                 dist.destroy_process_group(process_group)
-
-                for param_name, param in self.model.state_dict():
-                    dist.broadcast(param, src=src_rank, process_group=moe_sharding_group)
+                # The first moe_sharding group loads the model weights and then broadcasts them to all other moe_sharding groups.
+                logger.info(
+                    "First shard (moe_sharding_group) has loaded safetensors weights, starting broadcast on moe_sharding_groups."
+                )
+                for param_name, param in self.model.state_dict().items():
+                    dist.broadcast(param, src=src_rank, group=moe_sharding_group)
+            logger.info("Safetensors format weights have been loaded successfully.")
             return
 
         if not self.args.ignore_load_lr_and_optim:

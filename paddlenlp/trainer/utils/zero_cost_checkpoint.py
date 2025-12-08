@@ -1486,7 +1486,7 @@ class ZeroCostCheckpointCallbackFcBased(ZeroCostCheckpointCallback):
 
         group_getter = GroupGetter(model_to_save)
         gids = group_getter.get_group_ids()
-        from paddleformers.trainer.utils.sharding_io import (
+        from paddlenlp.trainer.utils.sharding_io import (
             exclude_parameters_in_state_dict,
             filter_sharded_params,
         )
