@@ -14,6 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+
+################
+# just for test
+################
+
 set -e
 
 export log_path=/workspace/case_logs
