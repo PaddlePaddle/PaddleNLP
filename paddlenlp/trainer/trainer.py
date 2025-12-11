@@ -471,8 +471,8 @@ class Trainer:
                 os.getenv("FLAG_LLM_PDC", "False")
             ), "Dont support FLAG_LLM_PDC when using zero cost checkpoint"
             assert (
-                self.args.should_save_sharding_stage1_model
-            ), "should_save_sharding_stage1_model should be True when using zero cost checkpoint"
+                self.args.should_save_sharding_stage1_model or self.args.save_checkpoint_format == "flex_checkpoint"
+            ), "should_save_sharding_stage1_model should be True or save_checkpoint_format is flex_checkpoint when using zero cost checkpoint"
             assert (
                 ShardingOption.FULL_SHARD not in self.args.sharding
             ), "FULL_SHARD is not supported when using flash save mode"
@@ -810,6 +810,7 @@ class Trainer:
                     master_weights_path,
                     aoa_config=self.args.aoa_config,
                     offload=self.args.load_via_cpu,
+                    comm_method=self.args.comm_method,
                 )
 
             self._load_scheduler(resume_from_checkpoint)
@@ -850,6 +851,7 @@ class Trainer:
                 model_states_path,
                 aoa_config=self.args.aoa_config,
                 offload=self.args.load_via_cpu,
+                comm_method=self.args.comm_method,
             )
 
         if self.args.bf16 and (not self.args.ignore_load_lr_and_optim) and should_load_stage1:
@@ -936,6 +938,10 @@ class Trainer:
             master_weights,
             master_weights_path,
         )
+
+        saved_signal_path = os.path.join(output_dir, f"saved_signal_{dist.get_rank()}")
+        with open(saved_signal_path, mode="w+") as f:
+            f.write("1")
 
     def _load_from_checkpoint(self, resume_from_checkpoint=None):
         """load state_dict from_checkpoint, Only load model state dict.

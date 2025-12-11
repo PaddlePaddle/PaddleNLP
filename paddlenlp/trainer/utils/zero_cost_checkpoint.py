@@ -1351,7 +1351,7 @@ class DistInfoCollectorValidator:
         if not self.args.use_hybrid_parallel:
             return None
 
-        if not self.args.should_save_sharding_stage1_model:
+        if not (self.args.should_save_sharding_stage1_model or self.args.save_checkpoint_format == "flex_checkpoint"):
             return None
 
         nranks = dist.get_world_size()
@@ -1482,20 +1482,23 @@ class ZeroCostCheckpointCallbackFcBased(ZeroCostCheckpointCallback):
             self.sharding_group = self.hcg.get_sharding_parallel_group()
 
     def _manipulate_state_dict_and_config(self, model_to_save, optimizer):
+        # return model_to_save.sharded_state_dict()
+
         group_getter = GroupGetter(model_to_save)
         gids = group_getter.get_group_ids()
-        from paddleformers.trainer.utils.sharding_io import (
+        from paddlenlp.trainer.utils.sharding_io import (
             exclude_parameters_in_state_dict,
             filter_sharded_params,
         )
 
-        filter_sharded_params = sharded_state_dict_compatibility(filter_sharded_params, return_sharded_state_dict=True)
-        exclude_parameters_in_state_dict = sharded_state_dict_compatibility(
-            exclude_parameters_in_state_dict, return_sharded_state_dict=True
-        )
+        # filter_sharded_params = sharded_state_dict_compatibility(filter_sharded_params, return_sharded_state_dict=True)
+        # exclude_parameters_in_state_dict = sharded_state_dict_compatibility(
+        #     exclude_parameters_in_state_dict, return_sharded_state_dict=True
+        # )
 
-        state_dict = model_to_save.sharded_state_dict()
-        if self.args.should_save_sharding_stage1_model:
+        state_dict = model_to_save.state_dict()
+        # tmp wa should_save_sharding_stage1_model
+        if self.args.should_save_sharding_stage1_model or self.args.save_checkpoint_format == "flex_checkpoint":
             state_dict = split_model_state(state_dict, group_getter)
             for gid in gids:
                 state_dict[gid] = filter_sharded_params(
@@ -1506,7 +1509,10 @@ class ZeroCostCheckpointCallbackFcBased(ZeroCostCheckpointCallback):
                 )
             state_dict = merge_model_state(state_dict)
 
-        if self.args.bf16 and self.args.should_save_sharding_stage1_model:
+        # tmp wa should_save_sharding_stage1_model
+        if self.args.bf16 and (
+            self.args.should_save_sharding_stage1_model or self.args.save_checkpoint_format == "flex_checkpoint"
+        ):
             param_names_in_master_weights = []
             optimzier_state_dict = optimizer.state_dict()
             optimzier_state_dict = split_opt_state(optimzier_state_dict, group_getter)
@@ -1532,7 +1538,15 @@ class ZeroCostCheckpointCallbackFcBased(ZeroCostCheckpointCallback):
         logger.info("Start caching metas for sharded save...")
         (self.manipulated_state_dict) = self._manipulate_state_dict_and_config(model, optimizer)
 
-        logger.debug(f"manipulated_state_dict: {self.manipulated_state_dict.keys()}")
+        def recover_sharded_state_dict():
+            filtered_sharded_state_dict = {}
+            model_sharded_state_dict = model.sharded_state_dict()
+            for k, v in self.manipulated_state_dict.items():
+                filtered_sharded_state_dict[k] = model_sharded_state_dict[k]
+            return filtered_sharded_state_dict
+
+        self.manipulated_state_dict = recover_sharded_state_dict()
+
         logger.info("Cache manipulated static dict done.")
 
         model_to_save = unwrap_model(model)
@@ -1822,7 +1836,9 @@ class ZeroCostCheckpointWorkerFcBased(ZeroCostCheckpointWorker):
                 opt_state_dict = self._filter_moe_no_sync_optimizer_params(self.model_meta_content, opt_state_dict)
 
             opt_state_dict = self._filter_state_dict(opt_state_dict, self.opt_state_filter)
+            logger.info("[ZCC worker] opt state dict filter by opt_state_filter complete.")
             master_weights = self._filter_state_dict(master_weights, self.master_weights_filter)
+            logger.info("[ZCC worker] master weights dict filter by master_weights_filter complete.")
 
             logger.debug(f"opt states length is {len(opt_state_dict)}")
             logger.debug(f"master weights length is {len(master_weights)}")
