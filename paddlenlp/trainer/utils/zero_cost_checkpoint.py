@@ -14,6 +14,7 @@
 
 import atexit
 import copy
+import functools
 import hashlib
 import json
 import multiprocessing
@@ -51,9 +52,16 @@ from paddle.incubate.tensor.manipulation import (
 )
 from paddle.optimizer.fusion_utils import FusionStorageHelper
 
+from paddlenlp.trainer.utils.sharding_io import GroupGetter
+
 from ...transformers.model_utils import unwrap_optimizer
 from . import reshard as reshard_util
-from .reshard import SHARDING_STRATEGY_V1
+from .reshard import (
+    SHARDING_STRATEGY_V1,
+    merge_model_state,
+    split_model_state,
+    split_opt_state,
+)
 
 try:
     from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
@@ -123,6 +131,65 @@ def showmem(msg):
     )
 
 
+# the funciotn that accept state dict as input can be decorated with this function
+def sharded_state_dict_compatibility(func, *, return_sharded_state_dict=False):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        def should_convert(maybe_sharded_state_dict):
+            all_shared_weights = all(isinstance(value, ShardedWeight) for value in maybe_sharded_state_dict.values())
+            any_shared_weights = any(isinstance(value, ShardedWeight) for value in maybe_sharded_state_dict.values())
+            logger.debug(f"all sharded weight {all_shared_weights}, any shared weight {any_shared_weights}")
+            if not any_shared_weights:
+                logger.debug("this is not a sharded state dict, no need to convert.")
+                return False
+
+            if any_shared_weights and (not all_shared_weights):
+                logger.debug("this is a mixed state dict(normal and sharded), not support to convert.")
+                return False
+            logger.debug("this is a sharded state dict, will convert it to local tensor dict.")
+            return True
+
+        original_sharded_state_dict = {}
+        # process args
+        new_args = list(args)
+        for idx, arg in enumerate(new_args):
+            if not isinstance(arg, dict):
+                continue
+            if should_convert(arg):
+                local_tensor_state_dict = {}
+                for k, v in arg.items():
+                    local_tensor_state_dict[k] = v.local_tensor
+
+                original_sharded_state_dict.update(arg)
+                new_args[idx] = local_tensor_state_dict
+
+        # process kwargs
+        for key, value in kwargs.items():
+            if not isinstance(value, dict):
+                continue
+            if should_convert(value):
+                local_tensor_state_dict = {}
+                for k, v in value.items():
+                    local_tensor_state_dict[k] = v.local_tensor
+
+                kwargs[key] = local_tensor_state_dict
+                original_sharded_state_dict.update(value)
+
+        # original function
+        result = func(*new_args, **kwargs)
+
+        if return_sharded_state_dict:
+            assert isinstance(result, dict), f"expected dict, but got {type(result)}"
+            for k, v in result.items():
+                sharded_sharded_weight = original_sharded_state_dict[k]
+                sharded_sharded_weight.local_tensor = v
+                result[k] = sharded_sharded_weight
+        return result
+
+    return wrapper
+
+
+@sharded_state_dict_compatibility
 def get_fused_param_mappings(optimizer, manipulated_state_dict):
     param_mappings = {}
     ipc_meta_mappings = {}
@@ -1415,48 +1482,51 @@ class ZeroCostCheckpointCallbackFcBased(ZeroCostCheckpointCallback):
             self.sharding_group = self.hcg.get_sharding_parallel_group()
 
     def _manipulate_state_dict_and_config(self, model_to_save, optimizer):
-        # TODO(): at now accracy is wrong, need to fix later.
-        return model_to_save.sharded_state_dict()
-        # group_getter = GroupGetter(model_to_save)
-        # gids = group_getter.get_group_ids()
-        # from paddleformers.trainer.utils.sharding_io import filter_sharded_params, exclude_parameters_in_state_dict
+        group_getter = GroupGetter(model_to_save)
+        gids = group_getter.get_group_ids()
+        from paddleformers.trainer.utils.sharding_io import (
+            exclude_parameters_in_state_dict,
+            filter_sharded_params,
+        )
 
-        # filter_sharded_params = sharded_state_dict_compatibility(filter_sharded_params, return_sharded_state_dict=True)
-        # exclude_parameters_in_state_dict = sharded_state_dict_compatibility(exclude_parameters_in_state_dict, return_sharded_state_dict=True)
+        filter_sharded_params = sharded_state_dict_compatibility(filter_sharded_params, return_sharded_state_dict=True)
+        exclude_parameters_in_state_dict = sharded_state_dict_compatibility(
+            exclude_parameters_in_state_dict, return_sharded_state_dict=True
+        )
 
-        # state_dict = model_to_save.sharded_state_dict()
-        # if self.args.should_save_sharding_stage1_model:
-        #     state_dict = split_model_state(state_dict, group_getter)
-        #     for gid in gids:
-        #         state_dict[gid] = filter_sharded_params(
-        #             state_dict.get(gid, {}),
-        #             optimizer,
-        #             self.sharding_group,
-        #             self.args.save_sharding_stage1_model_include_freeze_params,
-        #         )
-        #     state_dict = merge_model_state(state_dict)
+        state_dict = model_to_save.sharded_state_dict()
+        if self.args.should_save_sharding_stage1_model:
+            state_dict = split_model_state(state_dict, group_getter)
+            for gid in gids:
+                state_dict[gid] = filter_sharded_params(
+                    state_dict.get(gid, {}),
+                    optimizer,
+                    self.sharding_group,
+                    self.args.save_sharding_stage1_model_include_freeze_params,
+                )
+            state_dict = merge_model_state(state_dict)
 
-        # if self.args.bf16 and self.args.should_save_sharding_stage1_model:
-        #     param_names_in_master_weights = []
-        #     optimzier_state_dict = optimizer.state_dict()
-        #     optimzier_state_dict = split_opt_state(optimzier_state_dict, group_getter)
-        #     state_dict = split_model_state(state_dict, group_getter)
-        #     for gid in gids:
-        #         sub_opt_state = optimzier_state_dict.get(gid, {})
-        #         param_names_in_master_weights = list(sub_opt_state.get("master_weights", {}).keys())
-        #         state_dict[gid] = exclude_parameters_in_state_dict(
-        #             state_dict.get(gid, {}),
-        #             param_names_in_master_weights,
-        #             group_getter.get_group_by_id(gid),
-        #         )
-        #     state_dict = merge_model_state(state_dict)
-        #     logger.info(
-        #         "param_names_in_master_weights len:{}, bf16 state_dict len:{}, :{}".format(
-        #             len(param_names_in_master_weights), len(state_dict), state_dict.keys()
-        #         )
-        #     )
+        if self.args.bf16 and self.args.should_save_sharding_stage1_model:
+            param_names_in_master_weights = []
+            optimzier_state_dict = optimizer.state_dict()
+            optimzier_state_dict = split_opt_state(optimzier_state_dict, group_getter)
+            state_dict = split_model_state(state_dict, group_getter)
+            for gid in gids:
+                sub_opt_state = optimzier_state_dict.get(gid, {})
+                param_names_in_master_weights = list(sub_opt_state.get("master_weights", {}).keys())
+                state_dict[gid] = exclude_parameters_in_state_dict(
+                    state_dict.get(gid, {}),
+                    param_names_in_master_weights,
+                    group_getter.get_group_by_id(gid),
+                )
+            state_dict = merge_model_state(state_dict)
+            logger.info(
+                "param_names_in_master_weights len:{}, bf16 state_dict len:{}, :{}".format(
+                    len(param_names_in_master_weights), len(state_dict), state_dict.keys()
+                )
+            )
 
-        # return state_dict
+        return state_dict
 
     def _cache_meta_for_sharded_save(self, model, optimizer):
         logger.info("Start caching metas for sharded save...")
