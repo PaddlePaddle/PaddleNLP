@@ -814,7 +814,12 @@ class Trainer:
 
             self._load_scheduler(resume_from_checkpoint)
 
-        should_load_stage1 = self.args.should_load_sharding_stage1_model
+        from .trainer_utils import ShardingOption
+
+        should_load_stage1 = self.args.sharding_parallel_degree > 1 and ShardingOption.SHARD_OP in self.args.sharding
+        logger.debug(f"should_load_stage1 = {should_load_stage1}")
+        logger.debug(f"sharded_model_from_ema = {self.args.sharded_model_from_ema}")
+
         if should_load_stage1 and self.args.sharded_model_from_ema:
             ema_states_path = os.path.join(resume_from_checkpoint, EMA_STATE_DIC, f"{dist.get_rank()}_0.distcp")
             ema_state_dict = paddle.load(ema_states_path)
@@ -829,8 +834,19 @@ class Trainer:
             ema_state_dict = reshard_util.all_gather_state_dict(ema_state_dict, lambda x: True, self.sharding_group)
             self.model.set_state_dict(ema_state_dict)
         else:
+
+            def bf16_filtered_sharded_state_dict(sharded_state_dict):
+                new_state_dict = {}
+                for k, v in sharded_state_dict.items():
+                    if v.local_tensor.dtype == paddle.bfloat16:
+                        continue
+                    new_state_dict[k] = v
+                return new_state_dict
+
+            fp32_sharded_state_dict = bf16_filtered_sharded_state_dict(model_sharded_state_dict)
+
             dist.load_state_dict(
-                model_sharded_state_dict,
+                fp32_sharded_state_dict,
                 model_states_path,
                 aoa_config=self.args.aoa_config,
                 offload=self.args.load_via_cpu,
@@ -871,7 +887,7 @@ class Trainer:
 
                 model_state_dict = self.model.state_dict()
                 for key, param in model_state_dict.items():
-                    if param.name in master_weights:
+                    if param.name in master_weights and param.dtype == paddle.bfloat16:
                         logger.debug(
                             f"key {key}, convert master weights {param.name} shape {master_weights[param.name].shape} to param {param.name} shape{param.shape}"
                         )
