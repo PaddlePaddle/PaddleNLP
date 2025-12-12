@@ -1445,7 +1445,7 @@ def saved_ckptmeta(state_dict, ckpt_file_name, process_group=None, save_replicas
             global_storage_metadata.append(local_storage_metadata)
             global_flatten_mapping.append(mapping)
 
-        def balanced_dedup_key_in_dict(global_storage_metadata, save_replicas=False):
+        def balanced_dedup_key_in_dict(global_storage_metadata):
             lti_to_files = defaultdict(set)
             for storage_metadata in global_storage_metadata:
                 for lti, fname in storage_metadata.items():
