@@ -1559,6 +1559,7 @@ class MistralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Mistr
         excess_blocks=None,
         draft_tokens=None,
         output_padding_offset=None,
+        **kwargs,
     ):
         outputs = self.Mistral(
             input_ids,
@@ -1578,6 +1579,7 @@ class MistralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Mistr
             excess_blocks=excess_blocks,
             draft_tokens=draft_tokens,
             output_padding_offset=output_padding_offset,
+            **kwargs,
         )
 
         hidden_states = outputs[0]

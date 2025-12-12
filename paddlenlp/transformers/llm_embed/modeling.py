@@ -132,6 +132,10 @@ class BiEncoderModel(PretrainedModel):
             last_token_indices = sequence_lengths - 1
             embeddings = hidden_state[paddle.arange(hidden_state.shape[0]), last_token_indices]
             return embeddings
+        elif self.sentence_pooling_method == "last_8":
+            last_8_embeddings = hidden_state[paddle.arange(hidden_state.shape[0]), -8:]
+            embeddings = paddle.mean(last_8_embeddings, axis=1)
+            return embeddings
         else:
             raise ValueError(f"Invalid sentence pooling method: {self.sentence_pooling_method}")
 

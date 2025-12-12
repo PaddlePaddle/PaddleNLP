@@ -99,6 +99,11 @@ def main():
             dtype=dtype,
         )
     else:
+        if "llara" in model_args.model_name_or_path.lower():
+            model_flag = "llara"
+            tokenizer.padding_side = "left"
+        else:
+            model_flag = "NA"
         model = BiEncoderModel(
             model_name_or_path=model_args.model_name_or_path,
             normalized=model_args.normalized,
@@ -110,6 +115,7 @@ def main():
             matryoshka_dims=training_args.matryoshka_dims if training_args.use_matryoshka else None,
             matryoshka_loss_weights=training_args.matryoshka_loss_weights if training_args.use_matryoshka else None,
             dtype=dtype,
+            model_flag=model_flag,
         )
 
     if training_args.fix_position_embedding:
@@ -138,6 +144,32 @@ def main():
                 ".*up_proj$",
                 ".*gate_proj$",
             ]
+        elif any([x in model_args.model_name_or_path for x in ["bge"]]):  # no reference, so use the simplest setting
+            target_modules = [
+                ".*q_proj$",
+                ".*k_proj$",
+                ".*v_proj$",
+            ]
+        elif any([x in model_args.model_name_or_path for x in ["LLARA"]]):  # same as llama
+            target_modules = [
+                ".*q_proj$",
+                ".*k_proj$",
+                ".*v_proj$",
+                ".*o_proj$",
+                ".*down_proj$",
+                ".*up_proj$",
+                ".*gate_proj$",
+            ]
+        elif any([x in model_args.model_name_or_path for x in ["Qwen3"]]):  # copy from qwen2
+            target_modules = [
+                ".*q_proj.*",
+                ".*k_proj.*",
+                ".*v_proj.*",
+                ".*o_proj.*",
+                ".*gate_proj.*",
+                ".*down_proj.*",
+                ".*up_proj.*",
+            ]
         else:
             raise ValueError("need to specify the target modules for LoRA fine-tuning.")
 
@@ -149,6 +181,13 @@ def main():
             dtype=dtype,
         )
         if "llama" in model_args.model_name_or_path.lower():
+            model.config = model.model_config  # for NV-Embed, this is no needed, but for repllama, this is needed
+        if (
+            ("llara" in model_args.model_name_or_path.lower())
+            or ("bge-large" in model_args.model_name_or_path.lower())
+            or ("qwen3" in model_args.model_name_or_path.lower())
+            or ("bge-en-icl" in model_args.model_name_or_path.lower())
+        ):
             model.config = model.model_config  # for NV-Embed, this is no needed, but for repllama, this is needed
         model.config.tensor_parallel_degree = training_args.tensor_parallel_degree
         model = LoRAModel(model, lora_config)
