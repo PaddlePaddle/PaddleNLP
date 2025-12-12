@@ -18,10 +18,11 @@ pip install -r slm/pipelines/examples/contrastive_training/requirements.txt
 ```
 
 
-下载 DuReader-Retrieval 中文数据集：
+下载 DuReader-Retrieval 和 MMarco-Retrieval 中文数据集：
 ```
 cd data
 wget https://paddlenlp.bj.bcebos.com/datasets/dureader_dual.train.jsonl
+python download_mmarco.py
 ```
 
 ## 训练
@@ -73,7 +74,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train.py --do_tr
     --query_instruction_for_retrieval "query: " \
     --passage_instruction_for_retrieval "" \
     --model_name_or_path ${model_name} \
-    --output_dir ${output_dir}$ \
+    --output_dir ${output_dir} \
     --save_steps 100 \
     --train_data ./data/dureader_dual.train.jsonl  \
     --bf16 \
@@ -295,7 +296,7 @@ python shortgpt_prune.py \
     --model_name_or_path castorini/repllama-v1-7b-lora-passage \
     --output_model_path ./pruned-repllama-v1-7b-lora-passage \
     --n_prune_layers 6 \
-    --layers_path "llama.layers"
+    --layers_path "layers"
 ```
 
 以 NV-Embed-v1为例：
@@ -310,7 +311,7 @@ python shortgpt_prune.py \
 - `--model_name_or_path`: 原始模型的名称或本地路径。
 - `--output_model_path`: 剪枝后模型的保存路径。
 - `--n_prune_layers`: 希望移除的层数。脚本会自动找出最不重要的 N 层。
-- `--layers_path`: 模型对象中指向 transformer 层列表的点分隔路径（例如 repllama 为`"llama.layers"`, llama 为`"model.layers"`）。
+- `--layers_path`: 模型对象中指向 transformer 层列表的点分隔路径。
 
 #### 性能评估
 剪枝完成后，可以使用 `output_model_path` 路径下的新模型进行[MTEB 评估](#评估)。

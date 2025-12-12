@@ -25,7 +25,7 @@ from datasets import load_dataset
 from paddle.io import DataLoader
 from tqdm import tqdm
 
-from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, NVEncodeModel
+from paddlenlp.transformers import AutoModel, AutoTokenizer, NVEncodeModel
 
 
 # =====================================================================================
@@ -73,7 +73,19 @@ class ShortGPT:
                 model_name, tokenizer_path=model_name, query_instruction="", document_instruction=""
             )
         else:
-            self.model = AutoModelForCausalLM.from_pretrained(model_name, dtype=paddle.float16)
+            self.model = AutoModel.from_pretrained(model_name, dtype=paddle.float16)
+
+        import sys
+        from io import StringIO
+
+        buffer = StringIO()
+        sys.stdout = buffer
+        print(self.model)
+        sys.stdout = sys.__stdout__
+
+        model_str = buffer.getvalue()
+        print("\n=== Model structure (first 5 lines) ===")
+        print("\n".join(model_str.splitlines()[:5]))
 
         self.model.eval()
         print("Model loaded successfully for importance evaluation.")
@@ -335,7 +347,7 @@ def main():
 
     prune_order = sorted(range(len(short_model.importances)), key=lambda i: short_model.importances[i])
     layers_to_delete = set(prune_order[: args.n_prune_layers])
-    
+
     print("\n--- Importance Calculation Complete ---")
     print(f"Calculated importances: {[f'{v:.2f}' for v in short_model.importances]}")
     print(f"Pruning order (least to most important): {prune_order}")
