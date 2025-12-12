@@ -1155,6 +1155,18 @@ class TrainingArguments:
         },
     )
 
+    load_via_cpu: Optional[bool] = field(
+        default=False,
+        metadata={
+            "help": "If True, loads checkpoint data to CPU first, then transfers required parts to GPU on demand to reduce GPU memory usage. Defaults to False."
+        },
+    )
+
+    load_from_hf: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether to load a checkpoint in the HuggingFace format."},
+    )
+
     save_hf_steps: int = field(default=-1, metadata={"help": "Save huggingface checkpoint every X updates steps."})
 
     load_via_cpu: Optional[bool] = field(
@@ -1178,6 +1190,11 @@ class TrainingArguments:
                 'Default is "broadcast".'
             )
         },
+    )
+
+    save_replicas: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether to save replicas cross files in distributed save load system."},
     )
 
     def __post_init__(self):

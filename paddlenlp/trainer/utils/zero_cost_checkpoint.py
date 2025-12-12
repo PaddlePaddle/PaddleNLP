@@ -21,7 +21,8 @@ import multiprocessing
 import os
 import random
 import time
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
+from dataclasses import replace
 from enum import Enum
 
 import numpy as np
@@ -37,10 +38,7 @@ from paddle.distributed.flex_checkpoint.dcp.metadata import (
     LocalTensorMetadata,
     Metadata,
 )
-from paddle.distributed.flex_checkpoint.dcp.save_state_dict import (
-    balanced_dedup_key_in_dict,
-    dedup_key_in_dict,
-)
+from paddle.distributed.flex_checkpoint.dcp.save_state_dict import dedup_key_in_dict
 from paddle.distributed.flex_checkpoint.dcp.sharded_weight import ShardedWeight
 from paddle.distributed.flex_checkpoint.dcp.utils import (
     flatten_state_dict,
@@ -1380,7 +1378,7 @@ class DistInfoCollectorValidator:
         return True, None
 
 
-def saved_ckptmeta(state_dict, ckpt_file_name, process_group=None):
+def saved_ckptmeta(state_dict, ckpt_file_name, process_group=None, save_replicas=False):
     with paddle.base.dygraph.guard():
         assert isinstance(state_dict, dict), "The state_dict should be a dictionary."
         flat_state_dict, mapping = flatten_state_dict(state_dict)
@@ -1416,19 +1414,16 @@ def saved_ckptmeta(state_dict, ckpt_file_name, process_group=None):
             else:
                 flattened_range = None
             local_state_dict_metadata[key] = LocalTensorMetadata(
-                global_offset,
-                local_shape,
+                tuple(global_offset),
+                tuple(local_shape),
                 local_tensor_dtype,
-                global_shape,
+                tuple(global_shape),
                 is_flattened,
                 flattened_range,
             )
             local_storage_metadata[
                 LocalTensorIndex(
-                    key,
-                    tuple(global_offset),
-                    is_flattened,
-                    flattened_range,
+                    key, tuple(global_offset), is_flattened, flattened_range, local_shape=tuple(local_shape)
                 )
             ] = ckpt_file_name
 
@@ -1449,6 +1444,34 @@ def saved_ckptmeta(state_dict, ckpt_file_name, process_group=None):
             global_state_dict_metadata.append(local_state_dict_metadata)
             global_storage_metadata.append(local_storage_metadata)
             global_flatten_mapping.append(mapping)
+
+        def balanced_dedup_key_in_dict(global_storage_metadata, save_replicas=False):
+            lti_to_files = defaultdict(set)
+            for storage_metadata in global_storage_metadata:
+                for lti, fname in storage_metadata.items():
+                    lti_to_files[lti].add(fname)
+
+            file_load = defaultdict(int)
+            out = {}
+            for lti, file_candidates in lti_to_files.items():
+                candidates = sorted(file_candidates)
+                selected_main_file = min(candidates, key=lambda f: file_load[f])
+                file_load[selected_main_file] += 1
+
+                if save_replicas:
+                    lti_main = replace(lti, replica_id=0)
+                    out[lti_main] = selected_main_file
+                    replica_id = 1
+                    for fname in candidates:
+                        if fname == selected_main_file:
+                            continue
+                        lti_replica = replace(lti, replica_id=replica_id)
+                        out[lti_replica] = fname
+                        replica_id += 1
+                else:
+                    out[lti] = selected_main_file
+
+            return out
 
         metadata.state_dict_metadata = merge_state_dict_metadata(global_state_dict_metadata)
         metadata.storage_metadata = balanced_dedup_key_in_dict(global_storage_metadata)
@@ -1570,7 +1593,7 @@ class ZeroCostCheckpointCallbackFcBased(ZeroCostCheckpointCallback):
         self.ckpt_data_name, self.ckpt_meta_name = create_ckpt_file_name()
         # self.model_ckpt_meta, self.model_state_filter = saved_ckptmeta(model.sharded_state_dict(), self.ckpt_data_name)
         self.model_ckpt_meta, self.model_state_filter = saved_ckptmeta(
-            self.manipulated_state_dict, self.ckpt_data_name
+            self.manipulated_state_dict, self.ckpt_data_name, save_replicas=self.args.save_replicas
         )
 
         # opt state dict ckpt meta and filter
@@ -1584,8 +1607,12 @@ class ZeroCostCheckpointCallbackFcBased(ZeroCostCheckpointCallback):
             else:
                 opt_state_dict[k] = v
 
-        self.opt_ckpt_meta, self.opt_state_filter = saved_ckptmeta(opt_state_dict, self.ckpt_data_name)
-        self.master_weight_ckpt_meta, self.master_weights_filter = saved_ckptmeta(master_weights, self.ckpt_data_name)
+        self.opt_ckpt_meta, self.opt_state_filter = saved_ckptmeta(
+            opt_state_dict, self.ckpt_data_name, save_replicas=self.args.save_replicas
+        )
+        self.master_weight_ckpt_meta, self.master_weights_filter = saved_ckptmeta(
+            master_weights, self.ckpt_data_name, save_replicas=self.args.save_replicas
+        )
 
         # gen unified name mapping for optimzier
         self.unified_name_mapping, self.param_slice_info = self._gen_unified_name(
