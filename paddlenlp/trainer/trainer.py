@@ -703,7 +703,7 @@ class Trainer:
             except Exception:
                 moe_sharding_group = None
 
-            if moe_sharding_group is None or moe_sharding_group.nranks <= 1:
+            if (moe_sharding_group is None or moe_sharding_group.nranks <= 1) or True:
                 # when moe_sharding_group is None, we use the default process_group
                 logger.info(f"Loading model weights from '{resume_from_checkpoint}' in safetensors format.")
                 dist.load_state_dict(
@@ -713,7 +713,7 @@ class Trainer:
                     offload=self.args.load_via_cpu,
                     safetensors=True,
                     process_group=None,
-                    comm_method=self.args.comm_method,
+                    comm_method=self.args.flex_ckpt_comm_method,
                 )
             else:
                 try:
@@ -755,7 +755,7 @@ class Trainer:
                         offload=self.args.load_via_cpu,
                         safetensors=True,
                         process_group=process_group,
-                        comm_method=self.args.comm_method,
+                        comm_method=self.args.flex_ckpt_comm_method,
                     )
 
                 dist.barrier()
@@ -801,7 +801,7 @@ class Trainer:
                 opt_states_path,
                 aoa_config=self.args.aoa_config,
                 offload=self.args.load_via_cpu,
-                comm_method=self.args.comm_method,
+                comm_method=self.args.flex_ckpt_comm_method,
             )
 
             if not self.args.sharded_model_from_ema:
@@ -810,7 +810,7 @@ class Trainer:
                     master_weights_path,
                     aoa_config=self.args.aoa_config,
                     offload=self.args.load_via_cpu,
-                    comm_method=self.args.comm_method,
+                    comm_method=self.args.flex_ckpt_comm_method,
                 )
 
             self._load_scheduler(resume_from_checkpoint)
@@ -851,7 +851,7 @@ class Trainer:
                 model_states_path,
                 aoa_config=self.args.aoa_config,
                 offload=self.args.load_via_cpu,
-                comm_method=self.args.comm_method,
+                comm_method=self.args.flex_ckpt_comm_method,
             )
 
         if self.args.bf16 and (not self.args.ignore_load_lr_and_optim) and should_load_stage1:
