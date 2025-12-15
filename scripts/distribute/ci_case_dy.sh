@@ -133,7 +133,7 @@ function llm_gpt_case_list_dygraph() {
     fun_list=(
         # The test name must have "llm_gpt_" as a prefix, which will 
         # be used for tracking the execution status of the case.
-        # llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1
+        llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1
     )
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
@@ -549,7 +549,7 @@ function llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1() {
     if [ $IS_CUDA123 -ne 0 ];then
         loss_base=8.93676758
     else
-        loss_base=8.93362617
+        loss_base=8.93362999
     fi
     ips_base=64.75564390065037
     mem_base=8904

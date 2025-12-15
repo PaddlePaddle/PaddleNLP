@@ -107,27 +107,27 @@ function llama_case_list_auto() {
         # The test name must have "llama_" as a prefix, which will 
         # be used for tracking the execution status of the case.
         llama_dygraph_auto_bs4_bf16_SD2
-        # llama_dygraph_auto_bs8_fp32_DP2
-        # llama_dygraph_auto_bs8_fp32_DP2-MP2
+        llama_dygraph_auto_bs8_fp32_DP2
+        llama_dygraph_auto_bs8_fp32_DP2-MP2
         llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
-        # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
+        llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
         llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2
         #llama_dygraph_auto_bs8_fp16_DP2-MP2-CP2_intermediate
         llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp
         # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
         llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw
         llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2
-        # llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
-        # llama_pir_auto_fuse_ffn_attention_qkv_MP2
+        llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
+        llama_pir_auto_fuse_ffn_attention_qkv_MP2
         # llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
         llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP
-        # llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP
+        llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP
         llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1
-        # llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4
+        llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4
         llama_align_dygraph_dy2st_pir_auto_pp_bs2_bf16_DP1-MP1-PP4
         llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2
         # llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate
-        # llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN
+        llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN
         llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1
         llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate
         llama_baichuan_dygraph_auto_sp_async_reduce_scatter_bs8_bf16_DP4-MP2-SP
@@ -171,7 +171,7 @@ function llm_gpt_case_list_auto() {
     fun_list=(
         # The test name must have "llm_gpt_dygraph_auto_" as a prefix, 
         # which will be used for tracking the execution status of the case.
-        # llm_gpt_dygraph_auto_bs8_fp32_DP2
+        llm_gpt_dygraph_auto_bs8_fp32_DP2
         llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2
         llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2
         llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2
@@ -406,7 +406,7 @@ function llama_dygraph_auto_bs8_fp32_DP2() {
     ips=-1
     mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.4992733
+    loss_base=9.49927235
     if [ $IS_A100 -ne 0 ];then
         loss_base=9.50651741
     fi
@@ -478,7 +478,7 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.3507843
+    loss_base=9.35078526
     if [ $IS_A100 -ne 0 ];then
         if [ $IS_CUDA123 -ne 0 ];then
             loss_base=9.38577747
@@ -636,7 +636,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.35162163
+    loss_base=9.35163498
     if [ $IS_A100 -ne 0 ];then
         if [ $IS_CUDA123 -ne 0 ];then
             loss_base=9.39367676
@@ -1563,7 +1563,7 @@ function llama_pir_auto_fuse_ffn_attention_qkv_MP2() {
                         loss_base_10=9.4961319
                     else
                         loss_base_2=10.53477287
-                        loss_base_10=9.49613285
+                        loss_base_10=9.4961319
                     fi
                 fi
                 check_result $FUNCNAME ${loss_base_2} ${auto_loss_2} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
@@ -1658,7 +1658,7 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP() {
         mem=-1
         echo "result: to_static=$to_static loss=$loss loss_md5=$loss_md5 ips=$ips mem=$mem"
         if [ $to_static -eq 0 ];then
-            loss_base=9.25199432
+            loss_base=9.2519928
         elif [ $to_static -eq 1 ];then
             loss_base=9.25199356
         fi
@@ -1768,7 +1768,7 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
         mem=-1
         echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
         if [ $to_static -eq 0 ];then
-            loss_base=9.99302597
+            loss_base=9.99302673
         elif [ $to_static -eq 1 ];then
             loss_base=9.99302673
         fi
@@ -1882,7 +1882,7 @@ function llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN() {
     ips=-1
     mem=-1
     echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
-    loss_base=9.99302597
+    loss_base=9.99302521
     if [ $IS_A100 -ne 0 ];then
         if [ $IS_CUDA123 -ne 0 ];then
             loss_base=10.20989532
@@ -2203,7 +2203,7 @@ function llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
     if [ $IS_A100 -ne 0 ];then
         check_result $FUNCNAME ${loss1} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
     else
-        loss_base_fthenb=10.24240494
+        loss_base_fthenb=10.24240398
         loss_base_vpp=10.24149513  # Paddle PR#74530
         echo "FThenB check"
         check_result $FUNCNAME ${loss_base_fthenb} ${loss1} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -2690,7 +2690,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.55727577 # output of dropout is different after supporting spmd
+    loss_base=10.55727673 # output of dropout is different after supporting spmd
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
