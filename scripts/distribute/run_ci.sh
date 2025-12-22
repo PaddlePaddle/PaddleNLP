@@ -175,7 +175,7 @@ function contain_case(){
             return 1
         fi
     done
-    return 0
+    return 1
 }
 ####################################
 function execute_func_list(){
