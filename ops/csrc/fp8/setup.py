@@ -83,7 +83,7 @@ if __name__ == "__main__":
     try:
         cmd = ["git", "rev-parse", "--short", "HEAD"]
         revision = "+" + subprocess.check_output(cmd).decode("ascii").rstrip()
-    except:
+    except Exception:
         revision = ""
 
     setuptools.setup(

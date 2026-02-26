@@ -77,7 +77,7 @@ from .modeling import (
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
-except:
+except Exception:
     flash_attention = None
 
 __all__ = [

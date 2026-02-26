@@ -21,7 +21,7 @@ from easydict import EasyDict as AttrDict
 
 try:
     from paddle_serving_server_gpu.web_service import WebService
-except:
+except Exception:
     from paddle_serving_server.web_service import WebService
 
 from transformer_reader import TransformerReader
@@ -97,7 +97,7 @@ def do_server(args):
     if args.profile:
         try:
             service.setup_profile(30)
-        except:
+        except Exception:
             pass
     service.load_model_config(args.inference_model_dir)
     if args.device == "gpu":

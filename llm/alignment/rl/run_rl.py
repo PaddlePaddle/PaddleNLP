@@ -374,7 +374,7 @@ def main():
 
     try:
         generation_config = GenerationConfig.from_pretrained(model_args.actor_model_name_or_path)
-    except:
+    except Exception:
         logger.warning("Can't find generation config, so it will not use generation_config field in the model config")
         generation_config = None
 

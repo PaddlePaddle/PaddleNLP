@@ -85,19 +85,19 @@ def gen_allure_report():
             time.sleep(1)
             try:
                 os.remove("allure-2.19.0.zip")
-            except:
+            except Exception:
                 print("#### can not remove allure-2.19.0.zip")
         if os.path.exists("java_linux.tar.gz"):
             time.sleep(1)
             try:
                 os.remove("java_linux.tar.gz")
-            except:
+            except Exception:
                 print("#### can not remove java_linux.tar.gz")
         if os.path.exists("bos_new.tar.gz"):
             time.sleep(1)
             try:
                 os.remove("bos_new.tar.gz")
-            except:
+            except Exception:
                 print("#### can not remove bos_new.tar.gz")
         return ret
     else:

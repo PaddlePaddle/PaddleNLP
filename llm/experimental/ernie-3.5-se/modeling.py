@@ -47,7 +47,7 @@ try:
     from paddle.nn.functional.flash_attention import flash_attention
 
     logger.warning("Use flash attention in scaled-dot-product. Attention mask is deprecated")
-except:
+except Exception:
     flash_attention = None
 
 try:

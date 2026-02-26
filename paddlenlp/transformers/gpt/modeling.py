@@ -37,7 +37,7 @@ try:
         ScatterOp,
         mark_as_sequence_parallel_parameter,
     )
-except:
+except Exception:
     pass
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from paddle.utils import try_import
@@ -62,11 +62,11 @@ from .configuration import (
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
-except:
+except Exception:
     flash_attention = None
 try:
     from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
-except:
+except Exception:
     FusedDropoutAdd = None
 
 OriginLayerNorm = paddle.nn.LayerNorm
@@ -108,7 +108,7 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, transpose_y=True, tensor
         hcg = fleet.get_hybrid_communicate_group()
         model_parallel_group = hcg.get_model_parallel_group()
         tensor_parallel_degree = hcg.get_model_parallel_world_size()
-    except:
+    except Exception:
         is_fleet_init = False
 
     if is_fleet_init and tensor_parallel_degree > 1 and y.is_distributed:

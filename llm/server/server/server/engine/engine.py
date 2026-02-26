@@ -279,7 +279,7 @@ class Engine(object):
             self.shm_flag_ready.unlink()
             self.shm_flag_has_block_step.close()
             self.shm_flag_has_block_step.unlink()
-        except:
+        except Exception:
             pass
 
     def _init_engine_flags(self):
@@ -293,7 +293,7 @@ class Engine(object):
             )
             tmp.close()
             tmp.unlink()
-        except:
+        except Exception:
             pass
         self.shm_flag_ready = shared_memory.SharedMemory(
             create=True, size=flag_array.nbytes, name=self.cfg.get_unique_name("shm_flag_infer_ready")
@@ -311,7 +311,7 @@ class Engine(object):
             )
             tmp.close()
             tmp.unlink()
-        except:
+        except Exception:
             pass
         self.shm_flag_broadcast = shared_memory.SharedMemory(
             create=True, size=broadcast_flag_array.nbytes, name=self.cfg.get_unique_name("shm_pd_infer_flag_broadcast")
@@ -332,7 +332,7 @@ class Engine(object):
             )
             tmp.close()
             tmp.unlink()
-        except:
+        except Exception:
             pass
         self.shm_flag_has_block_step = shared_memory.SharedMemory(
             create=True,

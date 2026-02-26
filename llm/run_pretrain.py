@@ -485,7 +485,7 @@ def main():
                 from utils.register_reshard import register_pp_reshard_information
 
                 register_pp_reshard_information(config.num_hidden_layers)
-            except:
+            except Exception:
                 print("Not register llama pp reshard information.")
 
     architectures_to_check = {"Qwen2Moe", "DeepseekV2", "DeepseekV3"}

@@ -64,7 +64,7 @@ try:
         ScatterOp,
         mark_as_sequence_parallel_parameter,
     )
-except:
+except Exception:
     pass
 
 from paddlenlp.transformers.conversion_utils import (
@@ -97,7 +97,7 @@ try:
             if lib.endswith(".so"):
                 paddle.utils.cpp_extension.extension_utils.load_op_meta_info_and_register_op(lib)
     from paddle.nn.functional.flash_attention import flash_attention
-except:
+except Exception:
     flash_attention = None
 from . import fusion_ops
 
@@ -194,7 +194,7 @@ def parallel_matmul(x: Tensor, y: Tensor, transpose_y=False, tensor_parallel_out
         hcg = fleet.get_hybrid_communicate_group()
         model_parallel_group = hcg.get_model_parallel_group()
         tensor_parallel_degree = hcg.get_model_parallel_world_size()
-    except:
+    except Exception:
         is_fleet_init = False
 
     if paddle.in_dynamic_mode():

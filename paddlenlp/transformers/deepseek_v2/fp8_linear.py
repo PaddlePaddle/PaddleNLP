@@ -29,7 +29,7 @@ from ..linear_utils import RowSequenceParallelLinear as PD_RowSequenceParallelLi
 
 try:
     from .kernel import act_quant, fp8_gemm, weight_dequant
-except:
+except Exception:
     pass
 
 

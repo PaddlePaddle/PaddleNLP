@@ -22,7 +22,7 @@ from paddle import nn
 
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import GatherOp
-except:
+except Exception:
     pass
 
 import paddlenlp

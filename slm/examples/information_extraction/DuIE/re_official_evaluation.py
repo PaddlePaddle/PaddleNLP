@@ -53,12 +53,12 @@ def check_format(line):
     json_info = {}
     try:
         line = line.strip()
-    except:
+    except Exception:
         ret_code = ENCODING_ERROR
         return ret_code, json_info
     try:
         json_info = json.loads(line)
-    except:
+    except Exception:
         ret_code = JSON_ERROR
         return ret_code, json_info
     if "text" not in json_info or "spo_list" not in json_info:
@@ -99,7 +99,7 @@ def load_predict_result(predict_filename):
         return ret_code, predict_result
     try:
         predict_file_zip = zipfile.ZipFile(predict_filename)
-    except:
+    except Exception:
         ret_code = NOT_ZIP_FILE
         return ret_code, predict_result
     for predict_file in predict_file_zip.namelist():
@@ -149,7 +149,7 @@ def load_alias_dict(alias_filename):
                 alias_dict[words[0].lower()] = set()
                 for alias_word in words[1:]:
                     alias_dict[words[0].lower()].add(alias_word.lower())
-            except:
+            except Exception:
                 ret_code = ALIAS_FORMAT_ERROR
                 return ret_code, alias_dict
     return ret_code, alias_dict

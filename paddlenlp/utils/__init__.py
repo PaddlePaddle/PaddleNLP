@@ -26,7 +26,7 @@ from .memory_utils import empty_device_cache
 
 try:
     from .optimizer import *
-except:
+except Exception:
     logger.info("Not support custom optimizer")
 
 from .paddle_patch import *

@@ -68,7 +68,7 @@ try:
         ScatterOp,
         mark_as_sequence_parallel_parameter,
     )
-except:
+except Exception:
     pass
 
 __all__ = [
@@ -86,12 +86,12 @@ MAX_NTK_SEQ_LENGTH = 32768
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
-except:
+except Exception:
     flash_attention = None
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
-except:
+except Exception:
     fused_rotary_position_embedding = None
 
 
@@ -107,7 +107,7 @@ def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
         hcg = fleet.get_hybrid_communicate_group()
         model_parallel_group = hcg.get_model_parallel_group()
         tensor_parallel_degree = hcg.get_model_parallel_world_size()
-    except:
+    except Exception:
         is_fleet_init = False
 
     if is_fleet_init and tensor_parallel_degree > 1 and y.is_distributed:

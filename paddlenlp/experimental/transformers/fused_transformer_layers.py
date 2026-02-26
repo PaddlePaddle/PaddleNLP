@@ -73,7 +73,7 @@ if paddle.is_compiled_with_cuda():
             transpose_remove_padding,
             write_cache_kv,
         )
-    except:
+    except Exception:
         pass
 
 __all__ = [
@@ -666,7 +666,7 @@ class FusedMultiTransformerBase(Layer):
         if use_custom_allreduce():
             try:
                 from paddlenlp.ops.custom_all_reduce import custom_all_reduce
-            except:
+            except Exception:
                 assert False, "please install paddlenlp.ops"
             self.custom_all_reduce_max_bytes = 1024 * self.embed_dim
             from paddle.distributed import fleet
@@ -6090,7 +6090,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 from paddlenlp_ops import (
                     cutlass_fp8_fp8_half_gemm_ptr_scale_fused as fp8_gemm_fused_ptr_scale,
                 )
-            except:
+            except Exception:
                 assert False, "fp8_gemm_fused_ptr_scale only supported on sm90"
             if ffn1:
                 n, k = y.shape
@@ -6137,7 +6137,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 from paddlenlp_ops import (
                     cutlass_fp8_fp8_half_block_gemm_fused as fp8_block_gemm_fused,
                 )
-            except:
+            except Exception:
                 assert False, "fp8_block_gemm_fused only supported on sm90"
             out = fp8_block_gemm_fused(
                 x,

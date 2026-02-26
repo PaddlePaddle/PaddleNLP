@@ -61,7 +61,7 @@ from .utils.helper import distributed_file, distributed_isfile  # nested_truncat
 
 try:
     from ..quantization.quantization_linear import QuantizationLinear
-except:
+except Exception:
     QuantizationLinear = None
 
 MODEL_NAME = "model"

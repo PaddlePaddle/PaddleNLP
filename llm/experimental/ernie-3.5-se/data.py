@@ -54,7 +54,7 @@ def convert_example(example, tokenizer, data_args, is_test=False):
         question = example["question"]
         try:
             answer = example["answers"][0]
-        except:
+        except Exception:
             print(example["context"])
             print(example["question"])
             print(example["answers"])

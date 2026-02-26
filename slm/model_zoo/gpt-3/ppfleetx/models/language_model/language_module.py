@@ -28,7 +28,7 @@ try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
         register_sequence_parallel_allreduce_hooks,
     )
-except:
+except Exception:
     pass
 from ppfleetx.utils.log import logger
 

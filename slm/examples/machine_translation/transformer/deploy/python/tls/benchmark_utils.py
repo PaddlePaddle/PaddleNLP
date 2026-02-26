@@ -80,7 +80,7 @@ class PaddleInferBenchmark(object):
             self.data_num = data_info["data_num"]
 
             self.inference_time_s = round(perf_info["inference_time_s"], 4)
-        except:
+        except Exception:
             self.print_help()
             raise ValueError("Set argument wrong, please check input argument and its type")
 

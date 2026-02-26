@@ -952,7 +952,7 @@ class JambaSparseMoeBlock(nn.Layer):
                         )
                         * routing_weights[0, 0]
                     )
-        except:
+        except Exception:
             pass
 
         # Loop over all available experts in the model and perform the computation on each expert.

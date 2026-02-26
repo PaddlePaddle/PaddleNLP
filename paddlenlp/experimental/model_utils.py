@@ -479,7 +479,7 @@ def get_dequant_weight(w, w_s=None, dtype=None, weight_block_size=[128, 128]):
         from paddlenlp_ops import (
             cutlass_fp8_fp8_half_block_gemm_fused as fp8_block_gemm_fused,
         )
-    except:
+    except Exception:
         assert False, "fp8_block_gemm_fused only supported on sm90"
 
     eye = paddle.eye(w.shape[0], dtype=paddle.float32)

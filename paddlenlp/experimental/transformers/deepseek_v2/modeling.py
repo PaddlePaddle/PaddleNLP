@@ -331,7 +331,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             hcg = fleet.get_hybrid_communicate_group()
             model_parallel_group = hcg.get_model_parallel_group()
             ring_id = model_parallel_group.id
-        except:
+        except Exception:
             pass
 
         ln_scale_attrs = [
@@ -1382,7 +1382,7 @@ class DeepseekV2BlockInferenceModelXPU(DeepseekV2BlockInferenceModel):
             hcg = fleet.get_hybrid_communicate_group()
             model_parallel_group = hcg.get_model_parallel_group()
             ring_id = model_parallel_group.id
-        except:
+        except Exception:
             pass
 
         ln_scale_attrs = [

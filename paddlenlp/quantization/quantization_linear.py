@@ -30,7 +30,7 @@ from .qat_utils import QATFunc
 
 try:
     from .qlora import qlora_weight_dequantize, qlora_weight_linear
-except:
+except Exception:
     qlora_weight_linear = None
     qlora_weight_dequantize = None
 

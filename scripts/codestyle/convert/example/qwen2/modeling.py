@@ -74,12 +74,12 @@ try:
         ScatterOp,
         mark_as_sequence_parallel_parameter,
     )
-except:
+except Exception:
     pass
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
-except:
+except Exception:
     flash_attention = None
 
 
@@ -143,7 +143,7 @@ def parallel_matmul(x: Tensor, y: Tensor, transpose_y=True, tensor_parallel_outp
         hcg = fleet.get_hybrid_communicate_group()
         model_parallel_group = hcg.get_model_parallel_group()
         tensor_parallel_degree = hcg.get_model_parallel_world_size()
-    except:
+    except Exception:
         is_fleet_init = False
 
     if paddle.in_dynamic_mode():

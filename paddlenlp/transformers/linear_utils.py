@@ -21,7 +21,7 @@ from paddle import nn
 
 try:
     from paddle.distributed.fleet.utils import sequence_parallel_utils
-except:
+except Exception:
     sequence_parallel_utils = None
 
 from paddlenlp.transformers.mc2_parallel_linear import (
@@ -45,7 +45,7 @@ __all__ = [
 try:
     ColumnSequenceParallelLinear = sequence_parallel_utils.ColumnSequenceParallelLinear
     RowSequenceParallelLinear = sequence_parallel_utils.RowSequenceParallelLinear
-except:
+except Exception:
 
     class ColumnSequenceParallelLinearPass(object):
         """

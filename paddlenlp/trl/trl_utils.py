@@ -21,7 +21,7 @@ def calculate_effective_tokens(training_args, train_dataset, max_seq_len):
 
     try:
         data_parallel_degree = training_args.data_parallel_degree
-    except:
+    except Exception:
         data_parallel_degree = 1
     if training_args.sharding_parallel_degree > 1:
         sharding_parallel_degree = training_args.sharding_parallel_degree

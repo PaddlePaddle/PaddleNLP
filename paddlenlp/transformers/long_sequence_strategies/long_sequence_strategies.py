@@ -56,7 +56,7 @@ class LongSequenceStrategies:
             )
         try:
             strategy_class = getattr(import_class, stratety_name)
-        except:
+        except Exception:
             all_strategy_classes = import_class.__all__
             raise LookupError(
                 f"module '{import_class.__name__}' only supports the following classes: "

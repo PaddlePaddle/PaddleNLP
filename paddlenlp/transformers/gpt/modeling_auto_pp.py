@@ -39,7 +39,7 @@ try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
         mark_as_sequence_parallel_parameter,
     )
-except:
+except Exception:
     pass
 
 __all__ = [

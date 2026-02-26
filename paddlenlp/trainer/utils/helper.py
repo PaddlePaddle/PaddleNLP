@@ -198,7 +198,7 @@ def broadcast_dp_optimizer(state_dict):
         # Don't broadcast optimizer for dp rank is 1.
         if dp_group.nranks <= 1:
             return state_dict
-    except:
+    except Exception:
         dp_group = None
         src_rank = 0
         process_rank = paddle.distributed.get_rank()
@@ -239,7 +239,7 @@ def broadcast_moe_optimizer(state_dict, model_state_dict=None, broadcast_dp=True
         # Don't broadcast optimizer for dp rank is 1.
         if dp_group.nranks <= 1:
             return state_dict
-    except:
+    except Exception:
         dp_group = None
         src_rank = 0
         data_parallel_rank = dist.get_rank()

@@ -182,7 +182,7 @@ class MambaTokenizer(PretrainedTokenizer):
                     j = word.index(first, i)
                     new_word.extend(word[i:j])
                     i = j
-                except:
+                except Exception:
                     new_word.extend(word[i:])
                     break
 

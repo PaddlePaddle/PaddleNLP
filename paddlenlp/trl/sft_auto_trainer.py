@@ -56,7 +56,7 @@ from .sft_trainer import SFTTrainer
 
 try:
     from ...quantization.quantization_linear import QuantizationLinear
-except:
+except Exception:
     QuantizationLinear = None
 
 MODEL_NAME = "model"

@@ -63,7 +63,7 @@ from safetensors.paddle import save_file
 
 try:
     from paddle.distributed.fleet.meta_parallel import LocalSharedLayerDesc
-except:
+except Exception:
     LocalSharedLayerDesc = None
 from paddle.nn import Embedding, Layer
 
@@ -124,7 +124,7 @@ __all__ = [
 def dy2st_nocheck_guard_context():
     try:
         context = paddle.framework._no_check_dy2st_diff()
-    except:
+    except Exception:
         context = contextlib.nullcontext()
     return context
 
@@ -2731,7 +2731,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     subfolder=subfolder,
                     **kwargs,
                 )
-            except:
+            except Exception:
                 logger.info(
                     "Generation config file not found, using a generation config created from the model config."
                 )

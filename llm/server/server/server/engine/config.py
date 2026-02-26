@@ -127,7 +127,7 @@ class Config:
         # Generation config
         try:
             self.generation_config = GenerationConfig.from_pretrained(self.model_dir)
-        except:
+        except Exception:
             model_server_logger.warning(
                 "Can't find generation config, so it will not use generation_config field in the model config"
             )

@@ -63,7 +63,7 @@ def parallel_matmul(x: Tensor, y: Tensor, parallel_output=True):
         hcg = fleet.get_hybrid_communicate_group()
         model_parallel_group = hcg.get_model_parallel_group()
         world_size = hcg.get_model_parallel_world_size()
-    except:
+    except Exception:
         is_fleet_init = False
     if is_fleet_init and world_size > 1:
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'

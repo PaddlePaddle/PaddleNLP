@@ -29,7 +29,7 @@ try:
         ColumnSequenceParallelLinear,
         RowSequenceParallelLinear,
     )
-except:
+except Exception:
     pass
 from paddlenlp.utils.tools import get_env_device
 

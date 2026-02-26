@@ -32,7 +32,7 @@ from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy
 
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import GatherOp
-except:
+except Exception:
     pass
 
 
@@ -330,7 +330,7 @@ class VocabParallelEntropy(paddle.autograd.PyLayer):
             hcg = fleet.get_hybrid_communicate_group()
             model_parallel_group = hcg.get_model_parallel_group()
             tensor_parallel_degree = hcg.get_model_parallel_world_size()
-        except:
+        except Exception:
             tensor_parallel_degree = 1
         logits_max = vocab_parallel_logits.max(axis=-1, keepdim=True)
 

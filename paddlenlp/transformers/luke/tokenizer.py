@@ -18,7 +18,7 @@ from typing import Dict, List, Optional, Union
 
 try:
     import regex as re
-except:
+except Exception:
     import re
 
 import itertools
@@ -572,7 +572,7 @@ class LukeTokenizer(RobertaBPETokenizer):
                     j = word.index(first, i)
                     new_word.extend(word[i:j])
                     i = j
-                except:
+                except Exception:
                     new_word.extend(word[i:])
                     break
 

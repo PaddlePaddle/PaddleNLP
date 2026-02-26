@@ -36,7 +36,7 @@ try:
         InferenceWithReferenceProposer,
         SpeculateArgument,
     )
-except:
+except Exception:
     pass
 
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
@@ -268,7 +268,7 @@ class BasePredictor:
 
         try:
             self.generation_config = GenerationConfig.from_pretrained(config.model_name_or_path)
-        except:
+        except Exception:
             logger.warning(
                 "Can't find generation config, so it will not use generation_config field in the model config"
             )

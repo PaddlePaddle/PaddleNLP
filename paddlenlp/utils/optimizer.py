@@ -28,7 +28,7 @@ from paddlenlp.utils.log import logger
 
 try:
     from .adamw_triton import adamw_triton
-except:
+except Exception:
     adamw_triton = None
 
 
@@ -482,7 +482,7 @@ class AdamWCustom(AdamW):
         self._add_accumulator(self._moment2_acc_str, p, dtype=moment_dtype)
         try:
             type = core.VarDesc.VarType.DENSE_TENSOR
-        except:
+        except Exception:
             type = core.VarDesc.VarType.LOD_TENSOR
         self._add_accumulator(
             name=self._beta1_pow_acc_str,

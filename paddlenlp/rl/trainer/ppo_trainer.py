@@ -1221,7 +1221,7 @@ class PPOTrainer(RLTrainerBase):
             hcg = fleet.get_hybrid_communicate_group()
             sharding_parallel_group = hcg.get_sharding_parallel_group()
             data_parallel_group = hcg.get_data_parallel_group()
-        except:
+        except Exception:
             sharding_parallel_group = None
             data_parallel_group = None
 
@@ -1335,7 +1335,7 @@ class PPOTrainer(RLTrainerBase):
             hcg = fleet.get_hybrid_communicate_group()
             sharding_parallel_group = hcg.get_sharding_parallel_group()
             data_parallel_group = hcg.get_data_parallel_group()
-        except:
+        except Exception:
             is_fleet_init = False
             sharding_parallel_group = None
             data_parallel_group = None

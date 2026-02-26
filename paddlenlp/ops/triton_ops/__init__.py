@@ -20,5 +20,5 @@ try:
     from .segment_mean import segment_mean
 
     __all__ = +["per_token_group_quant_fp8_api_masked", "per_token_group_quant_fp8_api"]
-except:
+except Exception:
     pass

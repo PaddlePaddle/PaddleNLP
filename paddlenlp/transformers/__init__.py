@@ -46,7 +46,7 @@ try:
         mark_as_sequence_parallel_parameter,
         register_sequence_parallel_allreduce_hooks,
     )
-except:
+except Exception:
     pass
 from .export import export_model
 

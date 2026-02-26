@@ -152,7 +152,7 @@ def evaluate_ch(ref_ans, pred_ans):
         answers = sample["sent_label"]
         try:
             prediction = pred_ans[query_id]["pred_label"]
-        except:
+        except Exception:
             skip_count += 1
             continue
         if prediction == "":

@@ -20,7 +20,7 @@ try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
         register_sequence_parallel_allreduce_hooks,
     )
-except:
+except Exception:
     pass
 
 from paddlenlp.peft import LoRAModel
@@ -175,7 +175,7 @@ def get_module_gradient(
         model_parallel_group = hcg.get_model_parallel_group()
         sharding_parallel_group = hcg.get_sharding_parallel_group()
         data_parallel_group = hcg.get_data_parallel_group()
-    except:
+    except Exception:
         is_fleet_init = False
 
     if tp_degree > 1:

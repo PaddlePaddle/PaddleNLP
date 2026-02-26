@@ -16,7 +16,7 @@ import paddle.distributed.fleet as fleet
 
 try:
     from paddle.nn.layer.layers import in_declarative_mode
-except:
+except Exception:
     from paddle.fluid.dygraph.base import in_declarative_mode
 import paddle.distributed as dist
 from paddle.autograd import PyLayer
@@ -57,7 +57,7 @@ def parallel_matmul(lm_output, logit_weights, tensor_parallel_output=True, train
         hcg = fleet.get_hybrid_communicate_group()
         model_parallel_group = hcg.get_model_parallel_group()
         tensor_parallel_degree = hcg.get_model_parallel_world_size()
-    except:
+    except Exception:
         is_fleet_init = False
 
     is_logit_weight_distributed = logit_weights.is_distributed
@@ -85,7 +85,7 @@ def parallel_linear(lm_output, logit_weights, bias, tensor_parallel_output=True)
         hcg = fleet.get_hybrid_communicate_group()
         model_parallel_group = hcg.get_model_parallel_group()
         tensor_parallel_degree = hcg.get_model_parallel_world_size()
-    except:
+    except Exception:
         is_fleet_init = False
 
     is_logit_weight_distributed = logit_weights.is_distributed

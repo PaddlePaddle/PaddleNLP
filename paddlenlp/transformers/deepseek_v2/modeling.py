@@ -48,12 +48,12 @@ try:
         ScatterOp,
         mark_as_sequence_parallel_parameter,
     )
-except:
+except Exception:
     pass
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
-except:
+except Exception:
     flash_attention = None
 
 

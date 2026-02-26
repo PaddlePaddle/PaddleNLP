@@ -280,7 +280,7 @@ class SpacyTextSplitter(TextSplitter):
             raise ImportError("Spacy is not installed, please install it with `pip install spacy`.")
         try:
             self._tokenizer = spacy.load(pipeline)
-        except:
+        except Exception:
             spacy.cli.download(pipeline)
             self._tokenizer = spacy.load(pipeline)
 

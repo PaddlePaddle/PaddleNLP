@@ -127,7 +127,7 @@ class Template(nn.Layer):
                     if isinstance(part, set):
                         part = {k: None for k in part}
                     p.update(part)
-                except:
+                except Exception:
                     import traceback
 
                     logger.error(traceback.format_exc())

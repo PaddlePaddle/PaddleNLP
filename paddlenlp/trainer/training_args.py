@@ -1494,7 +1494,7 @@ class TrainingArguments:
                             logger.info("setting sync_moment")
                             strategy.hybrid_configs["mp_configs"].sync_moment = True
 
-                    except:
+                    except Exception:
                         warnings.warn(
                             "The enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add are not supported "
                             "by current version of Paddle. Please try latest develop Paddle."
@@ -1618,7 +1618,7 @@ class TrainingArguments:
                         ], "Only sharding stage1 supports to disable reduce_avg strategy."
                         try:
                             strategy.hybrid_configs["sharding_configs"].use_reduce_avg = False
-                        except:
+                        except Exception:
                             warnings.warn(
                                 "The reduce_avg strategy is not supported by current version of Paddle so you don't need to disable it. The nccl comm in sharding still use reduce_sum and scale of gradients."
                             )
@@ -1838,7 +1838,7 @@ class TrainingArguments:
                         mp_optimization.allreduce_matmul_grad_overlapping = True
                     if "replace_with_c_embedding" in mp_config:
                         mp_optimization.replace_with_c_embedding = True
-                except:
+                except Exception:
                     warnings.warn(
                         "The enable_mp_async_allreduce, replace_with_c_embedding, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add are not supported "
                         "by current version of Paddle. Please try latest develop Paddle."

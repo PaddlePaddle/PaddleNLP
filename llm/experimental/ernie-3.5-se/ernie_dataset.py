@@ -177,7 +177,7 @@ class BlendableDataset(paddle.io.Dataset):
 
             try:
                 hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
-            except:
+            except Exception:
                 hcg = FakeHCG()
 
             counts = paddle.to_tensor([cache_success], dtype="int64")
@@ -816,7 +816,7 @@ def _build_index_mappings(
 
     try:
         hcg = fleet.get_hybrid_communicate_group()
-    except:
+    except Exception:
         hcg = FakeHCG()
 
     counts = paddle.to_tensor([data_cache_success], dtype="int64")

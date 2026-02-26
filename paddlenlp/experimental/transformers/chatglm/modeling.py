@@ -168,7 +168,7 @@ class ChatGLMStackDyBatch(nn.Layer):
             hcg = fleet.get_hybrid_communicate_group()
             model_parallel_group = hcg.get_model_parallel_group()
             ring_id = model_parallel_group.id
-        except:
+        except Exception:
             pass
 
         self.input_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)

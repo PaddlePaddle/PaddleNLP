@@ -378,7 +378,7 @@ class PromptNode(BaseComponent):
         prompt_template_resolved: PromptTemplate = invocation_context.pop("prompt_template")
         try:
             output_variable = self.output_variable or prompt_template_resolved.output_variable or "results"
-        except:
+        except Exception:
             output_variable = "results"
         invocation_context[output_variable] = results
         invocation_context["prompts"] = prompt_collector

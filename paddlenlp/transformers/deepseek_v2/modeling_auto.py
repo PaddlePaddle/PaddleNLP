@@ -38,7 +38,7 @@ except ImportError:
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
-except:
+except Exception:
     flash_attention = None
 
 from ...utils.log import logger

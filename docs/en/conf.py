@@ -127,7 +127,7 @@ def extract_tar(app, config):
 
         with tarfile.open(fileobj=file_stream, mode="r") as tar:
             tar.extractall("_static/")
-    except:
+    except Exception:
         pass
 
 

@@ -34,7 +34,7 @@ import server
 
 try:
     import triton_python_backend_utils as pb_utils
-except:
+except Exception:
     model_server_logger.warning(
         "TritonPythonModel is only available under triton inference server framework."
     )

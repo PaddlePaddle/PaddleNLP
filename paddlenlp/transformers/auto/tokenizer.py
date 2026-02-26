@@ -367,7 +367,7 @@ class AutoTokenizer:
                 try:
                     if tokenizer_class is None:
                         tokenizer_class = getattr(import_class, init_class)
-                except:
+                except Exception:
                     raise ValueError(f"Tokenizer class {init_class} is not currently imported.")
                 return tokenizer_class
             else:

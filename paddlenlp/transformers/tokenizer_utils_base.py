@@ -1220,10 +1220,10 @@ class SpecialTokensMixin:
         for attr in self.SPECIAL_TOKENS_ATTRIBUTES:
             try:
                 attr_value = getattr(self, "_" + attr)
-            except:
+            except Exception:
                 try:
                     attr_value = getattr(self, attr)
-                except:
+                except Exception:
                     continue
             if attr_value:
                 set_attr[attr] = (
@@ -1246,10 +1246,10 @@ class SpecialTokensMixin:
         for attr in self.SPECIAL_TOKENS_ATTRIBUTES:
             try:
                 attr_value = getattr(self, "_" + attr)
-            except:
+            except Exception:
                 try:
                     attr_value = getattr(self, attr)
-                except:
+                except Exception:
                     continue
             if attr_value:
                 set_attr[attr] = attr_value

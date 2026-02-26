@@ -39,11 +39,11 @@ from .configuration import GPT_PRETRAINED_INIT_CONFIGURATION, GPTConfig
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
-except:
+except Exception:
     flash_attention = None
 try:
     from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
-except:
+except Exception:
     FusedDropoutAdd = None
 
 __all__ = [

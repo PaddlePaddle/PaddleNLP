@@ -22,13 +22,13 @@ from paddle.distributed.fleet.utils import recompute
 
 try:
     from paddle.distributed.fleet.meta_parallel import LocalSharedLayerDesc
-except:
+except Exception:
     LocalSharedLayerDesc = None
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
         mark_as_sequence_parallel_parameter,
     )
-except:
+except Exception:
     pass
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel

@@ -17,7 +17,7 @@ from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer
 
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import ScatterOp
-except:
+except Exception:
     pass
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel

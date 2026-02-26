@@ -27,7 +27,7 @@ def infer(
     while not req_que.empty():
         try:
             prompt, input_seqlen, output_seqlen = req_que.get(timeout=10.0)
-        except:
+        except Exception:
             continue
 
         start = time.time()
@@ -102,7 +102,7 @@ def infer(
                 token_num = eval(
                     res_text.split("previous_num_tokens:")[-1].split("data: [DONE]")[0]
                 )
-            except:
+            except Exception:
                 token_num = len(chunks)
         elif backend == "paddle":
             token_num = 0

@@ -28,7 +28,7 @@ class UnpackDataLoader(paddle.io.DataLoader):
 def create_if_not_exists(dir):
     try:
         dir.mkdir(parents=True)
-    except:
+    except Exception:
         pass
     return dir
 

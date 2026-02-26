@@ -29,7 +29,7 @@ from paddle.nn.quant import weight_quantize
 
 try:
     from .qlora import qlora_weight_linear, qlora_weight_quantize
-except:
+except Exception:
     qlora_weight_linear = None
     qlora_weight_quantize = None
 

@@ -35,7 +35,7 @@ try:
         ReduceScatterOp,
         mark_as_sequence_parallel_parameter,
     )
-except:
+except Exception:
     AllGatherOp = None
     ReduceScatterOp = None
     mark_as_sequence_parallel_parameter = None

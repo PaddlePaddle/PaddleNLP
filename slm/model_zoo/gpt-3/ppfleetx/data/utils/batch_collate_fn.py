@@ -19,7 +19,7 @@ import paddle
 
 try:
     from collections.abc import Mapping, Sequence
-except:
+except Exception:
     from collections import Sequence, Mapping
 
 from ppfleetx.data.sampler import Stack, Tuple

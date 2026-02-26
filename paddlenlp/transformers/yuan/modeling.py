@@ -44,7 +44,7 @@ try:
         ColumnSequenceParallelLinear,
         RowSequenceParallelLinear,
     )
-except:
+except Exception:
     pass
 
 __all__ = [

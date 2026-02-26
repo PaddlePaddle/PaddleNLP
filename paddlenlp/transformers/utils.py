@@ -60,7 +60,7 @@ from ..utils.download import resolve_file_path
 # TODO(@zewu): upgrade aistudio to the newest version
 try:
     from .aistudio_utils import aistudio_download
-except:
+except Exception:
     aistudio_download = None
 
 HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
@@ -183,7 +183,7 @@ def adapt_stale_fwd_patch(self, name, value):
 
             if is_inference_mode(value):
                 return value
-        except:
+        except Exception:
             pass
 
         if hasattr(inspect, "getfullargspec"):
@@ -563,7 +563,7 @@ def cached_file(
             resolved_file = aistudio_download(
                 repo_id=path_or_repo_id, filename=filename, subfolder=subfolder, cache_dir=cache_dir
             )
-        except:
+        except Exception:
             resolved_file = None
     else:
         # if cache_dir is None:
@@ -809,7 +809,7 @@ def use_hybrid_parallel():
 
         hcg = fleet.get_hybrid_communicate_group()
         return hcg
-    except:
+    except Exception:
         return None
 
 

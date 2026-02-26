@@ -25,7 +25,7 @@ try:
     from paddlenlp.quantization.qlora import qlora_weight_quantize_dequantize
     from paddlenlp.quantization.quantization_config import QuantizationConfig
     from paddlenlp.quantization.quantization_linear import QuantizationLinear
-except:
+except Exception:
     pass
 
 from paddlenlp.trainer.argparser import strtobool
@@ -159,7 +159,7 @@ def merge_old_lora(lora_config, args):
     try:
         model.merge()
         model.eval()
-    except:
+    except Exception:
         model.eval()
     model_state_dict = model.model.state_dict()
     for key in list(model_state_dict):
@@ -172,7 +172,7 @@ def read_file(file_name):
     if file_name.endswith("safetensors"):
         try:
             from paddlenlp.utils.safetensors import fast_load_file as load_file
-        except:
+        except Exception:
             from safetensors.numpy import load_file
 
         read_tensors = load_file(file_name)

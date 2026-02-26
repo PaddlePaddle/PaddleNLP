@@ -46,12 +46,12 @@ from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
 try:
     from paddle.distributed.fleet.meta_parallel import PipelineDatasetPreprocessor
-except:
+except Exception:
     PipelineDatasetPreprocessor = None
 
 try:
     from paddle.base import core
-except:
+except Exception:
     core = None
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
@@ -67,12 +67,12 @@ try:
     )
 
     _obtain_optimizer_parameters_list = obtain_optimizer_parameters_list
-except:
+except Exception:
     try:
         from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
             _obtain_optimizer_parameters_list,
         )
-    except:
+    except Exception:
         _obtain_optimizer_parameters_list = None
 
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
@@ -106,7 +106,7 @@ try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
         register_sequence_parallel_allreduce_hooks,
     )
-except:
+except Exception:
     pass
 
 from ..transformers.context_parallel_utils import split_inputs_sequence_dim_load_balance
@@ -227,17 +227,17 @@ if is_datasets_available():
 
 try:
     from paddle.distributed.fleet.utils import mix_precision_utils
-except:
+except Exception:
     mix_precision_utils = None
 
 try:
     from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
-except:
+except Exception:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
 try:
     from paddle.distributed import in_auto_parallel_align_mode
-except:
+except Exception:
 
     def in_auto_parallel_align_mode():
         """
@@ -2461,7 +2461,7 @@ class Trainer:
                     fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
                         checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
                     )
-                except:
+                except Exception:
                     logger.warning(
                         "Hybrid parallel rng states change when training environment differs, so we dot not set state tracker here."
                     )

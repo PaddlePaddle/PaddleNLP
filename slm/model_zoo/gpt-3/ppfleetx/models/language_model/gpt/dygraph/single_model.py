@@ -40,12 +40,12 @@ from .processor import (
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
-except:
+except Exception:
     flash_attention = None
 
 try:
     from paddle.jit.api import set_dynamic_shape
-except:
+except Exception:
     from paddle.jit.dy2static.utils_helper import set_dynamic_shape
 
 def get_attr(layer, name):

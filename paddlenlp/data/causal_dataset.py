@@ -588,7 +588,7 @@ def _build_index_mappings(
                     time.sleep(3)
     # try:
     #     hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
-    # except:
+    # except Exception:
     #     hcg = FakeHCG()
 
     # counts = paddle.to_tensor([data_cache_success], dtype="int64")

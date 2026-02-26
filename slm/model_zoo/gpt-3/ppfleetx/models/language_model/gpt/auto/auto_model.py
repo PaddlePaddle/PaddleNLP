@@ -40,18 +40,18 @@ from ..dygraph.processor import (
 
 try:
     from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
-except:
+except Exception:
     FusedDropoutAdd = None
 FusedDropoutAdd = None
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
-except:
+except Exception:
     flash_attention = None
 
 try:
     from paddle.jit.api import set_dynamic_shape
-except:
+except Exception:
     from paddle.jit.dy2static.utils_helper import set_dynamic_shape
 
 def shard_op_for_sequence_parallel_linear(tgt, mesh):

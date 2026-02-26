@@ -44,12 +44,12 @@ try:
         ScatterOp,
         mark_as_sequence_parallel_parameter,
     )
-except:
+except Exception:
     pass
 
 try:
     from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
-except:
+except Exception:
     FusedDropoutAdd = None
 
 __all__ = [
@@ -81,7 +81,7 @@ def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output):
         hcg = fleet.get_hybrid_communicate_group()
         model_parallel_group = hcg.get_model_parallel_group()
         tensor_parallel_degree = hcg.get_model_parallel_world_size()
-    except:
+    except Exception:
         is_fleet_init = False
 
     if paddle.in_dynamic_mode():

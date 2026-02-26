@@ -43,12 +43,12 @@ MAX_NTK_SEQ_LENGTH = 32768
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
-except:
+except Exception:
     flash_attention = None
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
-except:
+except Exception:
     fused_rotary_position_embedding = None
 
 try:

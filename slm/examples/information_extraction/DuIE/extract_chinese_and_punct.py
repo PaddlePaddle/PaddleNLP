@@ -89,18 +89,18 @@ class ChineseAndPunctuationExtractor(object):
                     f = chr(f)
                     t = chr(t)
                     L.append("%s-%s" % (f, t))
-                except:
+                except Exception:
                     pass  # A narrow python build, so can't use chars > 65535 without surrogate pairs!
 
             else:
                 try:
                     L.append(chr(i))
-                except:
+                except Exception:
                     pass
         for j, _ in CN_PUNCTS:
             try:
                 L.append(chr(j))
-            except:
+            except Exception:
                 pass
 
         for k in EN_PUNCTS:
@@ -109,7 +109,7 @@ class ChineseAndPunctuationExtractor(object):
                 f = chr(f)
                 t = chr(t)
                 L.append("%s-%s" % (f, t))
-            except:
+            except Exception:
                 raise ValueError()
                 pass  # A narrow python build, so can't use chars > 65535 without surrogate pairs!
 

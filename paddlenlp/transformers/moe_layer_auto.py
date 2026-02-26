@@ -24,7 +24,7 @@ import paddle.nn.functional as F
 
 try:
     from paddle.distributed.auto_parallel.local_layer import LocalLayer
-except:
+except Exception:
 
     class LocalLayer(object):
         """

@@ -56,24 +56,24 @@ try:
         ScatterOp,
         mark_as_sequence_parallel_parameter,
     )
-except:
+except Exception:
     pass
 
 from paddlenlp.transformers.segment_parallel_utils  import ReshardLayer
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
-except:
+except Exception:
     flash_attention = None
 
 try:
     from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
-except:
+except Exception:
     FusedDropoutAdd = None
 
 try:
     from paddle.jit.api import set_dynamic_shape
-except:
+except Exception:
     from paddle.jit.dy2static.utils_helper import set_dynamic_shape
 
 def get_attr(layer, name):

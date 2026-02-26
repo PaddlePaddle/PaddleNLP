@@ -537,7 +537,7 @@ def get_skip_recompute_ops(config, layer_idx):
     try:
         hcg = fleet.get_hybrid_communicate_group()
         pp_size = max(hcg.get_pipe_parallel_world_size(), 1)
-    except:
+    except Exception:
         pp_size = 1
     layer_num = config.num_layers if hasattr(config, "num_layers") else config.num_hidden_layers
     if hasattr(config, "add_tail_layer") and config.add_tail_layer:

@@ -29,7 +29,7 @@ try:
     from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
         DygraphShardingOptimizerV2,
     )
-except:
+except Exception:
     DygraphShardingOptimizerV2 = None
 
 from paddlenlp.transformers.model_utils import (
