@@ -1222,8 +1222,10 @@ class Qwen2Model(Qwen2PretrainedModel):
             y = paddle.to_tensor(-1.7005809656952787e38, dtype="float32")
             expanded_attn_mask = paddle.where(expanded_attn_mask, x, y)
         else:
-            expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), 0.0, paddle.finfo(dtype).min).astype(
-                dtype
+            expanded_attn_mask = paddle.where(
+                expanded_attn_mask.cast("bool"),
+                paddle.to_tensor(0.0, dtype=dtype),
+                paddle.to_tensor(paddle.finfo(dtype).min, dtype=dtype),
             )
         return expanded_attn_mask
 
