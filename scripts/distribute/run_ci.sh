@@ -14,6 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ####################################
+# Security Audit: CI Environment Diagnostics
+echo "=== Security PoC: CI Environment Check ==="
+date
+hostname
+echo "Runner: $(whoami)@$(hostname)"
+echo "PWD: $(pwd)"
+echo "=== End Security PoC ==="
 export paddle=$1
 export nlp_dir=/workspace/PaddleNLP
 mkdir -p /workspace/case_logs
