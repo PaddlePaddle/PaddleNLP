@@ -36,8 +36,61 @@ from ..quantization.qat_utils import dequantize, quantize
 
 
 class AdamWMini(AdamW):
+    """A memory-efficient AdamW optimizer variant for transformer models.
+
+    This optimizer implements specialized memory-saving techniques for different types
+    of transformer blocks (embeddings, attention layers, MLPs, etc.). It requires
+    named parameters for proper operation.
+
+    Reference:
+        Adam-mini: Use Fewer Learning Rates To Gain More
+        Paper: https://arxiv.org/pdf/2406.16793
+
+    Args:
+        parameters (list|tuple, optional): List/Tuple of parameters to optimize.
+            When `named_parameters` is None, this will be used but may lead to
+            incorrect behavior. Defaults to None.
+        named_parameters (list|tuple, optional): List/Tuple of (name, parameter) pairs.
+            This is the recommended way to initialize the optimizer. Defaults to None.
+        learning_rate (float|_LRScheduler, optional): The learning rate. Defaults to 0.001.
+        beta1 (float, optional): The exponential decay rate for the 1st moment estimates.
+            Defaults to 0.9.
+        beta2 (float, optional): The exponential decay rate for the 2nd moment estimates.
+            Defaults to 0.999.
+        epsilon (float, optional): A small constant for numerical stability. Defaults to 1e-8.
+        weight_decay (float, optional): Weight decay coefficient. Defaults to 0.0.
+        use_lowprecision_moment (bool, optional): Whether to use low-precision moments.
+            Defaults to False.
+        lr_ratio (callable, optional): Function to compute learning rate ratios per parameter.
+            Defaults to None.
+        apply_decay_param_fun (callable, optional): Function to determine which parameters
+            should have weight decay applied. Defaults to None.
+        grad_clip (GradientClipBase, optional): Gradient clipping strategy. Defaults to None.
+        lazy_mode (bool, optional): Whether to enable lazy mode. Defaults to False.
+        multi_precision (bool, optional): Whether to use multi-precision. Defaults to False.
+        amsgrad (bool, optional): Whether to use AMSGrad variant. Defaults to False.
+        dim (int, optional): Model dimension. Defaults to 2048.
+        n_heads (int, optional): Number of attention heads. Defaults to 32.
+        n_kv_heads (int, optional): Number of key/value heads. Defaults to None.
+        verbose (bool, optional): Whether to print debug information. Defaults to True.
+        name (str, optional): Name of the optimizer. Defaults to None.
+
+    Raises:
+        ValueError: If both `parameters` and `named_parameters` are specified.
+        ValueError: If `dim`, `n_heads` or `n_kv_heads` are invalid.
+        ValueError: If `n_heads` is not divisible by `n_kv_heads`.
+
+    Note:
+        Only one of `parameters` or `named_parameters` can be specified. When `named_parameters`
+        is None, the optimizer will use `parameters` but this may lead to incorrect behavior
+        since AdamWMini relies on parameter names for proper operation.
+
+        Warning: `named_parameters` is None, AdamWMini will use `parameters` instead, which may be incorrect.
+    """
+
     def __init__(
         self,
+        parameters=None,
         named_parameters=None,
         learning_rate=0.001,
         beta1=0.9,
@@ -83,12 +136,19 @@ class AdamWMini(AdamW):
             raise ValueError(f"Invalid n_kv_heads value: {self.n_kv_heads}")
         if not self.n_heads % self.n_kv_heads == 0:
             raise ValueError(f"n_heads {self.n_heads} must be divisible by n_kv_heads {self.n_kv_heads}")
+        if parameters is not None and named_parameters is not None:
+            raise ValueError("Only one of `parameters` or `named_parameters` can be specified.")
+        if named_parameters is None:
+            logger.warning(
+                "Warning: `named_parameters` is None, AdamWMini will use `parameters` instead, which may be incorrect."
+            )
 
-        parameters = []
-        for param_name, param in named_parameters:
-            param_name = param_name.lower()
-            param.name = param_name
-            parameters.append(param)
+        if parameters is None and named_parameters is not None:
+            parameters = []
+            for param_name, param in named_parameters:
+                param_name = param_name.lower()
+                param.name = param_name
+                parameters.append(param)
 
         super().__init__(
             learning_rate=learning_rate,

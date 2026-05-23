@@ -131,7 +131,7 @@ class TestAdamWMini(unittest.TestCase):
         model = SimpleTransformerPaddle()
 
         optimizer = AdamWMini(
-            model.named_parameters(),
+            named_parameters=model.named_parameters(),
             learning_rate=lr,
             weight_decay=weight_decay,
             beta1=beta1,
@@ -150,3 +150,50 @@ class TestAdamWMini(unittest.TestCase):
             loss.backward()
             optimizer.step()
             optimizer.clear_grad()
+
+    def test_adamw_parameters(self):
+        lr = 1e-3
+        beta1 = 0.8
+        beta2 = 0.888
+        epsilon = 1e-8
+        weight_decay = 0.0
+        dim = 2048
+        n_heads = 32
+        model = SimpleTransformerPaddle()
+
+        optimizer = AdamWMini(
+            parameters=model.parameters(),
+            learning_rate=lr,
+            weight_decay=weight_decay,
+            beta1=beta1,
+            beta2=beta2,
+            epsilon=epsilon,
+            dim=dim,
+            n_heads=n_heads,
+        )
+
+        for _ in range(2):
+            x_np, _ = generate_data()
+            x = paddle.to_tensor(x_np, dtype="int64")
+
+            output = model(x)
+            loss = paddle.mean(output)
+            loss.backward()
+            optimizer.step()
+            optimizer.clear_grad()
+
+    def test_error_args(self):
+        with self.assertRaises(ValueError):
+            model = SimpleTransformerPaddle()
+
+            _ = AdamWMini(
+                parameters=model.parameters(),
+                named_parameters=model.named_parameters(),
+                learning_rate=1e-3,
+                weight_decay=0.01,
+                beta1=0.9,
+                beta2=0.999,
+                epsilon=1e-8,
+                dim=2048,
+                n_heads=32,
+            )
