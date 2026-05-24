@@ -134,6 +134,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
         self.num_attention_heads = config.num_attention_heads
+        self.num_key_value_heads = config.num_key_value_heads
         self.intermediate_size = config.intermediate_size
         self.num_layers = config.num_hidden_layers
         self.epsilon = config.rms_norm_eps
@@ -196,7 +197,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
         transformer_config = FusedMultiTransformerConfig(
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
-            kv_num_heads=self.num_layers,
+            kv_num_heads=self.num_key_value_heads,
             intermediate_size=self.intermediate_size,
             activation="silu",
             num_layers=self.num_layers,
@@ -329,7 +330,11 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
                     axis=-1,
                 ).reshape(
                     self.hidden_size,
-                    3 * (self.num_attention_heads // self.config.tensor_parallel_degree) * (head_size),
+                    (
+                        self.num_attention_heads // self.config.tensor_parallel_degree
+                        + 2 * self.num_key_value_heads // self.config.tensor_parallel_degree
+                    )
+                    * (head_size),
                 )  # reshape(3, self.num_attention_heself.hidden_sizeads // self.config.tensor_parallel_degree, head_size, )
             if "llama.layers.{}.mlp.gate_up_fused_proj.weight".format(idx) in state_dict.keys():
                 concated_ffn1_weight = np.concatenate(
