@@ -26,6 +26,7 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
                   const paddle::optional<paddle::Tensor>& ffn1_scale,
                   const paddle::optional<paddle::Tensor>& ffn2_scale,
                   const std::string& quant_method,
+                  const int32_t weightonly_group_size,
                   paddle::Tensor ffn_out) {
   typedef PDTraits<T> traits_;
   typedef typename traits_::DataType DataType_;
@@ -62,8 +63,16 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
       ffn1_bias
           ? const_cast<paddle::Tensor*>(ffn1_bias.get_ptr())->data<data_t>()
           : nullptr;
-
+  /*
+  group size
+  different quant and no quant, no quant and quant channel wise have same group
+  size no quant : group_size = -1
+  quant channel wise : group_size = -1
+  quant group wise : group_size = 64 || 128
+  */
+  int group_size = weightonly_group_size;
   if (quant_method == "weight_only_int8") {
+    group_size = group_size == -1 ? hidden_size : group_size;
     int8_moe_gemm_runner.moe_gemm_bias_act(
         reinterpret_cast<const NvType*>(permuted_data),
         reinterpret_cast<const uint8_t*>(ffn1_weight.data<int8_t>()),
@@ -77,8 +86,10 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         hidden_size,
         num_experts,
         "none",
+        group_size,
         stream);
   } else if (quant_method == "weight_only_int4") {
+    group_size = group_size == -1 ? hidden_size : group_size;
     int4_moe_gemm_runner.moe_gemm_bias_act(
         reinterpret_cast<const NvType*>(permuted_data),
         reinterpret_cast<const cutlass::uint4b_t*>(ffn1_weight.data<int8_t>()),
@@ -92,6 +103,7 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         hidden_size,
         num_experts,
         "none",
+        group_size,
         stream);
   } else {
     fp16_moe_gemm_runner.moe_gemm_bias_act(
@@ -106,13 +118,16 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         hidden_size,
         num_experts,
         "none",
+        -1,
         stream);
   }
 
   auto act_out_tensor = paddle::experimental::swiglu(fc1_out_tensor, nullptr);
   auto act_out = act_out_tensor.data<data_t>();
-
+  // reset group_size
+  group_size = weightonly_group_size;
   if (quant_method == "weight_only_int8") {
+    group_size = group_size == -1 ? inter_size / 2 : group_size;
     int8_moe_gemm_runner.moe_gemm(
         reinterpret_cast<const NvType*>(act_out),
         reinterpret_cast<const uint8_t*>(ffn2_weight.data<int8_t>()),
@@ -124,9 +139,11 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         hidden_size,
         inter_size / 2,
         num_experts,
+        group_size,
         stream);
 
   } else if (quant_method == "weight_only_int4") {
+    group_size = group_size == -1 ? inter_size / 2 : group_size;
     int4_moe_gemm_runner.moe_gemm(
         reinterpret_cast<const NvType*>(act_out),
         reinterpret_cast<const cutlass::uint4b_t*>(ffn2_weight.data<int8_t>()),
@@ -138,6 +155,7 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         hidden_size,
         inter_size / 2,
         num_experts,
+        group_size,
         stream);
   } else {
     fp16_moe_gemm_runner.moe_gemm(
@@ -150,6 +168,7 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         hidden_size,
         inter_size / 2,
         num_experts,
+        -1,
         stream);
   }
 }
@@ -162,7 +181,8 @@ std::vector<paddle::Tensor> MoeExpertFFN(
     const paddle::optional<paddle::Tensor>& ffn1_bias,
     const paddle::optional<paddle::Tensor>& ffn1_scale,
     const paddle::optional<paddle::Tensor>& ffn2_scale,
-    const std::string& quant_method) {
+    const std::string& quant_method,
+    const int32_t weightonly_group_size) {
   const auto input_type = permute_input.dtype();
   auto ffn_out = paddle::empty_like(permute_input);
 
@@ -176,6 +196,7 @@ std::vector<paddle::Tensor> MoeExpertFFN(
                                                ffn1_scale,
                                                ffn2_scale,
                                                quant_method,
+                                               weightonly_group_size,
                                                ffn_out);
       break;
     case paddle::DataType::FLOAT16:
@@ -187,6 +208,7 @@ std::vector<paddle::Tensor> MoeExpertFFN(
                                               ffn1_scale,
                                               ffn2_scale,
                                               quant_method,
+                                              weightonly_group_size,
                                               ffn_out);
       break;
     default:
@@ -226,7 +248,7 @@ PD_BUILD_OP(moe_expert_ffn)
              paddle::Optional("ffn1_scale"),
              paddle::Optional("ffn2_scale")})
     .Outputs({"output_tensor"})
-    .Attrs({"quant_method:std::string"})
+    .Attrs({"quant_method:std::string", "weightonly_group_size: int"})
     .SetKernelFn(PD_KERNEL(MoeExpertFFN))
     .SetInferShapeFn(PD_INFER_SHAPE(MoeExpertFFNInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(MoeExpertFFNInferDtype));

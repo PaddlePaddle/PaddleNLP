@@ -188,3 +188,84 @@ class CommonGpusInferenceTest(TestMultipleGpus, LLMTest):
         LLMTest.tearDown(self)
         if os.path.exists(self.save_file_path):
             shutil.rmtree(self.save_file_path)
+
+
+@parameterized_class(
+    ["model_name_or_path", "model_class"],
+    [
+        ["deepseek-ai/DeepSeek-V2-Lite-Chat", AutoModelForCausalLM],
+    ],
+)
+class GroupWiseWeightQuantInferenceTest(LLMTest, unittest.TestCase):
+    config_path: str = "./tests/fixtures/llm/predictor.yaml"
+    model_name_or_path: str = None
+    model_class = None
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
+        AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
+        global global_result
+        model_tag = os.path.basename(self.model_name_or_path)
+
+        if model_tag not in global_result:
+            self.run_predictor({"inference_model": True, "block_attn": True, "append_attn": True, "max_length": 48})
+            self.golden_result = self._read_result(os.path.join(self.output_dir, "predict.json"))
+            global_result[model_tag] = self.golden_result
+        else:
+            self.golden_result = global_result[model_tag]
+
+    @parameterized.expand(
+        [
+            (
+                {
+                    "quant_type": "weight_only_int4",
+                    "weightonly_group_size": 64,
+                },
+            ),
+            (
+                {
+                    "quant_type": "weight_only_int4",
+                    "weightonly_group_size": 128,
+                },
+            ),
+            (
+                {
+                    "quant_type": "weight_only_int8",
+                    "weightonly_group_size": 64,
+                },
+            ),
+            (
+                {
+                    "quant_type": "weight_only_int8",
+                    "weightonly_group_size": 128,
+                },
+            ),
+        ]
+    )
+    def test_groupwise_weight_quant_inference(self, param_case):
+        config_params = {"inference_model": True, "block_attn": True, "append_attn": True, "max_length": 48}
+        config_params.update(param_case)
+        print(config_params)
+
+        self.run_predictor(config_params)
+
+        result = self._read_result(os.path.join(self.output_dir, "predict.json"))
+        assert len(self.golden_result) == len(result)
+
+        partial_match, full_match = 0, 0
+        for golden_item, result_item in zip(self.golden_result, result):
+            score = levenshtein_similarity(golden_item, result_item)
+            if score >= 0.95:
+                full_match += 1
+            if score >= 0.6:
+                partial_match += 1
+
+        if not config_params["inference_model"]:
+            self.assertGreaterEqual(full_match / len(self.golden_result), 0.3)
+            self.assertGreaterEqual(partial_match / len(self.golden_result), 0.4)
+        elif config_params.get("use_fake_parameter", False):
+            pass
+        else:
+            self.assertGreaterEqual(full_match / len(self.golden_result), 0.5)
+            self.assertGreaterEqual(partial_match / len(self.golden_result), 0.8)

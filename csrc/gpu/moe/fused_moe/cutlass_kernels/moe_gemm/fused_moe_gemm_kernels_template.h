@@ -52,6 +52,7 @@ template <typename T,
           typename WeightType,
           typename arch,
           typename EpilogueTag,
+          bool FineGrained,
           typename ThreadblockShape,
           typename WarpShape,
           int Stages>
@@ -64,6 +65,7 @@ void generic_moe_gemm_kernelLauncher(const T* A,
                                      int64_t gemm_n,
                                      int64_t gemm_k,
                                      int num_experts,
+                                     int group_size,
                                      CutlassGemmConfig gemm_config,
                                      const int multi_processor_count,
                                      cudaStream_t stream,
@@ -128,7 +130,10 @@ void generic_moe_gemm_kernelLauncher(const T* A,
                                        MixedGemmArchTraits::ElementsPerAccessC,
                                        ElementAccumulator,
                                        EpilogueTag>::Op;
-
+  using Operator = typename MixedGemmArchTraits::Operator;
+  using TaggedOperator =
+        typename cutlass::arch::TagOperator<Operator,
+                                            FineGrained>::TaggedOperator;
   // Finally, set up the kernel.
   using GemmKernel_ = typename cutlass::gemm::kernel::DefaultGemmGrouped<
       ElementType,
@@ -151,7 +156,7 @@ void generic_moe_gemm_kernelLauncher(const T* A,
       cutlass::gemm::threadblock::GemmBatchedIdentityThreadblockSwizzle,
       Stages,
       cutlass::gemm::kernel::GroupScheduleMode::kDeviceOnly,
-      typename MixedGemmArchTraits::Operator>::GemmKernel;
+      TaggedOperator>::GemmKernel;
 
   using GemmKernel =
       cutlass::gemm::kernel::MoeFCGemm<typename GemmKernel_::Mma,
@@ -159,7 +164,8 @@ void generic_moe_gemm_kernelLauncher(const T* A,
                                        typename GemmKernel_::ThreadblockSwizzle,
                                        arch,  // Ensure top level arch is used
                                               // for dispatch
-                                       GemmKernel_::kGroupScheduleMode>;
+                                       GemmKernel_::kGroupScheduleMode,
+                                       FineGrained>;
 
   using GemmGrouped = cutlass::gemm::device::GemmGrouped<GemmKernel>;
 
@@ -178,7 +184,7 @@ void generic_moe_gemm_kernelLauncher(const T* A,
 
   typename EpilogueOp::Params epilogue_op(ElementAccumulator(1.f),
                                           ElementAccumulator(0.f));
-
+  
   typename GemmGrouped::Arguments args(
       num_experts,
       threadblock_count,
@@ -190,7 +196,8 @@ void generic_moe_gemm_kernelLauncher(const T* A,
       reinterpret_cast<ElementType*>(C),
       total_rows_before_expert,
       gemm_n,
-      gemm_k);
+      gemm_k,
+      group_size);
 
   GemmGrouped gemm;
 
@@ -222,6 +229,7 @@ template <typename T,
           typename WeightType,
           typename arch,
           typename EpilogueTag,
+          bool FineGrained,
           typename ThreadblockShape,
           typename WarpShape,
           int Stages,
@@ -236,6 +244,7 @@ struct dispatch_stages {
                        int64_t gemm_n,
                        int64_t gemm_k,
                        int num_experts,
+                       int group_size,
                        CutlassGemmConfig gemm_config,
                        int multi_processor_count,
                        cudaStream_t stream,
@@ -252,12 +261,14 @@ template <typename T,
           typename WeightType,
           typename arch,
           typename EpilogueTag,
+          bool FineGrained,
           typename ThreadblockShape,
           typename WarpShape>
 struct dispatch_stages<T,
                        WeightType,
                        arch,
                        EpilogueTag,
+                       FineGrained,
                        ThreadblockShape,
                        WarpShape,
                        2> {
@@ -270,6 +281,7 @@ struct dispatch_stages<T,
                        int64_t gemm_n,
                        int64_t gemm_k,
                        int num_experts,
+                       int group_size,
                        CutlassGemmConfig gemm_config,
                        int multi_processor_count,
                        cudaStream_t stream,
@@ -278,6 +290,7 @@ struct dispatch_stages<T,
                                     WeightType,
                                     arch,
                                     EpilogueTag,
+                                    FineGrained,
                                     ThreadblockShape,
                                     WarpShape,
                                     2>(A,
@@ -289,6 +302,7 @@ struct dispatch_stages<T,
                                        gemm_n,
                                        gemm_k,
                                        num_experts,
+                                       group_size,
                                        gemm_config,
                                        multi_processor_count,
                                        stream,
@@ -299,6 +313,7 @@ struct dispatch_stages<T,
 template <typename T,
           typename WeightType,
           typename EpilogueTag,
+          bool FineGrained,
           typename ThreadblockShape,
           typename WarpShape,
           int Stages>
@@ -306,6 +321,7 @@ struct dispatch_stages<T,
                        WeightType,
                        cutlass::arch::Sm80,
                        EpilogueTag,
+                       FineGrained,
                        ThreadblockShape,
                        WarpShape,
                        Stages,
@@ -319,6 +335,7 @@ struct dispatch_stages<T,
                        int64_t gemm_n,
                        int64_t gemm_k,
                        int num_experts,
+                       int group_size,
                        CutlassGemmConfig gemm_config,
                        int multi_processor_count,
                        cudaStream_t stream,
@@ -327,6 +344,7 @@ struct dispatch_stages<T,
                                     WeightType,
                                     cutlass::arch::Sm80,
                                     EpilogueTag,
+                                    FineGrained,
                                     ThreadblockShape,
                                     WarpShape,
                                     Stages>(A,
@@ -338,6 +356,7 @@ struct dispatch_stages<T,
                                             gemm_n,
                                             gemm_k,
                                             num_experts,
+                                            group_size,
                                             gemm_config,
                                             multi_processor_count,
                                             stream,
@@ -349,6 +368,7 @@ template <typename T,
           typename WeightType,
           typename arch,
           typename EpilogueTag,
+          bool FineGrained,
           typename ThreadblockShape,
           typename WarpShape>
 void dispatch_gemm_config(const T* A,
@@ -360,6 +380,7 @@ void dispatch_gemm_config(const T* A,
                           int64_t gemm_n,
                           int64_t gemm_k,
                           int num_experts,
+                          int group_size,
                           CutlassGemmConfig gemm_config,
                           int multi_processor_count,
                           cudaStream_t stream,
@@ -370,6 +391,7 @@ void dispatch_gemm_config(const T* A,
                     WeightType,                                \
                     arch,                                      \
                     EpilogueTag,                               \
+                    FineGrained,                               \
                     ThreadblockShape,                          \
                     WarpShape,                                 \
                     STAGE>::dispatch(A,                        \
@@ -381,6 +403,7 @@ void dispatch_gemm_config(const T* A,
                                      gemm_n,                   \
                                      gemm_k,                   \
                                      num_experts,              \
+                                     group_size,               \
                                      gemm_config,              \
                                      multi_processor_count,    \
                                      stream,                   \
@@ -408,6 +431,7 @@ void dispatch_gemm_config(const T* A,
                          WeightType,                            \
                          arch,                                  \
                          EpilogueTag,                           \
+                         FineGrained,                           \
                          cutlass::gemm::GemmShape<AA, BB, CC>,  \
                          cutlass::gemm::GemmShape<DD, EE, FF>>( \
         A,                                                      \
@@ -419,6 +443,7 @@ void dispatch_gemm_config(const T* A,
         gemm_n,                                                 \
         gemm_k,                                                 \
         num_experts,                                            \
+        group_size,                                             \
         gemm_config,                                            \
         multi_processor_count,                                  \
         stream,                                                 \
@@ -431,6 +456,7 @@ template <typename T,
           typename WeightType,
           typename arch,
           typename EpilogueTag,
+          bool FineGrained,
           typename std::enable_if<!std::is_same<T, float>::value &&
                                   std::is_same<T, WeightType>::value>::type* =
               nullptr>
@@ -444,6 +470,7 @@ void dispatch_moe_gemm_to_cutlass(const T* A,
                                   int64_t gemm_n,
                                   int64_t gemm_k,
                                   int num_experts,
+                                  int group_size,
                                   CutlassGemmConfig gemm_config,
                                   int sm_version,
                                   int multi_processor_count,
@@ -477,6 +504,7 @@ template <typename T,
           typename WeightType,
           typename arch,
           typename EpilogueTag,
+          bool FineGrained,
           typename std::enable_if<!std::is_same<T, float>::value &&
                                   !std::is_same<T, WeightType>::value>::type* =
               nullptr>
@@ -490,6 +518,7 @@ void dispatch_moe_gemm_to_cutlass(const T* A,
                                   int64_t gemm_n,
                                   int64_t gemm_k,
                                   int num_experts,
+                                  int group_size,
                                   CutlassGemmConfig gemm_config,
                                   int sm_version,
                                   int multi_processor_count,
@@ -551,6 +580,7 @@ template <
     typename WeightType,
     typename arch,
     typename EpilogueTag,
+    bool FineGrained,
     typename std::enable_if<std::is_same<T, float>::value>::type* = nullptr>
 void dispatch_moe_gemm_to_cutlass(const T* A,
                                   const WeightType* B,
@@ -562,6 +592,7 @@ void dispatch_moe_gemm_to_cutlass(const T* A,
                                   int64_t gemm_n,
                                   int64_t gemm_k,
                                   int num_experts,
+                                  int group_size,
                                   CutlassGemmConfig gemm_config,
                                   int sm_version,
                                   int multi_processor_count,
@@ -597,8 +628,8 @@ MoeGemmRunner<T, WeightType>::MoeGemmRunner() {
 }
 
 template <typename T, typename WeightType>
-template <typename EpilogueTag>
-void MoeGemmRunner<T, WeightType>::dispatch_to_arch<EpilogueTag>(
+template <typename EpilogueTag, bool FineGrained>
+void MoeGemmRunner<T, WeightType>::dispatch_to_arch<EpilogueTag, FineGrained>(
     const T* A,
     const WeightType* B,
     const T* weight_scales,
@@ -609,25 +640,27 @@ void MoeGemmRunner<T, WeightType>::dispatch_to_arch<EpilogueTag>(
     int64_t gemm_n,
     int64_t gemm_k,
     int num_experts,
+    int group_size,
     CutlassGemmConfig gemm_config,
     cudaStream_t stream,
     int* occupancy) {
-#define dispatch_moe_gemm_to_cutlass_macro(ARCH)                  \
-  dispatch_moe_gemm_to_cutlass<T, WeightType, ARCH, EpilogueTag>( \
-      A,                                                          \
-      B,                                                          \
-      weight_scales,                                              \
-      biases,                                                     \
-      C,                                                          \
-      total_rows_before_expert,                                   \
-      total_rows,                                                 \
-      gemm_n,                                                     \
-      gemm_k,                                                     \
-      num_experts,                                                \
-      gemm_config,                                                \
-      sm_,                                                        \
-      multi_processor_count_,                                     \
-      stream,                                                     \
+#define dispatch_moe_gemm_to_cutlass_macro(ARCH)                               \
+  dispatch_moe_gemm_to_cutlass<T, WeightType, ARCH, EpilogueTag, FineGrained>( \
+      A,                                                                       \
+      B,                                                                       \
+      weight_scales,                                                           \
+      biases,                                                                  \
+      C,                                                                       \
+      total_rows_before_expert,                                                \
+      total_rows,                                                              \
+      gemm_n,                                                                  \
+      gemm_k,                                                                  \
+      num_experts,                                                             \
+      group_size,                                                              \
+      gemm_config,                                                             \
+      sm_,                                                                     \
+      multi_processor_count_,                                                  \
+      stream,                                                                  \
       occupancy);
 
   if (sm_ >= 70 && sm_ < 75) {
@@ -642,8 +675,8 @@ void MoeGemmRunner<T, WeightType>::dispatch_to_arch<EpilogueTag>(
 }
 
 template <typename T, typename WeightType>
-template <typename EpilogueTag>
-void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag>(
+template <typename EpilogueTag, bool FineGrained>
+void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag, FineGrained>(
     const T* A,
     const WeightType* B,
     const T* weight_scales,
@@ -654,11 +687,12 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag>(
     int64_t gemm_n,
     int64_t gemm_k,
     int num_experts,
+    int group_size,
     cudaStream_t stream) {
   static constexpr bool is_weight_only = !std::is_same<T, WeightType>::value;
   static constexpr bool only_simt_configs = std::is_same<T, float>::value;
-  std::vector<CutlassGemmConfig> candidate_configs =
-      get_candidate_configs(sm_, -1, is_weight_only, only_simt_configs, true);
+  std::vector<CutlassGemmConfig> candidate_configs = get_candidate_configs(
+      sm_, group_size, is_weight_only, only_simt_configs, true);
   static constexpr int warm_time = 5;
   static constexpr int test_time = 10;
   auto& gemmConfigManager = GemmConfigManager::Instance();
@@ -681,7 +715,7 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag>(
     for (size_t ii = 0; ii < candidate_configs.size(); ++ii) {
       try {
         for (int i = 0; i < warm_time; i++) {
-          dispatch_to_arch<EpilogueTag>(A,
+          dispatch_to_arch<EpilogueTag, FineGrained>(A,
                                         B,
                                         weight_scales,
                                         biases,
@@ -691,6 +725,7 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag>(
                                         gemm_n,
                                         gemm_k,
                                         num_experts,
+                                        group_size,
                                         candidate_configs[ii],
                                         stream);
         }
@@ -701,7 +736,7 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag>(
         check_cuda_error(cudaStreamSynchronize(stream));
         check_cuda_error(cudaEventRecord(start, stream));
         for (int i = 0; i < test_time; i++) {
-          dispatch_to_arch<EpilogueTag>(A,
+          dispatch_to_arch<EpilogueTag, FineGrained>(A,
                                         B,
                                         weight_scales,
                                         biases,
@@ -711,6 +746,7 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag>(
                                         gemm_n,
                                         gemm_k,
                                         num_experts,
+                                        group_size,
                                         candidate_configs[ii],
                                         stream);
         }
@@ -737,18 +773,19 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag>(
       PADDLE_FATAL("[MoE Configure Search] find no one available config.");
     }
   }
-  dispatch_to_arch<EpilogueTag>(A,
-                                B,
-                                weight_scales,
-                                biases,
-                                C,
-                                total_rows_before_expert,
-                                total_rows,
-                                gemm_n,
-                                gemm_k,
-                                num_experts,
-                                chosen_config,
-                                stream);
+  dispatch_to_arch<EpilogueTag, FineGrained>(A,
+                                             B,
+                                             weight_scales,
+                                             biases,
+                                             C,
+                                             total_rows_before_expert,
+                                             total_rows,
+                                             gemm_n,
+                                             gemm_k,
+                                             num_experts,
+                                             group_size,
+                                             chosen_config,
+                                             stream);
 }
 
 template <typename T, typename WeightType>
@@ -764,32 +801,73 @@ void MoeGemmRunner<T, WeightType>::moe_gemm_bias_act(
     int64_t gemm_k,
     int num_experts,
     std::string activation_type,
+    const int32_t weightonly_group_size,
     cudaStream_t stream) {
   if (activation_type == "none") {
     if (biases) {
-      run_gemm<EpilogueOpBias>(A,
-                               B,
-                               weight_scales,
-                               biases,
-                               C,
-                               total_rows_before_expert,
-                               total_rows,
-                               gemm_n,
-                               gemm_k,
-                               num_experts,
-                               stream);
+      if (weightonly_group_size > 0) {
+        PADDLE_ENFORCE_GE(sm_,
+                          80,
+                          phi::errors::Unimplemented(
+                              "Groupwise mode is not supported on SM < 8.0"));
+        run_gemm<EpilogueOpBias, true>(A,
+                                       B,
+                                       weight_scales,
+                                       biases,
+                                       C,
+                                       total_rows_before_expert,
+                                       total_rows,
+                                       gemm_n,
+                                       gemm_k,
+                                       num_experts,
+                                       weightonly_group_size,
+                                       stream);
+      } else {
+        run_gemm<EpilogueOpBias, false>(A,
+                                        B,
+                                        weight_scales,
+                                        biases,
+                                        C,
+                                        total_rows_before_expert,
+                                        total_rows,
+                                        gemm_n,
+                                        gemm_k,
+                                        num_experts,
+                                        weightonly_group_size,
+                                        stream);
+      }
     } else {
-      run_gemm<EpilogueOpNoBias>(A,
-                                 B,
-                                 weight_scales,
-                                 nullptr,
-                                 C,
-                                 total_rows_before_expert,
-                                 total_rows,
-                                 gemm_n,
-                                 gemm_k,
-                                 num_experts,
-                                 stream);
+      if (weightonly_group_size > 0) {
+        PADDLE_ENFORCE_GE(sm_,
+                          80,
+                          phi::errors::Unimplemented(
+                              "Groupwise mode is not supported on SM < 8.0"));
+        run_gemm<EpilogueOpNoBias, true>(A,
+                                         B,
+                                         weight_scales,
+                                         nullptr,
+                                         C,
+                                         total_rows_before_expert,
+                                         total_rows,
+                                         gemm_n,
+                                         gemm_k,
+                                         num_experts,
+                                         weightonly_group_size,
+                                         stream);
+      } else {
+        run_gemm<EpilogueOpNoBias, false>(A,
+                                          B,
+                                          weight_scales,
+                                          nullptr,
+                                          C,
+                                          total_rows_before_expert,
+                                          total_rows,
+                                          gemm_n,
+                                          gemm_k,
+                                          num_experts,
+                                          weightonly_group_size,
+                                          stream);
+      }
     }
   }
 }
@@ -804,16 +882,37 @@ void MoeGemmRunner<T, WeightType>::moe_gemm(const T* A,
                                             int64_t gemm_n,
                                             int64_t gemm_k,
                                             int num_experts,
+                                            int group_size,
                                             cudaStream_t stream) {
-  run_gemm<EpilogueOpNoBias>(A,
-                             B,
-                             weight_scales,
-                             nullptr,
-                             C,
-                             total_rows_before_expert,
-                             total_rows,
-                             gemm_n,
-                             gemm_k,
-                             num_experts,
-                             stream);
+  if (group_size > 0) {
+    PADDLE_ENFORCE_GE(sm_,
+                      80,
+                      phi::errors::Unimplemented(
+                          "Groupwise mode is not supported on SM < 8.0"));
+    run_gemm<EpilogueOpNoBias, true>(A,
+                                     B,
+                                     weight_scales,
+                                     nullptr,
+                                     C,
+                                     total_rows_before_expert,
+                                     total_rows,
+                                     gemm_n,
+                                     gemm_k,
+                                     num_experts,
+                                     group_size,
+                                     stream);
+  } else {
+    run_gemm<EpilogueOpNoBias, false>(A,
+                                      B,
+                                      weight_scales,
+                                      nullptr,
+                                      C,
+                                      total_rows_before_expert,
+                                      total_rows,
+                                      gemm_n,
+                                      gemm_k,
+                                      num_experts,
+                                      group_size,
+                                      stream);
+  }
 }

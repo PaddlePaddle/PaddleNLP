@@ -1325,6 +1325,7 @@ class FusedMultiTransformerBase(Layer):
                 self.ffn1_weights_scale[i] if hasattr(self, "ffn1_weights_scale") else None,
                 self.ffn2_weights_scale[i] if hasattr(self, "ffn2_weights_scale") else None,
                 self.quant_type if hasattr(self, "quant_type") else "None",
+                self.config.weightonly_group_size,
             )
 
             fused_moe_out = moe_expert_reduce(
@@ -1347,6 +1348,7 @@ class FusedMultiTransformerBase(Layer):
                 self.ffn2_biases[i],
                 self.ffn2_weights_scale[i] if hasattr(self, "ffn2_weights_scale") else None,
                 self.quant_type if hasattr(self, "quant_type") else "None",
+                self.config.weightonly_group_size,
                 self.config.moe_config.top_k,
                 self.config.moe_config.norm_topk_prob,
                 False,
@@ -1782,10 +1784,30 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             ffn1_weight_scale_attr = self.get_attr(config.ffn1_weight_scale_attrs, i)
             ffn2_weight_scale_attr = self.get_attr(config.ffn2_weight_scale_attrs, i)
             if self.config.moe_config.use_moe(i):
+                if self.weightonly_group_size < 0:
+                    base_shape = (
+                        [self.config.moe_config.num_experts, self.config.moe_config.moe_intermediate_size * 2]
+                        if config.activation.endswith("glu")
+                        else [self.config.moe_config.num_experts, self.config.moe_config.moe_intermediate_size]
+                    )
+                else:
+                    base_shape_group = (self.embed_dim + self.weightonly_group_size - 1) // self.weightonly_group_size
+                    base_shape = (
+                        [
+                            self.config.moe_config.num_experts,
+                            base_shape_group,
+                            self.config.moe_config.moe_intermediate_size * 2,
+                        ]
+                        if config.activation.endswith("glu")
+                        else [
+                            self.config.moe_config.num_experts,
+                            base_shape_group,
+                            self.config.moe_config.moe_intermediate_size,
+                        ]
+                    )
+
                 ffn1_weight_scale = self.create_parameter(
-                    shape=[self.config.moe_config.num_experts, self.config.moe_config.moe_intermediate_size * 2]
-                    if config.activation.endswith("glu")
-                    else [self.config.moe_config.num_experts, self.config.moe_config.moe_intermediate_size],
+                    shape=base_shape,
                     attr=ffn1_weight_scale_attr,
                     dtype=self.weight_scale_dtype,
                     is_bias=False,
@@ -1807,8 +1829,15 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                 )
 
             if self.config.moe_config.use_moe(i):
+                if self.weightonly_group_size < 0:
+                    base_shape = [self.config.moe_config.num_experts, self.embed_dim]
+                else:
+                    base_shape_group = (
+                        self.config.moe_config.moe_intermediate_size + self.weightonly_group_size - 1
+                    ) // self.weightonly_group_size
+                    base_shape = [self.config.moe_config.num_experts, base_shape_group, self.embed_dim]
                 ffn2_weight_scale = self.create_parameter(
-                    shape=[self.config.moe_config.num_experts, self.embed_dim],
+                    shape=base_shape,
                     attr=ffn2_weight_scale_attr,
                     dtype=self.weight_scale_dtype,
                     is_bias=False,

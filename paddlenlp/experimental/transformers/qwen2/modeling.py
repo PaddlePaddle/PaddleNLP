@@ -108,12 +108,15 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         self.use_fake_parameter = config.get("use_fake_parameter", False)
 
         self.use_weight_only = False
+        self.weightonly_group_size = -1
         if config.quant_type == "weight_only_int8":
             self.use_weight_only = True
             self.quant_algo = "weight_only_int8"
+            self.weightonly_group_size = config.weightonly_group_size
         elif config.quant_type == "weight_only_int4":
             self.use_weight_only = True
             self.quant_algo = "weight_only_int4"
+            self.weightonly_group_size = config.weightonly_group_size
         elif "a8w8" in config.quant_type:
             self.quant_model_path = config.model_name_or_path
             self.shift = config.quantization_config.shift
@@ -311,6 +314,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             kv_num_heads=self.num_key_value_heads,
             intermediate_size=self.intermediate_size,
             quant_type=self.quant_type,
+            weightonly_group_size=self.weightonly_group_size,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
             tp_degree=config.tensor_parallel_degree,
@@ -672,7 +676,9 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
 
             if self.use_weight_only:
                 qkv_weight = paddle.transpose(qkv_weight, perm=[1, 0])
-                qkv_quanted_weight, qkv_weight_scale = weight_quantize(qkv_weight, algo=self.quant_algo)
+                qkv_quanted_weight, qkv_weight_scale = weight_quantize(
+                    qkv_weight, algo=self.quant_algo, group_size=self.weightonly_group_size
+                )
                 self.transformer_block.qkv_weights[idx].copy_(qkv_quanted_weight, False)
                 self.transformer_block.qkv_weights_scale[idx].copy_(qkv_weight_scale, False)
             elif "fp8" in self.quant_type:
@@ -710,7 +716,9 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 paddle.get_default_dtype()
             )
             if self.use_weight_only:
-                linear_quanted_weight, linear_weight_scale = weight_quantize(linear_weight, algo=self.quant_algo)
+                linear_quanted_weight, linear_weight_scale = weight_quantize(
+                    linear_weight, algo=self.quant_algo, group_size=self.weightonly_group_size
+                )
                 self.transformer_block.linear_weights[idx].copy_(linear_quanted_weight, False)
                 self.transformer_block.linear_weights_scale[idx].copy_(linear_weight_scale, False)
             elif "fp8" in self.quant_type:
@@ -769,7 +777,9 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             ffn1_weight = paddle.to_tensor(concated_ffn1_weight).cast(paddle.get_default_dtype())
 
             if self.use_weight_only:
-                ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(ffn1_weight, algo=self.quant_algo)
+                ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(
+                    ffn1_weight, algo=self.quant_algo, group_size=self.weightonly_group_size
+                )
                 self.transformer_block.ffn1_weights[idx].copy_(ffn1_quanted_weight, False)
                 self.transformer_block.ffn1_weights_scale[idx].copy_(ffn1_weight_scale, False)
             elif "fp8" in self.quant_type:
@@ -806,7 +816,9 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 paddle.get_default_dtype()
             )
             if self.use_weight_only:
-                ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(ffn2_weight, algo=self.quant_algo)
+                ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(
+                    ffn2_weight, algo=self.quant_algo, group_size=self.weightonly_group_size
+                )
                 self.transformer_block.ffn2_weights[idx].copy_(ffn2_quanted_weight, False)
                 self.transformer_block.ffn2_weights_scale[idx].copy_(ffn2_weight_scale, False)
             elif "fp8" in self.quant_type:

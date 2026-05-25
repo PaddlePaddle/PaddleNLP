@@ -126,6 +126,7 @@ public:
                   const paddle::Tensor *ffn2_scale,
                   const paddle::Tensor *ffn2_bias,
                   const paddle::Tensor *moe_token_type_ids,
+                  const int weightonly_group_size,
                   const int moe_topk,
                   const bool group_moe,
                   const bool norm_topk_prob,
@@ -304,6 +305,7 @@ public:
           hidden_size,
           num_experts,
           "none",
+          weightonly_group_size,
           stream);
     } else if (gemm_method_ == "weight_only_int4") {
       int4_moe_gemm_runner_->moe_gemm_bias_act(
@@ -319,6 +321,7 @@ public:
           hidden_size,
           num_experts,
           "none",
+          weightonly_group_size,
           stream);
     } else {
       fp16_moe_gemm_runner_->moe_gemm_bias_act(
@@ -333,6 +336,7 @@ public:
           hidden_size,
           num_experts,
           "none",
+          weightonly_group_size,
           stream);
     }
 
@@ -356,6 +360,7 @@ public:
             hidden_size,
             inter_size / 2,
             num_experts,
+            weightonly_group_size,
             stream);
       } else if (gemm_method_ == "weight_only_int4") {
         int4_moe_gemm_runner_->moe_gemm(
@@ -369,6 +374,7 @@ public:
             hidden_size,
             inter_size / 2,
             num_experts,
+            weightonly_group_size,
             stream);
       } else {
         fp16_moe_gemm_runner_->moe_gemm(
@@ -381,6 +387,7 @@ public:
             hidden_size,
             inter_size / 2,
             num_experts,
+            weightonly_group_size,
             stream);
       }
 
