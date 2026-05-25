@@ -157,7 +157,6 @@ class AvxConfig:
 class SpeculateConfig:
     speculate_max_draft_token_num: int = 5
     speculate_method: str = None
-    return_full_hidden_states: bool = False
 
 
 @dataclass
