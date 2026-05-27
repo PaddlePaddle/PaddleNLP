@@ -748,6 +748,8 @@ def get_tensor_parallel_split_func(tensor_parallel_degree, tensor_parallel_rank,
         if x is None:
             return None
         if transpose:
+            if hasattr(x, "get"):
+                x = x.get()
             if isinstance(x, paddle.Tensor):
                 x = paddle.transpose(x, [1, 0])
             else:

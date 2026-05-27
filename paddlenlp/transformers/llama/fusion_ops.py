@@ -21,7 +21,10 @@ try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
 except ImportError:
     fused_rotary_position_embedding = None
-
+try:
+    from paddle.incubate.nn.functional import fused_rms_norm_ext
+except ImportError:
+    fused_rms_norm_ext = None
 try:
     from paddle.incubate.nn.functional import swiglu
 except ImportError:
@@ -132,6 +135,8 @@ def fusion_rope(
 
 
 def rms_norm_fused(x_in, w, eps, use_fast_ln=False):
+    if fused_rms_norm_ext is not None:
+        return fused_rms_norm_ext(x_in, w, eps)[0].astype(w.dtype)
     if use_fast_ln:
         fast_ln = try_import("fast_ln")
         return fast_ln.fast_rms_norm(x_in, w, eps)[0]
