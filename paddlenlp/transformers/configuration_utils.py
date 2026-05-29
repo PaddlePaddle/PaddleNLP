@@ -236,6 +236,8 @@ class LlmMetaConfig:
         ("use_fused_linear", bool, False, "GPT3 model, use fused linear layer"),
         ("use_fused_dropout_add", bool, False, "GPT3 model, use fused `dropout + residual add` op."),
         ("use_fused_linear_cross_entropy", bool, False, "use fused `linear + cross_entropy` fuse op."),
+        ("fuse_attention_qkv", bool, False, "use fused q/k/v proj linear"),
+        ("fuse_attention_ffn", bool, False, "use fused up/gate proj linear"),
     ]
 
     hybrid_parallel_attributes = [
@@ -553,6 +555,8 @@ class PretrainedConfig:
         llm_meta = LlmMetaConfig._get_defaults()
         self._unsavable_keys.update(LlmMetaConfig._get_unsavable_keys())
         self._unsavable_keys.remove("tensor_parallel_degree")
+        self._unsavable_keys.remove("fuse_attention_qkv")
+        self._unsavable_keys.remove("fuse_attention_ffn")
 
         kwargs = set_expected_keys(self, llm_meta, kwargs)
         if self.sequence_parallel:

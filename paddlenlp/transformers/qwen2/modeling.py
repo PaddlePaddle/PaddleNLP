@@ -641,23 +641,12 @@ class Qwen2Attention(nn.Layer):
 
         if self.fuse_attention_qkv:
             mix_layer = self.qkv_proj(hidden_states)
-            if self.sequence_parallel:
-                target_shape = [
-                    batch_size,
-                    -1,
-                    self.num_key_value_heads,
-                    (self.num_key_value_groups + 2) * self.head_dim,
-                ]
-            else:
-                target_shape = [0, 0, self.num_key_value_heads, (self.num_key_value_groups + 2) * self.head_dim]
-            mix_layer = paddle.reshape_(mix_layer, target_shape)
             query_states, key_states, value_states = paddle.split(
-                mix_layer,
-                num_or_sections=[self.num_key_value_groups * self.head_dim, self.head_dim, self.head_dim],
-                axis=-1,
+                mix_layer.reshape([batch_size, -1, (self.num_heads + self.num_key_value_heads * 2), self.head_dim]),
+                [self.num_heads, self.num_key_value_heads, self.num_key_value_heads],
+                axis=2,
             )
-            if self.gqa_or_mqa:
-                query_states = paddle.reshape_(query_states, [0, 0, self.num_heads, self.head_dim])
+            mix_layer = None
         else:
             query_states = self.q_proj(hidden_states)
             key_states = self.k_proj(hidden_states)
