@@ -1183,8 +1183,9 @@ class GPTLMHeadAuto(nn.Layer):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
-        y = dist.reshard(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)])
-        logits = paddle.matmul(hidden_states, y, transpose_y=self.transpose_y)
+        # y = dist.reshard(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)])
+        # logits = paddle.matmul(hidden_states, y, transpose_y=self.transpose_y)
+        logits = paddle.matmul(hidden_states, self.weight, transpose_y=self.transpose_y)
         return logits
 
 
@@ -1204,11 +1205,12 @@ class GPTForCausalLMAuto(GPTPretrainedModelAuto):
         super(GPTForCausalLMAuto, self).__init__(config)
         self.gpt = GPTModelAuto(config)
         self.ipp = self.gpt.get_last_layer_ipp()
-        self.lm_head = GPTLMHeadAuto(
-            config, embedding_weights=self.gpt.embeddings.word_embeddings.weight, ipp=self.ipp
-        )
+        self.lm_head = GPTLMHeadAuto(config, embedding_weights=None, ipp=self.ipp)
+        # self.lm_head = GPTLMHeadAuto(
+        #     config, embedding_weights=self.gpt.embeddings.word_embeddings.weight, ipp=self.ipp
+        # )
 
-        self.tie_weights()
+        # self.tie_weights()
         self.criterion = GPTPretrainingCriterionAuto(config)
 
     def get_output_embeddings(self):
