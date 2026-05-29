@@ -24,6 +24,7 @@ from typing import List, Optional
 import numpy as np
 import paddle
 import paddle.distributed as dist
+from paddle.distributed import fleet
 
 from paddlenlp.ops import Topology
 from paddlenlp.trainer import (
@@ -43,6 +44,7 @@ from paddlenlp.transformers import (
     GPTPretrainingCriterionAuto,
     GPTPretrainingCriterionNet,
     LinearAnnealingWithWarmupDecay,
+    get_gpt_pp_schedule,
 )
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
@@ -100,10 +102,6 @@ class PreTrainingArguments(AutoTrainingArguments):
     autotuner_benchmark: bool = field(
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
-    )
-    n_microbatches: int = field(
-        default=1,
-        metadata={"help": "Control the num of microbatches in one pp step."},
     )
     pre_alloc_memory: float = field(
         default=0.0,
@@ -620,6 +618,23 @@ def main():
             last_epoch=0,
         )
 
+    pp_schedule = None
+    if training_args.pipeline_parallel_degree > 1 and model_args.model_type == "gpt_pp":
+        comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
+        pp_schedule = get_gpt_pp_schedule(
+            model,
+            training_args.gradient_accumulation_steps,
+            criterion,
+            training_args.pipeline_schedule_mode,
+            training_args.pipeline_parallel_degree,
+            comm_group_in_pp,
+        )
+        # 自动并行pp，在内部进行编排和acc_step累积
+        training_args.per_device_train_batch_size = (
+            training_args.per_device_train_batch_size * training_args.gradient_accumulation_steps
+        )
+        training_args.gradient_accumulation_steps = 1
+
     data_file = get_train_data_file(data_args)
     train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
         data_args,
@@ -631,7 +646,7 @@ def main():
 
     trainer = PretrainingTrainer(
         model=model,
-        model_type=model_args.model_type,
+        pp_schedule=pp_schedule,
         criterion=criterion,
         args=training_args,
         data_collator=data_collator,

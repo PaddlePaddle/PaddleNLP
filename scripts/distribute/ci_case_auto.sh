@@ -902,10 +902,9 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_hybrid_pp() {
             --intermediate_size 3072 \
             --num_hidden_layers 8 \
             --num_attention_heads 32 \
-            --per_device_train_batch_size 4 \
+            --per_device_train_batch_size 1 \
             --per_device_eval_batch_size 4 \
-            --n_microbatch 4 \
-            --gradient_accumulation_steps 1 \
+            --gradient_accumulation_steps 4 \
             --use_flash_attention 1 \
             --use_fused_rms_norm 0 \
             --fp16 1 \

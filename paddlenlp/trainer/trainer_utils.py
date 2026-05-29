@@ -48,7 +48,6 @@ from paddle.optimizer.lr import LambdaDecay
 from paddlenlp.ops import Topology
 
 from ..trainer.argparser import strtobool
-from ..transformers import get_gpt_pp_schedule, get_llama_pp_schedule
 from ..transformers.tokenizer_utils_base import BatchEncoding
 from ..utils.env import PREFIX_CHECKPOINT_DIR, _re_checkpoint  # noqa for compatibility
 from ..utils.fault_tolerance import PDC_DOWNLOAD_ERROR
