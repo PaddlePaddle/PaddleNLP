@@ -295,6 +295,7 @@ python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./llm/tools/
 
 - **PTQ**。PaddleSlim 团队自研的自适应 LLM.PTQ 量化算法，在[SmoothQuant](https://arxiv.org/abs/2211.10438)和[Outlier Suppression+](https://arxiv.org/abs/2304.09145)基础上新增 PieceWiseSearch 参数搜索算法，对模型权重和激活分布进行调整，减少后续 A8W8 PTQ 量化损失。
 - **GPTQ**。[GPTQ](https://arxiv.org/abs/2210.17323)是业界主流的权重量化算法，可以将大模型权重进行4位整数无损量化，提高模型推理速度。
+- **FOEM**。[FOEM](https://arxiv.org/abs/2507.11017)是一种考虑一阶误差补偿的量化算法，相比GPTQ能够更进一步地减小量化误差。
 
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/969b62db-9692-4d50-b91a-85cff305d153">
@@ -319,6 +320,9 @@ python run_quantization.py ./config/llama/ptq_argument.json
 
 # GPTQ 量化启动命令参考
 python run_quantization.py ./config/llama/gptq_argument.json
+
+# FOEM Quantization Command Reference
+python run_quantization.py ./config/llama/foem_argument.json
 
 # W8A8C8(INT)量化启动命令参考
 python run_quantization.py ./config/llama/ptq_c8_argument.json

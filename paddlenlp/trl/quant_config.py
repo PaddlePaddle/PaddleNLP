@@ -104,6 +104,9 @@ class QuantConfig:
     # GPTQ related parameters
     do_gptq: bool = field(default=False, metadata={"help": "Whether to use GPTQ"})
     gptq_step: int = field(default=8, metadata={"help": "Step for GPTQ"})
+    # FOEM related parameters
+    do_foem: bool = field(default=False, metadata={"help": "Whether to use FOEM"})
+    foem_beta: int = field(default=0.1, metadata={"help": "beta for FOEM"})
 
     # AWQ related parameters, default for WINT4
     do_awq: bool = field(default=False, metadata={"help": "Whether to use AWQ Search"})

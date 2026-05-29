@@ -8,6 +8,7 @@
 新增 PieceWiseSearch 参数搜索算法并将算法扩展至**所有线性层**，对模型权重和激活分布进行调整，减少后续 A8W8 PTQ 量化损失。
 - **GPTQ**。[GPTQ](https://arxiv.org/abs/2210.17323)是业界主流的权重量化算法，可以将大模型权重进行4位整数无损量化，提高模型推理速度。
 - **AWQ**。[AWQ](https://arxiv.org/abs/2306.00978)是业界主流的权重量化算法，可以将大模型权重进行4位整数无损量化，提高模型推理速度。
+- **FOEM**。[FOEM](https://arxiv.org/abs/2507.11017)是一种考虑一阶误差补偿的量化算法，相比GPTQ能够更进一步地减小量化误差。
 
 <div align="center">
     <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/fe8f941b-4b35-48ca-814f-96533d7e24ce">
@@ -94,7 +95,13 @@ python  run_quantization.py ./config/llama/ptq_c8_argument.json
 python  run_quantization.py ./config/llama/fp8_ptq_argument.json
 ```
 
-### 2.8 量化参数介绍
+### 2.8 FOEM 量化
+
+```shell
+python  run_quantization.py ./config/llama/foem_argument.json
+```
+
+### 2.9 量化参数介绍
 
 <summary>&emsp; 量化参数（QuantArgument）</summary>
 
@@ -130,6 +137,7 @@ python  run_quantization.py ./config/llama/fp8_ptq_argument.json
 - `load_quant_model`: 是否加载量化模型，默认为 False。用于验证量化后的模型效果， 若设为 True，则从 output_dir 中加载权重。启动该过程需要设`do_ptq`为 False。如果量化时使用了 smooth 或 shift，加载时需要保持相同的配置（shift_step/search_step 可设为8）。注意，当前该函数只支持 pdparams 格式加载，若要使用该功能，设置`"unified_checkpoint": false`。
 - `skip_list_names`: 需要量化跳过的层名称列表，默认为空列表。可以使用层名的部分字符串作为匹配，如['down_proj']表示跳过所有 ffn2层。
 - `do_gptq`: 是否进行 GPTQ 量化，GPTQ 对模型进行 WINT4量化，相比于普通 PTQ 量化精度更高，量化时间较长。默认为 False。
+- `do_foem`: 是否进行 FOEM 量化，FOEM 对模型进行 WINT4量化，相比于普通 GPTQ 量化精度更高，量化时间较长。默认为 False。
 - `gptq_step`: GPTQ 量化步数，也即模型前向次数，默认为8。
 - `do_awq`: 是否进行 AWQ 量化，AWQ 对模型进行 WINT4量化，相比于普通 PTQ 量化精度更高。默认为 False。
 - `auto_clip`: AWQ 时是否进行自动搜索截断值并对模型权重进行截断操作，截断操作有利于量化模型精度，但搜索速度较慢。默认为 False。

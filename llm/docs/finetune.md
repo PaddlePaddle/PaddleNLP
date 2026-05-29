@@ -29,6 +29,8 @@
 
 - QLoRA:量化感知低秩适配（Quantized Low-Rank Adaptation）与标准 LoRA 相比，它可额外减少多达33%的内存使用，使其在 GPU 内存受限的情况下尤为有用。QLoRA 通常比普通 LoRA 多花费约20%的时间，但其显著的内存节省使其在 GPU 内存有限的情况下成为唯一可行的选择。
 
+- IR-QLoRA:量化感知低秩适配（Accurate LoRA-Finetuning Quantization of LLMs via Information Retention, ICML 2024 Oral）与标准 QLoRA 相比，通过准确的信息保留进一步地提高了精度。
+
 
 ## 3. 快速开始
 
@@ -80,6 +82,9 @@ python  run_finetune.py ./config/llama/lora_argument.json
 
 # 单卡QLoRA
 python  run_finetune.py ./config/llama/qlora_argument.json
+
+# 单卡IR-QLoRA
+python  run_finetune.py ./config/llama/irqlora_argument.json
 
 # 多卡LoRA
 python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  run_finetune.py ./config/llama/lora_argument.json

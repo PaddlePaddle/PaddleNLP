@@ -165,6 +165,7 @@ class ModelConfig:
             "help": "Block size for quant_scale of weight quant_scale(Only available for nf4 or fp4 quant_scale.)"
         },
     )
+    ir_qlora: bool = field(default=False, metadata={"help": "Whether to use IR-QLoRA"})
     apply_hadamard: bool = field(default=False, metadata={"help": "Whether to apply hadamard"})
     hadamard_block_size: int = field(default=32, metadata={"help": "hadamard block size"})
     quant_input_grad: bool = field(default=False, metadata={"help": "Whether to quantize input grad"})
