@@ -200,6 +200,8 @@ def get_dtype_str(dtype):
         return "_u8"
     elif dtype == paddle.int8:
         return "_i8"
+    elif dtype == paddle.int16:
+        return "_i16"
     elif dtype == paddle.int32:
         return "_i32"
     elif dtype == paddle.int64:
@@ -251,6 +253,8 @@ def get_pointer_hint(dtypes):
             hint += "*u8:16,"
         elif ele == paddle.int8:
             hint += "*i8:16,"
+        elif ele == paddle.int16:
+            hint += "*i16:16,"
         elif ele == paddle.float32:
             hint += "*fp32:16,"
         elif ele == paddle.bfloat16:
@@ -288,6 +292,8 @@ CUdeviceptr get_tensor_ptr(const paddle::Tensor& input){
     return (CUdeviceptr)(input.data<int64_t>());
   } else if (input.type() == paddle::DataType::INT32) {
     return (CUdeviceptr)(input.data<int32_t>());
+  } else if (input.type() == paddle::DataType::INT16) {
+    return (CUdeviceptr)(input.data<int16_t>());
   } else if (input.type() == paddle::DataType::FLOAT8_E4M3FN) {
     return (CUdeviceptr)(input.data<phi::dtype::float8_e4m3fn>());
   } else {

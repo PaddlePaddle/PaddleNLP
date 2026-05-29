@@ -75,6 +75,25 @@ def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, 
     state_dict = load_tp_checkpoint(model_path, cls, config, return_numpy=return_numpy)
     model.set_state_dict(state_dict)
 
+    # model.deepseek_v2.transformer_block.init_weight()
+
+    # for key, value in model.state_dict().items():
+    #     value._clear_data()
+
+    # paddle.distributed.barrier()
+    # rank = paddle.distributed.get_rank()
+    # file_name = f"/root/paddlejob/workspace/env_run/output/model/deepseek_V3_wint4_non/{rank}.pdparams"
+    # state_dict = paddle.load(file_name, return_numpy=False)
+
+    # for key, value in model.state_dict().items():
+    #     value._clear_data()
+    #     new_v = state_dict.pop(key)
+    #     if new_v.dtype == paddle.int8:
+    #         pass
+    #         # support fp8
+    #         # new_v = new_v.view("float8_e4m3fn")
+    #     new_v._share_buffer_to(value)
+
     return model
 
 

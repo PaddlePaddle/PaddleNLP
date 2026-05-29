@@ -1,9 +1,9 @@
 # /bin/bash
 
-pids=($(ps aux | grep -E 'tritonserver' | grep -v grep | awk '{print $2}'))
+pids=($(ps aux | grep -E 'fastdeployserver' | grep -v grep | awk '{print $2}'))
 
 if [ ${#pids[@]} -eq 0 ]; then
-    echo "Can not find tritonserver."
+    echo "Can not find fastdeployserver."
     timeout=1
 else
     timeout=300
@@ -30,7 +30,7 @@ while : ; do
 
   if [ $elapsed_time -ge $timeout ]; then
     echo "forcibly kill all process ..."
-    pids=$(ps auxww | grep -E "tritonserver|triton_python_backend_stub|infer|multiprocessing.resource_tracker|paddle.distributed.launch|task_queue_manager|app.py|spawn_main" | grep -v grep | grep -v start_both | awk '{print $2}');
+    pids=$(ps auxww | grep -E "fastdeployserver|triton_python_backend_stub|infer|multiprocessing.resource_tracker|paddle.distributed.launch|task_queue_manager|app.py|spawn_main" | grep -v grep | grep -v start_both | awk '{print $2}');
     echo $pids;
     for pid in ${pids[@]}; do
     kill -9 ${pid}
@@ -38,7 +38,7 @@ while : ; do
     break
   fi
 
-  pids=$(ps auxww | grep -E "tritonserver|triton_python_backend_stub|multiprocessing.resource_tracker|paddle.distributed.launch|app.py|spawn_main" | grep -v grep | awk '{print $2}');
+  pids=$(ps auxww | grep -E "fastdeployserver|triton_python_backend_stub|multiprocessing.resource_tracker|paddle.distributed.launch|app.py|spawn_main" | grep -v grep | awk '{print $2}');
   array=($(echo "$pids" | tr ' ' '\n'))
 
   if [ ${#array[*]} -ne 0 ]; then
