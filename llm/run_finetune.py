@@ -262,6 +262,13 @@ def main():
         )
     else:
         # NOTE(gongenlei): new add autotuner_benchmark
+        # 修改这里降低模型层数，deepseek前3层为dense层，之后才有稀疏层
+        model_config.num_hidden_layers = 2  # v3是61
+        model_config.first_k_dense_replace = 1  # v3是3
+        # 修改这里降低模型专家数量，如果希望进行EP并行，专家数量要能够被并行度整除
+        model_config.n_routed_experts = 16  # v3是256
+        model_config.num_experts_per_tok = 4  # v3是8
+        model_config.topk_group = 2  # v3是4
         model = model_class.from_config(model_config, dtype=dtype)
 
     if model_args.flash_mask and (not data_args.zero_padding or not model.config.use_flash_attention):

@@ -506,6 +506,14 @@ def main():
                 dtype=dtype,
             )
     else:
+        # 修改这里降低模型层数，deepseek前3层为dense层，之后才有稀疏层
+        config.num_hidden_layers = 1  # v3是61
+        config.first_k_dense_replace = 1  # v3是3
+        # 修改这里降低模型专家数量，如果希望进行EP并行，专家数量要能够被并行度整除
+        config.n_routed_experts = 16  # v3是256
+        config.num_experts_per_tok = 2  # v3是8
+        config.hidden_size = 128
+        config.topk_group = 2  # v3是4
         model = model_class.from_config(config, dtype=dtype)
 
     if training_args.recompute:
