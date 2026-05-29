@@ -84,6 +84,8 @@ class AutoTrainer(Trainer):
         self.auto_dist_config = kwargs.pop("auto_dist_config", None)
         model = kwargs.get("model", None)
         self.model_type = kwargs.pop("model_type", None)
+        if self.model_type is None and kwargs.get("args", None) is not None:
+            self.model_type = getattr(kwargs["args"], "model_type", None)
         assert model is not None
         if kwargs.get("args", None) is not None and kwargs["args"].use_intermediate_api:
             if not parallelize.has_parallelized_model:
@@ -106,6 +108,8 @@ class AutoTrainer(Trainer):
         self.global_mesh = fleet.auto.get_mesh()
         self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
         if self.args.pipeline_parallel_degree > 1 and check_auto_parallel_pipeline_support(self.model_type):
+            if self.criterion is None:
+                self.criterion = self.model.criterion
             self.pp_schedule = get_pp_schedule(
                 model,
                 self.model_type,
@@ -753,6 +757,8 @@ class AutoTrainer(Trainer):
         if self.criterion is not None:
             if "labels" in inputs:
                 labels = inputs.pop("labels")
+                if len(inputs["input_ids"]) == 4:
+                    input_ids, labels, _, _ = inputs["input_ids"]
             elif "start_positions" in inputs and "end_positions" in inputs:
                 labels = (inputs.pop("start_positions"), inputs.pop("end_positions"))
             elif self.args.label_names is not None:
