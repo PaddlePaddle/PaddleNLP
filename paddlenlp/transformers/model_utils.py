@@ -71,6 +71,7 @@ from paddle.nn import Embedding, Layer
 from paddle.utils.download import is_url as is_remote_url
 from tqdm.auto import tqdm
 
+from paddlenlp.utils import infohub
 from paddlenlp.utils.env import (
     ASYMMETRY_QUANT_SCALE_MAX,
     ASYMMETRY_QUANT_SCALE_MIN,
@@ -554,7 +555,13 @@ def load_state_dict(
             if len(scale_dict) != 0:
                 if ckpt_quant_stage == "O0":
                     raise ValueError('optimizer weight has quantization scales but `ckpt_quant_stage` is set to "O0"')
-                state_dict = dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict, use_pd=True)
+                state_dict = dequant_unified_optimizer(
+                    state_dict,
+                    ckpt_quant_stage,
+                    scale_dict,
+                    use_pd=True,
+                    return_dtype=infohub["opt_moment_dtype"] if "opt_moment_dtype" in infohub else "float32",
+                )
 
             return state_dict
 

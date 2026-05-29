@@ -42,6 +42,7 @@ def group_wise_quant_dequant(
     tp_degree=1,
     use_pd=False,
     symmetry=False,
+    return_dtype="float32",
 ):
     """
     group-wise quantization (support symmetry, asymmetry).
@@ -126,7 +127,7 @@ def group_wise_quant_dequant(
                     ]
                     / bnt
                 )
-            return dequant_tensor
+            return dequant_tensor.astype(return_dtype)
 
         scales = maxs - mins
         if use_pd:
@@ -158,7 +159,7 @@ def group_wise_quant_dequant(
             ) + new_mins[
                 :, tp_rank * new_mins.shape[-1] // tp_degree : (tp_rank + 1) * new_mins.shape[-1] // tp_degree
             ]
-        return dequant_tensor
+        return dequant_tensor.astype(return_dtype)
 
 
 def merge_int4(x, y):
@@ -217,7 +218,16 @@ def cal_abs_min_max_channel(inputs, quant_axis=1):
 
 
 def asymmetry_qdq_weight(
-    x, quant_bit=8, quant_axis=-1, mins=None, maxs=None, dequant=False, tp_rank=-1, tp_degree=1, use_pd=False
+    x,
+    quant_bit=8,
+    quant_axis=-1,
+    mins=None,
+    maxs=None,
+    dequant=False,
+    tp_rank=-1,
+    tp_degree=1,
+    use_pd=False,
+    return_dtype="float32",
 ):
     """
     channel-wise asymmetry quantization
@@ -278,7 +288,7 @@ def asymmetry_qdq_weight(
                     .unsqueeze(0)
                     .expand(quant_x.shape)
                 ) + mins[tp_rank * mins.shape[0] // tp_degree : (tp_rank + 1) * mins.shape[0] // tp_degree]
-            return qdq_x.astype(paddle.float32), scales
+            return qdq_x.astype(return_dtype), scales
 
 
 def cal_abs_max_channel(inputs, quant_axis=1):
@@ -302,7 +312,17 @@ def cal_abs_max_channel(inputs, quant_axis=1):
     return abs_max_values
 
 
-def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, tp_rank=-1, tp_degree=1, use_pd=False):
+def qdq_weight(
+    x,
+    quant_bit=8,
+    quant_axis=-1,
+    scales=None,
+    dequant=False,
+    tp_rank=-1,
+    tp_degree=1,
+    use_pd=False,
+    return_dtype="float32",
+):
     """
     channel-wise symmetry quantization
     Args:
@@ -361,4 +381,4 @@ def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, tp_ran
                     .expand(quant_x.shape)
                 )
             # fp32 , int8, int, fp32 or fp64
-            return qdq_x.astype(paddle.float32), scales
+            return qdq_x.astype(return_dtype), scales

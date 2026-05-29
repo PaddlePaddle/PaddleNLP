@@ -234,6 +234,8 @@ class UnifiedCheckpointHandler:
         if self.args.ckpt_quant_stage != "O0" and "quant_reach_limit" not in infohub:
             sharded_optim_index["ckpt_quant_stage"] = self.args.ckpt_quant_stage
 
+        sharded_optim_index["opt_moment_dtype"] = optim_state_dict[list(optim_state_dict.keys())[0]].dtype.name.lower()
+
         sharded_optim_index["quant_ckpt_resume_times"] = (
             infohub["quant_ckpt_resume_times"] if "quant_ckpt_resume_times" in infohub else 0
         )
@@ -464,6 +466,11 @@ class UnifiedCheckpointHandler:
         if quant_ckpt_resume_times >= MAX_QUANTIZATION_TIMES:
             infohub["quant_reach_limit"] = True
             logger.info("Checkpoint quantization time reach limit and will be closed.")
+
+        opt_moment_dtype = "float32"
+        if "opt_moment_dtype" in index:
+            opt_moment_dtype = index["opt_moment_dtype"]
+        infohub["opt_moment_dtype"] = opt_moment_dtype
 
         # If not having merge optimizer, then load non-merge optimizer.
         if "weight_map" not in index:
@@ -702,6 +709,7 @@ def unified_optimizer_into_shards(
         sharded_optim_index["quant_ckpt_resume_times"] = (
             infohub["quant_ckpt_resume_times"] if "quant_ckpt_resume_times" in infohub else 0
         )
+        sharded_optim_index["opt_moment_dtype"] = optim_state_dict[list(optim_state_dict.keys())[0]].dtype.name.lower()
 
     if master_weights is not None:
         index_master_weight_filelist, total_master_weight_size_list = gather_sharded_object(
