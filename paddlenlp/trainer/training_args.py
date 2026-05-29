@@ -1012,6 +1012,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": ("Whether to train model under static mode by jit.to_static or distributed.to_static.")},
     )
+    sot_mode: Optional[bool] = field(
+        default=False,
+        metadata={"help": ("Whether to train model using SOT in static mode.")},
+    )
     unified_checkpoint_config: Optional[str] = field(
         default="",
         metadata={

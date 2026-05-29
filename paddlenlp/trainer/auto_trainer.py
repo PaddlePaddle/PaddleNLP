@@ -241,7 +241,8 @@ class AutoTrainer(Trainer):
                 self.optimizer._enable_sharding_overlap(model)
 
         if self.args.to_static:
-            unified_strategy = dist.Strategy()
+            strategy_config = {"full_graph": False if self.args.sot_mode else True}
+            unified_strategy = dist.Strategy(strategy_config)
             unified_strategy._from_legacy_strategy(self.args.strategy)
 
             # same logic as autocast_smart_context_manager() in trainer.py
@@ -822,10 +823,10 @@ class AutoTrainer(Trainer):
 
         inputs = self._prepare_inputs(inputs)
 
-        if not self.args.to_static:
-            loss = self.dynamic_training(model, inputs)
-        else:
+        if self.args.to_static and not self.args.sot_mode:
             loss = self.static_training(model, inputs)
+        else:
+            loss = self.dynamic_training(model, inputs)
 
         if isinstance(loss, paddle.Tensor):
             return loss.detach() if loss._is_initialized() else float(0.0)
@@ -837,7 +838,10 @@ class AutoTrainer(Trainer):
             return float(loss)
 
     def optimizer_step(self):
-        if not self.args.to_static:
+        if self.args.to_static and not self.args.sot_mode:
+            # TODO: support optimizer_was_run in static mode
+            self.lr_scheduler.step()
+        else:
             optimizer_was_run = True
             if self.do_grad_scaling:
                 scale_before = paddle.assign(self.scaler._scale)
@@ -862,9 +866,6 @@ class AutoTrainer(Trainer):
                 self.lr_scheduler.step()
 
             self.optimizer.clear_grad()
-        else:
-            # TODO: support optimizer_was_run in static mode
-            self.lr_scheduler.step()
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         with _exec_mode_guard("dynamic"):
