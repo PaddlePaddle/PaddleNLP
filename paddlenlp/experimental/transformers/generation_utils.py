@@ -408,6 +408,13 @@ class GenerationInferenceModel(GenerationMixin):
 
 
 class GenerationBlockInferenceModel(GenerationMixin):
+    def __init__(self, config):
+        super().__init__(config)
+        self.rank = paddle.distributed.fleet.get_hybrid_communicate_group().get_model_parallel_rank()
+        self.nranks = paddle.distributed.fleet.get_hybrid_communicate_group().get_model_parallel_world_size()
+        self.root = 0
+        self.ring_id = paddle.distributed.fleet.get_hybrid_communicate_group().get_model_parallel_group().id
+
     @classmethod
     def get_cache_kvs_shape(cls, max_batch_size: int = None, max_length: int = None) -> list[list[int]]:
         raise NotImplementedError
@@ -736,7 +743,18 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:
-                paddle.distributed.broadcast(next_tokens, 0)
+                if "sdaa" in paddle.device.get_device():
+                    import paddle_sdaa
+
+                    paddle_sdaa.ops.custom_broadcast(
+                        next_tokens,
+                        rank=self.rank,
+                        nranks=self.nranks,
+                        root=self.root,
+                        ring_id=self.ring_id,
+                    )
+                else:
+                    paddle.distributed.broadcast(next_tokens, 0)
 
             with paddle.base.framework._stride_in_no_check_dy2st_diff():
                 from paddlenlp_ops import update_inputs_v2
