@@ -1,11 +1,11 @@
 // Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,36 +14,38 @@
 
 #pragma once
 
+#include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <sys/mman.h>
-#include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #ifdef PADDLE_WITH_HIP
-#include <hip/hip_runtime.h>
-#include <hip/hip_fp16.h>
 #include <hip/hip_bfloat16.h>
-#include <hipcub/hipcub.hpp>
+#include <hip/hip_fp16.h>
+#include <hip/hip_runtime.h>
 #include <hiprand.h>
 #include <hiprand_kernel.h>
+
+#include <hipcub/hipcub.hpp>
 namespace cub = hipcub;
 #else
-#include <cub/cub.cuh>
-#include <curand_kernel.h>
 #include <cuda_fp8.h>
+#include <curand_kernel.h>
+
+#include <cub/cub.cuh>
 #endif
-#include <iostream>
 #include <fstream>
+#include <iostream>
 
 #include "env.h"
-#include "paddle/extension.h"
-#include "paddle/phi/core/dense_tensor.h"
-#include "paddle/phi/core/allocator.h"
-#include "paddle/phi/backends/gpu/gpu_info.h"
 #include "nlohmann/json.hpp"
+#include "paddle/extension.h"
+#include "paddle/phi/backends/gpu/gpu_info.h"
+#include "paddle/phi/core/allocator.h"
+#include "paddle/phi/core/dense_tensor.h"
 
 
 using json = nlohmann::json;
@@ -61,47 +63,67 @@ using json = nlohmann::json;
   } while (0)
 
 #ifdef PADDLE_WITH_HIP
-template<size_t kBlockSize = 256, size_t kNumWaves = 16>
+template <size_t kBlockSize = 256, size_t kNumWaves = 16>
 inline hipError_t GetNumBlocks(int64_t n, int* num_blocks) {
   int dev;
   {
     hipError_t err = hipGetDevice(&dev);
-    if (err != hipSuccess) { return err; }
+    if (err != hipSuccess) {
+      return err;
+    }
   }
   int sm_count;
   {
-    hipError_t err = hipDeviceGetAttribute(&sm_count, hipDeviceAttributeMultiprocessorCount, dev);
-    if (err != hipSuccess) { return err; }
+    hipError_t err = hipDeviceGetAttribute(
+        &sm_count, hipDeviceAttributeMultiprocessorCount, dev);
+    if (err != hipSuccess) {
+      return err;
+    }
   }
   int tpm;
   {
-    hipError_t err = hipDeviceGetAttribute(&tpm, hipDeviceAttributeMaxThreadsPerMultiProcessor, dev);
-    if (err != hipSuccess) { return err; }
+    hipError_t err = hipDeviceGetAttribute(
+        &tpm, hipDeviceAttributeMaxThreadsPerMultiProcessor, dev);
+    if (err != hipSuccess) {
+      return err;
+    }
   }
-  *num_blocks = std::max<int>(1, std::min<int64_t>((n + kBlockSize - 1) / kBlockSize,
-                                                    sm_count * tpm / kBlockSize * kNumWaves));
+  *num_blocks =
+      std::max<int>(1,
+                    std::min<int64_t>((n + kBlockSize - 1) / kBlockSize,
+                                      sm_count * tpm / kBlockSize * kNumWaves));
   return hipSuccess;
 }
 #else
-template<size_t kBlockSize = 256, size_t kNumWaves = 16>
+template <size_t kBlockSize = 256, size_t kNumWaves = 16>
 inline cudaError_t GetNumBlocks(int64_t n, int* num_blocks) {
   int dev;
   {
     cudaError_t err = cudaGetDevice(&dev);
-    if (err != cudaSuccess) { return err; }
+    if (err != cudaSuccess) {
+      return err;
+    }
   }
   int sm_count;
   {
-    cudaError_t err = cudaDeviceGetAttribute(&sm_count, cudaDevAttrMultiProcessorCount, dev);
-    if (err != cudaSuccess) { return err; }
+    cudaError_t err =
+        cudaDeviceGetAttribute(&sm_count, cudaDevAttrMultiProcessorCount, dev);
+    if (err != cudaSuccess) {
+      return err;
+    }
   }
   int tpm;
   {
-    cudaError_t err = cudaDeviceGetAttribute(&tpm, cudaDevAttrMaxThreadsPerMultiProcessor, dev);
-    if (err != cudaSuccess) { return err; }
+    cudaError_t err = cudaDeviceGetAttribute(
+        &tpm, cudaDevAttrMaxThreadsPerMultiProcessor, dev);
+    if (err != cudaSuccess) {
+      return err;
+    }
   }
-  *num_blocks = std::max<int>(1, std::min<int64_t>((n + kBlockSize - 1) / kBlockSize,
-                                                    sm_count * tpm / kBlockSize * kNumWaves));
+  *num_blocks =
+      std::max<int>(1,
+                    std::min<int64_t>((n + kBlockSize - 1) / kBlockSize,
+                                      sm_count * tpm / kBlockSize * kNumWaves));
   return cudaSuccess;
 }
 
@@ -115,12 +137,12 @@ inline int GetGPUComputeCapability(int id) {
 }
 #endif
 
-template<typename T>
+template <typename T>
 __device__ T max_func(const T a, const T b) {
   return a > b ? a : b;
 }
 
-template<typename T>
+template <typename T>
 struct MaxOp {
   __device__ __forceinline__ T operator()(const T& a, const T& b) const {
     return max_func(a, b);
@@ -155,12 +177,14 @@ public:
   typedef paddle::bfloat16 data_t;
 };
 
+#ifndef PADDLE_WITH_HIP
 template <>
 class PDTraits<paddle::DataType::FLOAT8_E4M3FN> {
 public:
   typedef __nv_fp8_e4m3 DataType;
   typedef paddle::float8_e4m3fn data_t;
 };
+#endif
 
 template <>
 class PDTraits<paddle::DataType::INT8> {
@@ -193,51 +217,60 @@ HOSTDEVICE inline void Store(const AlignedVector<T, Size>& vec, T* addr) {
 
 #ifdef PADDLE_WITH_HIP
 template <int Size>
-HOSTDEVICE inline void Store(const AlignedVector<hip_bfloat16, Size>& vec, int8_t* addr) {
+HOSTDEVICE inline void Store(const AlignedVector<hip_bfloat16, Size>& vec,
+                             int8_t* addr) {
   printf("Error: Store hip_bfloat16 to int8_t is not supported!");
 }
 #else
 template <int Size>
-HOSTDEVICE inline void Store(const AlignedVector<__nv_bfloat16, Size>& vec, int8_t* addr) {
+HOSTDEVICE inline void Store(const AlignedVector<__nv_bfloat16, Size>& vec,
+                             int8_t* addr) {
   printf("Error: Store __nv_bfloat16 to int8_t is not supported!");
 }
 #endif
 
 template <int Size>
-HOSTDEVICE inline void Store(const AlignedVector<half, Size>& vec, int8_t* addr) {
+HOSTDEVICE inline void Store(const AlignedVector<half, Size>& vec,
+                             int8_t* addr) {
   printf("Error: Store half to int8_t is not supported!");
 }
 
 constexpr int VEC_16B = 16;
 
 inline json ReadJsonFromFile(const std::string& filePath) {
-    std::ifstream file(filePath);
-    if (!file.is_open()) {
-        throw std::runtime_error("Unable to open file: " + filePath);
-    }
+  std::ifstream file(filePath);
+  if (!file.is_open()) {
+    throw std::runtime_error("Unable to open file: " + filePath);
+  }
 
-    json j;
-    file >> j;
-    return j;
+  json j;
+  file >> j;
+  return j;
 }
 
-// place must be an existing place object and cannot use paddle::CPUPlace() or paddle::GPUPlace()
-inline paddle::Tensor GetEmptyTensor(const common::DDim& dims, const paddle::DataType& dtype, const paddle::Place& place){
+// place must be an existing place object and cannot use paddle::CPUPlace() or
+// paddle::GPUPlace()
+inline paddle::Tensor GetEmptyTensor(const common::DDim& dims,
+                                     const paddle::DataType& dtype,
+                                     const paddle::Place& place) {
   auto* allocator = paddle::GetAllocator(place);
   phi::DenseTensor dense_tensor;
   dense_tensor.Resize(dims);
-  dense_tensor.AllocateFrom(allocator, dtype, dense_tensor.numel() * phi::SizeOf(dtype));
+  dense_tensor.AllocateFrom(
+      allocator, dtype, dense_tensor.numel() * phi::SizeOf(dtype));
   return paddle::Tensor(std::make_shared<phi::DenseTensor>(dense_tensor));
 }
 
-__device__ inline bool is_in_end(const int64_t id, const int64_t *end_ids, int length) {
-    bool flag = false;
-    for (int i = 0; i < length; i++) {
-        if (id == end_ids[i]) {
-            return true;
-        }
+__device__ inline bool is_in_end(const int64_t id,
+                                 const int64_t* end_ids,
+                                 int length) {
+  bool flag = false;
+  for (int i = 0; i < length; i++) {
+    if (id == end_ids[i]) {
+      return true;
     }
-    return flag;
+  }
+  return flag;
 }
 
 inline int GetSMVersion() {
