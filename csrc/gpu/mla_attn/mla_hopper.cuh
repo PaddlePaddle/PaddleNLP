@@ -1,11 +1,11 @@
 // Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -114,6 +114,9 @@ struct Params {
   } else if (group_size == 16) {                             \
     constexpr size_t GROUP_SIZE = 16;                        \
     __VA_ARGS__                                              \
+  } else if (group_size == 32) {                             \
+    constexpr size_t GROUP_SIZE = 32;                        \
+    __VA_ARGS__                                              \
   } else if (group_size == 64) {                             \
     constexpr size_t GROUP_SIZE = 64;                        \
     __VA_ARGS__                                              \
@@ -185,7 +188,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
                                                : MainloopPipelineQ::ThreadCategory::Consumer;
   pipeline_params_q.producer_arv_count = NUM_COPY_THREADS;
   pipeline_params_q.consumer_arv_count = cutlass::NumThreadsPerWarpGroup; // just one wg qk
-  
+
 
   MainloopPipelineQ pipeline_q(shared_storage.pipeline_q, pipeline_params_q);
   MainloopPipeline pipeline_kv = [&] {
@@ -201,14 +204,14 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
 
   CollectiveMainloop collective_mainloop;
   CollectiveEpilogue collective_epilogue;
-  
+
   if (warp_group_idx == 0) {
     // producer
     if (USE_REG_EALLOC) {
       cutlass::arch::warpgroup_reg_dealloc<88>();
     }
     const uint32_t warp_idx_in_warpgroup = __shfl_sync(0xffffffff, warp_idx % 4, 0);
-    
+
     PipelineStateQ smem_pipe_write_q = cutlass::make_producer_start_state<MainloopPipelineQ>();
     PipelineState smem_pipe_write_kv = cutlass::make_producer_start_state<MainloopPipeline>();
     const int block_id = blockIdx.x;
@@ -280,12 +283,12 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
 
     if constexpr (BLOCK_SHAPE_KV == 64) {
       mma_f16<Ktraits, CAUSAL>(
-        mainloop_params, 
-        pipeline_q, 
+        mainloop_params,
+        pipeline_q,
         smem_pipe_read_q,
-        pipeline_kv, 
+        pipeline_kv,
         smem_pipe_read_kv,
-        tOrO, 
+        tOrO,
         attention_updater,
         threadIdx.x - NUM_COPY_THREADS,
         bid,
@@ -296,12 +299,12 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
         shared_storage);
     } else if (BLOCK_SHAPE_KV == 32) {
       mma_f16_two_stages<Ktraits, CAUSAL>(
-        mainloop_params, 
-        pipeline_q, 
+        mainloop_params,
+        pipeline_q,
         smem_pipe_read_q,
-        pipeline_kv, 
+        pipeline_kv,
         smem_pipe_read_kv,
-        tOrO, 
+        tOrO,
         attention_updater,
         threadIdx.x - NUM_COPY_THREADS,
         bid,
@@ -313,11 +316,11 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
     }
 
     collective_epilogue.store(
-        epilogue_params, 
-        tOrO, 
+        epilogue_params,
+        tOrO,
         attention_updater.get_lse(),
         shared_storage,
-        tiled_mma_pv, 
+        tiled_mma_pv,
         threadIdx.x - NUM_COPY_THREADS,
         bid,
         mainloop_params.bsz,
@@ -439,15 +442,15 @@ cudaError_t BatchMLAWithPagedKVCacheDispatched(Params& params, cudaStream_t stre
     if (params.block_size == 32) {
       DISPATCH_GROUP_SIZE(params.q_num_head, GROUP_SIZE,
         BatchMLAWithPagedKVCacheKernelTraitsDispatched<
-            AttentionKernelTraits</*USE_TMA_LOAD_KV=*/true, 
-                                  HEAD_DIM_QK, 
-                                  HEAD_DIM_VO, 
+            AttentionKernelTraits</*USE_TMA_LOAD_KV=*/true,
+                                  HEAD_DIM_QK,
+                                  HEAD_DIM_VO,
                                   GROUP_SIZE,
                                   /*BLOCK_SHAPE_Q_=*/64,
                                   /*BLOCK_SHAPE_KV_=*/32,
-                                  /*NUM_STAGES_=*/4, 
+                                  /*NUM_STAGES_=*/4,
                                   typename Params::DTypeQ,
-                                  typename Params::DTypeKV, 
+                                  typename Params::DTypeKV,
                                   typename Params::DTypeO,
                                   typename Params::IdType,
                                   NV_TYPE>,
@@ -457,15 +460,15 @@ cudaError_t BatchMLAWithPagedKVCacheDispatched(Params& params, cudaStream_t stre
     } else if (params.block_size == 64) {
       DISPATCH_GROUP_SIZE(params.q_num_head, GROUP_SIZE,
         BatchMLAWithPagedKVCacheKernelTraitsDispatched<
-            AttentionKernelTraits</*USE_TMA_LOAD_KV=*/true, 
-                                  HEAD_DIM_QK, 
-                                  HEAD_DIM_VO, 
+            AttentionKernelTraits</*USE_TMA_LOAD_KV=*/true,
+                                  HEAD_DIM_QK,
+                                  HEAD_DIM_VO,
                                   GROUP_SIZE,
                                   /*BLOCK_SHAPE_Q_=*/64,
                                   /*BLOCK_SHAPE_KV_=*/64,
-                                  /*NUM_STAGES_=*/2, 
+                                  /*NUM_STAGES_=*/2,
                                   typename Params::DTypeQ,
-                                  typename Params::DTypeKV, 
+                                  typename Params::DTypeKV,
                                   typename Params::DTypeO,
                                   typename Params::IdType,
                                   NV_TYPE>,
