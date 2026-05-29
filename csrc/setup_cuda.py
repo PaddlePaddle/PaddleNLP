@@ -194,9 +194,7 @@ if cc == 89 and cuda_version >= 12.4:
 if cc >= 80 and nvcc_version >= Version("12.4"):
     os.environ.pop('PADDLE_CUDA_ARCH_LIST', None)
     nvcc_compile_args += [
-        "-std=c++17",
         "--use_fast_math",
-        "--threads=8",
         "-D_GLIBCXX_USE_CXX11_ABI=1",
     ]
     sources += ["./gpu/sage_attn_kernels/sageattn_fused.cu"]
@@ -235,7 +233,7 @@ setup(
     ext_modules=CUDAExtension(
         sources=sources,
         extra_compile_args={
-            "cxx": ["-O3", "-fopenmp", "-lgomp", "-std=c++17", "-DENABLE_BF16"],
+            "cxx": ["-O3", "-fopenmp", "-lgomp", "-std=c++17", "-DENABLE_BF16", "--threads=8"],
             "nvcc": nvcc_compile_args,
         },
         libraries=["cublasLt"],
