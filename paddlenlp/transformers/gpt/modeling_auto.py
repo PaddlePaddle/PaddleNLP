@@ -692,6 +692,7 @@ class GPTEmbeddingsAuto(nn.Layer):
             embeddings = dist.reshard(embeddings, get_mesh(), [dist.Shard(0), dist.Replicate()])
         with seed_guard_context(current_seed):
             embeddings = self.dropout(embeddings)
+        embeddings = dist.reshard(embeddings, get_mesh(), [dist.Replicate(), dist.Replicate()])
         return embeddings
 
 
@@ -1183,7 +1184,7 @@ class GPTLMHeadAuto(nn.Layer):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
-        y = dist.reshard(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)])
+        y = dist.reshard(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(1)])
         logits = paddle.matmul(hidden_states, y, transpose_y=self.transpose_y)
         return logits
 
