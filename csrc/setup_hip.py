@@ -13,7 +13,8 @@
 # limitations under the License.
 
 import subprocess
-
+import os
+import wget
 from paddle.utils.cpp_extension import CUDAExtension, setup
 
 
@@ -24,8 +25,21 @@ def update_git_submodule():
         print(f"Error occurred while updating git submodule: {str(e)}")
         raise
 
+def download_paged_attn_lib():
+    try:
+        save_path = "./build"
+        lib_name = "libpaged_att.so"
+        url = "https://ai-rank.bj.bcebos.com/DCU/" + lib_name
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        if os.path.exists(os.path.join(save_path, lib_name)):
+            os.remove(os.path.join(save_path, lib_name))
+        wget.download(url, save_path)
+    except Exception as e:
+        print(f"Error occurred while download paged_att.so: {str(e)}")
+        raise
 
 update_git_submodule()
+download_paged_attn_lib()
 setup(
     name="paddlenlp_ops",
     ext_modules=CUDAExtension(
@@ -55,6 +69,7 @@ setup(
             "./gpu/flash_attn_bwd.cc",
             "./gpu/update_inputs_v2.cu",
             "./gpu/set_preids_token_penalty_multi_scores.cu",
+            "./gpu/paged_attention.cc"
         ],
         extra_compile_args={
             "cxx": ["-O3"],
@@ -71,5 +86,7 @@ setup(
                 "-Ithird_party/nlohmann_json/single_include",
             ],
         },
+        libraries=["paged_att"],
+        library_dirs=["./build"],
     ),
 )

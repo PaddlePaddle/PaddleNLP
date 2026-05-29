@@ -155,12 +155,14 @@ public:
   typedef paddle::bfloat16 data_t;
 };
 
+#ifndef PADDLE_WITH_HIP
 template <>
 class PDTraits<paddle::DataType::FLOAT8_E4M3FN> {
 public:
   typedef __nv_fp8_e4m3 DataType;
   typedef paddle::float8_e4m3fn data_t;
 };
+#endif
 
 template <>
 class PDTraits<paddle::DataType::INT8> {
