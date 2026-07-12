@@ -29,10 +29,10 @@ Welcome to PaddleNLP
 .. toctree::
    :maxdepth: 1
    :caption: Model Library List
-   
+
    Introduction to Popular Models <hot_model.md>
    Model Library List <model_list.rst>
-   
+
 
 .. toctree::
    :maxdepth: 1
@@ -46,7 +46,7 @@ Welcome to PaddleNLP
 .. toctree::
    :maxdepth: 1
    :caption: Paddle LLM Training
-   
+
    Paddle LLM Main Documentation <llm/README.md>
    LLM - Pre-training Documentation <llm/docs/pretrain.rst>
    LLM - Fine-tuning Documentation <llm/docs/finetune.md>
@@ -150,7 +150,7 @@ Welcome to PaddleNLP
 .. toctree::
    :maxdepth: 1
    :caption: API Reference
-   
+
    paddlenlp.data <source/paddlenlp.data>
    paddlenlp.datasets <source/paddlenlp.datasets>
    paddlenlp.embeddings <source/paddlenlp.embeddings>
