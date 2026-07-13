@@ -180,7 +180,7 @@ class MetricsDumper(object):
                     break
                 with open(self.filename, "a") as writer:
                     writer.write(json.dumps(metrics) + "\n")
-            except:
+            except Exception:
                 continue
 
     def _signal_handler(self, sig, frame):
