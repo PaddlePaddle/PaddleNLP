@@ -224,6 +224,7 @@ def upload_file_splitter(
 
 @router.get("/files")
 def download_file(file_name: str = "1fc0aeac9900487a8c6cec8dda6499bd_demo_1.png"):
+    file_name = os.path.basename(file_name)
     file_path = os.path.join(FILE_PARSE_PATH, file_name)
     if os.path.exists(file_path):
         return FileResponse(file_path)
