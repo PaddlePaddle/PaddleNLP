@@ -46,12 +46,12 @@ from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
 try:
     from paddle.distributed.fleet.meta_parallel import PipelineDatasetPreprocessor
-except:
+except ImportError:
     PipelineDatasetPreprocessor = None
 
 try:
     from paddle.base import core
-except:
+except ImportError:
     core = None
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
@@ -67,12 +67,12 @@ try:
     )
 
     _obtain_optimizer_parameters_list = obtain_optimizer_parameters_list
-except:
+except ImportError:
     try:
         from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
             _obtain_optimizer_parameters_list,
         )
-    except:
+    except ImportError:
         _obtain_optimizer_parameters_list = None
 
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
@@ -106,7 +106,7 @@ try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
         register_sequence_parallel_allreduce_hooks,
     )
-except:
+except ImportError:
     pass
 
 from ..transformers.context_parallel_utils import split_inputs_sequence_dim_load_balance
