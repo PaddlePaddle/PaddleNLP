@@ -73,6 +73,16 @@ if stream:
 else:
     print(completion.choices[0].message.content)
 ```
+
+The same OpenAI client pattern works against any OpenAI-compatible multi-model gateway. For example, point `base_url` at DaoXE (`https://api.daoxe.com/v1`) and use a key/model id issued by that endpoint:
+
+```python
+client = OpenAI(
+    api_key="YOUR_DAOXE_KEY",
+    base_url="https://api.daoxe.com/v1",
+)
+```
+
 3. You can also refer to the script invocation using the ./predict/request_flask_server.py file.
 ```bash
 # Under the PaddleNLP/llm directory
