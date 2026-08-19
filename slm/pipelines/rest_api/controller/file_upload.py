@@ -224,7 +224,18 @@ def upload_file_splitter(
 
 @router.get("/files")
 def download_file(file_name: str = "1fc0aeac9900487a8c6cec8dda6499bd_demo_1.png"):
-    file_path = os.path.join(FILE_PARSE_PATH, file_name)
-    if os.path.exists(file_path):
-        return FileResponse(file_path)
+    if not file_name or file_name in (".", "..") or "/" in file_name or "\\" in file_name or ".." in file_name:
+        raise HTTPException(status_code=400, detail="Invalid file name")
+
+    file_name = os.path.basename(file_name)
+    if not file_name or file_name in (".", ".."):
+        raise HTTPException(status_code=400, detail="Invalid file name")
+
+    abs_base = os.path.abspath(FILE_PARSE_PATH)
+    abs_target = os.path.abspath(os.path.join(FILE_PARSE_PATH, file_name))
+    if not abs_target.startswith(abs_base + os.sep):
+        raise HTTPException(status_code=400, detail="Invalid file name")
+
+    if os.path.exists(abs_target) and os.path.isfile(abs_target):
+        return FileResponse(abs_target)
     return {"message": "File not Found"}
