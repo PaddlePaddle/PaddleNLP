@@ -1,7 +1,6 @@
 import os
 import json
 import re
-import random
 from tqdm import tqdm
 import time
 from datasets import load_dataset
@@ -9,7 +8,6 @@ import argparse
 import requests
 
 API_KEY = ""
-random.seed(12345)
 
 def get_client():
     if args.model_name in ["gpt-4", "gpt-4o", "o1-preview"]:
@@ -299,11 +297,7 @@ def update_result(output_res_path):
                         if category not in category_record:
                             category_record[category] = {"corr": 0.0, "wrong": 0.0}
                         if not each["pred"]:
-                            x = random.randint(0, len(each["options"]) - 1)
-                            if x == each["answer_index"]:
-                                category_record[category]["corr"] += 1
-                            else:
-                                category_record[category]["wrong"] += 1
+                            category_record[category]["wrong"] += 1
                         elif each["pred"] == each["answer"]:
                             category_record[category]["corr"] += 1
                         else:
