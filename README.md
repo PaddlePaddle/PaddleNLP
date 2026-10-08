@@ -281,7 +281,7 @@ trainer.train()
 如果 PaddleNLP 对您的研究有帮助，欢迎引用
 
 ```bibtex
-@misc{=paddlenlp,
+@misc{paddlenlp,
     title={PaddleNLP: An Easy-to-use and High Performance NLP Library},
     author={PaddleNLP Contributors},
     howpublished = {\url{https://github.com/PaddlePaddle/PaddleNLP}},

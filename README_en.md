@@ -151,7 +151,7 @@ Scan the QR code below with your Wechat⬇️. You can access to official techni
 If you find PaddleNLP useful in your research, please consider citing
 
 ```bibtext
-@misc{=paddlenlp,
+@misc{paddlenlp,
     title={PaddleNLP: An Easy-to-use and High Performance NLP Library},
     author={PaddleNLP Contributors},
     howpublished = {\url{https://github.com/PaddlePaddle/PaddleNLP}},
