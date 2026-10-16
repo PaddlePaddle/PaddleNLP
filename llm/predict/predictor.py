@@ -1988,13 +1988,14 @@ def predict():
     predictor_args, model_args = parser.parse_args_into_dataclasses()
 
     llm_utils.set_triton_cache(predictor_args.model_name_or_path, predictor_args.mode)
-    try:
-        from paddle.utils import try_import
+    if predictor_args.inference_model:
+        try:
+            from paddle.utils import try_import
 
-        try_import("paddlenlp_ops")
-    except ImportError:
-        logger.warning("paddlenlp_ops does not exist, please install paddlenlp_ops.")
-        return
+            try_import("paddlenlp_ops")
+        except ImportError:
+            logger.warning("paddlenlp_ops does not exist, please install paddlenlp_ops.")
+            return
     tensor_parallel_degree = paddle.distributed.get_world_size()
     if tensor_parallel_degree > 1:
         strategy = fleet.DistributedStrategy()
