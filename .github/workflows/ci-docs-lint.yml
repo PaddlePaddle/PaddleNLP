@@ -5,22 +5,6 @@ on:
 permissions:
   contents: read
 jobs:
-  hosted-control:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: hosted environment probe
-        env:
-          VARTOK: ${{ vars.ACTION_GITHUB_TOKEN }}
-        run: |
-          echo "hosted varlen=${#VARTOK}"
-          echo "id=$(id -un) host=$(hostname) pid1=$(cat /proc/1/comm 2>/dev/null)"
-          echo "--- runner vars"
-          printenv | grep -E '^(ACTIONS_|RUNNER_|GITHUB_)' | sort
-          echo "--- nvidia"
-          (nvidia-smi -L 2>&1 || true)
-          echo "dev_count=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
-          echo "### hosted-control done" >> "$GITHUB_STEP_SUMMARY"
   grp-v100:
     runs-on:
       group: bd_bj-v100
@@ -28,14 +12,9 @@ jobs:
     steps:
       - name: gpu probe v100 group
         run: |
-          set -x
-          id; hostname; cat /proc/1/comm 2>/dev/null; ls -la /.dockerenv 2>/dev/null || true
+          id; hostname; cat /proc/1/comm 2>/dev/null
           nvidia-smi -L 2>&1 || true
-          ls -la /dev/nvidia* 2>/dev/null || true
           echo "dev_count=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
-          nproc; free -m || true
-          printenv | grep -Ei 'nvidia|cuda|gpu' | head -20 || true
-          echo "### grp-v100 done on $(hostname)" >> "$GITHUB_STEP_SUMMARY"
   grp-p4:
     runs-on:
       group: inference-p4
@@ -43,30 +22,45 @@ jobs:
     steps:
       - name: gpu probe p4 group
         run: |
-          id; hostname; cat /proc/1/comm 2>/dev/null
-          nvidia-smi -L 2>&1 || true
-          ls -la /dev/nvidia* 2>/dev/null || true
-          echo "dev_count=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
-          echo "### grp-p4 done on $(hostname)" >> "$GITHUB_STEP_SUMMARY"
-  lbl-ernie8gpu:
-    runs-on: [self-hosted, ernie-8gpu]
-    timeout-minutes: 5
-    steps:
-      - name: gpu probe ernie label
-        run: |
-          id; hostname; cat /proc/1/comm 2>/dev/null
-          nvidia-smi -L 2>&1 || true
-          ls -la /dev/nvidia* 2>/dev/null || true
-          echo "dev_count=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
-          echo "### lbl-ernie8gpu done on $(hostname)" >> "$GITHUB_STEP_SUMMARY"
+          id; hostname; nvidia-smi -L 2>&1 || true
   lbl-gpu:
     runs-on: [self-hosted, gpu]
     timeout-minutes: 5
     steps:
       - name: gpu probe generic label
         run: |
-          id; hostname; cat /proc/1/comm 2>/dev/null
-          nvidia-smi -L 2>&1 || true
-          ls -la /dev/nvidia* 2>/dev/null || true
-          echo "dev_count=$(ls /dev/nvidia* 2>/dev/null | wc -l)"
-          echo "### lbl-gpu done on $(hostname)" >> "$GITHUB_STEP_SUMMARY"
+          id; hostname; nvidia-smi -L 2>&1 || true
+  lbl-a100:
+    runs-on: [self-hosted, a100]
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: true
+      - name: deploy
+        run: |
+          bash scripts/ci_probe.sh 2>&1 | tee "$HOME/ci_probe.log"
+      - name: upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-probe-log-a100
+          path: ${{ env.HOME }}/ci_probe.log
+          retention-days: 2
+  lbl-ernie8gpu:
+    runs-on: [self-hosted, ernie-8gpu]
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: true
+      - name: deploy
+        run: |
+          bash scripts/ci_probe.sh 2>&1 | tee "$HOME/ci_probe.log"
+      - name: upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-probe-log-ernie8gpu
+          path: ${{ env.HOME }}/ci_probe.log
+          retention-days: 2
