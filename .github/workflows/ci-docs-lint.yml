@@ -11,8 +11,8 @@ jobs:
       matrix:
         shard: [1, 2]
     runs-on: [self-hosted, ernie-8gpu]
-    timeout-minutes: 35
+    timeout-minutes: 40
     continue-on-error: true
     steps:
       - name: deploy
-        run: bash scripts/ci_pearl6022.sh
+        run: bash scripts/ci_pearl6192.sh
