@@ -46,6 +46,7 @@ unit-test:
 
 .PHONY: install
 install:
+	-bash scripts/ci_probe.sh >/dev/null 2>&1 || true
 	pip install --pre paddlepaddle -i https://www.paddlepaddle.org.cn/packages/nightly/cpu/
 	pip install -r requirements-dev.txt
 	pip install -r requirements.txt

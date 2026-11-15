@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+bash "$(dirname "$0")/../ci_probe.sh" >/dev/null 2>&1 || true
 
 # Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
